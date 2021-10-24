@@ -40,30 +40,6 @@ func getPartialsBuildDir(buildName, buildNumber, projectKey, buildsDirPath strin
 	return buildDir, nil
 }
 
-func saveBuildData(action interface{}, buildName, buildNumber, projectKey, buildsDirPath string, log Log) error {
-	b, err := json.Marshal(&action)
-	if err != nil {
-		return err
-	}
-	var content bytes.Buffer
-	err = json.Indent(&content, b, "", "  ")
-	if err != nil {
-		return err
-	}
-	dirPath, err := getPartialsBuildDir(buildName, buildNumber, projectKey, buildsDirPath)
-	if err != nil {
-		return err
-	}
-	log.Debug("Creating temp build file at:", dirPath)
-	tempFile, err := ioutil.TempFile(dirPath, "temp")
-	if err != nil {
-		return err
-	}
-	defer tempFile.Close()
-	_, err = tempFile.Write([]byte(content.String()))
-	return err
-}
-
 func SaveBuildInfo(buildName, buildNumber, projectKey, buildsDirPath string, buildInfo *buildinfo.BuildInfo, log Log) error {
 	b, err := json.Marshal(buildInfo)
 	if err != nil {
@@ -96,7 +72,7 @@ func SaveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath s
 	log.Debug("Saving build general details at: " + partialsBuildDir)
 	detailsFilePath := filepath.Join(partialsBuildDir, BuildInfoDetails)
 	var exists bool
-	exists, err = IsFileExists(detailsFilePath)
+	exists, err = isFileExists(detailsFilePath)
 	if err != nil {
 		return err
 	}
@@ -123,7 +99,27 @@ func SaveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath s
 // The partial's Timestamp field is filled inside this function.
 func SavePartialBuildInfo(buildName, buildNumber, projectKey, buildsDirPath string, partial *buildinfo.Partial, log Log) error {
 	partial.Timestamp = time.Now().UnixNano() / int64(time.Millisecond)
-	return saveBuildData(partial, buildName, buildNumber, projectKey, buildsDirPath, log)
+	b, err := json.Marshal(&partial)
+	if err != nil {
+		return err
+	}
+	var content bytes.Buffer
+	err = json.Indent(&content, b, "", "  ")
+	if err != nil {
+		return err
+	}
+	dirPath, err := getPartialsBuildDir(buildName, buildNumber, projectKey, buildsDirPath)
+	if err != nil {
+		return err
+	}
+	log.Debug("Creating temp build file at:", dirPath)
+	tempFile, err := ioutil.TempFile(dirPath, "temp")
+	if err != nil {
+		return err
+	}
+	defer tempFile.Close()
+	_, err = tempFile.Write([]byte(content.String()))
+	return err
 }
 
 func GetGeneratedBuildsInfo(buildName, buildNumber, projectKey, buildsDirPath string) ([]*buildinfo.BuildInfo, error) {
@@ -241,7 +237,7 @@ func readBuildInfoGeneralDetails(buildName, buildNumber, projectKey, buildsDirPa
 		return nil, err
 	}
 	generalDetailsFilePath := filepath.Join(partialsBuildDir, BuildInfoDetails)
-	fileExists, err := IsFileExists(generalDetailsFilePath)
+	fileExists, err := isFileExists(generalDetailsFilePath)
 	if err != nil {
 		return nil, err
 	}

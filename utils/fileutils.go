@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func IsFileExists(path string) (bool, error) {
+func isFileExists(path string) (bool, error) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) { // If doesn't exist, don't omit an error
@@ -40,7 +40,7 @@ func listFiles(path string) ([]string, error) {
 
 	for _, f := range files {
 		filePath := path + f.Name()
-		exists, err := IsFileExists(filePath)
+		exists, err := isFileExists(filePath)
 		if err != nil {
 			return nil, err
 		}
