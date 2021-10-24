@@ -1,0 +1,17 @@
+# IDEs
+.idea
+.vscode
+*.iml
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# build-info-go executable
+build-info-go
+build-info-go.exe
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
