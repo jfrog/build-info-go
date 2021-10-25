@@ -15,7 +15,6 @@ type GoModule struct {
 	srcPath         string
 }
 
-// Pass srcPath an empty string to find the Go project in the working directory.
 func newGoModule(srcPath string, containingBuild *Build) (*GoModule, error) {
 	log.SetLogger(containingBuild.logger)
 

@@ -60,6 +60,7 @@ func (b *Build) SetBuildUrl(buildUrl string) {
 	b.buildUrl = buildUrl
 }
 
+// Pass srcPath an empty string to find the Go project in the working directory.
 func (b *Build) AddGoModule(srcPath string) (*GoModule, error) {
 	return newGoModule(srcPath, b)
 }
