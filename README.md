@@ -1,8 +1,3 @@
-| Branch |                                                                                          Status                                                                                           |
-| :----: | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-|  main  | [![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml?query=branch%3Amain) |
-|  dev   | [![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg?branch=dev)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml?query=branch%3Adev)   |
-
 # build-info-go
 
 ## Overview
