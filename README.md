@@ -32,6 +32,8 @@ service := build.NewBuildInfoService()
 bld, err := service.GetOrCreateBuild(buildName, buildNumber)
 ```
 
+It's important to invoke this function at the very beginning of the build, so that the start time property in the build-info will be accurate.
+
 ### Collecting Build-Info for Go Projects
 
 After you [created a Build](#creating-a-new-build), you can create a new Go build-info module for your Go project and collect its dependencies:
@@ -48,7 +50,7 @@ artifact := entities.Artifact{Name: "v1.0.0.mod", Type: "mod", Checksum: &entiti
 err = goModule.AddArtifacts(artifact)
 ```
 
-### Get a Final BuildInfo
+### Get the Final BuildInfo
 
 Using the `ToBuildInfo()` function you can create a final BuildInfo struct with all the information you collected:
 
