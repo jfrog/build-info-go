@@ -12,6 +12,8 @@
 # build-info-go executable
 build-info-go
 build-info-go.exe
+bi
+bi.exe
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
