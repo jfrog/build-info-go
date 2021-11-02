@@ -3,8 +3,8 @@ package build
 import (
 	"github.com/jfrog/build-info-go/entities"
 	buildutils "github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/stringutils"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -60,7 +60,7 @@ func (b *Build) SetBuildUrl(buildUrl string) {
 	b.buildUrl = buildUrl
 }
 
-// Pass srcPath an empty string to find the Go project in the working directory.
+// AddGoModule adds a Go module to this Build. Pass srcPath as an empty string if the root of the Go project is the working directory.
 func (b *Build) AddGoModule(srcPath string) (*GoModule, error) {
 	return newGoModule(srcPath, b)
 }
@@ -77,22 +77,18 @@ func (b *Build) CollectEnv() error {
 	return buildutils.SavePartialBuildInfo(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath, partial, b.logger)
 }
 
+// IncludeEnv sets one or more wildcard patterns, indicating which environment variables should be picked up and added to the build-info.
 func (b *Build) IncludeEnv(patterns ...string) error {
 	if len(patterns) == 0 {
 		b.includeFilter = nil
 		return nil
 	}
 
-	err := validateFilePatterns(patterns)
-	if err != nil {
-		return err
-	}
-
 	b.includeFilter = func(tempMap map[string]string) (map[string]string, error) {
 		result := make(map[string]string)
 		for k, v := range tempMap {
 			for _, filterPattern := range patterns {
-				matched, err := filepath.Match(strings.ToLower(filterPattern), strings.ToLower(strings.TrimPrefix(k, BuildInfoEnvPrefix)))
+				matched, err := stringutils.MatchWildcardPattern(strings.ToLower(filterPattern), strings.ToLower(strings.TrimPrefix(k, BuildInfoEnvPrefix)))
 				if err != nil {
 					return nil, err
 				}
@@ -108,15 +104,11 @@ func (b *Build) IncludeEnv(patterns ...string) error {
 	return nil
 }
 
+// ExcludeEnv sets one or more wildcard patterns, indicating which environment variables to exclude from the build-info.
 func (b *Build) ExcludeEnv(patterns ...string) error {
 	if len(patterns) == 0 {
 		b.excludeFilter = nil
 		return nil
-	}
-
-	err := validateFilePatterns(patterns)
-	if err != nil {
-		return err
 	}
 
 	b.excludeFilter = func(tempMap map[string]string) (map[string]string, error) {
@@ -124,7 +116,7 @@ func (b *Build) ExcludeEnv(patterns ...string) error {
 		for k, v := range tempMap {
 			include := true
 			for _, filterPattern := range patterns {
-				matched, err := filepath.Match(strings.ToLower(filterPattern), strings.ToLower(strings.TrimPrefix(k, BuildInfoEnvPrefix)))
+				matched, err := stringutils.MatchWildcardPattern(strings.ToLower(filterPattern), strings.ToLower(strings.TrimPrefix(k, BuildInfoEnvPrefix)))
 				if err != nil {
 					return nil, err
 				}
@@ -140,16 +132,6 @@ func (b *Build) ExcludeEnv(patterns ...string) error {
 		return result, nil
 	}
 
-	return nil
-}
-
-func validateFilePatterns(patterns []string) error {
-	for _, filterPattern := range patterns {
-		_, err := filepath.Match(strings.ToLower(filterPattern), "")
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

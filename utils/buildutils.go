@@ -73,11 +73,8 @@ func SaveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath s
 	detailsFilePath := filepath.Join(partialsBuildDir, BuildInfoDetails)
 	var exists bool
 	exists, err = isFileExists(detailsFilePath)
-	if err != nil {
+	if err != nil || exists {
 		return err
-	}
-	if exists {
-		return nil
 	}
 	meta := buildinfo.General{
 		Timestamp: time.Now(),
@@ -91,12 +88,11 @@ func SaveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath s
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(detailsFilePath, []byte(content.String()), 0600)
-	return err
+	return ioutil.WriteFile(detailsFilePath, []byte(content.String()), 0600)
 }
 
 // SavePartialBuildInfo saves the given partial in the builds directory.
-// The partial's Timestamp field is filled inside this function.
+// The partial's Timestamp field is set inside this function.
 func SavePartialBuildInfo(buildName, buildNumber, projectKey, buildsDirPath string, partial *buildinfo.Partial, log Log) error {
 	partial.Timestamp = time.Now().UnixNano() / int64(time.Millisecond)
 	b, err := json.Marshal(&partial)
@@ -210,10 +206,7 @@ func readPartialBuildInfoFiles(buildName, buildNumber, projectKey, buildsDirPath
 		if err != nil {
 			return nil, err
 		}
-		if dir {
-			continue
-		}
-		if strings.HasSuffix(buildFile, BuildInfoDetails) {
+		if dir || strings.HasSuffix(buildFile, BuildInfoDetails) {
 			continue
 		}
 		content, err := ioutil.ReadFile(buildFile)

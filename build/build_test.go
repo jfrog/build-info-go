@@ -36,13 +36,6 @@ func TestCollectEnv(t *testing.T) {
 			},
 			expectError: false,
 		},
-		{
-			description: "invalid pattern",
-			include:     []string{"BI_TEST_[*"},
-			exclude:     nil,
-			expected:    nil,
-			expectError: true,
-		},
 	}
 
 	env := entities.Env{

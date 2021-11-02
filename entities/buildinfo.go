@@ -119,7 +119,7 @@ type BuildInfo struct {
 	VcsList                  []Vcs    `json:"vcs,omitempty"`
 }
 
-// Represents the object returned from Artifactory when getting a build info.
+// PublishedBuildInfo represents the response structure returned from Artifactory when getting a build-info.
 type PublishedBuildInfo struct {
 	Uri       string    `json:"uri,omitempty"`
 	BuildInfo BuildInfo `json:"buildInfo,omitempty"`
