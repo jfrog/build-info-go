@@ -1,4 +1,4 @@
-package commands
+package cli
 
 import (
 	"bytes"
@@ -15,37 +15,42 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			Name:      "go",
 			Usage:     "collect build-info for a Go project",
 			UsageText: "bi go",
-			Action: func(context *clitool.Context) error {
+			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
 				service.SetLogger(logger)
 				bld, err := service.GetOrCreateBuild("", "")
 				if err != nil {
-					return err
+					return
 				}
-				defer bld.Clean()
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
 				goModule, err := bld.AddGoModule("")
 				if err != nil {
-					return err
+					return
 				}
 				err = goModule.CalcDependencies()
 				if err != nil {
-					return err
+					return
 				}
 				buildInfo, err := bld.ToBuildInfo()
 				if err != nil {
-					return err
+					return
 				}
 				b, err := json.Marshal(buildInfo)
 				if err != nil {
-					return err
+					return
 				}
 				var content bytes.Buffer
 				err = json.Indent(&content, b, "", "  ")
 				if err != nil {
-					return err
+					return
 				}
 				fmt.Println(content.String())
-				return nil
+				return
 			},
 		},
 	}
