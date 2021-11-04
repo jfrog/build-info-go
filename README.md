@@ -7,6 +7,7 @@
 - [Go APIs](#go-apis)
   - [Creating a New Build](#creating-a-new-build)
   - [Generating Build-Info for Go Projects](#generating-build-info-for-go-projects)
+  - [Collecting Environment Variables](#collecting-environment-variables)
   - [Get the Complete Build-Info](#get-the-complete-build-info)
   - [Clean the Build Cache](#clean-the-build-cache)
 - [Tests](#tests)
@@ -48,8 +49,21 @@ err = goModule.CalcDependencies()
 You can also add artifacts to that module:
 
 ```go
-artifact := entities.Artifact{Name: "v1.0.0.mod", Type: "mod", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
-err = goModule.AddArtifacts(artifact)
+artifact1 := entities.Artifact{Name: "v1.0.0.mod", Type: "mod", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
+err = goModule.AddArtifacts(artifact1, artifact2, ...)
+```
+
+### Collecting Environment Variables
+
+Using `CollectEnv()` you can collect environment variables and attach them to the build.
+
+After calling `ToBuildInfo()` ([see below](#get-the-complete-build-info)), you can also filter the environment variables using the `IncludeEnv()` and `ExcludeEnv()` methods of BuildInfo.
+
+```go
+err := bld.CollectEnv()
+buildInfo, err := bld.ToBuildInfo()
+err = buildInfo.IncludeEnv("ENV_VAR", "JFROG_CLI_*")
+err = buildInfo.ExcludeEnv("*password*", "*secret*", "*token*")
 ```
 
 ### Get the Complete Build-Info
@@ -58,6 +72,7 @@ Using the `ToBuildInfo()` method you can create a complete BuildInfo struct with
 
 ```go
 buildInfo, err := bld.ToBuildInfo()
+err = bld.Clean()
 ```
 
 ### Clean the Build Cache

@@ -58,15 +58,15 @@ func TestCollectEnv(t *testing.T) {
 			build, err := service.GetOrCreateBuild("bi-test", "1")
 			assert.NoError(t, err)
 			assert.NoError(t, build.CollectEnv())
-			err = build.IncludeEnv(tc.include...)
+			buildInfo, err := build.ToBuildInfo()
+			assert.NoError(t, err)
+			err = buildInfo.IncludeEnv(tc.include...)
 			if tc.expectError {
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
-			err = build.ExcludeEnv(tc.exclude...)
-			assert.NoError(t, err)
-			buildInfo, err := build.ToBuildInfo()
+			err = buildInfo.ExcludeEnv(tc.exclude...)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expected, buildInfo.Properties)
 			err = build.Clean()

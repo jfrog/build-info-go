@@ -3,26 +3,21 @@ package build
 import (
 	"github.com/jfrog/build-info-go/entities"
 	buildutils "github.com/jfrog/build-info-go/utils"
-	"github.com/jfrog/gofrog/stringutils"
 	"os"
 	"strings"
 )
 
-const BuildInfoEnvPrefix = "buildInfo.env."
-
 type Build struct {
-	buildName            string
-	buildNumber          string
-	projectKey           string
-	tempDirPath          string
-	logger               buildutils.Log
-	includeFilter        buildutils.Filter
-	excludeFilter        buildutils.Filter
-	agentName            string
-	agentVersion         string
-	buildAgentVersion    string
-	artifactoryPrincipal string
-	buildUrl             string
+	buildName         string
+	buildNumber       string
+	projectKey        string
+	tempDirPath       string
+	logger            buildutils.Log
+	agentName         string
+	agentVersion      string
+	buildAgentVersion string
+	principal         string
+	buildUrl          string
 }
 
 func NewBuild(buildName, buildNumber, projectKey, tempDirPath string, logger buildutils.Log) *Build {
@@ -33,6 +28,22 @@ func NewBuild(buildName, buildNumber, projectKey, tempDirPath string, logger bui
 		tempDirPath: tempDirPath,
 		logger:      logger,
 	}
+}
+
+func (b *Build) BuildName() string {
+	return b.buildName
+}
+
+func (b *Build) BuildNumber() string {
+	return b.buildNumber
+}
+
+func (b *Build) ProjectKey() string {
+	return b.projectKey
+}
+
+func (b *Build) TempDirPath() string {
+	return b.tempDirPath
 }
 
 // This field is not saved in local cache. It is used only when creating a build-info using the ToBuildInfo() function.
@@ -51,8 +62,8 @@ func (b *Build) SetBuildAgentVersion(buildAgentVersion string) {
 }
 
 // This field is not saved in local cache. It is used only when creating a build-info using the ToBuildInfo() function.
-func (b *Build) SetArtifactoryPrincipal(artifactoryPrincipal string) {
-	b.artifactoryPrincipal = artifactoryPrincipal
+func (b *Build) SetPrincipal(principal string) {
+	b.principal = principal
 }
 
 // This field is not saved in local cache. It is used only when creating a build-info using the ToBuildInfo() function.
@@ -77,73 +88,15 @@ func (b *Build) CollectEnv() error {
 	return buildutils.SavePartialBuildInfo(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath, partial, b.logger)
 }
 
-// IncludeEnv sets one or more wildcard patterns, indicating which environment variables should be picked up and added to the build-info.
-func (b *Build) IncludeEnv(patterns ...string) error {
-	if len(patterns) == 0 {
-		b.includeFilter = nil
-		return nil
-	}
-
-	b.includeFilter = func(tempMap map[string]string) (map[string]string, error) {
-		result := make(map[string]string)
-		for k, v := range tempMap {
-			for _, filterPattern := range patterns {
-				matched, err := stringutils.MatchWildcardPattern(strings.ToLower(filterPattern), strings.ToLower(strings.TrimPrefix(k, BuildInfoEnvPrefix)))
-				if err != nil {
-					return nil, err
-				}
-				if matched {
-					result[k] = v
-					break
-				}
-			}
-		}
-		return result, nil
-	}
-
-	return nil
-}
-
-// ExcludeEnv sets one or more wildcard patterns, indicating which environment variables to exclude from the build-info.
-func (b *Build) ExcludeEnv(patterns ...string) error {
-	if len(patterns) == 0 {
-		b.excludeFilter = nil
-		return nil
-	}
-
-	b.excludeFilter = func(tempMap map[string]string) (map[string]string, error) {
-		result := make(map[string]string)
-		for k, v := range tempMap {
-			include := true
-			for _, filterPattern := range patterns {
-				matched, err := stringutils.MatchWildcardPattern(strings.ToLower(filterPattern), strings.ToLower(strings.TrimPrefix(k, BuildInfoEnvPrefix)))
-				if err != nil {
-					return nil, err
-				}
-				if matched {
-					include = false
-					break
-				}
-			}
-			if include {
-				result[k] = v
-			}
-		}
-		return result, nil
-	}
-
-	return nil
-}
-
 func (b *Build) ToBuildInfo() (*entities.BuildInfo, error) {
-	buildInfo, err := buildutils.CreateBuildInfoFromPartials(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath, b.includeFilter, b.excludeFilter)
+	buildInfo, err := buildutils.CreateBuildInfoFromPartials(b)
 	if err != nil {
 		return nil, err
 	}
 	buildInfo.SetAgentName(b.agentName)
 	buildInfo.SetAgentVersion(b.agentVersion)
 	buildInfo.SetBuildAgentVersion(b.buildAgentVersion)
-	buildInfo.ArtifactoryPrincipal = b.artifactoryPrincipal
+	buildInfo.Principal = b.principal
 	buildInfo.BuildUrl = b.buildUrl
 
 	generatedBuildsInfo, err := buildutils.GetGeneratedBuildsInfo(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath)
