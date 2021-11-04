@@ -1,13 +1,16 @@
 package entities
 
 import (
+	"github.com/jfrog/gofrog/stringutils"
+	"strings"
 	"time"
 )
 
 type ModuleType string
 
 const (
-	TimeFormat = "2006-01-02T15:04:05.000-0700"
+	TimeFormat         = "2006-01-02T15:04:05.000-0700"
+	BuildInfoEnvPrefix = "buildInfo.env."
 
 	// Build type
 	Build ModuleType = "build"
@@ -22,6 +25,21 @@ const (
 	Go      ModuleType = "go"
 	Pip     ModuleType = "pip"
 )
+
+type BuildInfo struct {
+	Name          string   `json:"name,omitempty"`
+	Number        string   `json:"number,omitempty"`
+	Agent         *Agent   `json:"agent,omitempty"`
+	BuildAgent    *Agent   `json:"buildAgent,omitempty"`
+	Modules       []Module `json:"modules,omitempty"`
+	Started       string   `json:"started,omitempty"`
+	Properties    Env      `json:"properties,omitempty"`
+	Principal     string   `json:"artifactoryPrincipal,omitempty"`
+	BuildUrl      string   `json:"url,omitempty"`
+	Issues        *Issues  `json:"issues,omitempty"`
+	PluginVersion string   `json:"artifactoryPluginVersion,omitempty"`
+	VcsList       []Vcs    `json:"vcs,omitempty"`
+}
 
 func New() *BuildInfo {
 	return &BuildInfo{
@@ -44,8 +62,8 @@ func (targetBuildInfo *BuildInfo) SetAgentVersion(agentVersion string) {
 	targetBuildInfo.Agent.Version = agentVersion
 }
 
-func (targetBuildInfo *BuildInfo) SetArtifactoryPluginVersion(artifactoryPluginVersion string) {
-	targetBuildInfo.ArtifactoryPluginVersion = artifactoryPluginVersion
+func (targetBuildInfo *BuildInfo) SetPluginVersion(pluginVersion string) {
+	targetBuildInfo.PluginVersion = pluginVersion
 }
 
 // Append the modules of the received build info to this build info.
@@ -65,6 +83,53 @@ func (targetBuildInfo *BuildInfo) Append(buildInfo *BuildInfo) {
 			targetBuildInfo.Modules = append(targetBuildInfo.Modules, newModule)
 		}
 	}
+}
+
+// IncludeEnv gets one or more wildcard patterns and filters out environment variables that don't match any of them.
+func (targetBuildInfo *BuildInfo) IncludeEnv(patterns ...string) error {
+	var err error
+	for key := range targetBuildInfo.Properties {
+		if !strings.HasPrefix(key, BuildInfoEnvPrefix) {
+			continue
+		}
+		envKey := strings.TrimPrefix(key, BuildInfoEnvPrefix)
+		include := false
+		for _, filterPattern := range patterns {
+			include, err = stringutils.MatchWildcardPattern(strings.ToLower(filterPattern), strings.ToLower(envKey))
+			if err != nil {
+				return err
+			}
+			if include {
+				break
+			}
+		}
+
+		if !include {
+			delete(targetBuildInfo.Properties, key)
+		}
+	}
+	return nil
+}
+
+// ExcludeEnv gets one or more wildcard patterns and filters out environment variables that match at least one of them.
+func (targetBuildInfo *BuildInfo) ExcludeEnv(patterns ...string) error {
+	for key := range targetBuildInfo.Properties {
+		if !strings.HasPrefix(key, BuildInfoEnvPrefix) {
+			continue
+		}
+		envKey := strings.TrimPrefix(key, BuildInfoEnvPrefix)
+		for _, filterPattern := range patterns {
+			match, err := stringutils.MatchWildcardPattern(strings.ToLower(filterPattern), strings.ToLower(envKey))
+			if err != nil {
+				return err
+			}
+			if match {
+				delete(targetBuildInfo.Properties, key)
+				break
+			}
+		}
+	}
+	return nil
 }
 
 // Merge the first module into the second module.
@@ -104,22 +169,7 @@ func mergeDependencies(mergeDependencies *[]Dependency, intoDependencies *[]Depe
 	}
 }
 
-type BuildInfo struct {
-	Name                     string   `json:"name,omitempty"`
-	Number                   string   `json:"number,omitempty"`
-	Agent                    *Agent   `json:"agent,omitempty"`
-	BuildAgent               *Agent   `json:"buildAgent,omitempty"`
-	Modules                  []Module `json:"modules,omitempty"`
-	Started                  string   `json:"started,omitempty"`
-	Properties               Env      `json:"properties,omitempty"`
-	ArtifactoryPrincipal     string   `json:"artifactoryPrincipal,omitempty"`
-	BuildUrl                 string   `json:"url,omitempty"`
-	Issues                   *Issues  `json:"issues,omitempty"`
-	ArtifactoryPluginVersion string   `json:"artifactoryPluginVersion,omitempty"`
-	VcsList                  []Vcs    `json:"vcs,omitempty"`
-}
-
-// Represents the object returned from Artifactory when getting a build info.
+// PublishedBuildInfo represents the response structure returned from Artifactory when getting a build-info.
 type PublishedBuildInfo struct {
 	Uri       string    `json:"uri,omitempty"`
 	BuildInfo BuildInfo `json:"buildInfo,omitempty"`

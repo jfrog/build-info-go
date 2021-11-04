@@ -12,7 +12,9 @@ func TestGenerateBuildInfoForGoProject(t *testing.T) {
 	service := build.NewBuildInfoService()
 	goBuild, err := service.GetOrCreateBuild("build-info-go-test", "1")
 	assert.NoError(t, err)
-	defer goBuild.Clean()
+	defer func() {
+		assert.NoError(t, goBuild.Clean())
+	}()
 	goModule, err := goBuild.AddGoModule(filepath.Join("testdata", "golang", "project"))
 	assert.NoError(t, err)
 	err = goModule.CalcDependencies()

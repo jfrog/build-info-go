@@ -15,7 +15,6 @@ type GoModule struct {
 	srcPath         string
 }
 
-// Pass srcPath an empty string to find the Go project in the working directory.
 func newGoModule(srcPath string, containingBuild *Build) (*GoModule, error) {
 	log.SetLogger(containingBuild.logger)
 
@@ -70,7 +69,7 @@ func (gm *GoModule) AddArtifacts(artifacts ...entities.Artifact) error {
 // Get the go project dependencies.
 func (gm *GoModule) createBuildInfoDependencies() error {
 	for i, dep := range gm.dependencies {
-		err := dep.CreateBuildInfoDependencies()
+		err := dep.PopulateZip()
 		if err != nil {
 			return err
 		}

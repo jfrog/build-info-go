@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jfrog/build-info-go/build"
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"io/ioutil"
 	"os"
@@ -40,28 +41,33 @@ func getPartialsBuildDir(buildName, buildNumber, projectKey, buildsDirPath strin
 	return buildDir, nil
 }
 
-func SaveBuildInfo(buildName, buildNumber, projectKey, buildsDirPath string, buildInfo *buildinfo.BuildInfo, log Log) error {
+func SaveBuildInfo(buildName, buildNumber, projectKey, buildsDirPath string, buildInfo *buildinfo.BuildInfo, log Log) (err error) {
 	b, err := json.Marshal(buildInfo)
 	if err != nil {
-		return err
+		return
 	}
 	var content bytes.Buffer
 	err = json.Indent(&content, b, "", "  ")
 	if err != nil {
-		return err
+		return
 	}
 	dirPath, err := getBuildDir(buildName, buildNumber, projectKey, buildsDirPath)
 	if err != nil {
-		return err
+		return
 	}
 	log.Debug("Creating temp build file at: " + dirPath)
 	tempFile, err := ioutil.TempFile(dirPath, "temp")
 	if err != nil {
-		return err
+		return
 	}
-	defer tempFile.Close()
+	defer func() {
+		e := tempFile.Close()
+		if err == nil {
+			err = e
+		}
+	}()
 	_, err = tempFile.Write([]byte(content.String()))
-	return err
+	return
 }
 
 func SaveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath string, log Log) error {
@@ -73,11 +79,8 @@ func SaveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath s
 	detailsFilePath := filepath.Join(partialsBuildDir, BuildInfoDetails)
 	var exists bool
 	exists, err = isFileExists(detailsFilePath)
-	if err != nil {
+	if err != nil || exists {
 		return err
-	}
-	if exists {
-		return nil
 	}
 	meta := buildinfo.General{
 		Timestamp: time.Now(),
@@ -91,35 +94,39 @@ func SaveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath s
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(detailsFilePath, []byte(content.String()), 0600)
-	return err
+	return ioutil.WriteFile(detailsFilePath, []byte(content.String()), 0600)
 }
 
 // SavePartialBuildInfo saves the given partial in the builds directory.
-// The partial's Timestamp field is filled inside this function.
-func SavePartialBuildInfo(buildName, buildNumber, projectKey, buildsDirPath string, partial *buildinfo.Partial, log Log) error {
+// The partial's Timestamp field is set inside this function.
+func SavePartialBuildInfo(buildName, buildNumber, projectKey, buildsDirPath string, partial *buildinfo.Partial, log Log) (err error) {
 	partial.Timestamp = time.Now().UnixNano() / int64(time.Millisecond)
 	b, err := json.Marshal(&partial)
 	if err != nil {
-		return err
+		return
 	}
 	var content bytes.Buffer
 	err = json.Indent(&content, b, "", "  ")
 	if err != nil {
-		return err
+		return
 	}
 	dirPath, err := getPartialsBuildDir(buildName, buildNumber, projectKey, buildsDirPath)
 	if err != nil {
-		return err
+		return
 	}
 	log.Debug("Creating temp build file at:", dirPath)
 	tempFile, err := ioutil.TempFile(dirPath, "temp")
 	if err != nil {
-		return err
+		return
 	}
-	defer tempFile.Close()
+	defer func() {
+		e := tempFile.Close()
+		if err == nil {
+			err = e
+		}
+	}()
 	_, err = tempFile.Write([]byte(content.String()))
-	return err
+	return
 }
 
 func GetGeneratedBuildsInfo(buildName, buildNumber, projectKey, buildsDirPath string) ([]*buildinfo.BuildInfo, error) {
@@ -155,22 +162,22 @@ func GetGeneratedBuildsInfo(buildName, buildNumber, projectKey, buildsDirPath st
 	return generatedBuildsInfo, nil
 }
 
-func CreateBuildInfoFromPartials(buildName, buildNumber, projectKey, buildsDirPath string, includeFilter, excludeFilter Filter) (*buildinfo.BuildInfo, error) {
-	partials, err := readPartialBuildInfoFiles(buildName, buildNumber, projectKey, buildsDirPath)
+func CreateBuildInfoFromPartials(bld *build.Build) (*buildinfo.BuildInfo, error) {
+	partials, err := readPartialBuildInfoFiles(bld.BuildName(), bld.BuildNumber(), bld.ProjectKey(), bld.TempDirPath())
 	if err != nil {
 		return nil, err
 	}
 	sort.Sort(partials)
 
 	buildInfo := buildinfo.New()
-	buildInfo.Name = buildName
-	buildInfo.Number = buildNumber
-	buildGeneralDetails, err := readBuildInfoGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath)
+	buildInfo.Name = bld.BuildName()
+	buildInfo.Number = bld.BuildNumber()
+	buildGeneralDetails, err := readBuildInfoGeneralDetails(bld.BuildName(), bld.BuildNumber(), bld.ProjectKey(), bld.TempDirPath())
 	if err != nil {
 		return nil, err
 	}
 	buildInfo.Started = buildGeneralDetails.Timestamp.Format(buildinfo.TimeFormat)
-	modules, env, vcsList, issues, err := extractBuildInfoData(partials, includeFilter, excludeFilter)
+	modules, env, vcsList, issues, err := extractBuildInfoData(partials)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +195,7 @@ func CreateBuildInfoFromPartials(buildName, buildNumber, projectKey, buildsDirPa
 	}
 	for _, module := range modules {
 		if module.Id == "" {
-			module.Id = buildName
+			module.Id = bld.BuildName()
 		}
 		buildInfo.Modules = append(buildInfo.Modules, module)
 	}
@@ -210,10 +217,7 @@ func readPartialBuildInfoFiles(buildName, buildNumber, projectKey, buildsDirPath
 		if err != nil {
 			return nil, err
 		}
-		if dir {
-			continue
-		}
-		if strings.HasSuffix(buildFile, BuildInfoDetails) {
+		if dir || strings.HasSuffix(buildFile, BuildInfoDetails) {
 			continue
 		}
 		content, err := ioutil.ReadFile(buildFile)
@@ -287,7 +291,7 @@ type partialModule struct {
 
 type Filter func(map[string]string) (map[string]string, error)
 
-func extractBuildInfoData(partials buildinfo.Partials, includeFilter, excludeFilter Filter) ([]buildinfo.Module, buildinfo.Env, []buildinfo.Vcs, buildinfo.Issues, error) {
+func extractBuildInfoData(partials buildinfo.Partials) ([]buildinfo.Module, buildinfo.Env, []buildinfo.Vcs, buildinfo.Issues, error) {
 	var vcs []buildinfo.Vcs
 	var issues buildinfo.Issues
 	env := make(map[string]string)
@@ -325,21 +329,7 @@ func extractBuildInfoData(partials buildinfo.Partials, includeFilter, excludeFil
 				}
 			}
 		case partial.Env != nil:
-			var err error
-			filteredEnv := partial.Env
-			if includeFilter != nil {
-				filteredEnv, err = includeFilter(filteredEnv)
-				if err != nil {
-					return partialModulesToModules(partialModules), env, vcs, issues, err
-				}
-			}
-			if excludeFilter != nil {
-				filteredEnv, err = excludeFilter(filteredEnv)
-				if err != nil {
-					return partialModulesToModules(partialModules), env, vcs, issues, err
-				}
-			}
-			for k, v := range filteredEnv {
+			for k, v := range partial.Env {
 				env[k] = v
 			}
 		case partial.ModuleType == buildinfo.Build:
