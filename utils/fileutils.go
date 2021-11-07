@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -49,4 +51,26 @@ func ListFiles(path string) ([]string, error) {
 		}
 	}
 	return fileList, nil
+}
+
+func DownloadFile(downloadTo string, fromUrl string) error {
+	// Get the data
+	resp, err := http.Get(fromUrl)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	// Create the file
+	out, err := os.Create(downloadTo)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+func DoubleWinPathSeparator(filePath string) string {
+	return strings.Replace(filePath, "\\", "\\\\", -1)
 }
