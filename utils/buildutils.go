@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jfrog/build-info-go/build"
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"io/ioutil"
 	"os"
@@ -162,17 +161,17 @@ func GetGeneratedBuildsInfo(buildName, buildNumber, projectKey, buildsDirPath st
 	return generatedBuildsInfo, nil
 }
 
-func CreateBuildInfoFromPartials(bld *build.Build) (*buildinfo.BuildInfo, error) {
-	partials, err := readPartialBuildInfoFiles(bld.BuildName(), bld.BuildNumber(), bld.ProjectKey(), bld.TempDirPath())
+func CreateBuildInfoFromPartials(buildName, buildNumber, projectKey, buildsDirPath string) (*buildinfo.BuildInfo, error) {
+	partials, err := readPartialBuildInfoFiles(buildName, buildNumber, projectKey, buildsDirPath)
 	if err != nil {
 		return nil, err
 	}
 	sort.Sort(partials)
 
 	buildInfo := buildinfo.New()
-	buildInfo.Name = bld.BuildName()
-	buildInfo.Number = bld.BuildNumber()
-	buildGeneralDetails, err := readBuildInfoGeneralDetails(bld.BuildName(), bld.BuildNumber(), bld.ProjectKey(), bld.TempDirPath())
+	buildInfo.Name = buildName
+	buildInfo.Number = buildNumber
+	buildGeneralDetails, err := readBuildInfoGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +194,7 @@ func CreateBuildInfoFromPartials(bld *build.Build) (*buildinfo.BuildInfo, error)
 	}
 	for _, module := range modules {
 		if module.Id == "" {
-			module.Id = bld.BuildName()
+			module.Id = buildName
 		}
 		buildInfo.Modules = append(buildInfo.Modules, module)
 	}

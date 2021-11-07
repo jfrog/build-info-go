@@ -30,22 +30,6 @@ func NewBuild(buildName, buildNumber, projectKey, tempDirPath string, logger bui
 	}
 }
 
-func (b *Build) BuildName() string {
-	return b.buildName
-}
-
-func (b *Build) BuildNumber() string {
-	return b.buildNumber
-}
-
-func (b *Build) ProjectKey() string {
-	return b.projectKey
-}
-
-func (b *Build) TempDirPath() string {
-	return b.tempDirPath
-}
-
 // This field is not saved in local cache. It is used only when creating a build-info using the ToBuildInfo() function.
 func (b *Build) SetAgentName(agentName string) {
 	b.agentName = agentName
@@ -89,7 +73,7 @@ func (b *Build) CollectEnv() error {
 }
 
 func (b *Build) ToBuildInfo() (*entities.BuildInfo, error) {
-	buildInfo, err := buildutils.CreateBuildInfoFromPartials(b)
+	buildInfo, err := buildutils.CreateBuildInfoFromPartials(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath)
 	if err != nil {
 		return nil, err
 	}
