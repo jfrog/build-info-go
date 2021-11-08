@@ -4,6 +4,10 @@
 
 - [Overview](#overview)
 - [Using build-info-go as a CLI](#using-build-info-go-as-a-cli)
+  - [Build the CLI from Sources](#build-the-cli-from-sources)
+  - [Generating Build-Info](#generating-build-info)
+    - [Go](#go)
+  - [Logs](#logs)
 - [Go APIs](#go-apis)
   - [Creating a New Build](#creating-a-new-build)
   - [Generating Build-Info for Go Projects](#generating-build-info-for-go-projects)
@@ -19,6 +23,46 @@
 Read more about build-info and build integration in Artifactory [here](https://www.jfrog.com/confluence/display/JFROG/Build+Integration).
 
 ## Using build-info-go as a CLI
+
+### Build the CLI from Sources
+
+Make sure Go is installed.
+
+Clone the sources:
+```
+git clone https://github.com/jfrog/build-info-go
+```
+CD to the root directory of the cloned project and build the sources as follows.
+
+On Unix based systems run:
+````
+./buildscripts/build.sh
+````
+On Windows run:
+````
+.\buildscripts\build.bat
+````
+Once completed, you'll find the bi executable at the current directory.
+
+### Generating Build-Info
+
+The Build-Info CLI allows generating build-info for your project easily and quickly.
+
+All you need to do is to navigate to the project's root directory and run one of the following commands (depending on the package manager you use). The complete build-info will be written to stdout.
+
+#### Go
+
+```shell
+bi go
+```
+
+### Logs
+
+The default log level of the Build-Info CLI is INFO.
+
+You can change to another log level by setting the `BUILD_INFO_LOG_LEVEL` environment variable to one of these: ERROR, WARN or DEBUG.
+
+All logs are written to stderr.
 
 ## Go APIs
 
