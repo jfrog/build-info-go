@@ -17,11 +17,9 @@
 
 ## Overview
 
-**build-info-go** is a Go library, which allows generating build-info for a source code project. The library is also
-packaged as a CLI.
+**build-info-go** is a Go library, which allows generating build-info for a source code project. The library is also packaged as a CLI.
 
-Read more about build-info and build integration in
-Artifactory [here](https://www.jfrog.com/confluence/display/JFROG/Build+Integration).
+Read more about build-info and build integration in Artifactory [here](https://www.jfrog.com/confluence/display/JFROG/Build+Integration).
 
 ## Using build-info-go as a CLI
 
@@ -29,8 +27,7 @@ Artifactory [here](https://www.jfrog.com/confluence/display/JFROG/Build+Integrat
 
 The Build-Info CLI lets you generate basic build-info for your project easily and quickly.
 
-All you need to do is to navigate to the project's root directory and run one of the following commands (depending on
-the package manager you use). The complete build-info will be written to stdout.
+All you need to do is to navigate to the project's root directory and run one of the following commands (depending on the package manager you use). The complete build-info will be written to stdout.
 
 #### Go
 
@@ -42,8 +39,7 @@ bi go
 
 The default log level of the Build-Info CLI is INFO.
 
-You can change to another log level by setting the `BUILD_INFO_LOG_LEVEL` environment variable to one of these: ERROR,
-WARN or DEBUG.
+You can change to another log level by setting the `BUILD_INFO_LOG_LEVEL` environment variable to one of these: ERROR, WARN or DEBUG.
 
 All logs are written to stderr.
 
@@ -53,8 +49,7 @@ Collecting and building build-info for your project is easier than ever using th
 
 ### Creating a New Build
 
-To use the APIs below, you need to create a new instance of BuildInfoService and then create a new Build (or get an
-existing one):
+To use the APIs below, you need to create a new instance of BuildInfoService and then create a new Build (or get an existing one):
 
 ```go
 service := build.NewBuildInfoService()

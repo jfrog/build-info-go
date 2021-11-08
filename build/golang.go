@@ -2,7 +2,6 @@ package build
 
 import (
 	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -54,7 +53,7 @@ func (gm *GoModule) CalcDependencies() error {
 	buildInfoModule := entities.Module{Id: gm.name, Type: entities.Go, Dependencies: buildInfoDependencies}
 	buildInfo := &entities.BuildInfo{Modules: []entities.Module{buildInfoModule}}
 
-	return utils.SaveBuildInfo(gm.containingBuild.buildName, gm.containingBuild.buildNumber, gm.containingBuild.projectKey, gm.containingBuild.tempDirPath, buildInfo, gm.containingBuild.logger)
+	return gm.containingBuild.SaveBuildInfo(buildInfo)
 }
 
 func (gm *GoModule) SetName(name string) {
@@ -63,7 +62,7 @@ func (gm *GoModule) SetName(name string) {
 
 func (gm *GoModule) AddArtifacts(artifacts ...entities.Artifact) error {
 	partial := &entities.Partial{ModuleId: gm.name, ModuleType: entities.Go, Artifacts: artifacts}
-	return utils.SavePartialBuildInfo(gm.containingBuild.buildName, gm.containingBuild.buildNumber, gm.containingBuild.projectKey, gm.containingBuild.tempDirPath, partial, gm.containingBuild.logger)
+	return gm.containingBuild.SavePartialBuildInfo(partial)
 }
 
 // Get the go project dependencies.
