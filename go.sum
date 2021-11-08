@@ -11,12 +11,6 @@ github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 h1:kFOfPq6dUM1hTo
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/asafgabai/gocmd v0.1.20-0.20211025124110-b76b3a6186df h1:P3C/Goby63qTyKyZ+ydJYYCCQukv+A14w+NmvpGe3Us=
-github.com/asafgabai/gocmd v0.1.20-0.20211025124110-b76b3a6186df/go.mod h1:uHQdRcxXb21UmAdkJA0ULimmB0nuiv8Cff5HEAM97io=
-github.com/asafgabai/gofrog v1.0.7-0.20211102100824-06d5cfd1fc1b h1:faOALt2lnP22WAg/943F4Aml7T8NaCU4fXHQrZ/zw0s=
-github.com/asafgabai/gofrog v1.0.7-0.20211102100824-06d5cfd1fc1b/go.mod h1:9YN5v4LlsCfLIXpwQnzSf1wVtgjdHM20FzuIu58RMI4=
-github.com/asafgabai/jfrog-client-go v0.18.1-0.20211025084412-39087fc85727 h1:M+K8IgGcvOoPfEmagG9iyi1y6HKjY5nBU3lB94mQYGI=
-github.com/asafgabai/jfrog-client-go v0.18.1-0.20211025084412-39087fc85727/go.mod h1:erjcJnV3mz69H51T5Dns+RxqRd/amSQ7XJfJymRtQjI=
 github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -55,6 +49,8 @@ github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 h1:BQSFePA1RWJOl
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99/go.mod h1:1lJo3i6rXxKeerYnT8Nvf0QmHCRC1n8sfWVwXF2Frvo=
 github.com/jessevdk/go-flags v1.5.0/go.mod h1:Fw0T6WPc1dYxT4mKEZRfG5kJhaTDP9pj1c2EWnYs/m4=
 github.com/jfrog/build-info-go v0.0.0-20211020140610-2b15ac5444b5/go.mod h1:FW9/6nnwYg6pyeelEIjKKFv1YNQqkUM59d9nkMCGF4Y=
+github.com/jfrog/gofrog v1.0.7-0.20211107071406-54da7fb08599 h1:HxE3qC39i2ZAiwd+pngtYyJrAUowisbxmvXEUmjNSjQ=
+github.com/jfrog/gofrog v1.0.7-0.20211107071406-54da7fb08599/go.mod h1:9YN5v4LlsCfLIXpwQnzSf1wVtgjdHM20FzuIu58RMI4=
 github.com/kevinburke/ssh_config v0.0.0-20201106050909-4977a11b4351 h1:DowS9hvgyYSX4TO5NpyC606/Z4SxnNYbT+WX27or6Ck=
 github.com/kevinburke/ssh_config v0.0.0-20201106050909-4977a11b4351/go.mod h1:CT57kijsi8u/K/BOFA39wgDQJ9CxiF4nAY/ojJ6r6mM=
 github.com/klauspost/compress v1.4.1/go.mod h1:RyIbtBH6LamlWaDj8nUwkbUhJ87Yi3uG0guNDohfE1A=

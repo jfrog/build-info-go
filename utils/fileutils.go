@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func isFileExists(path string) (bool, error) {
+func IsFileExists(path string) (bool, error) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) { // If doesn't exist, don't omit an error
@@ -17,7 +17,7 @@ func isFileExists(path string) (bool, error) {
 	return !fileInfo.IsDir(), nil
 }
 
-func isDirExists(path string) (bool, error) {
+func IsDirExists(path string) (bool, error) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) { // If doesn't exist, don't omit an error
@@ -29,7 +29,7 @@ func isDirExists(path string) (bool, error) {
 }
 
 // ListFiles returns a list of files and directories in the specified path
-func listFiles(path string) ([]string, error) {
+func ListFiles(path string) ([]string, error) {
 	sep := string(os.PathSeparator)
 	if !strings.HasSuffix(path, sep) {
 		path += sep
@@ -40,7 +40,7 @@ func listFiles(path string) ([]string, error) {
 
 	for _, f := range files {
 		filePath := path + f.Name()
-		exists, err := isFileExists(filePath)
+		exists, err := IsFileExists(filePath)
 		if err != nil {
 			return nil, err
 		}
