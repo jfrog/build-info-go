@@ -13,7 +13,7 @@ func main() {
 	log = utils.NewDefaultLogger(getCliLogLevel())
 	app := &clitool.App{
 		Name:     "Build-Info CLI",
-		Usage:    "generate build-info for your source code",
+		Usage:    "Generate build-info for your source code",
 		Commands: cli.GetCommands(log),
 	}
 	err := app.Run(os.Args)

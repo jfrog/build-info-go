@@ -13,7 +13,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 	return []*clitool.Command{
 		{
 			Name:      "go",
-			Usage:     "collect build-info for a Go project",
+			Usage:     "Collect build-info for a Go project",
 			UsageText: "bi go",
 			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
