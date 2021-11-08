@@ -7,6 +7,7 @@ require (
 	github.com/jfrog/gofrog v1.0.7
 	github.com/jfrog/jfrog-client-go v1.5.1
 	github.com/stretchr/testify v1.7.0
+	github.com/urfave/cli/v2 v2.3.0
 )
 
 replace github.com/jfrog/gocmd => github.com/asafgabai/gocmd v0.1.20-0.20211104074947-336390e289b0
