@@ -4,6 +4,7 @@
 
 - [Overview](#overview)
 - [Using build-info-go as a CLI](#using-build-info-go-as-a-cli)
+  - [Clone and Build the CLI](#clone-and-build-the-cli)
   - [Generating Build-Info](#generating-build-info)
     - [Go](#go)
   - [Logs](#logs)
@@ -22,6 +23,24 @@
 Read more about build-info and build integration in Artifactory [here](https://www.jfrog.com/confluence/display/JFROG/Build+Integration).
 
 ## Using build-info-go as a CLI
+
+### Clone and Build the CLI
+
+Clone the build-info-go project by executing the following command:
+```
+git clone https://github.com/jfrog/build-info-go
+```
+Build the project by navigating to the project folder and executing the following commands.
+
+On Unix based systems run:
+````
+./buildscripts/build.sh
+````
+On Windows run:
+````
+.\buildscripts\build.bat
+````
+Once completed, you will find the Build-Info CLI executable at the project directory.
 
 ### Generating Build-Info
 
