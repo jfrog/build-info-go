@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
 )
 
 const BuildInfoDetails = "details"
@@ -68,6 +69,16 @@ func (b *Build) SetBuildUrl(buildUrl string) {
 // AddGoModule adds a Go module to this Build. Pass srcPath as an empty string if the root of the Go project is the working directory.
 func (b *Build) AddGoModule(srcPath string) (*GoModule, error) {
 	return newGoModule(srcPath, b)
+}
+
+// AddMavenModule adds a Maven module to this Build. Pass srcPath as an empty string if the root of the Maven project is the working directory.
+func (b *Build) AddMavenModule(srcPath string) (*MavenModule, error) {
+	return newMavenModule(b, srcPath)
+}
+
+// AddGradleModule adds a Gradle module to this Build. Pass srcPath as an empty string if the root of the Gradle project is the working directory.
+func (b *Build) AddGradleModule(srcPath string) (*GradleModule, error) {
+	return newGradleModule(b, srcPath)
 }
 
 func (b *Build) CollectEnv() error {
@@ -167,7 +178,7 @@ func (b *Build) SaveBuildInfo(buildInfo *entities.BuildInfo) (err error) {
 		return
 	}
 	b.logger.Debug("Creating temp build file at: " + dirPath)
-	tempFile, err := ioutil.TempFile(dirPath, "temp")
+	tempFile, err := utils.CreateTempBuildFile(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath, b.logger)
 	if err != nil {
 		return
 	}
@@ -194,12 +205,7 @@ func (b *Build) SavePartialBuildInfo(partial *entities.Partial) (err error) {
 	if err != nil {
 		return
 	}
-	dirPath, err := utils.GetPartialsBuildDir(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath)
-	if err != nil {
-		return
-	}
-	b.logger.Debug("Creating temp build file at:", dirPath)
-	tempFile, err := ioutil.TempFile(dirPath, "temp")
+	tempFile, err := utils.CreateTempBuildFile(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath, b.logger)
 	if err != nil {
 		return
 	}
@@ -444,4 +450,16 @@ func createDefaultModule(moduleId string) *entities.Module {
 		Artifacts:    []entities.Artifact{},
 		Dependencies: []entities.Dependency{},
 	}
+}
+
+func createEmptyBuildInfoFile(containingBuild *Build) (string, error) {
+	buildDir, err := utils.CreateTempBuildFile(containingBuild.buildName, containingBuild.buildNumber, containingBuild.projectKey, containingBuild.tempDirPath, containingBuild.logger)
+	if err != nil {
+		return "", err
+	}
+	if err := buildDir.Close(); err != nil {
+		return "", err
+	}
+	// If this is a Windows machine, there is a need to modify the path for the build info file to match Java syntax with double \\
+	return utils.DoubleWinPathSeparator(buildDir.Name()), nil
 }
