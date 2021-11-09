@@ -67,6 +67,7 @@ func newGradleModule(containingBuild *Build, srcPath string) (*GradleModule, err
 			localPath: extractorLocalPath,
 			tasks:     []string{"aP"},
 			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempfolderName),
+			props:     map[string]string{},
 		},
 	}, err
 }
@@ -106,12 +107,6 @@ func (gm *GradleModule) CalcDependencies() (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		deferErr := os.Remove(gradleRunConfig.extractorPropsFile)
-		if err == nil {
-			err = deferErr
-		}
-	}()
 	return gradleRunConfig.runCmd()
 }
 

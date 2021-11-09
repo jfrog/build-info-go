@@ -7,6 +7,8 @@
   - [Build the CLI from Sources](#build-the-cli-from-sources)
   - [Generating Build-Info](#generating-build-info)
     - [Go](#go)
+    - [Maven](#mvn)
+    - [Gradle](#gradle)
   - [Logs](#logs)
 - [Go APIs](#go-apis)
   - [Creating a New Build](#creating-a-new-build)
@@ -54,6 +56,16 @@ All you need to do is to navigate to the project's root directory and run one of
 
 ```shell
 bi go
+```
+#### Maven
+
+```shell
+bi mvn
+```
+#### Gradle
+
+```shell
+bi gradle
 ```
 
 ### Logs
