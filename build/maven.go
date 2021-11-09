@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	buildutil "github.com/jfrog/build-info-go/build/utils"
+	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 )
@@ -37,6 +38,7 @@ const (
 )
 
 type MavenModule struct {
+	name string
 	// The build which contains the maven module.
 	containingBuild *Build
 	// Project path in the file system.
@@ -96,6 +98,18 @@ func (mm *MavenModule) SetExtractorDetails(localdExtractorPath, extractorPropsdi
 		mm.extractorDetails.props = configProps
 	}
 	return mm
+}
+
+func (mm *MavenModule) SetName(name string) {
+	mm.name = name
+}
+
+func (mm *MavenModule) AddArtifacts(artifacts ...entities.Artifact) error {
+	if mm.name == ""{
+		return fmt.Errorf("Module name is empty")
+	}
+	partial := &entities.Partial{ModuleId: mm.name, ModuleType: entities.Gradle, Artifacts: artifacts}
+	return mm.containingBuild.SavePartialBuildInfo(partial)
 }
 
 func (mm *MavenModule) SetMavenOpts(mavenOpts ...string) {

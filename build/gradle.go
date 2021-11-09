@@ -11,6 +11,7 @@ import (
 
 	"github.com/jfrog/build-info-go/build/utils"
 	buildutil "github.com/jfrog/build-info-go/build/utils"
+	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -27,6 +28,8 @@ const (
 )
 
 type GradleModule struct {
+	// Module name.
+	name string
 	// The build which contains the gradle module.
 	containingBuild *Build
 	// Project path in the file system.
@@ -81,6 +84,18 @@ func (gm *GradleModule) SetExtractorDetails(localExtractorPath, extractorPropsDi
 	gm.gradleExtractorDetails.downloadExtractorFunc = downloadExtractorFunc
 	gm.gradleExtractorDetails.props = props
 	return gm
+}
+
+func (gm *GradleModule) SetName(name string) {
+	gm.name = name
+}
+
+func (gm *GradleModule) AddArtifacts(artifacts ...entities.Artifact) error {
+	if gm.name == ""{
+		return fmt.Errorf("Module name is empty")
+	}
+	partial := &entities.Partial{ModuleId: gm.name, ModuleType: entities.Gradle, Artifacts: artifacts}
+	return gm.containingBuild.SavePartialBuildInfo(partial)
 }
 
 // Generates Gradle build-info.

@@ -79,22 +79,47 @@ bld, err := service.GetOrCreateBuild(buildName, buildNumber)
 
 It's important to invoke this function at the very beginning of the build, so that the start time property in the build-info will be accurate.
 
-### Generating Build-Info for Go Projects
+### Generating Build-Info
 
-After you [created a Build](#creating-a-new-build), you can create a new Go build-info module for your Go project and collect its dependencies:
+After you [created a Build](#creating-a-new-build), you can create a new build-info module for your specific project type and collect its dependencies:
 
+Go
 ```go
 // You can pass an empty string as an argument, if the root of the Go project is the working directory
 goModule, err := bld.AddGoModule(goProjectPath)
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = goModule.CalcDependencies()
-```
 
-You can also add artifacts to that module:
-
-```go
+// You can also add artifacts to that module:
 artifact1 := entities.Artifact{Name: "v1.0.0.mod", Type: "mod", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
 err = goModule.AddArtifacts(artifact1, artifact2, ...)
+
+```
+
+Maven
+```go
+// You can pass an empty string as an argument, if the root of the Maven project is the working directory
+mavenModule, err := bld.AddMavenModule(mavenProjectPath)
+// Calculate the dependencies used by this module, and store them in the module struct.
+err = mavenModule.CalcDependencies()
+
+// You can also add artifacts to that module:
+artifact1 := entities.Artifact{Name: "junit:junit:4.11", Type: "jar", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
+mavenModule.SetName("org.example.gradle:api:1.0")
+err = mavenModule.AddArtifacts(artifact1, artifact2, ...)
+```
+
+Gradle
+```go
+// You can pass an empty string as an argument, if the root of the Gradle project is the working directory
+gradleModule, err := bld.AddGradleModule(gradleProjectPath)
+// Calculate the dependencies used by this module, and store them in the module struct.
+err = gradleModule.CalcDependencies()
+
+// You can also add artifacts to that module:
+artifact1 := entities.Artifact{Name: "junit:junit:4.11", Type: "jar", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
+gradleModule.SetName("org.example.gradle:api:1.0")
+err = gradleModule.AddArtifacts(artifact1, artifact2, ...)
 ```
 
 ### Collecting Environment Variables
