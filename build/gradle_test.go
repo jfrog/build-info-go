@@ -12,7 +12,9 @@ import (
 func TestDownloadExtractorsFromReleases(t *testing.T) {
 	tempDirPath, err := fileutils.CreateTempDir()
 	assert.NoError(t, err)
-	defer fileutils.RemoveTempDir(tempDirPath)
+	defer func() {
+		assert.NoError(t, fileutils.RemoveTempDir(tempDirPath))
+	}()
 
 	// Download JAR
 	err = downloadGradleDependencies(tempDirPath, nil)

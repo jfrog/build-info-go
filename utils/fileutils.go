@@ -53,22 +53,30 @@ func ListFiles(path string) ([]string, error) {
 	return fileList, nil
 }
 
-func DownloadFile(downloadTo string, fromUrl string) error {
+func DownloadFile(downloadTo string, fromUrl string) (err error) {
 	// Get the data
 	resp, err := http.Get(fromUrl)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if deferErr := resp.Body.Close(); err == nil {
+			err = deferErr
+		}
+	}()
 	// Create the file
 	out, err := os.Create(downloadTo)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() {
+		if deferErr := out.Close(); err == nil {
+			err = deferErr
+		}
+	}()
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
-	return err
+	return 
 }
 
 func DoubleWinPathSeparator(filePath string) string {

@@ -10,8 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	buildutil "github.com/jfrog/build-info-go/build/utils"
-	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 )
@@ -25,7 +24,7 @@ const (
 	PropertiesTempfolderName        = "properties"
 	mavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
 	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
-	MavenExtractorDependencyVersion = "2.30.2"
+	MavenExtractorDependencyVersion = "2.31.2"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -38,7 +37,6 @@ const (
 )
 
 type MavenModule struct {
-	name string
 	// The build which contains the maven module.
 	containingBuild *Build
 	// Project path in the file system.
@@ -100,18 +98,6 @@ func (mm *MavenModule) SetExtractorDetails(localdExtractorPath, extractorPropsdi
 	return mm
 }
 
-func (mm *MavenModule) SetName(name string) {
-	mm.name = name
-}
-
-func (mm *MavenModule) AddArtifacts(artifacts ...entities.Artifact) error {
-	if mm.name == ""{
-		return fmt.Errorf("Module name is empty")
-	}
-	partial := &entities.Partial{ModuleId: mm.name, ModuleType: entities.Gradle, Artifacts: artifacts}
-	return mm.containingBuild.SavePartialBuildInfo(partial)
-}
-
 func (mm *MavenModule) SetMavenOpts(mavenOpts ...string) {
 	mm.extractorDetails.mavenOpts = mavenOpts
 }
@@ -138,9 +124,9 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 	if len(plexusClassworlds) != 1 {
 		return nil, errors.New("couldn't find plexus-classworlds-x.x.x.jar in Maven installation path, please check M2_HOME environment variable")
 	}
-	buildInfoPath, err := generateEmptyBIFile(mm.containingBuild)
+	buildInfoPath, err := createEmptyBuildInfoFile(mm.containingBuild)
 	mm.extractorDetails.props[buildInfoPathKey] = buildInfoPath
-	extractorProps, err := buildutil.CreateExtractorPropsFile(mm.extractorDetails.propsDir, mm.extractorDetails.props)
+	extractorProps, err := utils.CreateExtractorPropsFile(mm.extractorDetails.propsDir, mm.extractorDetails.props)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +207,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error) error {
 	filename := fmt.Sprintf(MavenExtractorFileName, GradleExtractorDependencyVersion)
 	filePath := fmt.Sprintf(mavenExtractorRemotePath, GradleExtractorDependencyVersion)
-	if err := buildutil.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc); err != nil {
+	if err := utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc); err != nil {
 		return err
 	}
 	return createClassworldsConfig(downloadTo)

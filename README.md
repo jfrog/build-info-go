@@ -48,7 +48,7 @@ Once completed, you'll find the bi executable at the current directory.
 
 The Build-Info CLI allows generating build-info for your project easily and quickly.
 
-All you need to do is to navigate to the project's root directory and run one of the following commands (depending on the package manager you use). The complete build-info will be written to stdout.
+All you need to do is to navigate to the project's root directory and run one of the following commands (depending on the package manager you use). The complete build-info will be sent to the stdout.
 
 #### Go
 
@@ -60,9 +60,9 @@ bi go
 
 The default log level of the Build-Info CLI is INFO.
 
-You can change to another log level by setting the `BUILD_INFO_LOG_LEVEL` environment variable to one of these: ERROR, WARN or DEBUG.
+You can change the log level by setting the BUILD_INFO_LOG_LEVEL environment variable to either DEBUG, INFO, WARN or ERROR.
 
-All logs are written to stderr.
+All log messages are sent to the stderr, to allow picking up the generated build-info, which is sent to the stdout.
 
 ## Go APIs
 
@@ -102,11 +102,6 @@ Maven
 mavenModule, err := bld.AddMavenModule(mavenProjectPath)
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = mavenModule.CalcDependencies()
-
-// You can also add artifacts to that module:
-artifact1 := entities.Artifact{Name: "junit:junit:4.11", Type: "jar", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
-mavenModule.SetName("org.example.gradle:api:1.0")
-err = mavenModule.AddArtifacts(artifact1, artifact2, ...)
 ```
 
 Gradle
@@ -115,11 +110,6 @@ Gradle
 gradleModule, err := bld.AddGradleModule(gradleProjectPath)
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = gradleModule.CalcDependencies()
-
-// You can also add artifacts to that module:
-artifact1 := entities.Artifact{Name: "junit:junit:4.11", Type: "jar", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
-gradleModule.SetName("org.example.gradle:api:1.0")
-err = gradleModule.AddArtifacts(artifact1, artifact2, ...)
 ```
 
 ### Collecting Environment Variables

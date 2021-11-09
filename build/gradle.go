@@ -9,9 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jfrog/build-info-go/build/utils"
-	buildutil "github.com/jfrog/build-info-go/build/utils"
-	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -24,12 +22,10 @@ const (
 	GradleExtractorFileName          = "build-info-extractor-gradle-%s-uber.jar"
 	gradleInitScriptTemplate         = "gradle.init"
 	GradleExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
-	GradleExtractorDependencyVersion = "4.24.18"
+	GradleExtractorDependencyVersion = "4.24.21"
 )
 
 type GradleModule struct {
-	// Module name.
-	name string
 	// The build which contains the gradle module.
 	containingBuild *Build
 	// Project path in the file system.
@@ -86,30 +82,16 @@ func (gm *GradleModule) SetExtractorDetails(localExtractorPath, extractorPropsDi
 	return gm
 }
 
-func (gm *GradleModule) SetName(name string) {
-	gm.name = name
-}
-
-func (gm *GradleModule) AddArtifacts(artifacts ...entities.Artifact) error {
-	if gm.name == ""{
-		return fmt.Errorf("Module name is empty")
-	}
-	partial := &entities.Partial{ModuleId: gm.name, ModuleType: entities.Gradle, Artifacts: artifacts}
-	return gm.containingBuild.SavePartialBuildInfo(partial)
-}
-
 // Generates Gradle build-info.
-func (gm *GradleModule) CalcDependencies() error {
+func (gm *GradleModule) CalcDependencies() (err error) {
 	log.Info("Running gradle...")
 	if gm.srcPath == "" {
-		var err error
 		if gm.srcPath, err = os.Getwd(); err != nil {
-			return err
+			return
 		}
 	}
 
-	err := downloadGradleDependencies(gm.gradleExtractorDetails.localPath, gm.gradleExtractorDetails.downloadExtractorFunc)
-	if err != nil {
+	if err = downloadGradleDependencies(gm.gradleExtractorDetails.localPath, gm.gradleExtractorDetails.downloadExtractorFunc); err != nil {
 		return err
 	}
 	if !gm.gradleExtractorDetails.usePlugin {
@@ -124,7 +106,12 @@ func (gm *GradleModule) CalcDependencies() error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(gradleRunConfig.extractorPropsFile)
+	defer func() {
+		deferErr := os.Remove(gradleRunConfig.extractorPropsFile)
+		if err == nil {
+			err = deferErr
+		}
+	}()
 	return gradleRunConfig.runCmd()
 }
 
@@ -133,9 +120,9 @@ func (gm *GradleModule) createGradleRunConfig() (*gradleRunConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	buildInfoPath, err := generateEmptyBIFile(gm.containingBuild)
+	buildInfoPath, err := createEmptyBuildInfoFile(gm.containingBuild)
 	gm.gradleExtractorDetails.props[buildInfoPathKey] = buildInfoPath
-	extractorPropsFile, err := buildutil.CreateExtractorPropsFile(gm.gradleExtractorDetails.propsDir, gm.gradleExtractorDetails.props)
+	extractorPropsFile, err := utils.CreateExtractorPropsFile(gm.gradleExtractorDetails.propsDir, gm.gradleExtractorDetails.props)
 	if err != nil {
 		return nil, err
 	}

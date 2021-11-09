@@ -12,13 +12,15 @@ import (
 func TestDownloadDependencies(t *testing.T) {
 	tempDirPath, err := fileutils.CreateTempDir()
 	assert.NoError(t, err)
-	defer fileutils.RemoveTempDir(tempDirPath)
+	defer func() {
+		assert.NoError(t, fileutils.RemoveTempDir(tempDirPath))
+	}()
 
 	// Download JAR and create classworlds.conf
 	err = downloadMavenExtractor(tempDirPath, nil)
 	assert.NoError(t, err)
 
-	// Make sure the Maven build-info extractor JAR and the classwords.conf file exists
+	// Make sure the Maven build-info extractor JAR and the classwords.conf file exist.
 	expectedJarPath := filepath.Join(tempDirPath, fmt.Sprintf(MavenExtractorFileName, MavenExtractorDependencyVersion))
 	assert.FileExists(t, expectedJarPath)
 	expectedClasswordsPath := filepath.Join(tempDirPath, "classworlds.conf")

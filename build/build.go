@@ -452,7 +452,7 @@ func createDefaultModule(moduleId string) *entities.Module {
 	}
 }
 
-func generateEmptyBIFile(containingBuild *Build) (string, error) {
+func createEmptyBuildInfoFile(containingBuild *Build) (string, error) {
 	buildDir, err := utils.CreateTempBuildFile(containingBuild.buildName, containingBuild.buildNumber, containingBuild.projectKey, containingBuild.tempDirPath, containingBuild.logger)
 	if err != nil {
 		return "", err
@@ -460,6 +460,6 @@ func generateEmptyBIFile(containingBuild *Build) (string, error) {
 	if err := buildDir.Close(); err != nil {
 		return "", err
 	}
-	// If this is a Windows machine there is a need to modify the path for the build info file to match Java syntax with double \\
+	// If this is a Windows machine, there is a need to modify the path for the build info file to match Java syntax with double \\
 	return utils.DoubleWinPathSeparator(buildDir.Name()), nil
 }
