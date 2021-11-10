@@ -205,8 +205,8 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 }
 
 func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error) error {
-	filename := fmt.Sprintf(MavenExtractorFileName, GradleExtractorDependencyVersion)
-	filePath := fmt.Sprintf(mavenExtractorRemotePath, GradleExtractorDependencyVersion)
+	filename := fmt.Sprintf(MavenExtractorFileName, MavenExtractorDependencyVersion)
+	filePath := fmt.Sprintf(mavenExtractorRemotePath, MavenExtractorDependencyVersion)
 	if err := utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc); err != nil {
 		return err
 	}
