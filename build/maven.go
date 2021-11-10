@@ -13,7 +13,6 @@ import (
 
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
 const (
@@ -162,12 +161,12 @@ func (mm *MavenModule) CalcDependencies() error {
 	}
 
 	defer os.Remove(mvnRunConfig.buildInfoProperties)
-	log.Info("Running Mvn...")
+	mm.containingBuild.logger.Info("Running Mvn...")
 	return mvnRunConfig.runCmd()
 }
 
 func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
-	log.Debug("Searching for Maven home.")
+	mm.containingBuild.logger.Debug("Searching for Maven home.")
 	mavenHome = os.Getenv(MavenHome)
 	if mavenHome == "" {
 		// The 'mavenHome' is not defined.
@@ -180,7 +179,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 		if err != nil || mvnPath == "" {
 			return "", errors.New(err.Error() + "Hint: The mvn command may not be included in the PATH. Either add it to the path, or set the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
 		}
-		log.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
+		mm.containingBuild.logger.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
 		cmd := exec.Command("mvn", "--version")
 		var stdout bytes.Buffer
 		cmd.Stdout = &stdout
@@ -204,7 +203,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 			return "", errors.New("Could not find the location of the maven home directory, by running 'mvn --version' command. The command output is:\n" + stdout.String() + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
 		}
 	}
-	log.Debug("Maven home location: ", mavenHome)
+	mm.containingBuild.logger.Debug("Maven home location: ", mavenHome)
 	return
 }
 
@@ -259,10 +258,4 @@ func (config *mvnRunConfig) runCmd() error {
 	command.Stderr = os.Stderr
 	command.Stdout = os.Stderr
 	return command.Run()
-}
-
-func CreateBuildInfoService() *BuildInfoService {
-	buildInfoService := NewBuildInfoService()
-	buildInfoService.SetLogger(log.Logger)
-	return buildInfoService
 }
