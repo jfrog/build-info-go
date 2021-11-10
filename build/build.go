@@ -205,7 +205,12 @@ func (b *Build) SavePartialBuildInfo(partial *entities.Partial) (err error) {
 	if err != nil {
 		return
 	}
-	tempFile, err := utils.CreateTempBuildFile(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath, b.logger)
+	dirPath, err := utils.GetPartialsBuildDir(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath)
+	if err != nil {
+		return
+	}
+	b.logger.Debug("Creating temp build file at:", dirPath)
+	tempFile, err := ioutil.TempFile(dirPath, "temp")
 	if err != nil {
 		return
 	}
