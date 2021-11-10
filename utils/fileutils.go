@@ -84,8 +84,6 @@ func DoubleWinPathSeparator(filePath string) string {
 }
 
 // Check if path exists.
-// If path points at a symlink and `preserveSymLink == true`,
-// function will return `true` regardless of the symlink target
 func IsPathExists(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)
