@@ -76,7 +76,7 @@ func DownloadFile(downloadTo string, fromUrl string) (err error) {
 	}()
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
-	return 
+	return
 }
 
 func DoubleWinPathSeparator(filePath string) string {
