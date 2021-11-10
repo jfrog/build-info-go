@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
-	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 )
 
 const (
@@ -218,7 +217,7 @@ func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downlo
 
 func createClassworldsConfig(dependenciesPath string) error {
 	classworldsPath := filepath.Join(dependenciesPath, classworldsConfFileName)
-	if fileutils.IsPathExists(classworldsPath, false) {
+	if utils.IsPathExists(classworldsPath) {
 		return nil
 	}
 	return ioutil.WriteFile(classworldsPath, []byte(ClassworldsConf), 0644)
