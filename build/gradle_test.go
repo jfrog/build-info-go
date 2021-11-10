@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,7 +18,7 @@ func TestDownloadExtractorsFromReleases(t *testing.T) {
 	}()
 
 	// Download JAR
-	err = downloadGradleDependencies(tempDirPath, nil)
+	err = downloadGradleDependencies(tempDirPath, nil, &utils.NullLog{})
 	assert.NoError(t, err)
 
 	// Make sure the Gradle build-info extractor JAR exist
