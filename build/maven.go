@@ -64,7 +64,6 @@ type extractorDetails struct {
 
 // Add a new Maven module to a given build.
 func newMavenModule(containingBuild *Build, srcPath string) (*MavenModule, error) {
-	log.SetLogger(containingBuild.logger)
 	extractorProps := map[string]string{
 		"org.jfrog.build.extractor.maven.recorder.activate": "true",
 		"publish.artifacts": "false",
@@ -153,7 +152,7 @@ func (mm *MavenModule) CalcDependencies() error {
 		}
 	}
 
-	err := downloadMavenExtractor(mm.extractorDetails.localPath, mm.extractorDetails.downloadExtractorFunc)
+	err := downloadMavenExtractor(mm.extractorDetails.localPath, mm.extractorDetails.downloadExtractorFunc, mm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
@@ -209,10 +208,10 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 	return
 }
 
-func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error) error {
+func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
 	filename := fmt.Sprintf(MavenExtractorFileName, MavenExtractorDependencyVersion)
 	filePath := fmt.Sprintf(mavenExtractorRemotePath, MavenExtractorDependencyVersion)
-	if err := utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc); err != nil {
+	if err := utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc, logger); err != nil {
 		return err
 	}
 	return createClassworldsConfig(downloadTo)

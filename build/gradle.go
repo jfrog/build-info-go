@@ -12,7 +12,6 @@ import (
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
 const (
@@ -54,7 +53,6 @@ type gradleExtractorDetails struct {
 
 // Add a new Gradle module to a given build.
 func newGradleModule(containingBuild *Build, srcPath string) (*GradleModule, error) {
-	log.SetLogger(containingBuild.logger)
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -85,14 +83,14 @@ func (gm *GradleModule) SetExtractorDetails(localExtractorPath, extractorPropsDi
 
 // Generates Gradle build-info.
 func (gm *GradleModule) CalcDependencies() (err error) {
-	log.Info("Running gradle...")
+	gm.containingBuild.logger.Info("Running gradle...")
 	if gm.srcPath == "" {
 		if gm.srcPath, err = os.Getwd(); err != nil {
 			return
 		}
 	}
 
-	if err = downloadGradleDependencies(gm.gradleExtractorDetails.localPath, gm.gradleExtractorDetails.downloadExtractorFunc); err != nil {
+	if err = downloadGradleDependencies(gm.gradleExtractorDetails.localPath, gm.gradleExtractorDetails.downloadExtractorFunc, gm.containingBuild.logger); err != nil {
 		return err
 	}
 	if !gm.gradleExtractorDetails.usePlugin {
@@ -127,13 +125,14 @@ func (gm *GradleModule) createGradleRunConfig() (*gradleRunConfig, error) {
 		extractorPropsFile: extractorPropsFile,
 		tasks:              strings.Join(gm.gradleExtractorDetails.tasks, " "),
 		initScript:         gm.gradleExtractorDetails.initScript,
+		logger:             gm.containingBuild.logger,
 	}, nil
 }
 
-func downloadGradleDependencies(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error) error {
+func downloadGradleDependencies(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
 	filename := fmt.Sprintf(GradleExtractorFileName, GradleExtractorDependencyVersion)
 	filePath := fmt.Sprintf(GradleExtractorRemotePath, GradleExtractorDependencyVersion)
-	return utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc)
+	return utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc, logger)
 }
 
 func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, error) {
@@ -181,6 +180,7 @@ type gradleRunConfig struct {
 	tasks              string
 	initScript         string
 	env                map[string]string
+	logger             utils.Log
 }
 
 func (config *gradleRunConfig) GetCmd() *exec.Cmd {
@@ -190,7 +190,7 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 		cmd = append(cmd, "--init-script", config.initScript)
 	}
 	cmd = append(cmd, strings.Split(config.tasks, " ")...)
-	log.Info("Running gradle command:", strings.Join(cmd, " "))
+	config.logger.Info("Running gradle command:", strings.Join(cmd, " "))
 	return exec.Command(cmd[0], cmd[1:]...)
 }
 
