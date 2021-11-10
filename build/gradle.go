@@ -57,7 +57,7 @@ func newGradleModule(containingBuild *Build, srcPath string) (*GradleModule, err
 	if err != nil {
 		return nil, err
 	}
-	extractorLocalPath := filepath.Join(home, dependenciesDirName, "gradle")
+	extractorLocalPath := filepath.Join(home, dependenciesDirName, "gradle", GradleExtractorDependencyVersion)
 	return &GradleModule{
 		srcPath:         srcPath,
 		containingBuild: containingBuild,
