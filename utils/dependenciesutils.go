@@ -5,8 +5,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-
-	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
 const configPropertiesPathTempPrefix = "extractorProperties"
@@ -17,7 +15,7 @@ const configPropertiesPathTempPrefix = "extractorProperties"
 // downloadPath: download path in the remote server.
 // filename: The local file name.
 // targetPath: The local download path (without the file name).
-func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downloadExtractorFunc func(downloadTo, downloadPath string) error) error {
+func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger Log) error {
 	// If the file exists locally, we're done.
 	absFileName := filepath.Join(downloadTo, filename)
 	exists, err := IsFileExists(absFileName)
@@ -32,7 +30,7 @@ func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downlo
 		return downloadExtractorFunc(absFileName, downloadPath)
 	}
 	extractorUrl := "https://releases.jfrog.io/artifactory/oss-release-local/" + downloadPath
-	log.Info("Downloading build-info-extractor from", extractorUrl, " to ", downloadTo)
+	logger.Info("Downloading build-info-extractor from", extractorUrl, " to ", downloadTo)
 	return DownloadFile(absFileName, extractorUrl)
 }
 
@@ -61,7 +59,7 @@ func CreateExtractorPropsFile(configPropertiesPath string, configProperties map[
 	return propertiesFile.Name(), nil
 }
 
-func DownloadDependencies(downloadTo, filename, relativefilePath string, downloadExtractorFunc func(downloadTo, downloadPath string) error) error {
+func DownloadDependencies(downloadTo, filename, relativefilePath string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger Log) error {
 	downloadPath := path.Join(relativefilePath, filename)
-	return downloadExtractorIfNeeded(downloadTo, filename, downloadPath, downloadExtractorFunc)
+	return downloadExtractorIfNeeded(downloadTo, filename, downloadPath, downloadExtractorFunc, logger)
 }
