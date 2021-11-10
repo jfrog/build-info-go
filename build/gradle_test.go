@@ -22,6 +22,6 @@ func TestDownloadExtractorsFromReleases(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Make sure the Gradle build-info extractor JAR exist
-	expectedJarPath := filepath.Join(tempDirPath, fmt.Sprintf(GradleExtractorFileName, MavenExtractorDependencyVersion))
+	expectedJarPath := filepath.Join(tempDirPath, fmt.Sprintf(GradleExtractorFileName, GradleExtractorDependencyVersion))
 	assert.FileExists(t, expectedJarPath)
 }
