@@ -82,3 +82,9 @@ func DownloadFile(downloadTo string, fromUrl string) (err error) {
 func DoubleWinPathSeparator(filePath string) string {
 	return strings.Replace(filePath, "\\", "\\\\", -1)
 }
+
+// Check if path exists.
+func IsPathExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}

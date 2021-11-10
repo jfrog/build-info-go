@@ -10,13 +10,9 @@ import (
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
-	"github.com/jfrog/jfrog-client-go/utils/errorutils"
-	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 )
 
 const (
-	usePlugin                        = "useplugin"
-	useWrapper                       = "usewrapper"
 	extractorPropsDir                = "BUILDINFO_PROPFILE"
 	GradleExtractorFileName          = "build-info-extractor-gradle-%s-uber.jar"
 	gradleInitScriptTemplate         = "gradle.init"
@@ -138,11 +134,11 @@ func downloadGradleDependencies(downloadTo string, downloadExtractorFunc func(do
 func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, error) {
 	gradleDependenciesDir, err := filepath.Abs(gradleDependenciesDir)
 	if err != nil {
-		return "", errorutils.CheckError(err)
+		return "", err
 	}
 	initScriptPath := filepath.Join(gradleDependenciesDir, gradleInitScriptTemplate)
 
-	exists, err := fileutils.IsFileExists(initScriptPath, false)
+	exists, err := utils.IsFileExists(initScriptPath)
 	if exists || err != nil {
 		return initScriptPath, err
 	}
@@ -150,14 +146,14 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 	gradlePluginPath := filepath.Join(gradleDependenciesDir, gradlePluginFilename)
 	gradlePluginPath = strings.Replace(gradlePluginPath, "\\", "\\\\", -1)
 	initScriptContent := strings.Replace(GradleInitScript, "${pluginLibDir}", gradlePluginPath, -1)
-	if !fileutils.IsPathExists(gradleDependenciesDir, false) {
+	if !utils.IsPathExists(gradleDependenciesDir) {
 		err = os.MkdirAll(gradleDependenciesDir, 0777)
-		if errorutils.CheckError(err) != nil {
+		if err != nil {
 			return "", err
 		}
 	}
 
-	return initScriptPath, errorutils.CheckError(ioutil.WriteFile(initScriptPath, []byte(initScriptContent), 0644))
+	return initScriptPath, ioutil.WriteFile(initScriptPath, []byte(initScriptContent), 0644)
 }
 
 func getGradleExecPath(useWrapper bool) (string, error) {
@@ -169,7 +165,7 @@ func getGradleExecPath(useWrapper bool) (string, error) {
 	}
 	gradleExec, err := exec.LookPath("gradle")
 	if err != nil {
-		return "", errorutils.CheckError(err)
+		return "", err
 	}
 	return gradleExec, nil
 }
@@ -203,7 +199,7 @@ func (config *gradleRunConfig) runCmd() error {
 	command.Env = append(command.Env, extractorPropsDir+"="+config.extractorPropsFile)
 	command.Stderr = os.Stderr
 	command.Stdout = os.Stderr
-	return errorutils.CheckError(command.Run())
+	return command.Run()
 }
 
 const GradleInitScript = `import org.jfrog.gradle.plugin.artifactory.ArtifactoryPlugin
