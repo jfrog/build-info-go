@@ -72,7 +72,7 @@ func newMavenModule(containingBuild *Build, srcPath string) (*MavenModule, error
 	if err != nil {
 		return nil, err
 	}
-	extractorLocalPath := filepath.Join(home, dependenciesDirName, "maven")
+	extractorLocalPath := filepath.Join(home, dependenciesDirName, "maven", MavenExtractorDependencyVersion)
 	return &MavenModule{
 		srcPath:         srcPath,
 		containingBuild: containingBuild,
