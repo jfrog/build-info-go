@@ -13,7 +13,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 	return []*clitool.Command{
 		{
 			Name:      "go",
-			Usage:     "Collect build-info for a Go project",
+			Usage:     "Generate build-info for a Go project",
 			UsageText: "bi go",
 			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
@@ -55,7 +55,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 		},
 		{
 			Name:      "mvn",
-			Usage:     "Collect build-info for a Maven project",
+			Usage:     "Generate build-info for a Maven project",
 			UsageText: "bi mvn",
 			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
@@ -97,7 +97,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 		},
 		{
 			Name:      "gradle",
-			Usage:     "Collect build-info for a Gradle project",
+			Usage:     "Generate build-info for a Gradle project",
 			UsageText: "bi gradle",
 			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
