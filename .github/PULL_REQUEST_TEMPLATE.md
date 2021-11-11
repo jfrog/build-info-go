@@ -1,4 +1,4 @@
-- [ ] All [tests](https://github.com/jfrog/jfrog-cli#tests) passed. If this feature is not already covered by the tests, I added new tests.
+- [ ] All [tests](https://github.com/jfrog/build-info-go#tests) passed. If this feature is not already covered by the tests, I added new tests.
 - [ ] This pull request is on the dev branch.
 - [ ] I used gofmt for formatting the code before submitting the pull request.
 -----
