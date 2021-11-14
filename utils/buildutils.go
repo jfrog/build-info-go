@@ -1,15 +1,16 @@
 package utils
 
 import (
-	"encoding/base64"
+	"crypto/sha256"
+	"encoding/hex"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 )
 
 func GetBuildDir(buildName, buildNumber, projectKey, buildsDirPath string) (string, error) {
-	encodedDirName := base64.StdEncoding.EncodeToString([]byte(buildName + "_" + buildNumber + "_" + projectKey))
-	buildsDir := filepath.Join(buildsDirPath, encodedDirName)
+	hash := sha256.Sum256([]byte(buildName + "_" + buildNumber + "_" + projectKey))
+	buildsDir := filepath.Join(buildsDirPath, hex.EncodeToString(hash[:]))
 	err := os.MkdirAll(buildsDir, 0777)
 	if err != nil {
 		return "", err
