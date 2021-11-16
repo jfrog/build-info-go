@@ -25,7 +25,10 @@ Read more about build-info and build integration in Artifactory [here](https://w
 
 ### Build the CLI from Sources
 
-Make sure Go is installed.
+Make sure Go is installed by running:
+```
+go version
+```
 
 Clone the sources and CD to the root directory of the project:
 ```
