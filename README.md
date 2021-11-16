@@ -27,11 +27,12 @@ Read more about build-info and build integration in Artifactory [here](https://w
 
 Make sure Go is installed.
 
-Clone the sources:
+Clone the sources and CD to the root directory of the project:
 ```
 git clone https://github.com/jfrog/build-info-go
+cd build-info-go
 ```
-CD to the root directory of the cloned project and build the sources as follows.
+Build the sources as follows:
 
 On Unix based systems run:
 ````
