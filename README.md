@@ -5,11 +5,11 @@
 - [Overview](#overview)
 - [Using build-info-go as a CLI](#using-build-info-go-as-a-cli)
   - [Build the CLI from Sources](#build-the-cli-from-sources)
-  - [Generating Build-Info](#generating-build-info)
+  - [Generating Build-Info](#generating-build-info-using-the-cli)
   - [Logs](#logs)
 - [Go APIs](#go-apis)
   - [Creating a New Build](#creating-a-new-build)
-  - [Generating Build-Info for Go Projects](#generating-build-info-for-go-projects)
+  - [Generating Build-Info](#generating-build-info)
   - [Collecting Environment Variables](#collecting-environment-variables)
   - [Get the Complete Build-Info](#get-the-complete-build-info)
   - [Clean the Build Cache](#clean-the-build-cache)
@@ -44,7 +44,7 @@ On Windows run:
 ````
 Once completed, you'll find the bi executable at the current directory.
 
-### Generating Build-Info
+### Generating Build-Info Using the CLI
 
 The Build-Info CLI allows generating build-info for your project easily and quickly.
 
@@ -93,7 +93,7 @@ It's important to invoke this function at the very beginning of the build, so th
 
 After you [created a Build](#creating-a-new-build), you can create a new build-info module for your specific project type and collect its dependencies:
 
-Go
+#### Go
 ```go
 // You can pass an empty string as an argument, if the root of the Go project is the working directory
 goModule, err := bld.AddGoModule(goProjectPath)
@@ -106,7 +106,7 @@ err = goModule.AddArtifacts(artifact1, artifact2, ...)
 
 ```
 
-Maven
+#### Maven
 ```go
 // You can pass an empty string as an argument, if the root of the Maven project is the working directory
 mavenModule, err := bld.AddMavenModule(mavenProjectPath)
@@ -114,7 +114,7 @@ mavenModule, err := bld.AddMavenModule(mavenProjectPath)
 err = mavenModule.CalcDependencies()
 ```
 
-Gradle
+#### Gradle
 ```go
 // You can pass an empty string as an argument, if the root of the Gradle project is the working directory
 gradleModule, err := bld.AddGradleModule(gradleProjectPath)
