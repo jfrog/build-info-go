@@ -22,6 +22,20 @@
 Read more about build-info and build integration in Artifactory [here](https://www.jfrog.com/confluence/display/JFROG/Build+Integration).
 
 ## Using build-info-go as a CLI
+### Download CLI executable
+[mac-386](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/mac-386/bi)
+
+[windows-amd64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/windows-amd64/bi)
+
+[linux-386](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-386/bi)
+
+[linux-amd64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-amd64/bi)
+
+[linux-arm](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-arm/bi)
+
+[linux-arm64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-arm64/bi)
+
+[linux-s390x](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-s390x/bi)
 
 ### Build the CLI from Sources
 
