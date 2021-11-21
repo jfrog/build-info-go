@@ -3,9 +3,9 @@ module github.com/jfrog/build-info-go
 go 1.15
 
 require (
-	github.com/jfrog/gocmd v0.5.3
+	github.com/jfrog/gocmd v0.5.4
 	github.com/jfrog/gofrog v1.1.0
-	github.com/jfrog/jfrog-client-go v1.6.0
+	github.com/jfrog/jfrog-client-go v1.6.1
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
 )
