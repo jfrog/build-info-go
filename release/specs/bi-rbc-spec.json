@@ -3,10 +3,6 @@
     {
       "pattern": "ecosys-bi-cli/(v1/${VERSION}/*)",
       "target": "bi-cli/{1}"
-    },
-    {
-      "pattern": "ecosys-bi-cli/(v1/latest/*)",
-      "target": "bi-cli/{1}"
     }
   ]
 }

@@ -9,7 +9,17 @@ build () {
   exeName="$4"
   echo "Building $exeName for $GOOS-$GOARCH ..."
 
-  CGO_ENABLED=0 go build -o "$exeName" -ldflags '-w -extldflags "-static"' main.go
+  # Run verification after building plugin for the correct platform of this image.
+  if [[ "$pkg" = "linux-386" ]]; then
+    verifyPluginVersionMatching
+  fi
+
+  res=CGO_ENABLED=0 go build -o "$exeName" -ldflags '-w -extldflags "-static"' main.go
+  exitCode=$?
+  if [[ $exitCode -ne 0 ]]; then
+    echo "Error: Failed to build $exeName for $GOOS-$GOARCH"
+    exit $exitCode
+  fi
 }
 
 #function buildAndUpload(pkg, goos, goarch, fileExtension)
@@ -25,19 +35,27 @@ buildAndUpload () {
   destPath="$pkgPath/$version/$pkg/$exeName"
   echo "Uploading $exeName to $destPath ..."
 
-  ./jfrog rt u "./$exeName" "$destPath"
+  res=./jfrog rt u "./$exeName" "$destPath"
   exitCode=$?
-
+  if [[ $exitCode -ne 0 ]]; then
+    echo "Error: Failed to upload $exeName to $destPath"
+    exit $exitCode
+  fi
 }
 
 #function copyToLatestDir()
 copyToLatestDir () {
   echo "Copy version to latest dir: $pkgPath/$version/"
 
-  ./jfrog rt cp "$pkgPath/$version/(*)" "$pkgPath/latest/{1}" --flat
+  res=./jfrog rt cp "$pkgPath/$version/(*)" "$pkgPath/latest/{1}" --flat
   exitCode=$?
+  if [[ $exitCode -ne 0 ]]; then
+    echo "Error: Failed to copy version to latest"
+    exit $exitCode
+  fi
 }
 
+# Verify version provided in pipelines UI matches version in build-info-go source code.
 verifyVersionMatching () {
   echo "Verifying provided version matches built version..."
   go build -o bi
@@ -62,9 +80,6 @@ verifyVersionMatching () {
 version="$1"
 pkgPath="ecosys-bi-cli/v1"
 
-# Verify version provided in pipelines UI matches version in build-info-go source code.
-verifyVersionMatching
-
 # Build and upload for every architecture.
 # Keep 'linux-386' first to prevent unnecessary uploads in case the built version doesn't match the provided one.
 buildAndUpload 'linux-386' 'linux' '386' ''
@@ -72,6 +87,8 @@ buildAndUpload 'linux-amd64' 'linux' 'amd64' ''
 buildAndUpload 'linux-s390x' 'linux' 's390x' ''
 buildAndUpload 'linux-arm64' 'linux' 'arm64' ''
 buildAndUpload 'linux-arm' 'linux' 'arm' ''
+buildAndUpload 'linux-ppc64' 'linux' 'ppc64' ''
+buildAndUpload 'linux-ppc64le' 'linux' 'ppc64le' ''
 buildAndUpload 'mac-386' 'darwin' 'amd64' ''
 buildAndUpload 'windows-amd64' 'windows' 'amd64' '.exe'
 

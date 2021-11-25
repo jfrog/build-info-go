@@ -16,7 +16,7 @@ func main() {
 		Name:     "Build-Info CLI",
 		Usage:    "Generate build-info for your source code",
 		Commands: cli.GetCommands(log),
-		Version: cliutils.GetVersion(),
+		Version:  cliutils.GetVersion(),
 	}
 	err := app.Run(os.Args)
 	if err != nil {
