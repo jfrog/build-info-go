@@ -153,6 +153,9 @@ func (b *Build) getGeneratedBuildsInfo() ([]*entities.BuildInfo, error) {
 		if err != nil {
 			return nil, err
 		}
+		if len(content) == 0 {
+			continue
+		}
 		buildInfo := new(entities.BuildInfo)
 		err = json.Unmarshal(content, &buildInfo)
 		if err != nil {
