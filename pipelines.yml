@@ -1,5 +1,5 @@
 resources:
-  - name: buildinfoGoGit
+  - name: buildinfoGoGitgai
     type: GitRepo
     configuration:
       path: gailazar300/build-info-go
@@ -25,14 +25,14 @@ pipelines:
         type: Bash
         configuration:
           inputResources:
-            - name: buildinfoGoGit
+            - name: buildinfoGoGitgai
               trigger: false
           integrations:
             - name: gai_github
             - name: entplus_deployer
         execution:
           onExecute:
-            - cd $res_buildinfoGoGit_resourcePath
+            - cd $res_buildinfoGoGitgai_resourcePath
 
             # Set env
             - export CI=true
