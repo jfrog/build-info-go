@@ -88,3 +88,12 @@ func IsPathExists(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)
 }
+
+func GetFileDetails(filePath string) (modFileContent []byte, fileInfo os.FileInfo, err error) {
+	fileInfo, err = os.Stat(filePath)
+	if err != nil {
+		return
+	}
+	modFileContent, err = ioutil.ReadFile(filePath)
+	return
+}
