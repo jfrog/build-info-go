@@ -2,7 +2,7 @@ resources:
   - name: buildinfoGoGit
     type: GitRepo
     configuration:
-      path: jfrog/build-info-go
+      path: gailazar300/build-info-go
       branches:
         include: pr-repo21-release
       gitProvider: gai_github
