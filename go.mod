@@ -10,8 +10,8 @@ require (
 	github.com/urfave/cli/v2 v2.3.0
 )
 
-replace github.com/jfrog/gocmd => github.com/jfrog/gocmd v0.5.6-0.20211125095246-93273e52cec4
+replace github.com/jfrog/gocmd => github.com/jfrog/gocmd v0.5.6-0.20211125120614-66713cecff51
 
-replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v1.6.2-0.20211124162552-294b033f185b
+replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v1.6.3-0.20211125111027-5d007cf9b3bd
 
 //replace github.com/jfrog/gofrog => github.com/jfrog/gofrog v1.0.7-0.20211107071406-54da7fb08599
