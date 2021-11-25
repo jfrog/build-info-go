@@ -4,8 +4,8 @@ resources:
     configuration:
       path: jfrog/build-info-go
       branches:
-        include: main
-      gitProvider: il_automation
+        include: pr-repo21-release
+      gitProvider: gai_github
 
 pipelines:
   - name: release_build_info_go
@@ -28,7 +28,7 @@ pipelines:
             - name: buildinfoGoGit
               trigger: false
           integrations:
-            - name: il_automation
+            - name: gai_github
             - name: entplus_deployer
         execution:
           onExecute:
