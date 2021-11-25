@@ -8,6 +8,12 @@ require (
 	github.com/jfrog/jfrog-client-go v1.6.1
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
+	golang.org/x/text v0.3.7 // indirect
+)
+
+exclude (
+	golang.org/x/text v0.3.3
+	golang.org/x/text v0.3.5
 )
 
 // replace github.com/jfrog/gocmd => github.com/jfrog/gocmd v0.5.5-0.20211124162113-60531e4d9053
