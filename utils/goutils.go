@@ -165,12 +165,12 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 	}
 	// Read and store the details of the go.mod and go.sum files,
 	// because they may change by the 'go mod graph' or 'go list' commands.
-	modFileContent, modFileStat, err := GetFileDetails(filepath.Join(projectDir, "go.mod"))
+	modFileContent, modFileStat, err := GetFileContentAndInfo(filepath.Join(projectDir, "go.mod"))
 	if err != nil {
 		log.Info("Dependencies were not collected for this build, since go.mod could not be found in", projectDir)
 		return "", nil
 	}
-	sumFileContent, sumFileStat, err := GetFileDetails(filepath.Join(projectDir, "go.sum"))
+	sumFileContent, sumFileStat, err := GetFileContentAndInfo(filepath.Join(projectDir, "go.sum"))
 	if err != nil && !os.IsNotExist(err) {
 		return "", err
 	}
@@ -394,7 +394,7 @@ func getGoSum(rootProjectDir string, log Log) (sumFileContent []byte, sumFileSta
 	sumFileExists, err := IsFileExists(filepath.Join(rootProjectDir, "go.sum"))
 	if err == nil && sumFileExists {
 		log.Debug("Sum file exists:", rootProjectDir)
-		sumFileContent, sumFileStat, err = GetFileDetails(filepath.Join(rootProjectDir, "go.sum"))
+		sumFileContent, sumFileStat, err = GetFileContentAndInfo(filepath.Join(rootProjectDir, "go.sum"))
 	}
 	return
 }

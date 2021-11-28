@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
-	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-	"github.com/jfrog/jfrog-client-go/utils/log"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -18,8 +16,6 @@ type GoModule struct {
 }
 
 func newGoModule(srcPath string, containingBuild *Build) (*GoModule, error) {
-	log.SetLogger(containingBuild.logger)
-
 	var err error
 	if srcPath == "" {
 		srcPath, err = utils.GetProjectRoot()
@@ -83,7 +79,7 @@ func (gm *GoModule) getGoDependencies(cachePath string, moduleSlice map[string]b
 
 		// We first check if this dependency has a zip in the local Go cache.
 		// If it does not, nil is returned. This seems to be a bug in Go.
-		zipPath, err := getPackageZipLocation(cachePath, name, version)
+		zipPath, err := gm.getPackageZipLocation(cachePath, name, version)
 		if err != nil {
 			return nil, err
 		}
@@ -115,8 +111,8 @@ func goModEncode(name string) string {
 }
 
 // Returns the path to the package zip file if exists.
-func getPackageZipLocation(cachePath, dependencyName, version string) (string, error) {
-	zipPath, err := getPackagePathIfExists(cachePath, dependencyName, version)
+func (gm *GoModule) getPackageZipLocation(cachePath, dependencyName, version string) (string, error) {
+	zipPath, err := gm.getPackagePathIfExists(cachePath, dependencyName, version)
 	if err != nil {
 		return "", err
 	}
@@ -125,7 +121,7 @@ func getPackageZipLocation(cachePath, dependencyName, version string) (string, e
 		return zipPath, nil
 	}
 
-	zipPath, err = getPackagePathIfExists(filepath.Dir(cachePath), dependencyName, version)
+	zipPath, err = gm.getPackagePathIfExists(filepath.Dir(cachePath), dependencyName, version)
 
 	if err != nil {
 		return "", err
@@ -135,30 +131,30 @@ func getPackageZipLocation(cachePath, dependencyName, version string) (string, e
 }
 
 // Validates if the package zip file exists.
-func getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath string, err error) {
+func (gm *GoModule) getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath string, err error) {
 	zipPath = filepath.Join(cachePath, dependencyName, "@v", version+".zip")
 	fileExists, err := utils.IsFileExists(zipPath)
 	if err != nil {
-		log.Warn(fmt.Sprintf("Could not find zip binary for dependency '%s' at %s.", dependencyName, zipPath))
+		gm.containingBuild.logger.Warn(fmt.Sprintf("Could not find zip binary for dependency '%s' at %s.", dependencyName, zipPath))
 		return "", err
 	}
 	// Zip binary does not exist, so we skip it by returning a nil dependency.
 	if !fileExists {
-		log.Debug("The following file is missing:", zipPath)
+		gm.containingBuild.logger.Debug("The following file is missing:", zipPath)
 		return "", nil
 	}
 	return zipPath, nil
 }
 
 // populateZip adds the zip file as build-info dependency
-func populateZip(packageId, zipPath string) (*entities.Dependency, error) {
+func populateZip(packageId, zipPath string) (zipDependency *entities.Dependency, err error) {
 	// Zip file dependency for the build-info
-	zipDependency := &entities.Dependency{Id: packageId}
-	fileDetails, err := fileutils.GetFileDetails(zipPath, true)
+	zipDependency = &entities.Dependency{Id: packageId}
+	checksums, err := utils.GetFileChecksums(zipPath)
 	if err != nil {
 		return nil, err
 	}
 	zipDependency.Type = "zip"
-	zipDependency.Checksum = &entities.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}
-	return zipDependency, nil
+	zipDependency.Checksum = &entities.Checksum{Sha1: checksums.Sha1, Md5: checksums.Md5}
+	return
 }
