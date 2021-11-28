@@ -30,6 +30,7 @@ pipelines:
           integrations:
             - name: gai_github
             - name: entplus_deployer
+            - name: releases_edge_deployer_permissions
         execution:
           onExecute:
             - cd $res_buildinfoGoGitgai_resourcePath
