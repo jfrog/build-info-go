@@ -8,7 +8,7 @@ resources:
       gitProvider: gai_github
 
 pipelines:
-  - name: release_build_info_go
+  - name: release_build_info_go_fork
     configuration:
       runtime:
         type: image
