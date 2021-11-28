@@ -35,7 +35,7 @@ buildAndUpload () {
   destPath="$pkgPath/$version/$pkg/$exeName"
   echo "Uploading $exeName to $destPath ..."
 
-  res=./jfrog rt u "./$exeName" "$destPath"
+  res=sh "./jfrog rt u ./$exeName $destPath"
   exitCode=$?
   if [[ $exitCode -ne 0 ]]; then
     echo "Error: Failed to upload $exeName to $destPath"
