@@ -11,7 +11,7 @@ build () {
 
   # Run verification after building plugin for the correct platform of this image.
   if [[ "$pkg" = "linux-386" ]]; then
-    verifyPluginVersionMatching
+    verifyVersionMatching
   fi
 
   res=CGO_ENABLED=0 go build -o "$exeName" -ldflags '-w -extldflags "-static"' main.go
