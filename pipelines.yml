@@ -49,12 +49,12 @@ pipelines:
             - ./jfrog c add internal --url=$int_entplus_deployer_url --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
 
             # Build and upload
-            - chmod +x release/build.sh
-            - env -i PATH=$PATH HOME=$HOME NEXT_VERSION=$NEXT_VERSION release/build.sh "$NEXT_VERSION"
+            #- chmod +x release/build.sh
+            #- env -i PATH=$PATH HOME=$HOME NEXT_VERSION=$NEXT_VERSION release/build.sh "$NEXT_VERSION"
 
             # Distribute release bundle
-            - ./jfrog ds rbc "build-info-go" $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign --url=$int_entplus_deployer_url/distribution --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
-            - ./jfrog ds rbd "build-info-go" $NEXT_VERSION --site=releases.jfrog.io --url=$int_entplus_deployer_url/distribution --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
+            #- ./jfrog ds rbc "build-info-go" $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign --url=$int_entplus_deployer_url/distribution --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
+            #- ./jfrog ds rbd "build-info-go" $NEXT_VERSION --site=releases.jfrog.io --url=$int_entplus_deployer_url/distribution --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
 
             # Copy version to 'latest' directory in releases.jfrog.io
-            - ./jfrog rt cp "bi-cli/v1/$NEXT_VERSION/*" bi-cli/v1/latest/ --flat --url=releases.jfrog.io --access-token=$int_releases_edge_deployer_permissions_token
+            - ./jfrog rt cp "bi-cli/v1/$NEXT_VERSION/*" bi-cli/v1/latest/ --flat --url=https://releases.jfrog.io --access-token=$int_releases_edge_deployer_permissions_token
