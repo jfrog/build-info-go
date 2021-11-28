@@ -34,25 +34,13 @@ buildAndUpload () {
 
   destPath="$pkgPath/$version/$pkg/$exeName"
   echo "Uploading $exeName to $destPath ..."
-
   ./jfrog rt u "./$exeName" "$destPath"
-  exitCode=$?
-  if [[ $exitCode -ne 0 ]]; then
-    echo "Error: Failed to upload $exeName to $destPath"
-    exit $exitCode
-  fi
 }
 
 #function copyToLatestDir()
 copyToLatestDir () {
   echo "Copy version to latest dir: $pkgPath/$version/"
-
-  res=./jfrog rt cp "$pkgPath/$version/(*)" "$pkgPath/latest/{1}" --flat
-  exitCode=$?
-  if [[ $exitCode -ne 0 ]]; then
-    echo "Error: Failed to copy version to latest"
-    exit $exitCode
-  fi
+  ./jfrog rt cp "$pkgPath/$version/(*)" "$pkgPath/latest/{1}" --flat
 }
 
 # Verify version provided in pipelines UI matches version in build-info-go source code.
