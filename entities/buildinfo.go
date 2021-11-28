@@ -23,7 +23,7 @@ const (
 	Npm     ModuleType = "npm"
 	Nuget   ModuleType = "nuget"
 	Go      ModuleType = "go"
-	Pip     ModuleType = "pip"
+	Python  ModuleType = "python"
 )
 
 type BuildInfo struct {
