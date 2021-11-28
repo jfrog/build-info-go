@@ -9,16 +9,16 @@ build () {
   exeName="$4"
   echo "Building $exeName for $GOOS-$GOARCH ..."
 
-  # Run verification after building plugin for the correct platform of this image.
-  if [[ "$pkg" = "linux-386" ]]; then
-    verifyVersionMatching
-  fi
-
   res=CGO_ENABLED=0 go build -o "$exeName" -ldflags '-w -extldflags "-static"' main.go
   exitCode=$?
   if [[ $exitCode -ne 0 ]]; then
     echo "Error: Failed to build $exeName for $GOOS-$GOARCH"
     exit $exitCode
+  fi
+
+  # Run verification after building plugin for the correct platform of this image.
+  if [[ "$pkg" = "linux-386" ]]; then
+    verifyVersionMatching
   fi
 }
 
