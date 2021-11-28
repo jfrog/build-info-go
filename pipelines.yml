@@ -39,6 +39,7 @@ pipelines:
             - export JFROG_CLI_BUILD_NAME=ecosystem-build-info-go-release
             - export JFROG_CLI_BUILD_NUMBER=$run_number
             - export JFROG_CLI_BUILD_PROJECT=ecosys
+            - export PIPELINES_VERBOSE=true
 
             # Make sure version provided
             - echo "Checking variables"
