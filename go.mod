@@ -8,4 +8,4 @@ require (
 	github.com/urfave/cli/v2 v2.3.0
 )
 
-replace github.com/jfrog/gofrog => github.com/asafgabai/gofrog v1.0.7-0.20211124142550-392f9a68eb53
+replace github.com/jfrog/gofrog => github.com/jfrog/gofrog v1.0.7-0.20211128152632-e218c460d703
