@@ -1,5 +1,8 @@
 # Release Notes
 
+## 0.1.3 (November 29, 2021)
+- Upgrade dependencies
+
 ## 0.1.2 (November 25, 2021)
 - Bug fix - Publishing build-info can fail, if a previous build-info collection action left an empty cache file
 
