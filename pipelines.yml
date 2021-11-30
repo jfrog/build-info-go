@@ -59,4 +59,4 @@ pipelines:
             #- ./jfrog ds rbd "build-info-go" $NEXT_VERSION --site=releases.jfrog.io --url=$int_entplus_deployer_url/distribution --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
 
             # Copy version to 'latest' directory in releases.jfrog.io
-            - ./jfrog rt cp "bi-cli/v1/$NEXT_VERSION/(*)" "bi-cli/v1/latest/{1}" --url=https://releases.jfrog.io/artifactory/ --access-token=$int_releases_jfrog_io_deployer_apikey
+            - ./jfrog rt cp "bi-cli/v1/$NEXT_VERSION/(*)" "bi-cli/v1/latest/{1}" --url=https://releases.jfrog.io/artifactory/ --user=$int_releases_jfrog_io_deployer_user --access-token=$int_releases_jfrog_io_deployer_apikey
