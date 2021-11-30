@@ -143,6 +143,7 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 
 // Generates Maven build-info.
 func (mm *MavenModule) CalcDependencies() error {
+	fmt.Println("sssssssssssss")
 	if mm.srcPath == "" {
 		var err error
 		if mm.srcPath, err = os.Getwd(); err != nil {
