@@ -23,8 +23,15 @@ Read more about build-info and build integration in Artifactory [here](https://w
 
 ## Using build-info-go as a CLI
 ### Download CLI executable
-| [windows-amd64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/windows-amd64/bi) | [mac-386](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/mac-386/bi) | [linux-386](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-386/bi) | [linux-amd64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-amd64/bi) | [linux-arm](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-arm/bi) | [linux-arm64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-arm64/bi) | [linux-s390x](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-s390x/bi) |  [linux-ppc64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-ppc64/bi) | [linux-ppc64le](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-ppc64le/bi) |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+
+|🐧 Linux | [386](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-386/bi) |[amd64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-amd64/bi) | [arm](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-arm/bi) | [arm64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-arm64/bi) | [s390x](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-s390x/bi) |  [ppc64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-ppc64/bi) | [ppc64le](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/linux-ppc64le/bi) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+
+|🍏 Mac | [386](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/mac-386/bi) | 
+| :---: | :---: |
+
+|🪟 Windows | [amd64](https://releases.jfrog.io/ui/repos/tree/General/bi-cli/v1/latest/windows-amd64/bi) | 
+| :---: | :---: |
 
 ### Build the CLI from Sources
 
