@@ -1,0 +1,61 @@
+resources:
+  - name: buildinfoGoGit
+    type: GitRepo
+    configuration:
+      path: jfrog/build-info-go
+      branches:
+        include: main
+      gitProvider: il_automation
+
+pipelines:
+  - name: release_build_info_go
+    configuration:
+      runtime:
+        type: image
+        image:
+          custom:
+            name: releases-docker.jfrog.io/jfrog-ecosystem-integration-env
+            tag: 1.5.0
+      environmentVariables:
+        readOnly:
+          NEXT_VERSION: 0.0.0
+
+    steps:
+      - name: Release
+        type: Bash
+        configuration:
+          inputResources:
+            - name: buildinfoGoGit
+              trigger: false
+          integrations:
+            - name: il_automation
+            - name: entplus_deployer
+            - name: releases_jfrog_io_deployer
+        execution:
+          onExecute:
+            - cd $res_buildinfoGoGit_resourcePath
+
+            # Set env
+            - export CI=true
+            - export JFROG_CLI_BUILD_NAME=ecosystem-build-info-go-release
+            - export JFROG_CLI_BUILD_NUMBER=$run_number
+            - export JFROG_CLI_BUILD_PROJECT=ecosys
+
+            # Make sure version provided
+            - echo "Checking variables"
+            - test -n "$NEXT_VERSION" -a "$NEXT_VERSION" != "0.0.0"
+
+            # Download JFrog CLI
+            - curl -fL https://getcli.jfrog.io | bash -s v2 && chmod +x jfrog
+            - ./jfrog c add internal --url=$int_entplus_deployer_url --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
+
+            # Build and upload
+            - chmod +x release/build.sh
+            - env -i PATH=$PATH HOME=$HOME NEXT_VERSION=$NEXT_VERSION release/build.sh "$NEXT_VERSION"
+
+            # Distribute release bundle
+            - ./jfrog ds rbc "build-info-go" $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign --url=$int_entplus_deployer_url/distribution --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
+            - ./jfrog ds rbd "build-info-go" $NEXT_VERSION --site=releases.jfrog.io --url=$int_entplus_deployer_url/distribution --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
+
+            # Copy version to 'latest' directory in releases.jfrog.io
+            - ./jfrog rt cp "bi-cli/v1/$NEXT_VERSION/(*)" "bi-cli/v1/latest/{1}" --url=https://releases.jfrog.io/artifactory/ --access-token=$int_releases_jfrog_io_deployer_access_token

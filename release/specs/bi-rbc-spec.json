@@ -1,0 +1,8 @@
+{
+  "files": [
+    {
+      "pattern": "ecosys-bi-cli/(v1/${VERSION}/*)",
+      "target": "bi-cli/{1}"
+    }
+  ]
+}
