@@ -23,7 +23,7 @@ const (
 	PropertiesTempfolderName        = "properties"
 	mavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
 	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
-	MavenExtractorDependencyVersion = "2.31.3"
+	MavenExtractorDependencyVersion = "2.32.0"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -143,6 +143,7 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 
 // Generates Maven build-info.
 func (mm *MavenModule) CalcDependencies() error {
+	fmt.Println("sssssssssssss")
 	if mm.srcPath == "" {
 		var err error
 		if mm.srcPath, err = os.Getwd(); err != nil {
