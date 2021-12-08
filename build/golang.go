@@ -1,6 +1,7 @@
 package build
 
 import (
+	"errors"
 	"fmt"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
@@ -60,11 +61,8 @@ func (gm *GoModule) loadDependencies() ([]entities.Dependency, error) {
 		return nil, err
 	}
 	modulesMap, err := utils.GetDependenciesList(gm.srcPath, gm.containingBuild.logger)
-	if err != nil {
+	if err != nil || len(modulesMap) == 0 {
 		return nil, err
-	}
-	if modulesMap == nil {
-		return nil, nil
 	}
 	return gm.getGoDependencies(cachePath, modulesMap)
 }
@@ -96,8 +94,8 @@ func (gm *GoModule) getGoDependencies(cachePath string, moduleSlice map[string]b
 }
 
 // Returns the actual path to the dependency.
-// If in the path there are capital letters, the Go convention is to use "!" before the letter.
-// The letter itself in lowercase.
+// If the path includes capital letters, the Go convention is to use "!" before the letter.
+// The letter itself is in lowercase.
 func goModEncode(name string) string {
 	path := ""
 	for _, letter := range name {
@@ -121,22 +119,15 @@ func (gm *GoModule) getPackageZipLocation(cachePath, dependencyName, version str
 		return zipPath, nil
 	}
 
-	zipPath, err = gm.getPackagePathIfExists(filepath.Dir(cachePath), dependencyName, version)
-
-	if err != nil {
-		return "", err
-	}
-
-	return zipPath, nil
+	return gm.getPackagePathIfExists(filepath.Dir(cachePath), dependencyName, version)
 }
 
-// Validates if the package zip file exists.
+// Validates that the package zip file exists and returns its path.
 func (gm *GoModule) getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath string, err error) {
 	zipPath = filepath.Join(cachePath, dependencyName, "@v", version+".zip")
 	fileExists, err := utils.IsFileExists(zipPath)
 	if err != nil {
-		gm.containingBuild.logger.Warn(fmt.Sprintf("Could not find zip binary for dependency '%s' at %s.", dependencyName, zipPath))
-		return "", err
+		return "", errors.New(fmt.Sprintf("Could not find zip binary for dependency '%s' at %s: %s", dependencyName, zipPath, err))
 	}
 	// Zip binary does not exist, so we skip it by returning a nil dependency.
 	if !fileExists {

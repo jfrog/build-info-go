@@ -22,8 +22,6 @@ const (
 var algorithmFunc = map[Algorithm]func() hash.Hash{
 	MD5:  md5.New,
 	SHA1: sha1.New,
-	// TODO - Uncomment `Sha256` population when Artifactory support Sha256 checksum validation
-	//SHA256: sha256.New,
 }
 
 func GetFileChecksums(filePath string) (checksums *entities.Checksum, err error) {
@@ -44,7 +42,7 @@ func GetFileChecksums(filePath string) (checksums *entities.Checksum, err error)
 	return &entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1]}, nil
 }
 
-// CalcChecksums all hashes at once using AsyncMultiWriter therefore the file is read only once.
+// CalcChecksums calculates all hashes at once using AsyncMultiWriter. The file is therefore read only once.
 func CalcChecksums(reader io.Reader, checksumType ...Algorithm) (map[Algorithm]string, error) {
 	hashes := getChecksumByAlgorithm(checksumType...)
 	var multiWriter io.Writer

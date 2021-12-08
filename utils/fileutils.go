@@ -93,7 +93,7 @@ func DoubleWinPathSeparator(filePath string) string {
 	return strings.Replace(filePath, "\\", "\\\\", -1)
 }
 
-// IsPathExists checks if path exists.
+// IsPathExists checks if a path exists.
 func IsPathExists(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)
@@ -108,8 +108,7 @@ func GetFileContentAndInfo(filePath string) (fileContent []byte, fileInfo os.Fil
 	return
 }
 
-// CreateTempDir creates a temporary directory at tempDirBase.
-// Set tempDirPath to the created directory path.
+// CreateTempDir creates a temporary directory and returns its path.
 func CreateTempDir() (string, error) {
 	tempDirBase := os.TempDir()
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
