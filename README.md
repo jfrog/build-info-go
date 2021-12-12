@@ -30,7 +30,7 @@ Read more about build-info and build integration in Artifactory [here](https://w
 |🍏 Mac | [386](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/mac-386/bi) | 
 | :---: | :---: |
 
-|<img src="docs/windows.png"> Windows | [amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/windows-amd64/bi.exe) | 
+|<img src="docs/windows.png" width="20" height="20"> Windows | [amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/windows-amd64/bi.exe) | 
 | :---: | :---: |
 
 ### Build the CLI from Sources
