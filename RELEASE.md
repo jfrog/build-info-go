@@ -1,5 +1,8 @@
 # Release Notes
 
+## 0.1.5 (December 13, 2021)
+- Upgrade dependencies
+
 ## 0.1.4 (November 30, 2021)
 - Upgrade dependencies
 
