@@ -42,7 +42,7 @@ type Cmd struct {
 	ErrWriter    io.WriteCloser
 }
 
-func NewCmd() (*Cmd, error) {
+func newCmd() (*Cmd, error) {
 	execPath, err := exec.LookPath("go")
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func RunGo(goArg []string, repoUrl string) error {
 		return err
 	}
 
-	goCmd, err := NewCmd()
+	goCmd, err := newCmd()
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 			}
 		}()
 	}
-	goCmd, err := NewCmd()
+	goCmd, err := newCmd()
 	if err != nil {
 		return "", err
 	}
@@ -307,7 +307,7 @@ func getParsedGoVersion() (*version.Version, error) {
 }
 
 func getGoVersion() (string, error) {
-	goCmd, err := NewCmd()
+	goCmd, err := newCmd()
 	if err != nil {
 		return "", err
 	}
@@ -320,7 +320,7 @@ func getGoVersion() (string, error) {
 func prepareGlobalRegExp() error {
 	var err error
 	if protocolRegExp == nil {
-		protocolRegExp, err = initRegExp(credentialsInUrlRegexp, RemoveCredentials)
+		protocolRegExp, err = initRegExp(credentialsInUrlRegexp, removeCredentials)
 		if err != nil {
 			return err
 		}
@@ -344,7 +344,7 @@ func initRegExp(regex string, execFunc func(pattern *gofrogcmd.CmdOutputPattern)
 }
 
 // Remove the credentials information from the line.
-func RemoveCredentials(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
+func removeCredentials(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 	splitResult := strings.Split(pattern.MatchedResults[0], "//")
 	return strings.Replace(pattern.Line, pattern.MatchedResults[0], splitResult[0]+"//", 1), nil
 }
@@ -369,7 +369,7 @@ func GetGoModCachePath() (string, error) {
 
 // GetGOPATH returns the location of the GOPATH
 func getGOPATH() (string, error) {
-	goCmd, err := NewCmd()
+	goCmd, err := newCmd()
 	if err != nil {
 		return "", err
 	}
