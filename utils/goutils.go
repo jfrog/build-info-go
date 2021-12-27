@@ -140,7 +140,12 @@ func GetDependenciesList(projectDir string, log Log) (map[string]bool, error) {
 	}
 	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
 	if err != nil {
-		return nil, err
+		// Errors occurred during running "go list". Run again and this time ignore errors (with '-e')
+		log.Warn("Errors occurred during building the Go dependency tree. The dependency tree may be incomplete:" + err.Error())
+		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return listToMap(output), err
 }
@@ -212,7 +217,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 		return "", errors.New(errorString)
 	}
 
-	// Restore the the go.mod and go.sum files, to make sure they stay the same as before
+	// Restore the go.mod and go.sum files, to make sure they stay the same as before
 	// running the "go mod graph" command.
 	err = ioutil.WriteFile(filepath.Join(projectDir, "go.mod"), modFileContent, modFileStat.Mode())
 	if err != nil {
