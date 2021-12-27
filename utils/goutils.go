@@ -223,52 +223,12 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 
 // Returns the root dir where the go.mod located.
 func GetProjectRoot() (string, error) {
-	// Create a map to store all paths visited, to avoid running in circles.
-	visitedPaths := make(map[string]bool)
 	// Get the current directory.
 	wd, err := os.Getwd()
 	if err != nil {
 		return wd, err
 	}
-	defer os.Chdir(wd)
-
-	// Get the OS root.
-	osRoot := os.Getenv("SYSTEMDRIVE")
-	if osRoot != "" {
-		// If this is a Windows machine:
-		osRoot += "\\"
-	} else {
-		// Unix:
-		osRoot = "/"
-	}
-
-	// Check if the current directory includes the go.mod file. If not, check the parent directpry
-	// and so on.
-	for {
-		// If the go.mod is found the current directory, return the path.
-		exists, err := IsFileExists(filepath.Join(wd, "go.mod"))
-		if err != nil || exists {
-			return wd, err
-		}
-
-		// If this the OS root, we can stop.
-		if wd == osRoot {
-			break
-		}
-
-		// Save this path.
-		visitedPaths[wd] = true
-		// CD to the parent directory.
-		wd = filepath.Dir(wd)
-		os.Chdir(wd)
-
-		// If we already visited this directory, it means that there's a loop and we can stop.
-		if visitedPaths[wd] {
-			return "", errors.New("Could not find go.mod for project.")
-		}
-	}
-
-	return "", errors.New("Could not find go.mod for project.")
+	return FindFileInDirAndParents(wd, "go.mod")
 }
 
 // Go performs password redaction from url since version 1.13.
