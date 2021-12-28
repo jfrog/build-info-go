@@ -140,8 +140,8 @@ func GetDependenciesList(projectDir string, log Log) (map[string]bool, error) {
 	}
 	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
 	if err != nil {
-		// Errors occurred during running "go list". Run again and this time ignore errors (with '-e')
-		log.Warn("Errors occurred during building the Go dependency tree. The dependency tree may be incomplete:" + err.Error())
+		// Errors occurred while running "go list". Run again and this time ignore errors (with '-e')
+		log.Warn("Errors occurred while building the Go dependency tree. The dependency tree may be incomplete:" + err.Error())
 		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
 		if err != nil {
 			return nil, err
@@ -247,7 +247,7 @@ func GetProjectRoot() (string, error) {
 		osRoot = "/"
 	}
 
-	// Check if the current directory includes the go.mod file. If not, check the parent directpry
+	// Check if the current directory includes the go.mod file. If not, check the parent directory
 	// and so on.
 	for {
 		// If the go.mod is found the current directory, return the path.
