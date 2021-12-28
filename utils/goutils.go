@@ -18,7 +18,7 @@ import (
 
 const credentialsInUrlRegexp = `(http|https|git)://.+@`
 
-// Minimum go version, which its output does not require to mask passwords in URLs.
+// Minimum go version, which its output does not require masking passwords in URLs.
 const minGoVersionForMasking = "go1.13"
 
 // Max go version, which automatically modify go.mod and go.sum when executing build commands.
@@ -267,7 +267,7 @@ func GetProjectRoot() (string, error) {
 		wd = filepath.Dir(wd)
 		os.Chdir(wd)
 
-		// If we already visited this directory, it means that there's a loop and we can stop.
+		// If we already visited this directory, it means that there's a loop, and we can stop.
 		if visitedPaths[wd] {
 			return "", errors.New("Could not find go.mod for project.")
 		}
@@ -354,7 +354,7 @@ func removeCredentials(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 	return strings.Replace(pattern.Line, pattern.MatchedResults[0], splitResult[0]+"//", 1), nil
 }
 
-// GetCachePath returns the location of downloads dir insied the GOMODCACHE
+// GetCachePath returns the location of downloads dir inside the GOMODCACHE
 func GetCachePath() (string, error) {
 	goModCachePath, err := GetGoModCachePath()
 	if err != nil {
