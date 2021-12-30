@@ -156,7 +156,7 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 		"golang.org/x/text@v0.3.3": true,
 		"rsc.io/quote@v1.5.2":      true,
 		"rsc.io/sampler@v1.3.0":    true,
-		"testGoList@":              true,
+		testDir + "@":              true,
 	}
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("Expecting: \n%v \nGot: \n%v", expected, actual)

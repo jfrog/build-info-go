@@ -1,4 +1,4 @@
-module testGoBadList
+module testBadGoList
 
 go 1.16
 
