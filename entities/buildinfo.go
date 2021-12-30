@@ -1,9 +1,10 @@
 package entities
 
 import (
-	"github.com/jfrog/gofrog/stringutils"
 	"strings"
 	"time"
+
+	"github.com/jfrog/gofrog/stringutils"
 )
 
 type ModuleType string
@@ -190,11 +191,59 @@ type Module struct {
 	*Checksum
 }
 
+func (m *Module) isEqual(b Module) bool {
+	return m.Id == b.Id && m.Type == b.Type && isEqualArtifactSlices(m.Artifacts, b.Artifacts) && isEqualDependencySlices(m.Dependencies, b.Dependencies)
+}
+
+func IsEqualModuleSlices(a, b []Module) bool {
+	return isEqualModuleSlices(a, b) && isEqualModuleSlices(b, a)
+}
+
+func isEqualModuleSlices(a, b []Module) bool {
+	visitedIndexes := make(map[int]bool)
+	for _, aEl := range a {
+		found := false
+		for index, bEl := range b {
+			if _, ok := visitedIndexes[index]; !ok && aEl.isEqual(bEl) {
+				found = true
+				visitedIndexes[index] = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
 type Artifact struct {
 	Name string `json:"name,omitempty"`
 	Type string `json:"type,omitempty"`
 	Path string `json:"path,omitempty"`
 	*Checksum
+}
+
+func (a *Artifact) isEqual(b Artifact) bool {
+	return a.Name == b.Name && a.Path == b.Path && a.Type == b.Type && a.Sha1 == b.Sha1 && a.Md5 == b.Md5
+}
+
+func isEqualArtifactSlices(a, b []Artifact) bool {
+	visitedIndexes := make(map[int]bool)
+	for _, aEl := range a {
+		found := false
+		for index, bEl := range b {
+			if _, ok := visitedIndexes[index]; !ok && aEl.isEqual(bEl) {
+				found = true
+				visitedIndexes[index] = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 type Dependency struct {
@@ -203,6 +252,28 @@ type Dependency struct {
 	Scopes      []string   `json:"scopes,omitempty"`
 	RequestedBy [][]string `json:"requestedBy,omitempty"`
 	*Checksum
+}
+
+func (d *Dependency) IsEqual(b Dependency) bool {
+	return d.Id == b.Id && d.Type == b.Type && d.Sha1 == b.Sha1 && d.Md5 == b.Md5
+}
+
+func isEqualDependencySlices(a, b []Dependency) bool {
+	visitedIndexes := make(map[int]bool)
+	for _, aEl := range a {
+		found := false
+		for index, bEl := range b {
+			if _, ok := visitedIndexes[index]; !ok && aEl.IsEqual(bEl) {
+				found = true
+				visitedIndexes[index] = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 type Issues struct {
