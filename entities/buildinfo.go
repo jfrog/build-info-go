@@ -192,7 +192,7 @@ type Module struct {
 }
 
 func (m *Module) isEqual(b Module) bool {
-	return isEqualArtifactSlices(m.Artifacts, m.Artifacts) && isEqualDependencySlices(m.Dependencies, b.Dependencies) && m.Id == b.Id && m.Type == b.Type
+	return m.Id == b.Id && m.Type == b.Type && isEqualArtifactSlices(m.Artifacts, b.Artifacts) && isEqualDependencySlices(m.Dependencies, b.Dependencies)
 }
 
 func IsEqualModuleSlices(a, b []Module) bool {
@@ -200,11 +200,13 @@ func IsEqualModuleSlices(a, b []Module) bool {
 }
 
 func isEqualModuleSlices(a, b []Module) bool {
+	visitedIndexes := make(map[int]bool)
 	for _, aEl := range a {
 		found := false
-		for _, bEl := range b {
-			if aEl.isEqual(bEl) {
+		for index, bEl := range b {
+			if _, ok := visitedIndexes[index]; !ok && aEl.isEqual(bEl) {
 				found = true
+				visitedIndexes[index] = true
 				break
 			}
 		}
@@ -227,11 +229,13 @@ func (a *Artifact) isEqual(b Artifact) bool {
 }
 
 func isEqualArtifactSlices(a, b []Artifact) bool {
+	visitedIndexes := make(map[int]bool)
 	for _, aEl := range a {
 		found := false
-		for _, bEl := range b {
-			if aEl.isEqual(bEl) {
+		for index, bEl := range b {
+			if _, ok := visitedIndexes[index]; !ok && aEl.isEqual(bEl) {
 				found = true
+				visitedIndexes[index] = true
 				break
 			}
 		}
@@ -255,11 +259,13 @@ func (d *Dependency) IsEqual(b Dependency) bool {
 }
 
 func isEqualDependencySlices(a, b []Dependency) bool {
+	visitedIndexes := make(map[int]bool)
 	for _, aEl := range a {
 		found := false
-		for _, bEl := range b {
-			if aEl.IsEqual(bEl) {
+		for index, bEl := range b {
+			if _, ok := visitedIndexes[index]; !ok && aEl.IsEqual(bEl) {
 				found = true
+				visitedIndexes[index] = true
 				break
 			}
 		}
