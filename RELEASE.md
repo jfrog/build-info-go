@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.1.6 (December 31, 2021)
+- Added isEqual func to module, artifact & dependency structs
+- Allow ignoring go list errors
+
 ## 0.1.5 (December 13, 2021)
 - Upgrade dependencies
 
