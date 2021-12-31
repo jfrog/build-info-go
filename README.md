@@ -19,7 +19,7 @@
 
 **build-info-go** is a Go library, which allows generating build-info for a source code project. The library is also packaged as a CLI.
 
-Read more about build-info and build integration in Artifactory [here](https://www.jfrog.com/confluence/display/JFROG/Build+Integration).
+Want to get additional enhancements when using build-info with the JFrog Platform? [Read more](https://www.jfrog.com/confluence/display/JFROG/Build+Integration) on how to do this in JFrog Artifactory.
 
 ## Using build-info-go as a CLI
 ### Download the CLI executable
