@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/jfrog/gofrog v1.1.1
+	github.com/minio/sha256-simd v1.0.1-0.20210617151322-99e45fae3395
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
 )
