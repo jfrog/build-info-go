@@ -296,8 +296,9 @@ type AffectedIssue struct {
 }
 
 type Checksum struct {
-	Sha1 string `json:"sha1,omitempty"`
-	Md5  string `json:"md5,omitempty"`
+	Sha1   string `json:"sha1,omitempty"`
+	Md5    string `json:"md5,omitempty"`
+	Sha256 string `json:"sha256,omitempty"`
 }
 
 type Env map[string]string
