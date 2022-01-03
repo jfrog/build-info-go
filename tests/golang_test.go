@@ -19,7 +19,7 @@ func TestGenerateBuildInfoForGoProject(t *testing.T) {
 	assert.NoError(t, err)
 	err = goModule.CalcDependencies()
 	assert.NoError(t, err)
-	err = goModule.AddArtifacts(entities.Artifact{Name: "artifactName", Type: "artifactType", Path: "artifactPath", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}})
+	err = goModule.AddArtifacts(entities.Artifact{Name: "artifactName", Type: "artifactType", Path: "artifactPath", Checksum: &entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}})
 	assert.NoError(t, err)
 	buildInfo, err := goBuild.ToBuildInfo()
 	assert.NoError(t, err)

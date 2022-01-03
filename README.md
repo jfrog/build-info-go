@@ -114,7 +114,7 @@ goModule, err := bld.AddGoModule(goProjectPath)
 err = goModule.CalcDependencies()
 
 // You can also add artifacts to that module:
-artifact1 := entities.Artifact{Name: "v1.0.0.mod", Type: "mod", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
+artifact1 := entities.Artifact{Name: "v1.0.0.mod", Type: "mod", Checksum: &entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}}
 err = goModule.AddArtifacts(artifact1, artifact2, ...)
 
 ```
