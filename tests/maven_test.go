@@ -16,8 +16,10 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	service := build.NewBuildInfoService()
 	mavenBuild, err := service.GetOrCreateBuild("build-info-maven-test", "1")
 	assert.NoError(t, err)
+	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
+	assert.NoError(t, err)
 	// Create maven project
-	projectPath, err, cleanup := CopyProject(t)
+	projectPath, cleanup := CopyProject(t, testdataDir)
 	assert.NoError(t, err)
 	defer cleanup()
 	// Add maven project as module in build-info.
@@ -29,15 +31,17 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	buildInfo, err := mavenBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	// Check build-info results.
-	assert.True(t, entities.IsEqualModuleSlices(buildInfo.Modules, getExpectedMavenBuildInfo(t, filepath.Join("testdata", "maven", "expected_maven_buildinfo.json")).Modules))
+	assert.True(t, entities.IsEqualModuleSlices(buildInfo.Modules, getExpectedMavenBuildInfo(t, filepath.Join(testdataDir, "maven", "expected_maven_buildinfo.json")).Modules))
 }
 
-func CopyProject(t *testing.T) (string, error, func()) {
-	projectRoot := filepath.Join("testdata", "maven", "project")
+func CopyProject(t *testing.T, testdataDir string) (string, func()) {
+	projectRoot := filepath.Join(testdataDir, "maven", "project")
 	path, err := utils.CreateTempDir()
 	assert.NoError(t, err)
+	err = utils.CopyDir(projectRoot, path, true, nil)
+	assert.NoError(t, err)
 
-	return path, utils.CopyDir(projectRoot, path, true, nil), func() {
+	return path, func() {
 		assert.NoError(t, utils.RemoveTempDir(path))
 	}
 }
