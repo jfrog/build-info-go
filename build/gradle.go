@@ -138,7 +138,7 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 	}
 	initScriptPath := filepath.Join(gradleDependenciesDir, gradleInitScriptTemplate)
 
-	exists, err := utils.IsFileExists(initScriptPath)
+	exists, err := utils.IsFileExists(initScriptPath, true)
 	if exists || err != nil {
 		return initScriptPath, err
 	}

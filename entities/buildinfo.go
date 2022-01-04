@@ -281,7 +281,16 @@ type Artifact struct {
 }
 
 func (a *Artifact) isEqual(b Artifact) bool {
-	return a.Name == b.Name && a.Path == b.Path && a.Type == b.Type && a.Sha1 == b.Sha1 && a.Md5 == b.Md5
+	if b.Checksum == nil && a.Checksum == nil {
+		return a.Name == b.Name && a.Path == b.Path && a.Type == b.Type
+	}
+	if b.Checksum == nil && a.Checksum != nil {
+		return false
+	}
+	if b.Checksum != nil && a.Checksum == nil {
+		return false
+	}
+	return a.Name == b.Name && a.Path == b.Path && a.Type == b.Type && a.Sha1 == b.Sha1 && a.Md5 == b.Md5 && a.Sha256 == b.Sha256
 }
 
 func isEqualArtifactSlices(a, b []Artifact) bool {
@@ -310,15 +319,24 @@ type Dependency struct {
 	*Checksum
 }
 
-func (d *Dependency) IsEqual(b Dependency) bool {
-	return d.Id == b.Id && d.Type == b.Type && d.Sha1 == b.Sha1 && d.Md5 == b.Md5
+func (d *Dependency) IsEqual(a Dependency) bool {
+	if d.Checksum == nil && a.Checksum == nil {
+		return d.Id == a.Id && d.Type == a.Type
+	}
+	if d.Checksum != nil && a.Checksum == nil {
+		return false
+	}
+	if d.Checksum == nil && a.Checksum != nil {
+		return false
+	}
+	return d.Id == a.Id && d.Type == a.Type && d.Sha1 == a.Sha1 && d.Md5 == a.Md5 && d.Sha256 == a.Sha256
 }
 
 func isEqualDependencySlices(a, b []Dependency) bool {
 	visitedIndexes := make(map[int]bool)
 	for _, aEl := range a {
 		found := false
-		for index, bEl := range b {
+		for index, bEl := range a {
 			if _, ok := visitedIndexes[index]; !ok && aEl.IsEqual(bEl) {
 				found = true
 				visitedIndexes[index] = true

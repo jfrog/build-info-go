@@ -3,17 +3,19 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"github.com/jfrog/gofrog/version"
 	"regexp"
 	"runtime"
 
-	gofrogcmd "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/gofrog/version"
+
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	gofrogcmd "github.com/jfrog/gofrog/io"
 )
 
 const credentialsInUrlRegexp = `(http|https|git)://.+@`
@@ -356,7 +358,7 @@ func parseGoPath(goPath string) string {
 }
 
 func getGoSum(rootProjectDir string, log Log) (sumFileContent []byte, sumFileStat os.FileInfo, err error) {
-	sumFileExists, err := IsFileExists(filepath.Join(rootProjectDir, "go.sum"))
+	sumFileExists, err := IsFileExists(filepath.Join(rootProjectDir, "go.sum"), true)
 	if err == nil && sumFileExists {
 		log.Debug("Sum file exists:", rootProjectDir)
 		sumFileContent, sumFileStat, err = GetFileContentAndInfo(filepath.Join(rootProjectDir, "go.sum"))

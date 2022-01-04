@@ -18,7 +18,7 @@ const configPropertiesPathTempPrefix = "extractorProperties"
 func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger Log) error {
 	// If the file exists locally, we're done.
 	absFileName := filepath.Join(downloadTo, filename)
-	exists, err := IsFileExists(absFileName)
+	exists, err := IsFileExists(absFileName, true)
 	if exists || err != nil {
 		return err
 	}

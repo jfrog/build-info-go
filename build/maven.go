@@ -256,5 +256,6 @@ func (config *mvnRunConfig) runCmd() error {
 	command := config.GetCmd()
 	command.Stderr = os.Stderr
 	command.Stdout = os.Stderr
+	command.Dir = config.workspace
 	return command.Run()
 }
