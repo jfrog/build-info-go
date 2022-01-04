@@ -1,9 +1,12 @@
-package tests
+package build
 
 import (
+	"path/filepath"
+	"testing"
+
+	"github.com/jfrog/build-info-go/entities"
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func validateModule(t *testing.T, module buildinfo.Module, expectedDependencies, expectedArtifacts int, moduleName string, moduleType buildinfo.ModuleType, depsContainChecksums bool) {
@@ -22,4 +25,23 @@ func validateModule(t *testing.T, module buildinfo.Module, expectedDependencies,
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Md5, "Empty MD5 field.")
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Sha256, "Empty SHA256 field.")
 	}
+}
+
+func TestGenerateBuildInfoForGoProject(t *testing.T) {
+	service := NewBuildInfoService()
+	goBuild, err := service.GetOrCreateBuild("build-info-go-test-golang", "1")
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, goBuild.Clean())
+	}()
+	goModule, err := goBuild.AddGoModule(filepath.Join("testdata", "golang", "project"))
+	assert.NoError(t, err)
+	err = goModule.CalcDependencies()
+	assert.NoError(t, err)
+	err = goModule.AddArtifacts(entities.Artifact{Name: "artifactName", Type: "artifactType", Path: "artifactPath", Checksum: &entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}})
+	assert.NoError(t, err)
+	buildInfo, err := goBuild.ToBuildInfo()
+	assert.NoError(t, err)
+	assert.Len(t, buildInfo.Modules, 1)
+	validateModule(t, buildInfo.Modules[0], 4, 1, "github.com/jfrog/dependency", entities.Go, true)
 }
