@@ -64,8 +64,8 @@ type extractorDetails struct {
 func newMavenModule(containingBuild *Build, srcPath string) (*MavenModule, error) {
 	extractorProps := map[string]string{
 		"org.jfrog.build.extractor.maven.recorder.activate": "true",
-		"publish.artifacts": "false",
-		"publish.buildInfo": "false",
+		"add.deployable.artifacts":                          "false",
+		"publish.buildInfo":                                 "false",
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
