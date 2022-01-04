@@ -336,7 +336,7 @@ func isEqualDependencySlices(a, b []Dependency) bool {
 	visitedIndexes := make(map[int]bool)
 	for _, aEl := range a {
 		found := false
-		for index, bEl := range a {
+		for index, bEl := range b {
 			if _, ok := visitedIndexes[index]; !ok && aEl.IsEqual(bEl) {
 				found = true
 				visitedIndexes[index] = true
