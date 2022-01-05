@@ -1,11 +1,14 @@
 package utils
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -166,4 +169,30 @@ func extractTimestamp(item string) (time.Time, error) {
 	}
 	// Convert to time type.
 	return time.Unix(timestampInt, 0), nil
+}
+
+// FindFileInDirAndParents looks for a file named fileName in dirPath and its parents, and returns the path of the directory where it was found.
+// dirPath must be a full path.
+func FindFileInDirAndParents(dirPath, fileName string) (string, error) {
+	// Create a map to store all paths visited, to avoid running in circles.
+	visitedPaths := make(map[string]bool)
+	currDir := dirPath
+	for {
+		// If the file is found in the current directory, return the path.
+		exists, err := IsFileExists(filepath.Join(currDir, fileName))
+		if err != nil || exists {
+			return currDir, err
+		}
+
+		// Save this path.
+		visitedPaths[currDir] = true
+
+		// CD to the parent directory.
+		currDir = filepath.Dir(currDir)
+
+		// If we already visited this directory, it means that there's a loop and we can stop.
+		if visitedPaths[currDir] {
+			return "", errors.New(fmt.Sprintf("could not find the %s file of the project", fileName))
+		}
+	}
 }

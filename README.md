@@ -71,22 +71,33 @@ All you need to do is to navigate to the project's root directory and run one of
 ```shell
 bi go
 ```
+
 #### Maven
 
 ```shell
 bi mvn
 ```
+
 #### Gradle
 
 ```shell
 bi gradle
 ```
 
+#### npm
+
+```shell
+bi npm
+```
+
+Note: checksums calculation is not supported for npm projects.
+
 ### Logs
 
 The default log level of the Build-Info CLI is INFO.
 
-You can change the log level by setting the BUILD_INFO_LOG_LEVEL environment variable to either DEBUG, INFO, WARN or ERROR.
+You can change the log level by setting the BUILD_INFO_LOG_LEVEL environment variable to either DEBUG, INFO, WARN or
+ERROR.
 
 All log messages are sent to the stderr, to allow picking up the generated build-info, which is sent to the stdout.
 
@@ -111,7 +122,7 @@ After you [created a Build](#creating-a-new-build), you can create a new build-i
 
 #### Go
 ```go
-// You can pass an empty string as an argument, if the root of the Go project is the working directory
+// You can pass an empty string as an argument, if the root of the Go project is the working directory.
 goModule, err := bld.AddGoModule(goProjectPath)
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = goModule.CalcDependencies()
@@ -119,30 +130,49 @@ err = goModule.CalcDependencies()
 // You can also add artifacts to that module:
 artifact1 := entities.Artifact{Name: "v1.0.0.mod", Type: "mod", Checksum: &entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}}
 err = goModule.AddArtifacts(artifact1, artifact2, ...)
-
 ```
 
 #### Maven
 ```go
-// You can pass an empty string as an argument, if the root of the Maven project is the working directory
+// You can pass an empty string as an argument, if the root of the Maven project is the working directory.
 mavenModule, err := bld.AddMavenModule(mavenProjectPath)
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = mavenModule.CalcDependencies()
 ```
 
 #### Gradle
+
 ```go
-// You can pass an empty string as an argument, if the root of the Gradle project is the working directory
+// You can pass an empty string as an argument, if the root of the Gradle project is the working directory.
 gradleModule, err := bld.AddGradleModule(gradleProjectPath)
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = gradleModule.CalcDependencies()
+```
+
+#### npm
+
+```go
+// You can pass an empty string as an argument, if the root of the npm project is the working directory.
+npmModule, err := bld.AddNpmModule(npmProjectPath)
+// Checksum calculation is not supported for npm projects, so you can add a function that calculates them.
+npmModule.SetTraverseDependenciesFunc(func(dependency *entities.Dependency) (bool, error) {
+    dependency.Checksum = &entities.Checksum{Sha1: "123"}
+    return true, nil
+})
+// Calculate the dependencies used by this module, and store them in the module struct.
+err = npmModule.CalcDependencies()
+
+// You can also add artifacts to that module:
+artifact1 := entities.Artifact{Name: "json", Type: "tgz", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
+err = npmModule.AddArtifacts(artifact1, artifact2, ...)
 ```
 
 ### Collecting Environment Variables
 
 Using `CollectEnv()` you can collect environment variables and attach them to the build.
 
-After calling `ToBuildInfo()` ([see below](#get-the-complete-build-info)), you can also filter the environment variables using the `IncludeEnv()` and `ExcludeEnv()` methods of BuildInfo.
+After calling `ToBuildInfo()` ([see below](#get-the-complete-build-info)), you can also filter the environment variables
+using the `IncludeEnv()` and `ExcludeEnv()` methods of BuildInfo.
 
 ```go
 err := bld.CollectEnv()
