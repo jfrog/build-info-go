@@ -76,7 +76,7 @@ func newMavenModule(containingBuild *Build, srcPath string) (*MavenModule, error
 		srcPath:         srcPath,
 		containingBuild: containingBuild,
 		extractorDetails: &extractorDetails{
-			goals:     []string{"compile", "-B"},
+			goals:     []string{"compile"},
 			props:     extractorProps,
 			localPath: extractorLocalPath,
 			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempfolderName),
