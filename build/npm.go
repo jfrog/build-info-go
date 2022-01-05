@@ -20,14 +20,14 @@ type NpmModule struct {
 	threads                  int
 }
 
-// Pass srcPath an empty string to find the npm project in the working directory.
+// Pass an empty string for srcPath to find the npm project in the working directory.
 func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 	npmVersion, executablePath, err := utils.GetNpmVersionAndExecPath(containingBuild.logger)
 	if err != nil {
 		return nil, err
 	}
 	if npmVersion.Compare(minSupportedNpmVersion) > 0 {
-		return nil, errors.New("npm CLI must be version " + minSupportedNpmVersion + " or higher. The current version is: " + npmVersion.GetVersion())
+		return nil, errors.New("npm CLI must have version " + minSupportedNpmVersion + " or higher. The current version is: " + npmVersion.GetVersion())
 	}
 
 	if srcPath == "" {

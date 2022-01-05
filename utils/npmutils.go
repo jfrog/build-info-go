@@ -25,6 +25,8 @@ const (
 	ProdOnly
 )
 
+// CalculateDependenciesList gets an npm project's dependencies.
+// It sends each of them as a parameter to traverseDependenciesFunc and based on its return values, they will be returned from CalculateDependenciesList.
 func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error), threads int, log Log) (dependenciesList []entities.Dependency, err error) {
 	if log == nil {
 		log = &NullLog{}
@@ -89,6 +91,8 @@ func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, 
 	return
 }
 
+// createHandlerFunc creates a function that runs traverseDependenciesFunc (if it's not nil) with dep as its parameter.
+// If traverseDependenciesFunc returns false, then dep will not be saved in the module's dependencies list.
 func createHandlerFunc(dep *entities.Dependency, dependenciesChan chan *entities.Dependency, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error)) func(threadId int) error {
 	return func(threadId int) error {
 		var err error
@@ -135,13 +139,14 @@ func parseDependencies(data []byte, scope string, pathToRoot []string, dependenc
 	return jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
 		depName := string(key)
 		ver, _, _, err := jsonparser.Get(data, depName, "version")
-		depVersion := string(ver)
-		depId := depName + ":" + depVersion
 		if err != nil && err != jsonparser.KeyPathNotFoundError {
 			return err
 		} else if err == jsonparser.KeyPathNotFoundError {
 			log.Debug(fmt.Sprintf("%s dependency will not be included in the build-info, because the 'npm ls' command did not return its version.\nThe reason why the version wasn't returned may be because the package is a 'peerdependency', which was not manually installed.\n'npm install' does not download 'peerdependencies' automatically. It is therefore okay to skip this dependency.", depName))
-		} else {
+		}
+		depVersion := string(ver)
+		depId := depName + ":" + depVersion
+		if err == nil {
 			appendDependency(dependencies, depId, scope, pathToRoot)
 		}
 		transitive, _, _, err := jsonparser.Get(data, depName, "dependencies")

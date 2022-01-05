@@ -36,21 +36,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				if err != nil {
 					return
 				}
-				buildInfo, err := bld.ToBuildInfo()
-				if err != nil {
-					return
-				}
-				b, err := json.Marshal(buildInfo)
-				if err != nil {
-					return
-				}
-				var content bytes.Buffer
-				err = json.Indent(&content, b, "", "  ")
-				if err != nil {
-					return
-				}
-				fmt.Println(content.String())
-				return
+				return printBuild(bld)
 			},
 		},
 		{
@@ -78,21 +64,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				if err != nil {
 					return
 				}
-				buildInfo, err := bld.ToBuildInfo()
-				if err != nil {
-					return
-				}
-				b, err := json.Marshal(buildInfo)
-				if err != nil {
-					return
-				}
-				var content bytes.Buffer
-				err = json.Indent(&content, b, "", "  ")
-				if err != nil {
-					return
-				}
-				fmt.Println(content.String())
-				return
+				return printBuild(bld)
 			},
 		},
 		{
@@ -120,21 +92,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				if err != nil {
 					return
 				}
-				buildInfo, err := bld.ToBuildInfo()
-				if err != nil {
-					return
-				}
-				b, err := json.Marshal(buildInfo)
-				if err != nil {
-					return
-				}
-				var content bytes.Buffer
-				err = json.Indent(&content, b, "", "  ")
-				if err != nil {
-					return
-				}
-				fmt.Println(content.String())
-				return
+				return printBuild(bld)
 			},
 		},
 		{
@@ -162,22 +120,26 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				if err != nil {
 					return
 				}
-				buildInfo, err := bld.ToBuildInfo()
-				if err != nil {
-					return
-				}
-				b, err := json.Marshal(buildInfo)
-				if err != nil {
-					return
-				}
-				var content bytes.Buffer
-				err = json.Indent(&content, b, "", "  ")
-				if err != nil {
-					return
-				}
-				fmt.Println(content.String())
-				return
+				return printBuild(bld)
 			},
 		},
 	}
+}
+
+func printBuild(bld *build.Build) error {
+	buildInfo, err := bld.ToBuildInfo()
+	if err != nil {
+		return err
+	}
+	b, err := json.Marshal(buildInfo)
+	if err != nil {
+		return err
+	}
+	var content bytes.Buffer
+	err = json.Indent(&content, b, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(content.String())
+	return nil
 }

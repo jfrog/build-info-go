@@ -197,6 +197,7 @@ func mergeStringSlices(slice1, slice2 []string) []string {
 	return slice1
 }
 
+// mergeRequestedBySlices gets two slices of dependencies' paths in a build (RequestedBy) and merges them together, without duplicates.
 func mergeRequestedBySlices(requestedBy1, requestedBy2 [][]string) [][]string {
 	for _, item2 := range requestedBy2 {
 		exists := false
