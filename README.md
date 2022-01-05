@@ -1,4 +1,5 @@
 # build-info-go
+<img src="images/build-info.png">
 
 ## Project Status
 [![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml)
