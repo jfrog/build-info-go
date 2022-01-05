@@ -81,6 +81,10 @@ func (b *Build) AddGradleModule(srcPath string) (*GradleModule, error) {
 	return newGradleModule(b, srcPath)
 }
 
+func (b *Build) AddNpmModule(srcPath string) (*NpmModule, error) {
+	return newNpmModule(srcPath, b)
+}
+
 func (b *Build) CollectEnv() error {
 	envMap := make(map[string]string)
 	for _, e := range os.Environ() {

@@ -10,7 +10,7 @@ import (
 
 func TestGenerateBuildInfoForGoProject(t *testing.T) {
 	service := build.NewBuildInfoService()
-	goBuild, err := service.GetOrCreateBuild("build-info-go-test", "1")
+	goBuild, err := service.GetOrCreateBuild("build-info-go-test-golang", "1")
 	assert.NoError(t, err)
 	defer func() {
 		assert.NoError(t, goBuild.Clean())
@@ -24,5 +24,5 @@ func TestGenerateBuildInfoForGoProject(t *testing.T) {
 	buildInfo, err := goBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 4, 1, "github.com/jfrog/dependency", entities.Go)
+	validateModule(t, buildInfo.Modules[0], 4, 1, "github.com/jfrog/dependency", entities.Go, true)
 }

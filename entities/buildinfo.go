@@ -137,7 +137,7 @@ func (targetBuildInfo *BuildInfo) ExcludeEnv(patterns ...string) error {
 func mergeModules(merge *Module, into *Module) {
 	mergeArtifacts(&merge.Artifacts, &into.Artifacts)
 	mergeArtifacts(&merge.ExcludedArtifacts, &into.ExcludedArtifacts)
-	mergeDependencies(&merge.Dependencies, &into.Dependencies)
+	mergeDependenciesLists(&merge.Dependencies, &into.Dependencies)
 }
 
 func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
@@ -155,19 +155,75 @@ func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
 	}
 }
 
-func mergeDependencies(mergeDependencies *[]Dependency, intoDependencies *[]Dependency) {
-	for _, mergeDependency := range *mergeDependencies {
+func mergeDependenciesLists(dependenciesToAdd, intoDependencies *[]Dependency) {
+	for i, dependencyToAdd := range *dependenciesToAdd {
 		exists := false
 		for _, dependency := range *intoDependencies {
-			if mergeDependency.Sha1 == dependency.Sha1 {
+			if (dependencyToAdd.Checksum != nil && dependency.Checksum != nil && dependencyToAdd.Sha1 == dependency.Sha1) || (dependencyToAdd.Checksum == nil && dependency.Checksum == nil && dependencyToAdd.Id == dependency.Id) {
 				exists = true
+				(*dependenciesToAdd)[i] = mergeDependencies(dependency, dependencyToAdd)
 				break
 			}
 		}
 		if !exists {
-			*intoDependencies = append(*intoDependencies, mergeDependency)
+			*intoDependencies = append(*intoDependencies, dependencyToAdd)
 		}
 	}
+}
+
+func mergeDependencies(dep1, dep2 Dependency) Dependency {
+	return Dependency{
+		Id:          dep1.Id,
+		Type:        dep1.Type,
+		Scopes:      mergeStringSlices(dep1.Scopes, dep2.Scopes),
+		RequestedBy: mergeRequestedBySlices(dep1.RequestedBy, dep2.RequestedBy),
+		Checksum:    dep1.Checksum,
+	}
+}
+
+func mergeStringSlices(slice1, slice2 []string) []string {
+	for _, item2 := range slice2 {
+		exists := false
+		for _, item1 := range slice1 {
+			if item1 == item2 {
+				exists = true
+				break
+			}
+			if !exists {
+				slice1 = append(slice1, item2)
+			}
+		}
+	}
+	return slice1
+}
+
+// mergeRequestedBySlices gets two slices of dependencies' paths in a build (RequestedBy) and merges them together, without duplicates.
+func mergeRequestedBySlices(requestedBy1, requestedBy2 [][]string) [][]string {
+	for _, item2 := range requestedBy2 {
+		exists := false
+		for _, item1 := range requestedBy1 {
+			if equalStringSlices(item1, item2) {
+				exists = true
+				break
+			}
+			if !exists {
+				requestedBy1 = append(requestedBy1, item2)
+			}
+		}
+	}
+	return requestedBy1
+}
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // PublishedBuildInfo represents the response structure returned from Artifactory when getting a build-info.
