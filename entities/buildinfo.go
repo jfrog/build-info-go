@@ -247,8 +247,8 @@ type Module struct {
 	*Checksum
 }
 
-func (m *Module) isEqual(b Module) bool {
-	return m.Id == b.Id && m.Type == b.Type && isEqualArtifactSlices(m.Artifacts, b.Artifacts) && isEqualDependencySlices(m.Dependencies, b.Dependencies)
+func (m *Module) isEqual(other Module) bool {
+	return m.Id == other.Id && m.Type == other.Type && isEqualArtifactSlices(m.Artifacts, other.Artifacts) && isEqualDependencySlices(m.Dependencies, other.Dependencies)
 }
 
 func IsEqualModuleSlices(a, b []Module) bool {
@@ -280,8 +280,17 @@ type Artifact struct {
 	*Checksum
 }
 
-func (a *Artifact) isEqual(b Artifact) bool {
-	return a.Name == b.Name && a.Path == b.Path && a.Type == b.Type && a.Sha1 == b.Sha1 && a.Md5 == b.Md5
+func (a *Artifact) isEqual(other Artifact) bool {
+	if other.Checksum == nil && a.Checksum == nil {
+		return a.Name == other.Name && a.Path == other.Path && a.Type == other.Type
+	}
+	if other.Checksum == nil && a.Checksum != nil {
+		return false
+	}
+	if other.Checksum != nil && a.Checksum == nil {
+		return false
+	}
+	return a.Name == other.Name && a.Path == other.Path && a.Type == other.Type && a.Sha1 == other.Sha1 && a.Md5 == other.Md5 && a.Sha256 == other.Sha256
 }
 
 func isEqualArtifactSlices(a, b []Artifact) bool {
@@ -310,8 +319,17 @@ type Dependency struct {
 	*Checksum
 }
 
-func (d *Dependency) IsEqual(b Dependency) bool {
-	return d.Id == b.Id && d.Type == b.Type && d.Sha1 == b.Sha1 && d.Md5 == b.Md5
+func (d *Dependency) IsEqual(other Dependency) bool {
+	if d.Checksum == nil && other.Checksum == nil {
+		return d.Id == other.Id && d.Type == other.Type
+	}
+	if d.Checksum != nil && other.Checksum == nil {
+		return false
+	}
+	if d.Checksum == nil && other.Checksum != nil {
+		return false
+	}
+	return d.Id == other.Id && d.Type == other.Type && d.Sha1 == other.Sha1 && d.Md5 == other.Md5 && d.Sha256 == other.Sha256
 }
 
 func isEqualDependencySlices(a, b []Dependency) bool {

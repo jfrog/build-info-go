@@ -23,7 +23,7 @@ const (
 	PropertiesTempfolderName        = "properties"
 	mavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
 	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
-	MavenExtractorDependencyVersion = "2.32.0"
+	MavenExtractorDependencyVersion = "2.33.0"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -94,6 +94,10 @@ func (mm *MavenModule) SetExtractorDetails(localdExtractorPath, extractorPropsdi
 		mm.extractorDetails.props = configProps
 	}
 	return mm
+}
+
+func (mm *MavenModule) SetMavenGoals(goals ...string) {
+	mm.extractorDetails.goals = goals
 }
 
 func (mm *MavenModule) SetMavenOpts(mavenOpts ...string) {
@@ -256,5 +260,6 @@ func (config *mvnRunConfig) runCmd() error {
 	command := config.GetCmd()
 	command.Stderr = os.Stderr
 	command.Stdout = os.Stderr
+	command.Dir = config.workspace
 	return command.Run()
 }
