@@ -22,10 +22,10 @@ const (
 )
 
 // Check if path points at a file.
-// If path points at a symlink and `preserveSymLink == true`,
+// If path points at a symlink and `followSymlink == false`,
 // function will return `true` regardless of the symlink target
-func IsFileExists(path string, preserveSymLink bool) (bool, error) {
-	fileInfo, err := GetFileInfo(path, preserveSymLink)
+func IsFileExists(path string, followSymlink bool) (bool, error) {
+	fileInfo, err := GetFileInfo(path, followSymlink)
 	if err != nil {
 		if os.IsNotExist(err) { // If doesn't exist, don't omit an error
 			return false, nil
@@ -36,10 +36,10 @@ func IsFileExists(path string, preserveSymLink bool) (bool, error) {
 }
 
 // Check if path points at a directory.
-// If path points at a symlink and `preserveSymLink == true`,
+// If path points at a symlink and `followSymlink == false`,
 // function will return `false` regardless of the symlink target
-func IsDirExists(path string, preserveSymLink bool) (bool, error) {
-	fileInfo, err := GetFileInfo(path, preserveSymLink)
+func IsDirExists(path string, followSymlink bool) (bool, error) {
+	fileInfo, err := GetFileInfo(path, followSymlink)
 	if err != nil {
 		if os.IsNotExist(err) { // If doesn't exist, don't omit an error
 			return false, nil
@@ -50,9 +50,9 @@ func IsDirExists(path string, preserveSymLink bool) (bool, error) {
 }
 
 // Get the file info of the file in path.
-// If path points at a symlink and `preserveSymLink == true`, return the file info of the symlink instead
-func GetFileInfo(path string, preserveSymLink bool) (fileInfo os.FileInfo, err error) {
-	if preserveSymLink {
+// If path points at a symlink and `followSymlink == false`, return the file info of the symlink instead
+func GetFileInfo(path string, followSymlink bool) (fileInfo os.FileInfo, err error) {
+	if followSymlink {
 		fileInfo, err = os.Lstat(path)
 	} else {
 		fileInfo, err = os.Stat(path)
@@ -368,8 +368,8 @@ func CopyFile(dst, src string) error {
 		return err
 	}
 	defer dstFile.Close()
-	io.Copy(dstFile, srcFile)
-	return nil
+	_, err = io.Copy(dstFile, srcFile)
+	return err
 }
 
 func GetFileSeparator() string {
@@ -433,6 +433,7 @@ func IsStringInSlice(string string, strings []string) bool {
 	}
 	return false
 }
+
 func IsPathSymlink(path string) bool {
 	f, _ := os.Lstat(path)
 	return f != nil && IsFileSymlink(f)
