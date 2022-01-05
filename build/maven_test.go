@@ -53,7 +53,11 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	buildInfo, err := mavenBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	// Check build-info results.
-	assert.True(t, entities.IsEqualModuleSlices(buildInfo.Modules, getExpectedMavenBuildInfo(t, filepath.Join(testdataDir, "maven", "expected_maven_buildinfo.json")).Modules))
+	expectedModules := getExpectedMavenBuildInfo(t, filepath.Join(testdataDir, "maven", "expected_maven_buildinfo.json")).Modules
+	if !entities.IsEqualModuleSlices(buildInfo.Modules, expectedModules) {
+		t.Errorf("build-info don't match. want: \n %v\n got:\n%v\n", buildInfo.Modules, expectedModules)
+		t.Fail()
+	}
 }
 
 func CopyProject(t *testing.T, testdataDir string) (string, func()) {
