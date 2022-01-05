@@ -350,6 +350,17 @@ func isEqualDependencySlices(a, b []Dependency) bool {
 	return true
 }
 
+func (d *Dependency) NodeHasLoop() bool {
+	for _, requestedBy := range d.RequestedBy {
+		for _, depId := range requestedBy {
+			if depId == d.Id {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 type Issues struct {
 	Tracker                *Tracker        `json:"tracker,omitempty"`
 	AggregateBuildIssues   bool            `json:"aggregateBuildIssues,omitempty"`
