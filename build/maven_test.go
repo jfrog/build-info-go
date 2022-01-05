@@ -55,7 +55,11 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	// Check build-info results.
 	expectedModules := getExpectedMavenBuildInfo(t, filepath.Join(testdataDir, "maven", "expected_maven_buildinfo.json")).Modules
 	if !entities.IsEqualModuleSlices(buildInfo.Modules, expectedModules) {
-		t.Errorf("build-info don't match. want: \n %v\n got:\n%v\n", buildInfo.Modules, expectedModules)
+		got, err := json.MarshalIndent(expectedModules, "", "  ")
+		assert.NoError(t, err)
+		excpected, err := json.MarshalIndent(buildInfo.Modules, "", "  ")
+		assert.NoError(t, err)
+		t.Errorf("build-info don't match. want: \n %v\n got:\n%s\n", string(excpected), string(got))
 		t.Fail()
 	}
 }
