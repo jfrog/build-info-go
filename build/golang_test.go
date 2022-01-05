@@ -25,7 +25,9 @@ func TestGenerateBuildInfoForGoProject(t *testing.T) {
 	buildInfo, err := goBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 4, 1, "github.com/jfrog/dependency", entities.Go, true)
+	validateModule(t, buildInfo.Modules[0], 5, 1, "github.com/jfrog/dependency", entities.Go, true)
+	validateRequestedBy(t, buildInfo.Modules[0])
+
 }
 
 func validateModule(t *testing.T, module buildinfo.Module, expectedDependencies, expectedArtifacts int, moduleName string, moduleType buildinfo.ModuleType, depsContainChecksums bool) {
@@ -47,4 +49,17 @@ func validateModule(t *testing.T, module buildinfo.Module, expectedDependencies,
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Md5, "Empty MD5 field.")
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Sha256, "Empty SHA256 field.")
 	}
+}
+
+func validateRequestedBy(t *testing.T, module entities.Module) {
+	for _, dep := range module.Dependencies {
+		if assert.NotEmpty(t, dep.RequestedBy) {
+			if assert.NotEmpty(t, dep.RequestedBy[0]) {
+				if dep.Id == "github.com/pkg/errors:v0.8.0" {
+					assert.Len(t, dep.RequestedBy, 2, "'errors:v0.8.0' dependency should contain 2 requestedBy paths")
+				}
+			}
+		}
+	}
+
 }
