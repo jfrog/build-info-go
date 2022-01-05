@@ -1,0 +1,11 @@
+package testBadGoList
+
+import (
+	"fmt"
+	"rsc.io/quote"
+	"rscxxxx.ioxxxx/quotexxxx"
+)
+
+func PrintHello() {
+	fmt.Println(quote.Hello())
+}

@@ -47,9 +47,13 @@ func TestCollectEnv(t *testing.T) {
 	}
 
 	// Set environment variables
+	defer func() {
+		for key, _ := range env {
+			assert.NoError(t, os.Unsetenv(key))
+		}
+	}()
 	for key, value := range env {
 		assert.NoError(t, os.Setenv(key, value))
-		defer os.Unsetenv(key)
 	}
 
 	service := NewBuildInfoService()

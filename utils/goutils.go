@@ -18,7 +18,7 @@ import (
 
 const credentialsInUrlRegexp = `(http|https|git)://.+@`
 
-// Minimum go version, which its output does not require to mask passwords in URLs.
+// Minimum go version, which its output does not require masking passwords in URLs.
 const minGoVersionForMasking = "go1.13"
 
 // Max go version, which automatically modify go.mod and go.sum when executing build commands.
@@ -140,7 +140,12 @@ func GetDependenciesList(projectDir string, log Log) (map[string]bool, error) {
 	}
 	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
 	if err != nil {
-		return nil, err
+		// Errors occurred while running "go list". Run again and this time ignore errors (with '-e')
+		log.Warn("Errors occurred while building the Go dependency tree. The dependency tree may be incomplete:" + err.Error())
+		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return listToMap(output), err
 }
@@ -212,7 +217,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 		return "", errors.New(errorString)
 	}
 
-	// Restore the the go.mod and go.sum files, to make sure they stay the same as before
+	// Restore the go.mod and go.sum files, to make sure they stay the same as before
 	// running the "go mod graph" command.
 	err = ioutil.WriteFile(filepath.Join(projectDir, "go.mod"), modFileContent, modFileStat.Mode())
 	if err != nil {
@@ -309,7 +314,7 @@ func removeCredentials(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 	return strings.Replace(pattern.Line, pattern.MatchedResults[0], splitResult[0]+"//", 1), nil
 }
 
-// GetCachePath returns the location of downloads dir insied the GOMODCACHE
+// GetCachePath returns the location of downloads dir inside the GOMODCACHE
 func GetCachePath() (string, error) {
 	goModCachePath, err := GetGoModCachePath()
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"github.com/jfrog/build-info-go/entities"
+	"github.com/minio/sha256-simd"
 	"hash"
 	"io"
 	"os"
@@ -20,8 +21,11 @@ const (
 )
 
 var algorithmFunc = map[Algorithm]func() hash.Hash{
+	// Go native crypto algorithms:
 	MD5:  md5.New,
 	SHA1: sha1.New,
+	// sha256-simd algorithm:
+	SHA256: sha256.New,
 }
 
 func GetFileChecksums(filePath string) (checksums *entities.Checksum, err error) {
@@ -39,7 +43,7 @@ func GetFileChecksums(filePath string) (checksums *entities.Checksum, err error)
 	if err != nil {
 		return nil, err
 	}
-	return &entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1]}, nil
+	return &entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}, nil
 }
 
 // CalcChecksums calculates all hashes at once using AsyncMultiWriter. The file is therefore read only once.

@@ -109,8 +109,18 @@ func TestGetProjectRoot(t *testing.T) {
 }
 
 func TestGetDependenciesList(t *testing.T) {
+	testGetDependenciesList(t, "testGoList")
+}
+
+func TestGetDependenciesListWithIgnoreErrors(t *testing.T) {
+	// In some cases, we see that running go list on some Go packages may fail.
+	// We should allow ignoring the errors in such cases and build the Go dependency tree, even if partial.
+	testGetDependenciesList(t, "testBadGoList")
+}
+
+func testGetDependenciesList(t *testing.T, testDir string) {
 	log := NewDefaultLogger(ERROR)
-	gomodPath := filepath.Join("testdata", "mods", "testGoList")
+	gomodPath := filepath.Join("testdata", "mods", testDir)
 	err := os.Rename(filepath.Join(gomodPath, "go.mod.txt"), filepath.Join(gomodPath, "go.mod"))
 	assert.NoError(t, err)
 	defer func() {
@@ -146,7 +156,7 @@ func TestGetDependenciesList(t *testing.T) {
 		"golang.org/x/text@v0.3.3": true,
 		"rsc.io/quote@v1.5.2":      true,
 		"rsc.io/sampler@v1.3.0":    true,
-		"testGoList@":              true,
+		testDir + "@":              true,
 	}
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("Expecting: \n%v \nGot: \n%v", expected, actual)

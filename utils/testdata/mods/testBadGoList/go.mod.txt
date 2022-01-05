@@ -1,0 +1,7 @@
+module testBadGoList
+
+go 1.16
+
+require rsc.io/quote v1.5.2
+
+require golang.org/x/text v0.3.3 // indirect
