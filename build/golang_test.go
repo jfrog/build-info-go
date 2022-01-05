@@ -33,6 +33,9 @@ func validateModule(t *testing.T, module buildinfo.Module, expectedDependencies,
 	assert.Len(t, module.Dependencies, expectedDependencies, "Incorrect number of dependencies found in the build-info")
 	assert.Len(t, module.Artifacts, expectedArtifacts, "Incorrect number of artifacts found in the build-info")
 	if expectedArtifacts > 0 {
+		assert.Equal(t, "artifactName", module.Artifacts[0].Name, "Unexpected Sha1 field.")
+		assert.Equal(t, "artifactType", module.Artifacts[0].Type, "Unexpected Sha1 field.")
+		assert.Equal(t, "artifactPath", module.Artifacts[0].Path, "Unexpected Sha1 field.")
 		assert.Equal(t, "123", module.Artifacts[0].Checksum.Sha1, "Unexpected Sha1 field.")
 		assert.Equal(t, "456", module.Artifacts[0].Checksum.Md5, "Unexpected MD5 field.")
 		assert.Equal(t, "789", module.Artifacts[0].Checksum.Sha256, "Unexpected SHA256 field.")
