@@ -96,6 +96,10 @@ func (mm *MavenModule) SetExtractorDetails(localdExtractorPath, extractorPropsdi
 	return mm
 }
 
+func (mm *MavenModule) SetMavenGoals(goals ...string) {
+	mm.extractorDetails.goals = goals
+}
+
 func (mm *MavenModule) SetMavenOpts(mavenOpts ...string) {
 	mm.extractorDetails.mavenOpts = mavenOpts
 }

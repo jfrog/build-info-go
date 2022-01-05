@@ -47,6 +47,7 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	// Add maven project as module in build-info.
 	mavenModule, err := mavenBuild.AddMavenModule(projectPath)
 	assert.NoError(t, err)
+	mavenModule.SetMavenGoals("compile","--no-transfer-progress")
 	// Calculate build-info.
 	err = mavenModule.CalcDependencies()
 	assert.NoError(t, err)
