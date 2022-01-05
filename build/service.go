@@ -3,12 +3,13 @@ package build
 import (
 	"bytes"
 	"encoding/json"
-	buildinfo "github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
+
+	buildinfo "github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
 )
 
 const BuildsTempPath = "jfrog/builds/"
@@ -54,7 +55,7 @@ func saveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath s
 	log.Debug("Saving build general details at: " + partialsBuildDir)
 	detailsFilePath := filepath.Join(partialsBuildDir, BuildInfoDetails)
 	var exists bool
-	exists, err = utils.IsFileExists(detailsFilePath)
+	exists, err = utils.IsFileExists(detailsFilePath, true)
 	if err != nil || exists {
 		return err
 	}

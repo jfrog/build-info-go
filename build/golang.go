@@ -125,7 +125,7 @@ func (gm *GoModule) getPackageZipLocation(cachePath, dependencyName, version str
 // Validates that the package zip file exists and returns its path.
 func (gm *GoModule) getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath string, err error) {
 	zipPath = filepath.Join(cachePath, dependencyName, "@v", version+".zip")
-	fileExists, err := utils.IsFileExists(zipPath)
+	fileExists, err := utils.IsFileExists(zipPath, true)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("Could not find zip binary for dependency '%s' at %s: %s", dependencyName, zipPath, err))
 	}

@@ -1,16 +1,16 @@
-package tests
+package build
 
 import (
 	"errors"
-	"github.com/jfrog/build-info-go/build"
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/stretchr/testify/assert"
 	"path/filepath"
 	"testing"
+
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGenerateBuildInfoForNpmProject(t *testing.T) {
-	service := build.NewBuildInfoService()
+	service := NewBuildInfoService()
 	goBuild, err := service.GetOrCreateBuild("build-info-go-test-npm", "1")
 	assert.NoError(t, err)
 	defer func() {
@@ -29,7 +29,7 @@ func TestGenerateBuildInfoForNpmProject(t *testing.T) {
 }
 
 func TestCollectDepsForNpmProjectWithTraverse(t *testing.T) {
-	service := build.NewBuildInfoService()
+	service := NewBuildInfoService()
 	goBuild, err := service.GetOrCreateBuild("build-info-go-test-npm", "2")
 	assert.NoError(t, err)
 	defer func() {
@@ -55,7 +55,7 @@ func TestCollectDepsForNpmProjectWithTraverse(t *testing.T) {
 }
 
 func TestCollectDepsForNpmProjectWithErrorInTraverse(t *testing.T) {
-	service := build.NewBuildInfoService()
+	service := NewBuildInfoService()
 	goBuild, err := service.GetOrCreateBuild("build-info-go-test-npm", "2")
 	assert.NoError(t, err)
 	defer func() {

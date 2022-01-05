@@ -102,7 +102,7 @@ func (b *Build) Clean() error {
 	if err != nil {
 		return err
 	}
-	exists, err := utils.IsDirExists(tempDirPath)
+	exists, err := utils.IsDirExists(tempDirPath, true)
 	if err != nil {
 		return err
 	}
@@ -139,14 +139,14 @@ func (b *Build) getGeneratedBuildsInfo() ([]*entities.BuildInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	buildFiles, err := utils.ListFiles(buildDir)
+	buildFiles, err := utils.ListFiles(buildDir, true)
 	if err != nil {
 		return nil, err
 	}
 
 	var generatedBuildsInfo []*entities.BuildInfo
 	for _, buildFile := range buildFiles {
-		dir, err := utils.IsDirExists(buildFile)
+		dir, err := utils.IsDirExists(buildFile, true)
 		if err != nil {
 			return nil, err
 		}
@@ -277,12 +277,12 @@ func (b *Build) readPartialBuildInfoFiles() (entities.Partials, error) {
 	if err != nil {
 		return nil, err
 	}
-	buildFiles, err := utils.ListFiles(partialsBuildDir)
+	buildFiles, err := utils.ListFiles(partialsBuildDir, true)
 	if err != nil {
 		return nil, err
 	}
 	for _, buildFile := range buildFiles {
-		dir, err := utils.IsDirExists(buildFile)
+		dir, err := utils.IsDirExists(buildFile, true)
 		if err != nil {
 			return nil, err
 		}
@@ -310,7 +310,7 @@ func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
 		return nil, err
 	}
 	generalDetailsFilePath := filepath.Join(partialsBuildDir, BuildInfoDetails)
-	fileExists, err := utils.IsFileExists(generalDetailsFilePath)
+	fileExists, err := utils.IsFileExists(generalDetailsFilePath, true)
 	if err != nil {
 		return nil, err
 	}

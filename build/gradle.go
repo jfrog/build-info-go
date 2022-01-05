@@ -17,7 +17,7 @@ const (
 	GradleExtractorFileName          = "build-info-extractor-gradle-%s-uber.jar"
 	gradleInitScriptTemplate         = "gradle.init"
 	GradleExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
-	GradleExtractorDependencyVersion = "4.25.0"
+	GradleExtractorDependencyVersion = "4.26.0"
 )
 
 type GradleModule struct {
@@ -138,7 +138,7 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 	}
 	initScriptPath := filepath.Join(gradleDependenciesDir, gradleInitScriptTemplate)
 
-	exists, err := utils.IsFileExists(initScriptPath)
+	exists, err := utils.IsFileExists(initScriptPath, true)
 	if exists || err != nil {
 		return initScriptPath, err
 	}
