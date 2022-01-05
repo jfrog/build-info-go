@@ -69,7 +69,7 @@ func (gm *GoModule) loadDependencies() ([]entities.Dependency, error) {
 		return nil, err
 	}
 	rootModule := entities.Dependency{Id: gm.name, RequestedBy: [][]string{{}}}
-	populateRequestedByTree(rootModule, dependenciesMap, dependenciesGraph)
+	populateRequestedByField(rootModule, dependenciesMap, dependenciesGraph)
 	return dependenciesMapToList(dependenciesMap), nil
 }
 
@@ -161,8 +161,8 @@ func populateZip(packageId, zipPath string) (zipDependency entities.Dependency, 
 	return
 }
 
-func populateRequestedByTree(parentDependency entities.Dependency, dependenciesMap map[string]entities.Dependency, dependenciesGraph map[string][]string) {
-	if NodeHasLoop(parentDependency) {
+func populateRequestedByField(parentDependency entities.Dependency, dependenciesMap map[string]entities.Dependency, dependenciesGraph map[string][]string) {
+	if parentDependency.NodeHasLoop() {
 		return
 	}
 	childrenList := dependenciesGraph[strings.ReplaceAll(parentDependency.Id, ":v", ":")]
@@ -176,18 +176,7 @@ func populateRequestedByTree(parentDependency entities.Dependency, dependenciesM
 			// Reassign map entry with new entry copy
 			dependenciesMap[fixedChildName] = childDep
 			// Run recursive call on child dependencies
-			populateRequestedByTree(childDep, dependenciesMap, dependenciesGraph)
+			populateRequestedByField(childDep, dependenciesMap, dependenciesGraph)
 		}
 	}
-}
-
-func NodeHasLoop(dependency entities.Dependency) bool {
-	for _, requestedBy := range dependency.RequestedBy {
-		for _, depId := range requestedBy {
-			if depId == dependency.Id {
-				return true
-			}
-		}
-	}
-	return false
 }
