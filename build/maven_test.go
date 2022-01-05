@@ -41,13 +41,13 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
 	assert.NoError(t, err)
 	// Create maven project
-	projectPath, cleanup := CopyProject(t, testdataDir)
+	projectPath, cleanup := copyTestProject(t, testdataDir)
 	assert.NoError(t, err)
 	defer cleanup()
 	// Add maven project as module in build-info.
 	mavenModule, err := mavenBuild.AddMavenModule(projectPath)
 	assert.NoError(t, err)
-	mavenModule.SetMavenGoals("compile","--no-transfer-progress")
+	mavenModule.SetMavenGoals("compile", "--no-transfer-progress")
 	// Calculate build-info.
 	err = mavenModule.CalcDependencies()
 	assert.NoError(t, err)
@@ -61,11 +61,10 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 		got, err := json.MarshalIndent(buildInfo.Modules, "", "  ")
 		assert.NoError(t, err)
 		t.Errorf("build-info don't match. want: \n %v\n got:\n%s\n", string(excpected), string(got))
-		t.Fail()
 	}
 }
 
-func CopyProject(t *testing.T, testdataDir string) (string, func()) {
+func copyTestProject(t *testing.T, testdataDir string) (string, func()) {
 	projectRoot := filepath.Join(testdataDir, "maven", "project")
 	path, err := utils.CreateTempDir()
 	assert.NoError(t, err)
