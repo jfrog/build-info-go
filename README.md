@@ -1,5 +1,8 @@
 # build-info-go
 
+## Project Status
+[![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml)
+
 ## Table of Contents
 
 - [Overview](#overview)
