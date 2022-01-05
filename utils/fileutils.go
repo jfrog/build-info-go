@@ -1,11 +1,14 @@
 package utils
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -18,8 +21,11 @@ const (
 	maxFileAge = 24.0
 )
 
-func IsFileExists(path string) (bool, error) {
-	fileInfo, err := os.Stat(path)
+// Check if path points at a file.
+// If path points at a symlink and `followSymlink == false`,
+// function will return `true` regardless of the symlink target
+func IsFileExists(path string, followSymlink bool) (bool, error) {
+	fileInfo, err := GetFileInfo(path, followSymlink)
 	if err != nil {
 		if os.IsNotExist(err) { // If doesn't exist, don't omit an error
 			return false, nil
@@ -29,8 +35,11 @@ func IsFileExists(path string) (bool, error) {
 	return !fileInfo.IsDir(), nil
 }
 
-func IsDirExists(path string) (bool, error) {
-	fileInfo, err := os.Stat(path)
+// Check if path points at a directory.
+// If path points at a symlink and `followSymlink == false`,
+// function will return `false` regardless of the symlink target
+func IsDirExists(path string, followSymlink bool) (bool, error) {
+	fileInfo, err := GetFileInfo(path, followSymlink)
 	if err != nil {
 		if os.IsNotExist(err) { // If doesn't exist, don't omit an error
 			return false, nil
@@ -40,24 +49,132 @@ func IsDirExists(path string) (bool, error) {
 	return fileInfo.IsDir(), nil
 }
 
-// ListFiles returns a list of files and directories in the specified path
-func ListFiles(path string) ([]string, error) {
-	sep := string(os.PathSeparator)
+// Get the file info of the file in path.
+// If path points at a symlink and `followSymlink == false`, return the file info of the symlink instead
+func GetFileInfo(path string, followSymlink bool) (fileInfo os.FileInfo, err error) {
+	if followSymlink {
+		fileInfo, err = os.Lstat(path)
+	} else {
+		fileInfo, err = os.Stat(path)
+	}
+	// We should not do CheckError here, because the error is checked by the calling functions.
+	return fileInfo, err
+}
+
+// Move directory content from one path to another.
+func MoveDir(fromPath, toPath string) error {
+	err := CreateDirIfNotExist(toPath)
+	if err != nil {
+		return err
+	}
+
+	files, err := ListFiles(fromPath, true)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range files {
+		dir, err := IsDirExists(v, true)
+		if err != nil {
+			return err
+		}
+
+		if dir {
+			toPath := toPath + GetFileSeparator() + filepath.Base(v)
+			err := MoveDir(v, toPath)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		err = MoveFile(v, filepath.Join(toPath, filepath.Base(v)))
+		if err != nil {
+			return err
+		}
+	}
+	return err
+}
+
+// GoLang: os.Rename() give error "invalid cross-device link" for Docker container with Volumes.
+// MoveFile(source, destination) will work moving file between folders
+// Therefore, we are using our own implementation (MoveFile) in order to rename files.
+func MoveFile(sourcePath, destPath string) (err error) {
+	inputFileOpen := true
+	var inputFile *os.File
+	inputFile, err = os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if inputFileOpen {
+			e := inputFile.Close()
+			if err == nil {
+				err = e
+			}
+		}
+	}()
+	inputFileInfo, err := inputFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	var outputFile *os.File
+	outputFile, err = os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		e := outputFile.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+
+	_, err = io.Copy(outputFile, inputFile)
+	if err != nil {
+		return err
+	}
+	err = os.Chmod(destPath, inputFileInfo.Mode())
+	if err != nil {
+		return err
+	}
+
+	// The copy was successful, so now delete the original file
+	err = inputFile.Close()
+	if err != nil {
+		return err
+	}
+	inputFileOpen = false
+	err = os.Remove(sourcePath)
+	return err
+}
+
+// Return the list of files and directories in the specified path
+func ListFiles(path string, includeDirs bool) ([]string, error) {
+	sep := GetFileSeparator()
 	if !strings.HasSuffix(path, sep) {
 		path += sep
 	}
-	var fileList []string
+	fileList := []string{}
 	files, _ := ioutil.ReadDir(path)
 	path = strings.TrimPrefix(path, "."+sep)
 
 	for _, f := range files {
 		filePath := path + f.Name()
-		exists, err := IsFileExists(filePath)
+		exists, err := IsFileExists(filePath, false)
 		if err != nil {
 			return nil, err
 		}
-		if exists {
+		if exists || IsPathSymlink(filePath) {
 			fileList = append(fileList, filePath)
+		} else if includeDirs {
+			isDir, err := IsDirExists(filePath, false)
+			if err != nil {
+				return nil, err
+			}
+			if isDir {
+				fileList = append(fileList, filePath)
+			}
 		}
 	}
 	return fileList, nil
@@ -116,7 +233,7 @@ func CreateTempDir() (string, error) {
 }
 
 func RemoveTempDir(dirPath string) error {
-	exists, err := IsDirExists(dirPath)
+	exists, err := IsDirExists(dirPath, true)
 	if err != nil {
 		return err
 	}
@@ -166,4 +283,162 @@ func extractTimestamp(item string) (time.Time, error) {
 	}
 	// Convert to time type.
 	return time.Unix(timestampInt, 0), nil
+}
+
+// FindFileInDirAndParents looks for a file named fileName in dirPath and its parents, and returns the path of the directory where it was found.
+// dirPath must be a full path.
+func FindFileInDirAndParents(dirPath, fileName string) (string, error) {
+	// Create a map to store all paths visited, to avoid running in circles.
+	visitedPaths := make(map[string]bool)
+	currDir := dirPath
+	for {
+		// If the file is found in the current directory, return the path.
+		exists, err := IsFileExists(filepath.Join(currDir, fileName), true)
+		if err != nil || exists {
+			return currDir, err
+		}
+
+		// Save this path.
+		visitedPaths[currDir] = true
+
+		// CD to the parent directory.
+		currDir = filepath.Dir(currDir)
+
+		// If we already visited this directory, it means that there's a loop and we can stop.
+		if visitedPaths[currDir] {
+			return "", errors.New(fmt.Sprintf("could not find the %s file of the project", fileName))
+		}
+	}
+}
+
+// Copy directory content from one path to another.
+// includeDirs means to copy also the dirs if presented in the src folder.
+// excludeNames - Skip files/dirs in the src folder that match names in provided slice. ONLY excludes first layer (only in src folder).
+func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) error {
+	err := CreateDirIfNotExist(toPath)
+	if err != nil {
+		return err
+	}
+
+	files, err := ListFiles(fromPath, includeDirs)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range files {
+		// Skip if excluded
+		if IsStringInSlice(filepath.Base(v), excludeNames) {
+			continue
+		}
+
+		dir, err := IsDirExists(v, false)
+		if err != nil {
+			return err
+		}
+
+		if dir {
+			toPath := toPath + GetFileSeparator() + filepath.Base(v)
+			err := CopyDir(v, toPath, true, nil)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		err = CopyFile(toPath, v)
+		if err != nil {
+			return err
+		}
+	}
+	return err
+}
+
+func CopyFile(dst, src string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+	fileName, _ := GetFileAndDirFromPath(src)
+	dstPath, err := CreateFilePath(dst, fileName)
+	if err != nil {
+		return err
+	}
+	dstFile, err := os.Create(dstPath)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+	_, err = io.Copy(dstFile, srcFile)
+	return err
+}
+
+func GetFileSeparator() string {
+	return string(os.PathSeparator)
+}
+
+// Return the file's name and dir of a given path by finding the index of the last separator in the path.
+// Support separators : "/" , "\\" and "\\\\"
+func GetFileAndDirFromPath(path string) (fileName, dir string) {
+	index1 := strings.LastIndex(path, "/")
+	index2 := strings.LastIndex(path, "\\")
+	var index int
+	offset := 0
+	if index1 >= index2 {
+		index = index1
+	} else {
+		index = index2
+		// Check if the last separator is "\\\\" or "\\".
+		index3 := strings.LastIndex(path, "\\\\")
+		if index3 != -1 && index2-index3 == 1 {
+			offset = 1
+		}
+	}
+	if index != -1 {
+		fileName = path[index+1:]
+		// If the last separator is "\\\\" index will contain the index of the last "\\" ,
+		// to get the dir path (without separator suffix) we will use the offset's value.
+		dir = path[:index-offset]
+		return
+	}
+	fileName = path
+	dir = ""
+	return
+}
+
+func CreateFilePath(localPath, fileName string) (string, error) {
+	if localPath != "" {
+		err := os.MkdirAll(localPath, 0777)
+		if err != nil {
+			return "", err
+		}
+		fileName = filepath.Join(localPath, fileName)
+	}
+	return fileName, nil
+}
+
+func CreateDirIfNotExist(path string) error {
+	exist, err := IsDirExists(path, false)
+	if exist || err != nil {
+		return err
+	}
+	_, err = CreateFilePath(path, "")
+	return err
+}
+
+func IsStringInSlice(string string, strings []string) bool {
+	for _, v := range strings {
+		if v == string {
+			return true
+		}
+	}
+	return false
+}
+
+func IsPathSymlink(path string) bool {
+	f, _ := os.Lstat(path)
+	return f != nil && IsFileSymlink(f)
+}
+
+func IsFileSymlink(file os.FileInfo) bool {
+	return file.Mode()&os.ModeSymlink != 0
 }
