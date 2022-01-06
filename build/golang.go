@@ -72,18 +72,14 @@ func (gm *GoModule) loadDependencies() ([]entities.Dependency, error) {
 	populateRequestedByField(rootModule, dependenciesMap, dependenciesGraph)
 	return dependenciesMapToList(dependenciesMap), nil
 }
-
 func (gm *GoModule) getGoDependencies(cachePath string) (map[string]entities.Dependency, error) {
 	modulesMap, err := utils.GetDependenciesList(gm.srcPath, gm.containingBuild.logger)
 	if err != nil || len(modulesMap) == 0 {
 		return nil, err
 	}
-	return gm.getGoDependencies(cachePath, modulesMap)
-}
-
-func (gm *GoModule) getGoDependencies(cachePath string, moduleSlice map[string]bool) ([]entities.Dependency, error) {
-	var buildInfoDependencies []entities.Dependency
-	for module := range moduleSlice {
+	// Create a map from dependency to parents
+	buildInfoDependencies := make(map[string]entities.Dependency)
+	for module := range modulesMap {
 		moduleInfo := strings.Split(module, "@")
 		name := goModEncode(moduleInfo[0])
 		version := goModEncode(moduleInfo[1])
