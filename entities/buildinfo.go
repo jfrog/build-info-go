@@ -136,7 +136,6 @@ func (targetBuildInfo *BuildInfo) ExcludeEnv(patterns ...string) error {
 }
 
 func (targetBuildInfo *BuildInfo) ToCycloneDxBom() (*cdx.BOM, error) {
-	var components []cdx.Component
 	var biDependencies []Dependency
 	moduleIds := make(map[string]bool)
 
@@ -154,11 +153,14 @@ func (targetBuildInfo *BuildInfo) ToCycloneDxBom() (*cdx.BOM, error) {
 		mergeDependenciesLists(&dependenciesToAdd, &biDependencies)
 	}
 
+	var components []cdx.Component
+	depMap := make(map[string]map[string]bool)
 	for _, biDep := range biDependencies {
 		newComp, err := packageIdToCycloneDxComponent(biDep.Id)
 		if err != nil {
 			return nil, err
 		}
+		newComp.BOMRef = biDep.Id
 		if _, exist := moduleIds[biDep.Id]; exist {
 			newComp.Type = cdx.ComponentTypeApplication
 		} else {
@@ -183,10 +185,28 @@ func (targetBuildInfo *BuildInfo) ToCycloneDxBom() (*cdx.BOM, error) {
 			newComp.Hashes = &hashes
 		}
 		components = append(components, *newComp)
+
+		for _, reqByPath := range biDep.RequestedBy {
+			if depMap[reqByPath[0]] == nil {
+				depMap[reqByPath[0]] = make(map[string]bool)
+			}
+			depMap[reqByPath[0]][biDep.Id] = true
+		}
+	}
+
+	// Convert the map of dependencies to CycloneDX dependency objects
+	var dependencies []cdx.Dependency
+	for compRef, deps := range depMap {
+		var cdxDepsSlice []cdx.Dependency
+		for depRef := range deps {
+			cdxDepsSlice = append(cdxDepsSlice, cdx.Dependency{Ref: depRef})
+		}
+		dependencies = append(dependencies, cdx.Dependency{Ref: compRef, Dependencies: &cdxDepsSlice})
 	}
 
 	bom := cdx.NewBOM()
 	bom.Components = &components
+	bom.Dependencies = &dependencies
 	return bom, nil
 }
 
