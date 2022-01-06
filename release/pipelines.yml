@@ -46,7 +46,7 @@ pipelines:
             - test -n "$NEXT_VERSION" -a "$NEXT_VERSION" != "v0.0.0"
 
             # Configure Git and merge from the dev
-            - git checkout master
+            - git checkout main
             - git remote set-url origin https://$int_il_automation_token@github.com/jfrog/builf-info-go.git
             - git merge origin/dev
             - git tag ${NEXT_VERSION}
@@ -75,7 +75,7 @@ pipelines:
             # Copy version to 'latest' directory in releases.jfrog.io
             - jf rt cp "bi-cli/v1/$NEXT_VERSION/(*)" "bi-cli/v1/latest/{1}" --url=https://releases.jfrog.io/artifactory/ --access-token=$int_releases_jfrog_io_deployer_access_token
 
-            # Push to master
+            # Push to main
             - git clean -fd
             - git push
             - git push --tags
