@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.0.0 (January 6, 2022)
+- Support for generating build-info for npm
+- Generate and populate sha256
+- Populate requestedBy field
+- Allow converting to CycloneDX BOM
+- Upgrade build-info to 2.33.0 / 4.26.0
+
 ## 0.1.6 (December 31, 2021)
 - Added isEqual func to module, artifact & dependency structs
 - Allow ignoring go list errors
