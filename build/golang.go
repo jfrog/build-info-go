@@ -119,6 +119,24 @@ func goModEncode(name string) string {
 	return path
 }
 
+// The opposite of goModEncode
+func goModUnEncode(name string) string {
+	name = strings.ReplaceAll(name, ":v", ":")
+	if !strings.Contains(name, "!") {
+		return name
+	}
+	// if name contains '!' sign before a letter, we need to remove it and Uppercase the letter
+	path := ""
+	for i, letter := range name {
+		if i > 0 && name[i-1] == '!' {
+			path += strings.ToUpper(string(name[i+1]))
+		} else if letter != '!' {
+			path += string(letter)
+		}
+	}
+	return path
+}
+
 // Returns the path to the package zip file if exists.
 func (gm *GoModule) getPackageZipLocation(cachePath, dependencyName, version string) (string, error) {
 	zipPath, err := gm.getPackagePathIfExists(cachePath, dependencyName, version)
@@ -165,9 +183,10 @@ func populateRequestedByField(parentDependency entities.Dependency, dependencies
 	if parentDependency.NodeHasLoop() {
 		return
 	}
-	childrenList := dependenciesGraph[strings.ReplaceAll(parentDependency.Id, ":v", ":")]
+
+	childrenList := dependenciesGraph[goModUnEncode(parentDependency.Id)]
 	for _, childName := range childrenList {
-		fixedChildName := strings.ReplaceAll(childName, ":", ":v")
+		fixedChildName := goModEncode(strings.ReplaceAll(childName, ":", ":v"))
 		if childDep, ok := dependenciesMap[fixedChildName]; ok {
 			for _, parentRequestedBy := range parentDependency.RequestedBy {
 				childRequestedBy := append([]string{parentDependency.Id}, parentRequestedBy...)
