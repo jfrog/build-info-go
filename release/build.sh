@@ -9,7 +9,7 @@ build () {
   exeName="$4"
   echo "Building $exeName for $GOOS-$GOARCH ..."
 
-  res=CGO_ENABLED=0 jf go build -o "$exeName" -ldflags '-w -extldflags "-static"' main.go
+  CGO_ENABLED=0 jf go build -o "$exeName" -ldflags '-w -extldflags "-static"' main.go
   chmod +x bi
 
   # Run verification after building plugin for the correct platform of this image.
