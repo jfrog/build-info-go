@@ -13,14 +13,16 @@ import (
 )
 
 const (
-	formatFlag = "format"
+	formatFlag    = "format"
+	cycloneDxXml  = "cyclonedx/xml"
+	cycloneDxJson = "cyclonedx/json"
 )
 
 func GetCommands(logger utils.Log) []*clitool.Command {
 	flags := []clitool.Flag{
 		&clitool.StringFlag{
 			Name:  formatFlag,
-			Usage: "[Optional] If specified, the build-info will be printed in another format. Supported formats: 'cdx/xml' or 'cdx/json'` `",
+			Usage: fmt.Sprintf("[Optional] Set to convert the build-info to a different format. Supported values are '%s' and '%s'.` `", cycloneDxXml, cycloneDxJson),
 		},
 	}
 
@@ -151,7 +153,7 @@ func printBuild(bld *build.Build, format string) error {
 	}
 
 	switch format {
-	case "cdx/xml":
+	case cycloneDxXml:
 		cdxBom, err := buildInfo.ToCycloneDxBom()
 		if err != nil {
 			return err
@@ -161,7 +163,7 @@ func printBuild(bld *build.Build, format string) error {
 		if err = encoder.Encode(cdxBom); err != nil {
 			return err
 		}
-	case "cdx/json":
+	case cycloneDxJson:
 		cdxBom, err := buildInfo.ToCycloneDxBom()
 		if err != nil {
 			return err

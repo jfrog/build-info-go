@@ -137,7 +137,7 @@ func (targetBuildInfo *BuildInfo) ExcludeEnv(patterns ...string) error {
 
 func (targetBuildInfo *BuildInfo) ToCycloneDxBom() (*cdx.BOM, error) {
 	var components []cdx.Component
-	var dependencies []Dependency
+	var biDependencies []Dependency
 	moduleIds := make(map[string]bool)
 
 	for _, module := range targetBuildInfo.Modules {
@@ -151,33 +151,33 @@ func (targetBuildInfo *BuildInfo) ToCycloneDxBom() (*cdx.BOM, error) {
 
 		dependenciesToAdd := []Dependency{moduleDep}
 		dependenciesToAdd = append(dependenciesToAdd, module.Dependencies...)
-		mergeDependenciesLists(&dependenciesToAdd, &dependencies)
+		mergeDependenciesLists(&dependenciesToAdd, &biDependencies)
 	}
 
-	for _, dep := range dependencies {
-		newComp, err := packageIdToCycloneDxComponent(dep.Id)
+	for _, biDep := range biDependencies {
+		newComp, err := packageIdToCycloneDxComponent(biDep.Id)
 		if err != nil {
 			return nil, err
 		}
-		if _, exist := moduleIds[dep.Id]; exist {
+		if _, exist := moduleIds[biDep.Id]; exist {
 			newComp.Type = cdx.ComponentTypeApplication
 		} else {
 			newComp.Type = cdx.ComponentTypeLibrary
 		}
 
-		if dep.Checksum != nil {
+		if biDep.Checksum != nil {
 			hashes := []cdx.Hash{
 				{
 					Algorithm: cdx.HashAlgoSHA256,
-					Value:     dep.Sha256,
+					Value:     biDep.Sha256,
 				},
 				{
 					Algorithm: cdx.HashAlgoSHA1,
-					Value:     dep.Sha1,
+					Value:     biDep.Sha1,
 				},
 				{
 					Algorithm: cdx.HashAlgoMD5,
-					Value:     dep.Md5,
+					Value:     biDep.Md5,
 				},
 			}
 			newComp.Hashes = &hashes
