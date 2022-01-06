@@ -52,7 +52,7 @@ func validateModule(t *testing.T, module buildinfo.Module, expectedDependencies,
 
 func validateRequestedBy(t *testing.T, module entities.Module) {
 	for _, dep := range module.Dependencies {
-		if assert.NotEmpty(t, dep.RequestedBy) {
+		if assert.NotEmpty(t, dep.RequestedBy, dep.Id+" RequestedBy filed is empty") {
 			switch dep.Id {
 
 			case "golang.org/x/text:v0.0.0-20170915032832-14c0d48ead0c":
@@ -69,7 +69,7 @@ func validateRequestedBy(t *testing.T, module entities.Module) {
 				assert.Equal(t, [][]string{{"github.com/jfrog/gofrog:v1.1.1", "github.com/jfrog/dependency"}, {"github.com/jfrog/dependency"}}, dep.RequestedBy)
 
 				// uppercase encoding
-			case "github.com/!microsoft/go-winio:v0.4.12":
+			case "github.com/!burnt!sushi/toml:v0.4.2-0.20211125115023-7d0236fe7476":
 				assert.Equal(t, [][]string{{"github.com/jfrog/dependency"}}, dep.RequestedBy)
 			default:
 				assert.Fail(t, "Unexpected dependency "+dep.Id)
