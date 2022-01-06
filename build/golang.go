@@ -60,16 +60,27 @@ func (gm *GoModule) loadDependencies() ([]entities.Dependency, error) {
 	if err != nil {
 		return nil, err
 	}
+	dependenciesGraph, err := utils.GetDependenciesGraph(gm.srcPath, gm.containingBuild.logger)
+	if err != nil {
+		return nil, err
+	}
+	dependenciesMap, err := gm.getGoDependencies(cachePath)
+	if err != nil {
+		return nil, err
+	}
+	rootModule := entities.Dependency{Id: gm.name, RequestedBy: [][]string{{}}}
+	populateRequestedByField(rootModule, dependenciesMap, dependenciesGraph)
+	return dependenciesMapToList(dependenciesMap), nil
+}
+
+func (gm *GoModule) getGoDependencies(cachePath string) (map[string]entities.Dependency, error) {
 	modulesMap, err := utils.GetDependenciesList(gm.srcPath, gm.containingBuild.logger)
 	if err != nil || len(modulesMap) == 0 {
 		return nil, err
 	}
-	return gm.getGoDependencies(cachePath, modulesMap)
-}
-
-func (gm *GoModule) getGoDependencies(cachePath string, moduleSlice map[string]bool) ([]entities.Dependency, error) {
-	var buildInfoDependencies []entities.Dependency
-	for module := range moduleSlice {
+	// Create a map from dependency to parents
+	buildInfoDependencies := make(map[string]entities.Dependency)
+	for module := range modulesMap {
 		moduleInfo := strings.Split(module, "@")
 		name := goModEncode(moduleInfo[0])
 		version := goModEncode(moduleInfo[1])
@@ -88,7 +99,7 @@ func (gm *GoModule) getGoDependencies(cachePath string, moduleSlice map[string]b
 		if err != nil {
 			return nil, err
 		}
-		buildInfoDependencies = append(buildInfoDependencies, *zipDependency)
+		buildInfoDependencies[packageId] = zipDependency
 	}
 	return buildInfoDependencies, nil
 }
@@ -138,14 +149,34 @@ func (gm *GoModule) getPackagePathIfExists(cachePath, dependencyName, version st
 }
 
 // populateZip adds the zip file as build-info dependency
-func populateZip(packageId, zipPath string) (zipDependency *entities.Dependency, err error) {
+func populateZip(packageId, zipPath string) (zipDependency entities.Dependency, err error) {
 	// Zip file dependency for the build-info
-	zipDependency = &entities.Dependency{Id: packageId}
+	zipDependency = entities.Dependency{Id: packageId}
 	checksums, err := utils.GetFileChecksums(zipPath)
 	if err != nil {
-		return nil, err
+		return
 	}
 	zipDependency.Type = "zip"
 	zipDependency.Checksum = &entities.Checksum{Sha1: checksums.Sha1, Md5: checksums.Md5, Sha256: checksums.Sha256}
 	return
+}
+
+func populateRequestedByField(parentDependency entities.Dependency, dependenciesMap map[string]entities.Dependency, dependenciesGraph map[string][]string) {
+	if parentDependency.NodeHasLoop() {
+		return
+	}
+	childrenList := dependenciesGraph[strings.ReplaceAll(parentDependency.Id, ":v", ":")]
+	for _, childName := range childrenList {
+		fixedChildName := strings.ReplaceAll(childName, ":", ":v")
+		if childDep, ok := dependenciesMap[fixedChildName]; ok {
+			for _, parentRequestedBy := range parentDependency.RequestedBy {
+				childRequestedBy := append([]string{parentDependency.Id}, parentRequestedBy...)
+				childDep.RequestedBy = append(childDep.RequestedBy, childRequestedBy)
+			}
+			// Reassign map entry with new entry copy
+			dependenciesMap[fixedChildName] = childDep
+			// Run recursive call on child dependencies
+			populateRequestedByField(childDep, dependenciesMap, dependenciesGraph)
+		}
+	}
 }

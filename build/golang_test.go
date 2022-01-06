@@ -25,7 +25,8 @@ func TestGenerateBuildInfoForGoProject(t *testing.T) {
 	buildInfo, err := goBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 4, 1, "github.com/jfrog/dependency", entities.Go, true)
+	validateModule(t, buildInfo.Modules[0], 5, 1, "github.com/jfrog/dependency", entities.Go, true)
+	validateRequestedBy(t, buildInfo.Modules[0])
 }
 
 func validateModule(t *testing.T, module buildinfo.Module, expectedDependencies, expectedArtifacts int, moduleName string, moduleType buildinfo.ModuleType, depsContainChecksums bool) {
@@ -46,5 +47,28 @@ func validateModule(t *testing.T, module buildinfo.Module, expectedDependencies,
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Sha1, "Empty Sha1 field.")
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Md5, "Empty MD5 field.")
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Sha256, "Empty SHA256 field.")
+	}
+}
+
+func validateRequestedBy(t *testing.T, module entities.Module) {
+	for _, dep := range module.Dependencies {
+		if assert.NotEmpty(t, dep.RequestedBy) {
+			switch dep.Id {
+			case "github.com/pkg/errors:v0.8.0":
+				assert.Equal(t, [][]string{{"github.com/jfrog/gofrog:v1.1.1", "github.com/jfrog/dependency"}, {"github.com/jfrog/dependency"}}, dep.RequestedBy)
+			case "golang.org/x/text:v0.0.0-20170915032832-14c0d48ead0c":
+				assert.Equal(t, [][]string{{"rsc.io/sampler:v1.3.0", "rsc.io/quote:v1.5.2", "github.com/jfrog/dependency"}}, dep.RequestedBy)
+			case "rsc.io/quote:v1.5.2":
+				assert.Equal(t, [][]string{{"github.com/jfrog/dependency"}}, dep.RequestedBy)
+
+			case "rsc.io/sampler:v1.3.0":
+				assert.Equal(t, [][]string{{"rsc.io/quote:v1.5.2", "github.com/jfrog/dependency"}}, dep.RequestedBy)
+
+			case "github.com/jfrog/gofrog:v1.1.1":
+				assert.Equal(t, [][]string{{"github.com/jfrog/dependency"}}, dep.RequestedBy)
+			default:
+				assert.Fail(t, "Unexpected dependency "+dep.Id)
+			}
+		}
 	}
 }
