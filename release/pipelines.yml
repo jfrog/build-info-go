@@ -47,7 +47,7 @@ pipelines:
 
             # Configure Git and merge from the dev
             - git checkout master
-            - git remote set-url origin https://$int_il_automation_token@github.com/jfrog/builf-info-go.git
+            - git remote set-url origin https://$int_il_automation_token@github.com/jfrog/build-info-go.git
             - git merge origin/dev
             - git tag ${NEXT_VERSION}
 
@@ -67,6 +67,8 @@ pipelines:
               JFROG_CLI_BUILD_NUMBER=$JFROG_CLI_BUILD_NUMBER 
               JFROG_CLI_BUILD_PROJECT=$JFROG_CLI_BUILD_PROJECT 
               release/build.sh "$NEXT_VERSION"
+            - jf rt bag && jf rt bce
+            - jf rt bp
 
             # Distribute release bundle
             - jf ds rbc "build-info-go" $NEXT_VERSION --spec="specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign

@@ -10,7 +10,7 @@ build () {
   echo "Building $exeName for $GOOS-$GOARCH ..."
 
   CGO_ENABLED=0 jf go build -o "$exeName" -ldflags '-w -extldflags "-static" -X main.cliVersion='$version main.go
-  chmod +x bi
+  chmod +x $exeName
 
   # Run verification after building plugin for the correct platform of this image.
   if [[ "$pkg" = "linux-386" ]]; then
