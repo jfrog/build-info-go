@@ -1,9 +1,11 @@
 package entities
 
 import (
+	"github.com/pkg/errors"
 	"strings"
 	"time"
 
+	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/gofrog/stringutils"
 )
 
@@ -133,6 +135,80 @@ func (targetBuildInfo *BuildInfo) ExcludeEnv(patterns ...string) error {
 	return nil
 }
 
+func (targetBuildInfo *BuildInfo) ToCycloneDxBom() (*cdx.BOM, error) {
+	var components []cdx.Component
+	var dependencies []Dependency
+	moduleIds := make(map[string]bool)
+
+	for _, module := range targetBuildInfo.Modules {
+		// Aggregated builds are not supported
+		if module.Type == Build {
+			continue
+		}
+
+		moduleDep := Dependency{Id: module.Id}
+		moduleIds[module.Id] = true
+
+		dependenciesToAdd := []Dependency{moduleDep}
+		dependenciesToAdd = append(dependenciesToAdd, module.Dependencies...)
+		mergeDependenciesLists(&dependenciesToAdd, &dependencies)
+	}
+
+	for _, dep := range dependencies {
+		newComp, err := packageIdToCycloneDxComponent(dep.Id)
+		if err != nil {
+			return nil, err
+		}
+		if _, exist := moduleIds[dep.Id]; exist {
+			newComp.Type = cdx.ComponentTypeApplication
+		} else {
+			newComp.Type = cdx.ComponentTypeLibrary
+		}
+
+		if dep.Checksum != nil {
+			hashes := []cdx.Hash{
+				{
+					Algorithm: cdx.HashAlgoSHA256,
+					Value:     dep.Sha256,
+				},
+				{
+					Algorithm: cdx.HashAlgoSHA1,
+					Value:     dep.Sha1,
+				},
+				{
+					Algorithm: cdx.HashAlgoMD5,
+					Value:     dep.Md5,
+				},
+			}
+			newComp.Hashes = &hashes
+		}
+		components = append(components, *newComp)
+	}
+
+	bom := cdx.NewBOM()
+	bom.Components = &components
+	return bom, nil
+}
+
+func packageIdToCycloneDxComponent(packageId string) (*cdx.Component, error) {
+	comp := &cdx.Component{}
+	packageIdParts := strings.Split(packageId, ":")
+	switch len(packageIdParts) {
+	case 1:
+		comp.Name = packageIdParts[0]
+	case 2:
+		comp.Name = packageIdParts[0]
+		comp.Version = packageIdParts[1]
+	case 3:
+		comp.Group = packageIdParts[0]
+		comp.Name = packageIdParts[1]
+		comp.Version = packageIdParts[2]
+	default:
+		return nil, errors.New("invalid package identifier: " + packageId)
+	}
+	return comp, nil
+}
+
 // Merge the first module into the second module.
 func mergeModules(merge *Module, into *Module) {
 	mergeArtifacts(&merge.Artifacts, &into.Artifacts)
@@ -244,6 +320,7 @@ type Module struct {
 	Artifacts         []Artifact   `json:"artifacts,omitempty"`
 	ExcludedArtifacts []Artifact   `json:"excludedArtifacts,omitempty"`
 	Dependencies      []Dependency `json:"dependencies,omitempty"`
+	// Used in aggregated builds - this field stores the checksums of the referenced build-info JSON.
 	*Checksum
 }
 
