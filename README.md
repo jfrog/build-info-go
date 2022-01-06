@@ -533,13 +533,13 @@ Read more about build-info at [buildinfo.org](https://buildinfo.org/).
 ## Using build-info-go as a CLI
 ### Download the CLI executable
 
-|<img src="images/linux.png" valign="middle" width="20"> | Linux | [386](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/linux-386/bi) |[amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/linux-amd64/bi) | [arm](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/linux-arm/bi) | [arm64](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/linux-arm64/bi) | [s390x](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/linux-s390x/bi) |  [ppc64](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/linux-ppc64/bi) | [ppc64le](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/linux-ppc64le/bi) |
+|<img src="images/linux.png" valign="middle" width="20"> | Linux | [386](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-386/bi) |[amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-amd64/bi) | [arm](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-arm/bi) | [arm64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-arm64/bi) | [s390x](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-s390x/bi) |  [ppc64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-ppc64/bi) | [ppc64le](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-ppc64le/bi) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 
-|<img src="images/mac.png" valign="middle" width="20"> | Mac | [386](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/mac-386/bi) | 
+|<img src="images/mac.png" valign="middle" width="20"> | Mac | [386](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/mac-386/bi) | 
 | :---: | :---: | :---: |
 
-|<img src="images/windows.png" valign="middle" width="20"> | Windows | [amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/0.1.2/windows-amd64/bi.exe) | 
+|<img src="images/windows.png" valign="middle" width="20"> | Windows | [amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/windows-amd64/bi.exe) | 
 | :---: | :---: | :---: |
 
 ### Build the CLI from Sources
