@@ -69,7 +69,7 @@ pipelines:
               release/build.sh "$NEXT_VERSION"
 
             # Distribute release bundle
-            - jf ds rbc "build-info-go" $NEXT_VERSION --spec="specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
+            - jf ds rbc "build-info-go" $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
             - jf ds rbd "build-info-go" $NEXT_VERSION --site="releases.jfrog.io" --sync
 
             # Copy version to 'latest' directory in releases.jfrog.io
