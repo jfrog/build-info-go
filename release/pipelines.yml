@@ -1,0 +1,84 @@
+resources:
+  - name: buildinfoGoGit
+    type: GitRepo
+    configuration:
+      path: jfrog/build-info-go
+      branches:
+        include: main
+      gitProvider: il_automation
+
+pipelines:
+  - name: release_build_info_go
+    configuration:
+      runtime:
+        type: image
+        image:
+          custom:
+            name: releases-docker.jfrog.io/jfrog-ecosystem-integration-env
+            tag: 1.5.0
+      environmentVariables:
+        readOnly:
+          NEXT_VERSION: v0.0.0
+
+    steps:
+      - name: Release
+        type: Bash
+        configuration:
+          inputResources:
+            - name: buildinfoGoGit
+              trigger: false
+          integrations:
+            - name: il_automation
+            - name: entplus_deployer
+            - name: releases_jfrog_io_deployer
+        execution:
+          onExecute:
+            - cd $res_buildinfoGoGit_resourcePath
+
+            # Set env
+            - export CI=true
+            - export JFROG_CLI_BUILD_NAME=ecosystem-build-info-go-release
+            - export JFROG_CLI_BUILD_NUMBER=$run_number
+            - export JFROG_CLI_BUILD_PROJECT=ecosys
+
+            # Make sure version provided
+            - echo "Checking variables"
+            - test -n "$NEXT_VERSION" -a "$NEXT_VERSION" != "v0.0.0"
+
+            # Configure Git and merge from the dev
+            - git checkout master
+            - git remote set-url origin https://$int_il_automation_token@github.com/jfrog/builf-info-go.git
+            - git merge origin/dev
+            - git tag ${NEXT_VERSION}
+
+            # Download JFrog CLI
+            - curl -fL https://install-cli.jfrog.io | sh
+            - jf c rm --quiet
+            - jf c add internal --url=$int_entplus_deployer_url --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
+            - jf goc --repo-resolve ecosys-go-remote
+
+            # Audit
+            - jf audit
+
+            # Build and upload
+            - >
+              env -i PATH=$PATH HOME=$HOME 
+              JFROG_CLI_BUILD_NAME=$JFROG_CLI_BUILD_NAME 
+              JFROG_CLI_BUILD_NUMBER=$JFROG_CLI_BUILD_NUMBER 
+              JFROG_CLI_BUILD_PROJECT=$JFROG_CLI_BUILD_PROJECT 
+              release/build.sh "$NEXT_VERSION"
+
+            # Distribute release bundle
+            - jf ds rbc "build-info-go" $NEXT_VERSION --spec="specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
+            - jf ds rbd "build-info-go" $NEXT_VERSION --site="releases.jfrog.io" --sync
+
+            # Copy version to 'latest' directory in releases.jfrog.io
+            - jf rt cp "bi-cli/v1/$NEXT_VERSION/(*)" "bi-cli/v1/latest/{1}" --url=https://releases.jfrog.io/artifactory/ --access-token=$int_releases_jfrog_io_deployer_access_token
+
+            # Push to master
+            - git clean -fd
+            - git push
+            - git push --tags
+
+          onComplete:
+            - jf c rm --quiet

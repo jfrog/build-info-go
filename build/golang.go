@@ -78,9 +78,12 @@ func (gm *GoModule) getGoDependencies(cachePath string) (map[string]entities.Dep
 	if err != nil || len(modulesMap) == 0 {
 		return nil, err
 	}
-	// Create a map from dependency to parents
-	buildInfoDependencies := make(map[string]entities.Dependency)
-	for module := range modulesMap {
+	return gm.getGoDependencies(cachePath, modulesMap)
+}
+
+func (gm *GoModule) getGoDependencies(cachePath string, moduleSlice map[string]bool) ([]entities.Dependency, error) {
+	var buildInfoDependencies []entities.Dependency
+	for module := range moduleSlice {
 		moduleInfo := strings.Split(module, "@")
 		name := goModEncode(moduleInfo[0])
 		version := goModEncode(moduleInfo[1])

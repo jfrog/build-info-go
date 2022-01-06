@@ -9,12 +9,8 @@ build () {
   exeName="$4"
   echo "Building $exeName for $GOOS-$GOARCH ..."
 
-  res=CGO_ENABLED=0 go build -o "$exeName" -ldflags '-w -extldflags "-static"' main.go
-  exitCode=$?
-  if [[ $exitCode -ne 0 ]]; then
-    echo "Error: Failed to build $exeName for $GOOS-$GOARCH"
-    exit $exitCode
-  fi
+  CGO_ENABLED=0 jf go build -o "$exeName" -ldflags '-w -extldflags "-static"' main.go
+  chmod +x bi
 
   # Run verification after building plugin for the correct platform of this image.
   if [[ "$pkg" = "linux-386" ]]; then
@@ -34,19 +30,19 @@ buildAndUpload () {
 
   destPath="$pkgPath/$version/$pkg/$exeName"
   echo "Uploading $exeName to $destPath ..."
-  ./jfrog rt u "./$exeName" "$destPath"
+  jf rt u "./$exeName" "$destPath"
 }
 
 #function copyToLatestDir()
 copyToLatestDir () {
   echo "Copy version to latest dir: $pkgPath/$version/"
-  ./jfrog rt cp "$pkgPath/$version/(*)" "$pkgPath/latest/{1}" --flat
+  jf rt cp "$pkgPath/$version/(*)" "$pkgPath/latest/{1}" --flat
 }
 
 # Verify version provided in pipelines UI matches version in build-info-go source code.
 verifyVersionMatching () {
   echo "Verifying provided version matches built version..."
-  go build -o bi
+  jf go build -o bi
   res=$(eval "./bi -v")
   exitCode=$?
   if [[ $exitCode -ne 0 ]]; then
