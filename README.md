@@ -595,8 +595,10 @@ bi gradle
 ```shell
 bi npm
 ```
+Note: checksums calculation is not yet supported for npm projects.
 
-Note: checksums calculation is not supported for npm projects.
+#### Conversion to CycloneDX
+You can generate build-info and have it converted into the CycloneDX format by adding to the command ```--format cyclonedx/xml``` or ```--format cyclonedx/json```.
 
 ### Logs
 
