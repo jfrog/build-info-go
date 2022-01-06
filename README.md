@@ -288,7 +288,7 @@ Read more about build-info at [buildinfo.org](https://buildinfo.org/).
           "id": "github.com/jfrog/build-info-go",
           "dependencies": [
             {
-              "id": "github.com/!cyclone!d!x/cyclonedx-go:v0.4.0",
+              "id": "github.com/CycloneDX/cyclonedx-go:v0.4.0",
               "type": "zip",
               "sha1": "4fd24140c9d75be7361f204809ac509cfbec7d21",
               "md5": "2ac70bf2397c5bb980ccfd3dac6bd24d",
