@@ -1,11 +1,13 @@
 package entities
 
 import (
-	"github.com/pkg/errors"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	cdx "github.com/CycloneDX/cyclonedx-go"
+	"github.com/jfrog/build-info-go/utils/compare"
 	"github.com/jfrog/gofrog/stringutils"
 )
 
@@ -345,7 +347,7 @@ type Module struct {
 }
 
 func (m *Module) isEqual(other Module) bool {
-	return m.Id == other.Id && m.Type == other.Type && isEqualArtifactSlices(m.Artifacts, other.Artifacts) && isEqualDependencySlices(m.Dependencies, other.Dependencies)
+	return m.Id == other.Id && m.Type == other.Type && m.Checksum.IsEqual(other.Checksum) && isEqualArtifactSlices(m.Artifacts, other.Artifacts) && isEqualDependencySlices(m.Dependencies, other.Dependencies)
 }
 
 func IsEqualModuleSlices(a, b []Module) bool {
@@ -378,16 +380,7 @@ type Artifact struct {
 }
 
 func (a *Artifact) isEqual(other Artifact) bool {
-	if other.Checksum == nil && a.Checksum == nil {
-		return a.Name == other.Name && a.Path == other.Path && a.Type == other.Type
-	}
-	if other.Checksum == nil && a.Checksum != nil {
-		return false
-	}
-	if other.Checksum != nil && a.Checksum == nil {
-		return false
-	}
-	return a.Name == other.Name && a.Path == other.Path && a.Type == other.Type && a.Sha1 == other.Sha1 && a.Md5 == other.Md5 && a.Sha256 == other.Sha256
+	return a.Name == other.Name && a.Path == other.Path && a.Type == other.Type && a.Checksum.IsEqual(other.Checksum)
 }
 
 func isEqualArtifactSlices(a, b []Artifact) bool {
@@ -417,16 +410,7 @@ type Dependency struct {
 }
 
 func (d *Dependency) IsEqual(other Dependency) bool {
-	if d.Checksum == nil && other.Checksum == nil {
-		return d.Id == other.Id && d.Type == other.Type
-	}
-	if d.Checksum != nil && other.Checksum == nil {
-		return false
-	}
-	if d.Checksum == nil && other.Checksum != nil {
-		return false
-	}
-	return d.Id == other.Id && d.Type == other.Type && d.Sha1 == other.Sha1 && d.Md5 == other.Md5 && d.Sha256 == other.Sha256
+	return d.Id == other.Id && d.Type == other.Type && d.Checksum.IsEqual(other.Checksum) && compare.IsEqualSlices(d.Scopes, other.Scopes) && compare.IsEqual2DSlices(d.RequestedBy, other.RequestedBy)
 }
 
 func isEqualDependencySlices(a, b []Dependency) bool {
@@ -481,6 +465,19 @@ type Checksum struct {
 	Sha1   string `json:"sha1,omitempty"`
 	Md5    string `json:"md5,omitempty"`
 	Sha256 string `json:"sha256,omitempty"`
+}
+
+func (c *Checksum) IsEqual(b *Checksum) bool {
+	if c != nil && b == nil {
+		return false
+	}
+	if c == nil && b != nil {
+		return false
+	}
+	if c == nil && b == nil {
+		return true
+	}
+	return c.Sha1 == b.Sha1 && c.Md5 == b.Md5 && c.Sha256 == b.Sha256
 }
 
 type Env map[string]string
