@@ -1,0 +1,39 @@
+package compare
+
+import (
+	"reflect"
+	"sort"
+)
+
+// Check for equality on slices without order.
+func IsEqualSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	a_copy := make([]string, len(a))
+	b_copy := make([]string, len(b))
+
+	copy(a_copy, a)
+	copy(b_copy, b)
+
+	sort.Strings(a_copy)
+	sort.Strings(b_copy)
+
+	return reflect.DeepEqual(a_copy, b_copy)
+}
+
+func IsEqual2DSlices(a, b [][]string) bool {
+	return IsEqualSlices(to1DSlice(a), to1DSlice(b))
+}
+
+func to1DSlice(a [][]string) (result []string) {
+	for _, i := range a {
+		temp := ""
+		for _, j := range i {
+			temp += j
+		}
+		result = append(result, temp)
+	}
+	return
+}

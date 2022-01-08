@@ -346,7 +346,7 @@ type Module struct {
 }
 
 func (m *Module) isEqual(other Module) bool {
-	return m.Id == other.Id && m.Type == other.Type && isEqualArtifactSlices(m.Artifacts, other.Artifacts) && isEqualDependencySlices(m.Dependencies, other.Dependencies)
+	return m.Id == other.Id && m.Type == other.Type && m.Sha1 == other.Sha1 && m.Md5 == other.Md5 && m.Sha256 == other.Sha256 && isEqualArtifactSlices(m.Artifacts, other.Artifacts) && isEqualDependencySlices(m.Dependencies, other.Dependencies)
 }
 
 func IsEqualModuleSlices(a, b []Module) bool {
