@@ -79,26 +79,21 @@ func (gm *GoModule) getGoDependencies(cachePath string) (map[string]entities.Dep
 	}
 	// Create a map from dependency to parents
 	buildInfoDependencies := make(map[string]entities.Dependency)
-	for module := range modulesMap {
-		moduleInfo := strings.Split(module, "@")
-		name := goModEncode(moduleInfo[0])
-		version := goModEncode(moduleInfo[1])
-		packageId := strings.Join([]string{name, version}, ":")
-
+	for moduleId := range modulesMap {
 		// We first check if this dependency has a zip in the local Go cache.
 		// If it does not, nil is returned. This seems to be a bug in Go.
-		zipPath, err := gm.getPackageZipLocation(cachePath, name, version)
+		zipPath, err := gm.getPackageZipLocation(cachePath, moduleId)
 		if err != nil {
 			return nil, err
 		}
 		if zipPath == "" {
 			continue
 		}
-		zipDependency, err := populateZip(packageId, zipPath)
+		zipDependency, err := populateZip(moduleId, zipPath)
 		if err != nil {
 			return nil, err
 		}
-		buildInfoDependencies[packageId] = zipDependency
+		buildInfoDependencies[moduleId] = zipDependency
 	}
 	return buildInfoDependencies, nil
 }
@@ -118,27 +113,9 @@ func goModEncode(name string) string {
 	return path
 }
 
-// The opposite of goModEncode
-func goModUnEncode(name string) string {
-	name = strings.ReplaceAll(name, ":v", ":")
-	if !strings.Contains(name, "!") {
-		return name
-	}
-	// if name contains '!' sign before a letter, we need to remove it and Uppercase the letter
-	path := ""
-	for i, letter := range name {
-		if i > 0 && name[i-1] == '!' {
-			path += strings.ToUpper(string(name[i+1]))
-		} else if letter != '!' {
-			path += string(letter)
-		}
-	}
-	return path
-}
-
 // Returns the path to the package zip file if exists.
-func (gm *GoModule) getPackageZipLocation(cachePath, dependencyName, version string) (string, error) {
-	zipPath, err := gm.getPackagePathIfExists(cachePath, dependencyName, version)
+func (gm *GoModule) getPackageZipLocation(cachePath, dependencyId string) (string, error) {
+	zipPath, err := gm.getPackagePathIfExists(cachePath, dependencyId)
 	if err != nil {
 		return "", err
 	}
@@ -147,11 +124,17 @@ func (gm *GoModule) getPackageZipLocation(cachePath, dependencyName, version str
 		return zipPath, nil
 	}
 
-	return gm.getPackagePathIfExists(filepath.Dir(cachePath), dependencyName, version)
+	return gm.getPackagePathIfExists(filepath.Dir(cachePath), dependencyId)
 }
 
 // Validates that the package zip file exists and returns its path.
-func (gm *GoModule) getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath string, err error) {
+func (gm *GoModule) getPackagePathIfExists(cachePath, dependencyId string) (zipPath string, err error) {
+	// If the path includes capital letters, the Go convention is to use "!" before the letter. The letter itself is in lowercase.
+	encodedId := goModEncode(dependencyId)
+
+	moduleInfo := strings.Split(encodedId, ":")
+	dependencyName := moduleInfo[0]
+	version := moduleInfo[1]
 	zipPath = filepath.Join(cachePath, dependencyName, "@v", version+".zip")
 	fileExists, err := utils.IsFileExists(zipPath, true)
 	if err != nil {
@@ -182,17 +165,15 @@ func populateRequestedByField(parentDependency entities.Dependency, dependencies
 	if parentDependency.NodeHasLoop() {
 		return
 	}
-
-	childrenList := dependenciesGraph[goModUnEncode(parentDependency.Id)]
+	childrenList := dependenciesGraph[parentDependency.Id]
 	for _, childName := range childrenList {
-		fixedChildName := goModEncode(strings.ReplaceAll(childName, ":", ":v"))
-		if childDep, ok := dependenciesMap[fixedChildName]; ok {
+		if childDep, ok := dependenciesMap[childName]; ok {
 			for _, parentRequestedBy := range parentDependency.RequestedBy {
 				childRequestedBy := append([]string{parentDependency.Id}, parentRequestedBy...)
 				childDep.RequestedBy = append(childDep.RequestedBy, childRequestedBy)
 			}
 			// Reassign map entry with new entry copy
-			dependenciesMap[fixedChildName] = childDep
+			dependenciesMap[childName] = childDep
 			// Run recursive call on child dependencies
 			populateRequestedByField(childDep, dependenciesMap, dependenciesGraph)
 		}
