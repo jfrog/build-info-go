@@ -52,25 +52,27 @@ func validateModule(t *testing.T, module buildinfo.Module, expectedDependencies,
 
 func validateRequestedBy(t *testing.T, module entities.Module) {
 	for _, dep := range module.Dependencies {
-		if assert.NotEmpty(t, dep.RequestedBy, dep.Id+" RequestedBy filed is empty") {
+		if assert.NotEmpty(t, dep.RequestedBy, dep.Id+" RequestedBy field is empty") {
 			switch dep.Id {
+			// Direct dependencies:
+			case "rsc.io/quote:v1.5.2", "github.com/jfrog/gofrog:v1.1.1":
+				assert.Equal(t, [][]string{{module.Id}}, dep.RequestedBy)
 
+			// Indirect dependencies:
 			case "golang.org/x/text:v0.0.0-20170915032832-14c0d48ead0c":
-				assert.Equal(t, [][]string{{"rsc.io/sampler:v1.3.0", "rsc.io/quote:v1.5.2", "github.com/jfrog/dependency"}}, dep.RequestedBy)
-			case "rsc.io/quote:v1.5.2":
-				assert.Equal(t, [][]string{{"github.com/jfrog/dependency"}}, dep.RequestedBy)
+				assert.Equal(t, [][]string{{"rsc.io/sampler:v1.3.0", "rsc.io/quote:v1.5.2", module.Id}}, dep.RequestedBy)
+
 			case "rsc.io/sampler:v1.3.0":
-				assert.Equal(t, [][]string{{"rsc.io/quote:v1.5.2", "github.com/jfrog/dependency"}}, dep.RequestedBy)
-			case "github.com/jfrog/gofrog:v1.1.1":
-				assert.Equal(t, [][]string{{"github.com/jfrog/dependency"}}, dep.RequestedBy)
+				assert.Equal(t, [][]string{{"rsc.io/quote:v1.5.2", module.Id}}, dep.RequestedBy)
 
-				// 2 requestedBy lists
+				// 2 requestedBy lists:
 			case "github.com/pkg/errors:v0.8.0":
-				assert.Equal(t, [][]string{{"github.com/jfrog/gofrog:v1.1.1", "github.com/jfrog/dependency"}, {"github.com/jfrog/dependency"}}, dep.RequestedBy)
+				assert.Equal(t, [][]string{{"github.com/jfrog/gofrog:v1.1.1", module.Id}, {module.Id}}, dep.RequestedBy)
 
-				// uppercase encoded module
+				// Uppercase encoded module:
 			case "github.com/!burnt!sushi/toml:v0.4.2-0.20211125115023-7d0236fe7476":
-				assert.Equal(t, [][]string{{"github.com/jfrog/dependency"}}, dep.RequestedBy)
+				assert.Equal(t, [][]string{{module.Id}}, dep.RequestedBy)
+
 			default:
 				assert.Fail(t, "Unexpected dependency "+dep.Id)
 			}
