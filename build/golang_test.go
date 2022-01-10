@@ -67,7 +67,10 @@ func validateRequestedBy(t *testing.T, module entities.Module) {
 
 				// 2 requestedBy lists:
 			case "github.com/pkg/errors:v0.8.0":
-				assert.Equal(t, [][]string{{"github.com/jfrog/gofrog:v1.1.1", module.Id}, {module.Id}}, dep.RequestedBy)
+				assert.Equal(t, [][]string{
+					{"github.com/jfrog/gofrog:v1.1.1", module.Id},
+					{module.Id},
+				}, dep.RequestedBy)
 
 				// Uppercase encoded module:
 			case "github.com/!burnt!sushi/toml:v0.4.2-0.20211125115023-7d0236fe7476":
