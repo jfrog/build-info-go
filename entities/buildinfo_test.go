@@ -109,3 +109,40 @@ func TestMergeDependenciesLists(t *testing.T) {
 	mergeDependenciesLists(&dependenciesToAdd, &intoDependencies)
 	reflect.DeepEqual(expectedMergedDependencies, intoDependencies)
 }
+
+func TestAppend(t *testing.T) {
+	artifactA := Artifact{Name: "artifact-a", Checksum: Checksum{Sha1: "artifact-a-sha"}}
+	artifactB := Artifact{Name: "artifact-b", Checksum: Checksum{Sha1: "artifact-b-sha"}}
+	artifactC := Artifact{Name: "artifact-c", Checksum: Checksum{Sha1: "artifact-c-sha"}}
+
+	dependencyA := Dependency{Id: "dependency-a", Checksum: Checksum{Sha1: "dependency-a-sha"}}
+	dependencyB := Dependency{Id: "dependency-b", Checksum: Checksum{Sha1: "dependency-b-sha"}}
+	dependencyC := Dependency{Id: "dependency-c", Checksum: Checksum{Sha1: "dependency-c-sha"}}
+
+	buildInfo1 := BuildInfo{
+		Modules: []Module{{
+			Id:           "module-id",
+			Artifacts:    []Artifact{artifactA, artifactB},
+			Dependencies: []Dependency{dependencyA, dependencyB},
+		}},
+	}
+
+	buildInfo2 := BuildInfo{
+		Modules: []Module{{
+			Id:           "module-id",
+			Artifacts:    []Artifact{artifactA, artifactC},
+			Dependencies: []Dependency{dependencyA, dependencyC},
+		}},
+	}
+
+	expected := BuildInfo{
+		Modules: []Module{{
+			Id:           "module-id",
+			Artifacts:    []Artifact{artifactA, artifactB, artifactC},
+			Dependencies: []Dependency{dependencyA, dependencyB, dependencyC},
+		}},
+	}
+
+	buildInfo1.Append(&buildInfo2)
+	assert.True(t, IsEqualModuleSlices(expected.Modules, buildInfo1.Modules))
+}
