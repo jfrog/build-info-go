@@ -157,7 +157,7 @@ func populateZip(packageId, zipPath string) (zipDependency entities.Dependency, 
 		return
 	}
 	zipDependency.Type = "zip"
-	zipDependency.Checksum = &entities.Checksum{Sha1: checksums.Sha1, Md5: checksums.Md5, Sha256: checksums.Sha256}
+	zipDependency.Checksum = entities.Checksum{Sha1: checksums.Sha1, Md5: checksums.Md5, Sha256: checksums.Sha256}
 	return
 }
 
