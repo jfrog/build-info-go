@@ -20,7 +20,7 @@ func TestGenerateBuildInfoForNpmProject(t *testing.T) {
 	assert.NoError(t, err)
 	err = npmModule.CalcDependencies()
 	assert.NoError(t, err)
-	err = npmModule.AddArtifacts(entities.Artifact{Name: "artifactName", Type: "artifactType", Path: "artifactPath", Checksum: &entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}})
+	err = npmModule.AddArtifacts(entities.Artifact{Name: "artifactName", Type: "artifactType", Path: "artifactPath", Checksum: entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}})
 	assert.NoError(t, err)
 	buildInfo, err := goBuild.ToBuildInfo()
 	assert.NoError(t, err)
@@ -41,7 +41,7 @@ func TestCollectDepsForNpmProjectWithTraverse(t *testing.T) {
 		if dependency.Id == "xml:1.0.1" {
 			return false, nil
 		}
-		dependency.Checksum = &entities.Checksum{Sha1: "test123", Md5: "test456", Sha256: "test789"}
+		dependency.Checksum = entities.Checksum{Sha1: "test123", Md5: "test456", Sha256: "test789"}
 		return true, nil
 	})
 	err = npmModule.CalcDependencies()

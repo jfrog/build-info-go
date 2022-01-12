@@ -340,7 +340,7 @@ type partialModule struct {
 	moduleType   entities.ModuleType
 	artifacts    map[string]entities.Artifact
 	dependencies map[string]entities.Dependency
-	checksum     *entities.Checksum
+	checksum     entities.Checksum
 }
 
 func extractBuildInfoData(partials entities.Partials) ([]entities.Module, entities.Env, []entities.Vcs, entities.Issues, error) {
@@ -442,7 +442,7 @@ func dependenciesMapToList(dependenciesMap map[string]entities.Dependency) []ent
 	return dependencies
 }
 
-func createModule(moduleId string, moduleType entities.ModuleType, checksum *entities.Checksum, artifacts []entities.Artifact, dependencies []entities.Dependency) *entities.Module {
+func createModule(moduleId string, moduleType entities.ModuleType, checksum entities.Checksum, artifacts []entities.Artifact, dependencies []entities.Dependency) *entities.Module {
 	module := createDefaultModule(moduleId)
 	module.Type = moduleType
 	module.Checksum = checksum
