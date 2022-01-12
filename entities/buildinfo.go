@@ -74,13 +74,11 @@ func (targetBuildInfo *BuildInfo) SetPluginVersion(pluginVersion string) {
 // If the two build info instances contain modules with identical names, these modules are merged.
 // When merging the modules, the artifacts and dependencies remain unique according to their checksum.
 func (targetBuildInfo *BuildInfo) Append(buildInfo *BuildInfo) {
-	for i := range buildInfo.Modules {
-		newModule := buildInfo.Modules[i]
+	for i, newModule := range buildInfo.Modules {
 		exists := false
 		for j := range targetBuildInfo.Modules {
-			targetModule := targetBuildInfo.Modules[j]
-			if newModule.Id == targetModule.Id {
-				mergeModules(&newModule, &targetModule)
+			if newModule.Id == targetBuildInfo.Modules[j].Id {
+				mergeModules(&buildInfo.Modules[i], &targetBuildInfo.Modules[j])
 				exists = true
 				break
 			}
