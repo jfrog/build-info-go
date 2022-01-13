@@ -8,10 +8,8 @@ import (
 
 	"github.com/jfrog/gofrog/version"
 
-	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -35,56 +33,20 @@ var autoModify *bool = nil
 // Used for masking basic auth credentials as part of a URL.
 var protocolRegExp *gofrogcmd.CmdOutputPattern
 
-type Cmd struct {
-	Go           string
-	Command      []string
-	CommandFlags []string
-	Dir          string
-	StrWriter    io.WriteCloser
-	ErrWriter    io.WriteCloser
+func goCmd(cmdArgs []string) (*Cmd, error) {
+	return NewCmd("go", cmdArgs)
 }
 
-func newCmd() (*Cmd, error) {
-	execPath, err := exec.LookPath("go")
-	if err != nil {
-		return nil, err
-	}
-	return &Cmd{Go: execPath}, nil
-}
-
-func (config *Cmd) GetCmd() (cmd *exec.Cmd) {
-	var cmdStr []string
-	cmdStr = append(cmdStr, config.Go)
-	cmdStr = append(cmdStr, config.Command...)
-	cmdStr = append(cmdStr, config.CommandFlags...)
-	cmd = exec.Command(cmdStr[0], cmdStr[1:]...)
-	cmd.Dir = config.Dir
-	return
-}
-
-func (config *Cmd) GetEnv() map[string]string {
-	return map[string]string{}
-}
-
-func (config *Cmd) GetStdWriter() io.WriteCloser {
-	return config.StrWriter
-}
-
-func (config *Cmd) GetErrWriter() io.WriteCloser {
-	return config.ErrWriter
-}
-
-func RunGo(goArg []string, repoUrl string) error {
+func RunGo(commandArgs []string, repoUrl string) error {
 	err := os.Setenv("GOPROXY", repoUrl)
 	if err != nil {
 		return err
 	}
 
-	goCmd, err := newCmd()
+	goCmd, err := goCmd(commandArgs)
 	if err != nil {
 		return err
 	}
-	goCmd.Command = goArg
 	err = prepareGlobalRegExp()
 	if err != nil {
 		return err
@@ -189,11 +151,10 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 			}
 		}()
 	}
-	goCmd, err := newCmd()
+	goCmd, err := goCmd(commandArgs)
 	if err != nil {
 		return "", err
 	}
-	goCmd.Command = commandArgs
 	goCmd.Dir = projectDir
 
 	err = prepareGlobalRegExp()
@@ -274,11 +235,10 @@ func getParsedGoVersion() (*version.Version, error) {
 }
 
 func getGoVersion() (string, error) {
-	goCmd, err := newCmd()
+	goCmd, err := goCmd([]string{"version"})
 	if err != nil {
 		return "", err
 	}
-	goCmd.Command = []string{"version"}
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
 	return output, err
 }
@@ -336,11 +296,10 @@ func GetGoModCachePath() (string, error) {
 
 // GetGOPATH returns the location of the GOPATH
 func getGOPATH() (string, error) {
-	goCmd, err := newCmd()
+	goCmd, err := goCmd([]string{"env", "GOPATH"})
 	if err != nil {
 		return "", err
 	}
-	goCmd.Command = []string{"env", "GOPATH"}
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
 	if err != nil {
 		return "", fmt.Errorf("Could not find GOPATH env: %s", err.Error())

@@ -81,8 +81,14 @@ func (b *Build) AddGradleModule(srcPath string) (*GradleModule, error) {
 	return newGradleModule(b, srcPath)
 }
 
+// AddNpmModule adds a Npm module to this Build. Pass srcPath as an empty string if the root of the Npm project is the working directory.
 func (b *Build) AddNpmModule(srcPath string) (*NpmModule, error) {
 	return newNpmModule(srcPath, b)
+}
+
+// AddPipModule adds a Npm module to this Build. Pass srcPath as an empty string if the root of the Pip project is the working directory.
+func (b *Build) AddPipModule(srcPath string) (*PipModule, error) {
+	return newPipModule(srcPath, b)
 }
 
 func (b *Build) CollectEnv() error {

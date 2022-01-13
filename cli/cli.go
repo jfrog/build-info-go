@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	clitool "github.com/urfave/cli/v2"
 	"os"
+	"strings"
 )
 
 const (
@@ -143,7 +144,48 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				return printBuild(bld, context.String(formatFlag))
 			},
 		},
+		{
+			Name:      "pip",
+			Usage:     "Generate build-info for an pip project",
+			UsageText: "bi pip",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("", "")
+				if err != nil {
+					return
+				}
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
+				pipModule, err := bld.AddPipModule("")
+				if err != nil {
+					return
+				}
+				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
+				err = pipModule.RunCommandAndCollectDependencies(filteredArgs)
+				if err != nil {
+					return
+				}
+				return printBuild(bld, context.String(formatFlag))
+			},
+		},
 	}
+}
+
+func filterCliFlags(allArgs []string, cliFlags []clitool.Flag) []string {
+	var filteredArgs []string
+	for _, arg := range allArgs {
+		if !strings.HasPrefix(arg, "-") {
+
+			filteredArgs = append(filteredArgs, arg)
+		}
+	}
+	return filteredArgs
 }
 
 func printBuild(bld *build.Build, format string) error {
