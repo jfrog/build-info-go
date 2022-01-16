@@ -16,7 +16,6 @@ import (
 
 const (
 	MavenHome                       = "M2_HOME"
-	buildInfoPathKey                = "buildInfo.generated.build.info"
 	dependenciesDirName             = ".build-info"
 	MavenExtractorFileName          = "build-info-extractor-maven3-%s-uber.jar"
 	classworldsConfFileName         = "classworlds.conf"
@@ -90,7 +89,6 @@ func (mm *MavenModule) SetExtractorDetails(localdExtractorPath, extractorPropsdi
 	mm.extractorDetails.downloadExtractorFunc = downloadExtractorFunc
 	mm.extractorDetails.goals = goals
 	if configProps != nil {
-		configProps[buildInfoPathKey] = mm.extractorDetails.props[buildInfoPathKey]
 		mm.extractorDetails.props = configProps
 	}
 	return mm
@@ -127,8 +125,7 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 		return nil, errors.New("couldn't find plexus-classworlds-x.x.x.jar in Maven installation path, please check M2_HOME environment variable")
 	}
 	buildInfoPath, err := createEmptyBuildInfoFile(mm.containingBuild)
-	mm.extractorDetails.props[buildInfoPathKey] = buildInfoPath
-	extractorProps, err := utils.CreateExtractorPropsFile(mm.extractorDetails.propsDir, mm.extractorDetails.props)
+	extractorProps, err := utils.CreateExtractorPropsFile(mm.extractorDetails.propsDir, buildInfoPath, mm.containingBuild.buildName, mm.containingBuild.buildNumber, mm.containingBuild.projectKey, mm.extractorDetails.props)
 	if err != nil {
 		return nil, err
 	}
