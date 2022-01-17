@@ -134,6 +134,10 @@ func (gm *GoModule) getPackageZipLocation(cachePath, encodedDependencyId string)
 // Validates that the package zip file exists and returns its path.
 func (gm *GoModule) getPackagePathIfExists(cachePath, encodedDependencyId string) (zipPath string, err error) {
 	moduleInfo := strings.Split(encodedDependencyId, ":")
+	if len(moduleInfo) != 2 {
+		gm.containingBuild.logger.Debug("The encoded dependency Id syntax should be 'name:version' but instead got:", encodedDependencyId)
+		return "", nil
+	}
 	dependencyName := moduleInfo[0]
 	version := moduleInfo[1]
 	zipPath = filepath.Join(cachePath, dependencyName, "@v", version+".zip")
