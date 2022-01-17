@@ -18,7 +18,7 @@ pipelines:
             tag: 1.5.0
       environmentVariables:
         readOnly:
-          NEXT_VERSION: v0.0.0
+          NEXT_VERSION: 0.0.0
 
     steps:
       - name: Release
@@ -43,13 +43,13 @@ pipelines:
 
             # Make sure version provided
             - echo "Checking variables"
-            - test -n "$NEXT_VERSION" -a "$NEXT_VERSION" != "v0.0.0"
+            - test -n "$NEXT_VERSION" -a "$NEXT_VERSION" != "0.0.0"
 
             # Configure Git and merge from the dev
-            - git checkout master
+            - git checkout main
             - git remote set-url origin https://$int_il_automation_token@github.com/jfrog/builf-info-go.git
             - git merge origin/dev
-            - git tag ${NEXT_VERSION}
+            - git tag v${NEXT_VERSION}
 
             # Download JFrog CLI
             - curl -fL https://install-cli.jfrog.io | sh
@@ -67,15 +67,17 @@ pipelines:
               JFROG_CLI_BUILD_NUMBER=$JFROG_CLI_BUILD_NUMBER 
               JFROG_CLI_BUILD_PROJECT=$JFROG_CLI_BUILD_PROJECT 
               release/build.sh "$NEXT_VERSION"
+            - jf rt bag && jf rt bce
+            - jf rt bp
 
             # Distribute release bundle
-            - jf ds rbc "build-info-go" $NEXT_VERSION --spec="specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
+            - jf ds rbc "build-info-go" $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
             - jf ds rbd "build-info-go" $NEXT_VERSION --site="releases.jfrog.io" --sync
 
             # Copy version to 'latest' directory in releases.jfrog.io
             - jf rt cp "bi-cli/v1/$NEXT_VERSION/(*)" "bi-cli/v1/latest/{1}" --url=https://releases.jfrog.io/artifactory/ --access-token=$int_releases_jfrog_io_deployer_access_token
 
-            # Push to master
+            # Push to main
             - git clean -fd
             - git push
             - git push --tags
