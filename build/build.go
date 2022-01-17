@@ -351,7 +351,7 @@ func extractBuildInfoData(partials entities.Partials) ([]entities.Module, entiti
 	issuesMap := make(map[string]*entities.AffectedIssue)
 	for _, partial := range partials {
 		moduleId := partial.ModuleId
-		if partialModules[moduleId] == nil {
+		if partialModules[moduleId] == nil && partial.ModuleType != "" {
 			partialModules[moduleId] = &partialModule{moduleType: partial.ModuleType}
 		}
 		switch {
