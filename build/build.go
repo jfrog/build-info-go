@@ -351,9 +351,7 @@ func extractBuildInfoData(partials entities.Partials) ([]entities.Module, entiti
 	issuesMap := make(map[string]*entities.AffectedIssue)
 	for _, partial := range partials {
 		moduleId := partial.ModuleId
-		if partialModules[moduleId] == nil {
-			partialModules[moduleId] = &partialModule{moduleType: partial.ModuleType}
-		}
+		addNewPartialModule(partial, partialModules)
 		switch {
 		case partial.Artifacts != nil:
 			for _, artifact := range partial.Artifacts {
@@ -389,6 +387,18 @@ func extractBuildInfoData(partials entities.Partials) ([]entities.Module, entiti
 		}
 	}
 	return partialModulesToModules(partialModules), env, vcs, issuesMapToArray(issues, issuesMap), nil
+}
+
+func addNewPartialModule(partial *entities.Partial, partialModules map[string]*partialModule) {
+	// Skip if module ID already exists.
+	if partialModules[partial.ModuleId] != nil {
+		return
+	}
+	// Skip if module is of Env or Vcs.
+	if partial.ModuleType == "" && (partial.Env != nil || partial.VcsList != nil) {
+		return
+	}
+	partialModules[partial.ModuleId] = &partialModule{moduleType: partial.ModuleType}
 }
 
 func partialModulesToModules(partialModules map[string]*partialModule) []entities.Module {
