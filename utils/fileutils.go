@@ -191,10 +191,15 @@ func DownloadFile(downloadTo string, fromUrl string) (err error) {
 			err = deferErr
 		}
 	}()
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("download failed. status code: %s", resp.Status)
+		return
+	}
 	// Create the file
-	out, err := os.Create(downloadTo)
+	var out *os.File
+	out, err = os.Create(downloadTo)
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
 		if deferErr := out.Close(); err == nil {
