@@ -346,7 +346,7 @@ type partialModule struct {
 	moduleType   entities.ModuleType
 	artifacts    map[string]entities.Artifact
 	dependencies map[string]entities.Dependency
-	checksum     *entities.Checksum
+	checksum     entities.Checksum
 }
 
 func extractBuildInfoData(partials entities.Partials) ([]entities.Module, entities.Env, []entities.Vcs, entities.Issues, error) {
@@ -357,7 +357,7 @@ func extractBuildInfoData(partials entities.Partials) ([]entities.Module, entiti
 	issuesMap := make(map[string]*entities.AffectedIssue)
 	for _, partial := range partials {
 		moduleId := partial.ModuleId
-		if partialModules[moduleId] == nil {
+		if partialModules[moduleId] == nil && partial.ModuleType != "" {
 			partialModules[moduleId] = &partialModule{moduleType: partial.ModuleType}
 		}
 		switch {
@@ -448,7 +448,7 @@ func dependenciesMapToList(dependenciesMap map[string]entities.Dependency) []ent
 	return dependencies
 }
 
-func createModule(moduleId string, moduleType entities.ModuleType, checksum *entities.Checksum, artifacts []entities.Artifact, dependencies []entities.Dependency) *entities.Module {
+func createModule(moduleId string, moduleType entities.ModuleType, checksum entities.Checksum, artifacts []entities.Artifact, dependencies []entities.Dependency) *entities.Module {
 	module := createDefaultModule(moduleId)
 	module.Type = moduleType
 	module.Checksum = checksum

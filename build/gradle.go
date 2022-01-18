@@ -110,8 +110,7 @@ func (gm *GradleModule) createGradleRunConfig() (*gradleRunConfig, error) {
 		return nil, err
 	}
 	buildInfoPath, err := createEmptyBuildInfoFile(gm.containingBuild)
-	gm.gradleExtractorDetails.props[buildInfoPathKey] = buildInfoPath
-	extractorPropsFile, err := utils.CreateExtractorPropsFile(gm.gradleExtractorDetails.propsDir, gm.gradleExtractorDetails.props)
+	extractorPropsFile, err := utils.CreateExtractorPropsFile(gm.gradleExtractorDetails.propsDir, buildInfoPath, gm.containingBuild.buildName, gm.containingBuild.buildNumber, gm.containingBuild.projectKey, gm.gradleExtractorDetails.props)
 	if err != nil {
 		return nil, err
 	}

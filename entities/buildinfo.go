@@ -1,9 +1,10 @@
 package entities
 
 import (
-	"github.com/pkg/errors"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/gofrog/stringutils"
@@ -73,11 +74,11 @@ func (targetBuildInfo *BuildInfo) SetPluginVersion(pluginVersion string) {
 // If the two build info instances contain modules with identical names, these modules are merged.
 // When merging the modules, the artifacts and dependencies remain unique according to their checksum.
 func (targetBuildInfo *BuildInfo) Append(buildInfo *BuildInfo) {
-	for _, newModule := range buildInfo.Modules {
+	for i, newModule := range buildInfo.Modules {
 		exists := false
-		for i := range targetBuildInfo.Modules {
-			if newModule.Id == targetBuildInfo.Modules[i].Id {
-				mergeModules(&newModule, &targetBuildInfo.Modules[i])
+		for j := range targetBuildInfo.Modules {
+			if newModule.Id == targetBuildInfo.Modules[j].Id {
+				mergeModules(&buildInfo.Modules[i], &targetBuildInfo.Modules[j])
 				exists = true
 				break
 			}
@@ -167,7 +168,7 @@ func (targetBuildInfo *BuildInfo) ToCycloneDxBom() (*cdx.BOM, error) {
 			newComp.Type = cdx.ComponentTypeLibrary
 		}
 
-		if biDep.Checksum != nil {
+		if !biDep.Checksum.IsEmpty() {
 			hashes := []cdx.Hash{
 				{
 					Algorithm: cdx.HashAlgoSHA256,
@@ -255,7 +256,7 @@ func mergeDependenciesLists(dependenciesToAdd, intoDependencies *[]Dependency) {
 	for i, dependencyToAdd := range *dependenciesToAdd {
 		exists := false
 		for _, dependency := range *intoDependencies {
-			if (dependencyToAdd.Checksum != nil && dependency.Checksum != nil && dependencyToAdd.Sha1 == dependency.Sha1) || (dependencyToAdd.Checksum == nil && dependency.Checksum == nil && dependencyToAdd.Id == dependency.Id) {
+			if dependencyToAdd.Sha1 == dependency.Sha1 && dependencyToAdd.Id == dependency.Id {
 				exists = true
 				(*dependenciesToAdd)[i] = mergeDependencies(dependency, dependencyToAdd)
 				break
@@ -341,7 +342,7 @@ type Module struct {
 	ExcludedArtifacts []Artifact   `json:"excludedArtifacts,omitempty"`
 	Dependencies      []Dependency `json:"dependencies,omitempty"`
 	// Used in aggregated builds - this field stores the checksums of the referenced build-info JSON.
-	*Checksum
+	Checksum
 }
 
 func (m *Module) isEqual(other Module) bool {
@@ -374,19 +375,10 @@ type Artifact struct {
 	Name string `json:"name,omitempty"`
 	Type string `json:"type,omitempty"`
 	Path string `json:"path,omitempty"`
-	*Checksum
+	Checksum
 }
 
 func (a *Artifact) isEqual(other Artifact) bool {
-	if other.Checksum == nil && a.Checksum == nil {
-		return a.Name == other.Name && a.Path == other.Path && a.Type == other.Type
-	}
-	if other.Checksum == nil && a.Checksum != nil {
-		return false
-	}
-	if other.Checksum != nil && a.Checksum == nil {
-		return false
-	}
 	return a.Name == other.Name && a.Path == other.Path && a.Type == other.Type && a.Sha1 == other.Sha1 && a.Md5 == other.Md5 && a.Sha256 == other.Sha256
 }
 
@@ -413,19 +405,10 @@ type Dependency struct {
 	Type        string     `json:"type,omitempty"`
 	Scopes      []string   `json:"scopes,omitempty"`
 	RequestedBy [][]string `json:"requestedBy,omitempty"`
-	*Checksum
+	Checksum
 }
 
 func (d *Dependency) IsEqual(other Dependency) bool {
-	if d.Checksum == nil && other.Checksum == nil {
-		return d.Id == other.Id && d.Type == other.Type
-	}
-	if d.Checksum != nil && other.Checksum == nil {
-		return false
-	}
-	if d.Checksum == nil && other.Checksum != nil {
-		return false
-	}
 	return d.Id == other.Id && d.Type == other.Type && d.Sha1 == other.Sha1 && d.Md5 == other.Md5 && d.Sha256 == other.Sha256
 }
 
@@ -483,6 +466,10 @@ type Checksum struct {
 	Sha256 string `json:"sha256,omitempty"`
 }
 
+func (c *Checksum) IsEmpty() bool {
+	return c.Md5 == "" && c.Sha1 == "" && c.Sha256 == ""
+}
+
 type Env map[string]string
 
 type Vcs struct {
@@ -503,7 +490,7 @@ type Partial struct {
 	ModuleId     string       `json:"ModuleId,omitempty"`
 	Issues       *Issues      `json:"Issues,omitempty"`
 	VcsList      []Vcs        `json:"vcs,omitempty"`
-	*Checksum
+	Checksum
 }
 
 func (partials Partials) Len() int {

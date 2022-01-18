@@ -1,3 +1,5 @@
+github.com/BurntSushi/toml v0.4.2-0.20211125115023-7d0236fe7476 h1:AJe2An/bK0YZUpl4YCTlnZYUMMNMu+zB/oWPrKPdG64=
+github.com/BurntSushi/toml v0.4.2-0.20211125115023-7d0236fe7476/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/jfrog/gofrog v1.1.1 h1:uRjeZWidQl4FmKP4Zpj5hSKJp3gSIWW9VUwbQdVEVRU=
 github.com/jfrog/gofrog v1.1.1/go.mod h1:9YN5v4LlsCfLIXpwQnzSf1wVtgjdHM20FzuIu58RMI4=
