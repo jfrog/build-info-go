@@ -73,6 +73,7 @@ func TestCollectEnv(t *testing.T) {
 			err = buildInfo.ExcludeEnv(tc.exclude...)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expected, buildInfo.Properties)
+			assert.Empty(t, buildInfo.Modules)
 			err = build.Clean()
 			assert.NoError(t, err)
 		})
