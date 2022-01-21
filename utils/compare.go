@@ -1,4 +1,4 @@
-package compare
+package utils
 
 import (
 	"reflect"

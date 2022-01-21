@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
-	"github.com/jfrog/build-info-go/utils/compare"
+	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/stringutils"
 )
 
@@ -410,7 +410,7 @@ type Dependency struct {
 }
 
 func (d *Dependency) IsEqual(other Dependency) bool {
-	return d.Id == other.Id && d.Type == other.Type && d.Checksum.IsEqual(other.Checksum) && compare.IsEqualSlices(d.Scopes, other.Scopes) && compare.IsEqual2DSlices(d.RequestedBy, other.RequestedBy)
+	return d.Id == other.Id && d.Type == other.Type && d.Checksum.IsEqual(other.Checksum) && utils.IsEqualSlices(d.Scopes, other.Scopes) && utils.IsEqual2DSlices(d.RequestedBy, other.RequestedBy)
 }
 
 func isEqualDependencySlices(a, b []Dependency) bool {
