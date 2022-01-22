@@ -5,7 +5,7 @@ import (
 	"sort"
 )
 
-// Check for equality on slices without order.
+// Compare two slices irrespective of elements order.
 func IsEqualSlices(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -23,10 +23,12 @@ func IsEqualSlices(a, b []string) bool {
 	return reflect.DeepEqual(a_copy, b_copy)
 }
 
+// Compare two dimensional slices irrespective of elements order.
 func IsEqual2DSlices(a, b [][]string) bool {
 	return IsEqualSlices(to1DSlice(a), to1DSlice(b))
 }
 
+// Transform two dimensional slice to one dimensional slice
 func to1DSlice(a [][]string) (result []string) {
 	for _, i := range a {
 		temp := ""
