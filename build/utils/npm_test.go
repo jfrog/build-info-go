@@ -62,7 +62,7 @@ func TestGetDeployPath(t *testing.T) {
 }
 
 func TestParseDependencies(t *testing.T) {
-	dependenciesJsonList, err := ioutil.ReadFile(filepath.Join("testdata", "dependenciesList.json"))
+	dependenciesJsonList, err := ioutil.ReadFile(filepath.Join("..", "testdata", "dependenciesList.json"))
 	if err != nil {
 		t.Error(err)
 	}
