@@ -59,7 +59,7 @@ func newGradleModule(containingBuild *Build, srcPath string) (*GradleModule, err
 		containingBuild: containingBuild,
 		gradleExtractorDetails: &gradleExtractorDetails{
 			localPath: extractorLocalPath,
-			tasks:     []string{"aP"},
+			tasks:     []string{"artifactoryPublish"},
 			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempfolderName),
 			props:     map[string]string{},
 		},
