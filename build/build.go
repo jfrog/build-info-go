@@ -351,6 +351,11 @@ func extractBuildInfoData(partials entities.Partials) ([]entities.Module, entiti
 	issuesMap := make(map[string]*entities.AffectedIssue)
 	for _, partial := range partials {
 		moduleId := partial.ModuleId
+		// If type is not set but module has artifacts / dependencies, throw error.
+		if (partial.Artifacts != nil || partial.Dependencies != nil) && partial.ModuleType == "" {
+			return nil, nil, nil, entities.Issues{}, errors.New("module with artifacts or dependencies but no Type is not supported")
+		}
+		// Avoid adding redundant modules without type (for issues, env, etc)
 		if partialModules[moduleId] == nil && partial.ModuleType != "" {
 			partialModules[moduleId] = &partialModule{moduleType: partial.ModuleType}
 		}
