@@ -42,7 +42,6 @@ copyToLatestDir () {
 # Verify version provided in pipelines UI matches version in build-info-go source code.
 verifyVersionMatching () {
   echo "Verifying provided version matches built version..."
-  jf go build -o bi
   res=$(eval "./bi -v")
   exitCode=$?
   if [[ $exitCode -ne 0 ]]; then
