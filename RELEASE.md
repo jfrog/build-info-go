@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.0.1 (January 30, 2022)
+- Bug fix - Gradle - Avoid potential ambigues task error
+- Bug fix - Go - Change Go dependency ID syntax to '{dependencyName}:v{dependecyVersion)
+- Bug fix - Add build name/number/project to Maven & Gradle extractors
+- Bug fix - Avoid creating a redundant build-info module in some scenarios
+- Bug fix - Implicit memory aliasing in for loop whereby the targetBuildInfo modules may be reused accidentally
+
 ## 1.0.0 (January 6, 2022)
 - Support for generating build-info for npm
 - Generate and populate sha256

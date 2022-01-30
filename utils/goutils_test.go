@@ -12,26 +12,26 @@ import (
 
 func TestListToMap(t *testing.T) {
 	content := `github.com/you/hello
-github.com/dsnet/compress@v0.0.0-20171208185109-cc9eb1d7ad76
-github.com/golang/snappy@v0.0.0-20180518054509-2e65f85255db
-github.com/mholt/archiver@v2.1.0+incompatible
-github.com/nwaples/rardecode@v0.0.0-20171029023500-e06696f847ae
-github.com/pierrec/lz4@v2.0.5+incompatible
-github.com/ulikunitz/xz@v0.5.4
-rsc.io/quote@v1.5.2
-rsc.io/sampler@v1.3.0
+github.com/dsnet/compress:v0.0.0-20171208185109-cc9eb1d7ad76
+github.com/golang/snappy:v0.0.0-20180518054509-2e65f85255db
+github.com/mholt/archiver:v2.1.0+incompatible
+github.com/nwaples/rardecode:v0.0.0-20171029023500-e06696f847ae
+github.com/pierrec/lz4:v2.0.5+incompatible
+github.com/ulikunitz/xz:v0.5.4
+rsc.io/quote:v1.5.2
+rsc.io/sampler:v1.3.0
 	`
 
 	actual := listToMap(content)
 	expected := map[string]bool{
-		"github.com/dsnet/compress@v0.0.0-20171208185109-cc9eb1d7ad76":    true,
-		"github.com/golang/snappy@v0.0.0-20180518054509-2e65f85255db":     true,
-		"github.com/mholt/archiver@v2.1.0+incompatible":                   true,
-		"github.com/nwaples/rardecode@v0.0.0-20171029023500-e06696f847ae": true,
-		"github.com/pierrec/lz4@v2.0.5+incompatible":                      true,
-		"github.com/ulikunitz/xz@v0.5.4":                                  true,
-		"rsc.io/quote@v1.5.2":                                             true,
-		"rsc.io/sampler@v1.3.0":                                           true,
+		"github.com/dsnet/compress:v0.0.0-20171208185109-cc9eb1d7ad76":    true,
+		"github.com/golang/snappy:v0.0.0-20180518054509-2e65f85255db":     true,
+		"github.com/mholt/archiver:v2.1.0+incompatible":                   true,
+		"github.com/nwaples/rardecode:v0.0.0-20171029023500-e06696f847ae": true,
+		"github.com/pierrec/lz4:v2.0.5+incompatible":                      true,
+		"github.com/ulikunitz/xz:v0.5.4":                                  true,
+		"rsc.io/quote:v1.5.2":                                             true,
+		"rsc.io/sampler:v1.3.0":                                           true,
 	}
 
 	if !reflect.DeepEqual(expected, actual) {
@@ -153,10 +153,10 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 	}
 
 	expected := map[string]bool{
-		"golang.org/x/text@v0.3.3": true,
-		"rsc.io/quote@v1.5.2":      true,
-		"rsc.io/sampler@v1.3.0":    true,
-		testDir + "@":              true,
+		"golang.org/x/text:v0.3.3": true,
+		"rsc.io/quote:v1.5.2":      true,
+		"rsc.io/sampler:v1.3.0":    true,
+		testDir + ":":              true,
 	}
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("Expecting: \n%v \nGot: \n%v", expected, actual)

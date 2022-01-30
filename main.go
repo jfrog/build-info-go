@@ -1,14 +1,15 @@
 package main
 
 import (
+	"os"
+
 	"github.com/jfrog/build-info-go/cli"
 	"github.com/jfrog/build-info-go/utils"
-	"github.com/jfrog/build-info-go/utils/cliutils"
 	clitool "github.com/urfave/cli/v2"
-	"os"
 )
 
 var log utils.Log
+var cliVersion = "dev"
 
 func main() {
 	log = utils.NewDefaultLogger(getCliLogLevel())
@@ -16,7 +17,7 @@ func main() {
 		Name:     "Build-Info CLI",
 		Usage:    "Generate build-info for your source code",
 		Commands: cli.GetCommands(log),
-		Version:  cliutils.CliVersion,
+		Version:  cliVersion,
 	}
 	err := app.Run(os.Args)
 	if err != nil {

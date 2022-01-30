@@ -140,11 +140,11 @@ func GetDependenciesList(projectDir string, log Log) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
+	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}:{{.Version}}{{end}}", "all"), log)
 	if err != nil {
 		// Errors occurred while running "go list". Run again and this time ignore errors (with '-e')
 		log.Warn("Errors occurred while building the Go dependency tree. The dependency tree may be incomplete:" + err.Error())
-		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
+		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}:{{.Version}}{{end}}", "all"), log)
 		if err != nil {
 			return nil, err
 		}
@@ -370,8 +370,8 @@ func listToMap(output string) map[string]bool {
 	lineOutput := strings.Split(output, "\n")
 	mapOfDeps := map[string]bool{}
 	for _, line := range lineOutput {
-		// The expected syntax : github.com/name@v1.2.3
-		if len(strings.Split(line, "@")) == 2 && mapOfDeps[line] == false {
+		// The expected syntax : github.com/name:v1.2.3
+		if len(strings.Split(line, ":")) == 2 && mapOfDeps[line] == false {
 			mapOfDeps[line] = true
 			continue
 		}
@@ -384,7 +384,7 @@ func graphToMap(output string) map[string][]string {
 	mapOfDeps := map[string][]string{}
 	for _, line := range lineOutput {
 		// The expected syntax : github.com/parentname@v1.2.3 github.com/childname@v1.2.3
-		line = strings.ReplaceAll(line, "@v", ":")
+		line = strings.ReplaceAll(line, "@v", ":v")
 		splitLine := strings.Split(line, " ")
 		if len(splitLine) == 2 {
 			parent := splitLine[0]

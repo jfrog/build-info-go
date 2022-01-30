@@ -67,6 +67,8 @@ pipelines:
               JFROG_CLI_BUILD_NUMBER=$JFROG_CLI_BUILD_NUMBER 
               JFROG_CLI_BUILD_PROJECT=$JFROG_CLI_BUILD_PROJECT 
               release/build.sh "$NEXT_VERSION"
+            - jf rt bag && jf rt bce
+            - jf rt bp
 
             # Distribute release bundle
             - jf ds rbc "build-info-go" $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign

@@ -68,8 +68,8 @@ func (gm *GoModule) loadDependencies() ([]entities.Dependency, error) {
 	if err != nil {
 		return nil, err
 	}
-	rootModule := entities.Dependency{Id: gm.name, RequestedBy: [][]string{{}}}
-	populateRequestedByField(rootModule, dependenciesMap, dependenciesGraph)
+	emptyRequestedBy := [][]string{{}}
+	populateRequestedByField(gm.name, emptyRequestedBy, dependenciesMap, dependenciesGraph)
 	return dependenciesMapToList(dependenciesMap), nil
 }
 
@@ -80,26 +80,24 @@ func (gm *GoModule) getGoDependencies(cachePath string) (map[string]entities.Dep
 	}
 	// Create a map from dependency to parents
 	buildInfoDependencies := make(map[string]entities.Dependency)
-	for module := range modulesMap {
-		moduleInfo := strings.Split(module, "@")
-		name := goModEncode(moduleInfo[0])
-		version := goModEncode(moduleInfo[1])
-		packageId := strings.Join([]string{name, version}, ":")
+	for moduleId := range modulesMap {
+		// If the path includes capital letters, the Go convention is to use "!" before the letter. The letter itself is in lowercase.
+		encodedDependencyId := goModEncode(moduleId)
 
 		// We first check if this dependency has a zip in the local Go cache.
 		// If it does not, nil is returned. This seems to be a bug in Go.
-		zipPath, err := gm.getPackageZipLocation(cachePath, name, version)
+		zipPath, err := gm.getPackageZipLocation(cachePath, encodedDependencyId)
 		if err != nil {
 			return nil, err
 		}
 		if zipPath == "" {
 			continue
 		}
-		zipDependency, err := populateZip(packageId, zipPath)
+		zipDependency, err := populateZip(encodedDependencyId, zipPath)
 		if err != nil {
 			return nil, err
 		}
-		buildInfoDependencies[packageId] = zipDependency
+		buildInfoDependencies[moduleId] = zipDependency
 	}
 	return buildInfoDependencies, nil
 }
@@ -120,8 +118,8 @@ func goModEncode(name string) string {
 }
 
 // Returns the path to the package zip file if exists.
-func (gm *GoModule) getPackageZipLocation(cachePath, dependencyName, version string) (string, error) {
-	zipPath, err := gm.getPackagePathIfExists(cachePath, dependencyName, version)
+func (gm *GoModule) getPackageZipLocation(cachePath, encodedDependencyId string) (string, error) {
+	zipPath, err := gm.getPackagePathIfExists(cachePath, encodedDependencyId)
 	if err != nil {
 		return "", err
 	}
@@ -130,11 +128,18 @@ func (gm *GoModule) getPackageZipLocation(cachePath, dependencyName, version str
 		return zipPath, nil
 	}
 
-	return gm.getPackagePathIfExists(filepath.Dir(cachePath), dependencyName, version)
+	return gm.getPackagePathIfExists(filepath.Dir(cachePath), encodedDependencyId)
 }
 
 // Validates that the package zip file exists and returns its path.
-func (gm *GoModule) getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath string, err error) {
+func (gm *GoModule) getPackagePathIfExists(cachePath, encodedDependencyId string) (zipPath string, err error) {
+	moduleInfo := strings.Split(encodedDependencyId, ":")
+	if len(moduleInfo) != 2 {
+		gm.containingBuild.logger.Debug("The encoded dependency Id syntax should be 'name:version' but instead got:", encodedDependencyId)
+		return "", nil
+	}
+	dependencyName := moduleInfo[0]
+	version := moduleInfo[1]
 	zipPath = filepath.Join(cachePath, dependencyName, "@v", version+".zip")
 	fileExists, err := utils.IsFileExists(zipPath, true)
 	if err != nil {
@@ -157,26 +162,24 @@ func populateZip(packageId, zipPath string) (zipDependency entities.Dependency, 
 		return
 	}
 	zipDependency.Type = "zip"
-	zipDependency.Checksum = &entities.Checksum{Sha1: checksums.Sha1, Md5: checksums.Md5, Sha256: checksums.Sha256}
+	zipDependency.Checksum = entities.Checksum{Sha1: checksums.Sha1, Md5: checksums.Md5, Sha256: checksums.Sha256}
 	return
 }
 
-func populateRequestedByField(parentDependency entities.Dependency, dependenciesMap map[string]entities.Dependency, dependenciesGraph map[string][]string) {
-	if parentDependency.NodeHasLoop() {
-		return
-	}
-	childrenList := dependenciesGraph[strings.ReplaceAll(parentDependency.Id, ":v", ":")]
-	for _, childName := range childrenList {
-		fixedChildName := strings.ReplaceAll(childName, ":", ":v")
-		if childDep, ok := dependenciesMap[fixedChildName]; ok {
-			for _, parentRequestedBy := range parentDependency.RequestedBy {
-				childRequestedBy := append([]string{parentDependency.Id}, parentRequestedBy...)
+func populateRequestedByField(parentId string, parentRequestedBy [][]string, dependenciesMap map[string]entities.Dependency, dependenciesGraph map[string][]string) {
+	for _, childName := range dependenciesGraph[parentId] {
+		if childDep, ok := dependenciesMap[childName]; ok {
+			for _, requestedBy := range parentRequestedBy {
+				childRequestedBy := append([]string{parentId}, requestedBy...)
 				childDep.RequestedBy = append(childDep.RequestedBy, childRequestedBy)
 			}
+			if childDep.NodeHasLoop() {
+				continue
+			}
 			// Reassign map entry with new entry copy
-			dependenciesMap[fixedChildName] = childDep
+			dependenciesMap[childName] = childDep
 			// Run recursive call on child dependencies
-			populateRequestedByField(childDep, dependenciesMap, dependenciesGraph)
+			populateRequestedByField(childName, childDep.RequestedBy, dependenciesMap, dependenciesGraph)
 		}
 	}
 }
