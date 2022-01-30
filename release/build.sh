@@ -9,7 +9,7 @@ build () {
   exeName="$4"
   echo "Building $exeName for $GOOS-$GOARCH ..."
 
-  CGO_ENABLED=0 jf go build -o "$exeName" -ldflags '-w -extldflags "-static" -X main.cliVersion='$version main.go
+  CGO_ENABLED=0 jf go build -o "$exeName" -ldflags '-w -extldflags "-static" -X main.cliVersion='${version:1} main.go
   chmod +x $exeName
 
   # Run verification after building plugin for the correct platform of this image.
@@ -42,7 +42,6 @@ copyToLatestDir () {
 # Verify version provided in pipelines UI matches version in build-info-go source code.
 verifyVersionMatching () {
   echo "Verifying provided version matches built version..."
-  jf go build -o bi
   res=$(eval "./bi -v")
   exitCode=$?
   if [[ $exitCode -ne 0 ]]; then
