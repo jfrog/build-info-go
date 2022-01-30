@@ -47,7 +47,7 @@ pipelines:
 
             # Configure Git and merge from the dev
             - git checkout main
-            - git remote set-url origin https://$int_il_automation_token@github.com/jfrog/builf-info-go.git
+            - git remote set-url origin https://$int_il_automation_token@github.com/jfrog/build-info-go.git
             - git merge origin/dev
             - git tag v${NEXT_VERSION}
 
