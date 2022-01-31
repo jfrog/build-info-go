@@ -5,11 +5,11 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"fmt"
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/minio/sha256-simd"
 	"hash"
 	"io"
 	"os"
+
+	"github.com/minio/sha256-simd"
 )
 
 type Algorithm int
@@ -28,10 +28,10 @@ var algorithmFunc = map[Algorithm]func() hash.Hash{
 	SHA256: sha256.New,
 }
 
-func GetFileChecksums(filePath string) (checksums *entities.Checksum, err error) {
+func GetFileChecksums(filePath string) (md5, sha1, sha2 string, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer func() {
 		e := file.Close()
@@ -41,9 +41,10 @@ func GetFileChecksums(filePath string) (checksums *entities.Checksum, err error)
 	}()
 	checksumInfo, err := CalcChecksums(file)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return &entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}, nil
+	md5, sha1, sha2 = checksumInfo[MD5], checksumInfo[SHA1], checksumInfo[SHA256]
+	return
 }
 
 // CalcChecksums calculates all hashes at once using AsyncMultiWriter. The file is therefore read only once.

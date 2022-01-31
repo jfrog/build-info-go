@@ -2,9 +2,11 @@ package build
 
 import (
 	"errors"
+	"os"
+
+	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
-	"os"
 )
 
 const minSupportedNpmVersion = "5.4.0"
@@ -14,7 +16,7 @@ type NpmModule struct {
 	name                     string
 	srcPath                  string
 	executablePath           string
-	typeRestriction          utils.TypeRestriction
+	typeRestriction          buildutils.TypeRestriction
 	npmArgs                  []string
 	traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error)
 	threads                  int
@@ -22,7 +24,7 @@ type NpmModule struct {
 
 // Pass an empty string for srcPath to find the npm project in the working directory.
 func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
-	npmVersion, executablePath, err := utils.GetNpmVersionAndExecPath(containingBuild.logger)
+	npmVersion, executablePath, err := buildutils.GetNpmVersionAndExecPath(containingBuild.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +44,7 @@ func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 	}
 
 	// Read module name
-	packageInfo, err := utils.ReadPackageInfoFromPackageJson(srcPath, npmVersion)
+	packageInfo, err := buildutils.ReadPackageInfoFromPackageJson(srcPath, npmVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +54,7 @@ func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 }
 
 func (nm *NpmModule) CalcDependencies() error {
-	buildInfoDependencies, err := utils.CalculateDependenciesList(nm.typeRestriction, nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, nm.traverseDependenciesFunc, nm.threads, nm.containingBuild.logger)
+	buildInfoDependencies, err := buildutils.CalculateDependenciesList(nm.typeRestriction, nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, nm.traverseDependenciesFunc, nm.threads, nm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
@@ -65,7 +67,7 @@ func (nm *NpmModule) SetName(name string) {
 	nm.name = name
 }
 
-func (nm *NpmModule) SetTypeRestriction(typeRestriction utils.TypeRestriction) {
+func (nm *NpmModule) SetTypeRestriction(typeRestriction buildutils.TypeRestriction) {
 	nm.typeRestriction = typeRestriction
 }
 
