@@ -43,6 +43,10 @@ func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, 
 		}
 	}
 
+	return TraverseDependencies(dependenciesMap, traverseDependenciesFunc, threads)
+}
+
+func TraverseDependencies(dependenciesMap map[string]*entities.Dependency, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error), threads int) (dependenciesList []entities.Dependency, err error) {
 	producerConsumer := parallel.NewBounedRunner(threads, false)
 	dependenciesChan := make(chan *entities.Dependency)
 	errorChan := make(chan error, 1)
@@ -87,7 +91,6 @@ func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, 
 	default:
 		return
 	}
-
 	return
 }
 
@@ -263,7 +266,7 @@ func ReadPackageInfo(data []byte, npmVersion *version.Version) (*PackageInfo, er
 		return nil, err
 	}
 	// If npm older than v7, remove prefixes.
-	if npmVersion == nil || npmVersion.Compare("7.0.0") > 0 {
+	if npmVersion != nil && npmVersion.Compare("7.0.0") > 0 {
 		removeVersionPrefixes(parsedResult)
 	}
 	splitScopeFromName(parsedResult)
