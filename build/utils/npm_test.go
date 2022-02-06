@@ -1,16 +1,18 @@
 package utils
 
 import (
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestReadPackageInfoFromPackageJson(t *testing.T) {
-	logger := NewDefaultLogger(DEBUG)
+	logger := utils.NewDefaultLogger(utils.DEBUG)
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	if err != nil {
 		assert.NoError(t, err)
@@ -60,7 +62,7 @@ func TestGetDeployPath(t *testing.T) {
 }
 
 func TestParseDependencies(t *testing.T) {
-	dependenciesJsonList, err := ioutil.ReadFile(filepath.Join("testdata", "dependenciesList.json"))
+	dependenciesJsonList, err := ioutil.ReadFile(filepath.Join("..", "testdata", "dependenciesList.json"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -86,7 +88,7 @@ func TestParseDependencies(t *testing.T) {
 		{"shopify-liquid:1.d7.9", [][]string{{"xpm:0.1.1", "@jfrog/npm_scoped:1.0.0", "root"}}},
 	}
 	dependencies := make(map[string]*entities.Dependency)
-	nullLog := &NullLog{}
+	nullLog := &utils.NullLog{}
 	err = parseDependencies([]byte(dependenciesJsonList), "myScope", []string{"root"}, &dependencies, nullLog)
 	if err != nil {
 		t.Error(err)
