@@ -18,8 +18,6 @@ type NpmModule struct {
 	executablePath           string
 	typeRestriction          buildutils.TypeRestriction
 	npmArgs                  []string
-	traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error)
-	threads                  int
 }
 
 // Pass an empty string for srcPath to find the npm project in the working directory.
@@ -50,14 +48,14 @@ func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 	}
 	name := packageInfo.BuildInfoModuleId()
 
-	return &NpmModule{name: name, srcPath: srcPath, containingBuild: containingBuild, executablePath: executablePath, threads: 3}, nil
+	return &NpmModule{name: name, srcPath: srcPath, containingBuild: containingBuild, executablePath: executablePath}, nil
 }
 
 func (nm *NpmModule) CalcDependencies() error {
 	if !nm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}
-	buildInfoDependencies, err := buildutils.CalculateDependenciesList(nm.typeRestriction, nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, nm.traverseDependenciesFunc, nm.threads, nm.containingBuild.logger)
+	buildInfoDependencies, err := buildutils.CalculateDependenciesList(nm.typeRestriction, nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, nm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
@@ -76,18 +74,6 @@ func (nm *NpmModule) SetTypeRestriction(typeRestriction buildutils.TypeRestricti
 
 func (nm *NpmModule) SetNpmArgs(npmArgs []string) {
 	nm.npmArgs = npmArgs
-}
-
-func (nm *NpmModule) SetThreads(threads int) {
-	nm.threads = threads
-}
-
-// SetTraverseDependenciesFunc gets a function to execute on all dependencies after their collection in CalcDependencies(), before they're saved.
-// This function needs to return a boolean value indicating whether to save this dependency in the build-info or not.
-// This function might run asynchronously with different dependencies (if the threads amount setting is bigger than 1).
-// If more than one error are returned from this function in different threads, only the first of them will be returned from CalcDependencies().
-func (nm *NpmModule) SetTraverseDependenciesFunc(traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error)) {
-	nm.traverseDependenciesFunc = traverseDependenciesFunc
 }
 
 func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {

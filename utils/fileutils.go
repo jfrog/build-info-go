@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -446,4 +447,27 @@ func IsPathSymlink(path string) bool {
 
 func IsFileSymlink(file os.FileInfo) bool {
 	return file.Mode()&os.ModeSymlink != 0
+}
+
+// Parses the JSON-encoded data and stores the result in the value pointed to by 'loadTarget'.
+// filePath - Path to json file.
+// loadTarget - Pointer to a struct
+func Unmarshal(filePath string, loadTarget interface{}) (err error) {
+	var jsonFile *os.File
+	jsonFile, err = os.Open(filePath)
+	if err != nil {
+		return
+	}
+	defer func() {
+		closeErr := jsonFile.Close()
+		if err == nil {
+			err = closeErr
+		}
+	}()
+	var byteValue []byte
+	byteValue, err = ioutil.ReadAll(jsonFile)
+	if err != nil {
+		return
+	}
+	return json.Unmarshal(byteValue, &loadTarget)
 }
