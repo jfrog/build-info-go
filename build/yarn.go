@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/version"
@@ -24,7 +25,7 @@ type YarnModule struct {
 	yarnArgs                 []string
 	traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error)
 	threads                  int
-	packageInfo              *utils.PackageInfo
+	packageInfo              *buildutils.PackageInfo
 }
 
 // Pass an empty string for srcPath to find the Yarn project in the working directory.
@@ -51,7 +52,7 @@ func newYarnModule(srcPath string, containingBuild *Build) (*YarnModule, error) 
 	}
 
 	// Read module name
-	packageInfo, err := utils.ReadPackageInfoFromPackageJson(srcPath, nil)
+	packageInfo, err := buildutils.ReadPackageInfoFromPackageJson(srcPath, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +74,7 @@ func (ym *YarnModule) Build() error {
 	if err != nil {
 		return err
 	}
-	buildInfoDependencies, err := utils.TraverseDependencies(dependenciesMap, ym.traverseDependenciesFunc, ym.threads)
+	buildInfoDependencies, err := buildutils.TraverseDependencies(dependenciesMap, ym.traverseDependenciesFunc, ym.threads)
 	if err != nil {
 		return err
 	}
