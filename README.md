@@ -595,10 +595,21 @@ bi gradle
 ```shell
 bi npm
 ```
+
 Note: checksums calculation is not yet supported for npm projects.
 
+#### Yarn
+
+```shell
+bi yarn [Yarn command] [command options]
+```
+
+Note: checksums calculation is not yet supported for Yarn projects.
+
 #### Conversion to CycloneDX
-You can generate build-info and have it converted into the CycloneDX format by adding to the command ```--format cyclonedx/xml``` or ```--format cyclonedx/json```.
+
+You can generate build-info and have it converted into the CycloneDX format by adding to the
+command ```--format cyclonedx/xml``` or ```--format cyclonedx/json```.
 
 ### Logs
 
@@ -664,8 +675,8 @@ err = gradleModule.CalcDependencies()
 npmModule, err := bld.AddNpmModule(npmProjectPath)
 // Checksum calculation is not supported for npm projects, so you can add a function that calculates them.
 npmModule.SetTraverseDependenciesFunc(func(dependency *entities.Dependency) (bool, error) {
-    dependency.Checksum = &entities.Checksum{Sha1: "123"}
-    return true, nil
+dependency.Checksum = &entities.Checksum{Sha1: "123"}
+return true, nil
 })
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = npmModule.CalcDependencies()
@@ -673,6 +684,26 @@ err = npmModule.CalcDependencies()
 // You can also add artifacts to that module:
 artifact1 := entities.Artifact{Name: "json", Type: "tgz", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
 err = npmModule.AddArtifacts(artifact1, artifact2, ...)
+```
+
+#### Yarn
+
+```go
+// You can pass an empty string as an argument, if the root of the Yarn project is the working directory.
+yarnModule, err := bld.AddYarnModule(npmProjectPath)
+// Checksum calculation is not supported for Yarn projects, so you can add a function that calculates them.
+yarnModule.SetTraverseDependenciesFunc(func (dependency *entities.Dependency) (bool, error) {
+dependency.Checksum = &entities.Checksum{Sha1: "123"}
+return true, nil
+})
+// By default, your project will be built with the 'yarn install' command. If you want, you can set another command.
+yarnModule.SetArgs([]string{"install", "--json"})
+// Calculate the dependencies used by this module, and store them in the module struct.
+err = yarnModule.Build()
+
+// You can also add artifacts to that module:
+artifact1 := entities.Artifact{Name: "json", Type: "tgz", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
+err = yarnModule.AddArtifacts(artifact1, artifact2, ...)
 ```
 
 ### Collecting Environment Variables
