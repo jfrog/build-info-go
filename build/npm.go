@@ -16,7 +16,6 @@ type NpmModule struct {
 	name                     string
 	srcPath                  string
 	executablePath           string
-	typeRestriction          buildutils.TypeRestriction
 	npmArgs                  []string
 }
 
@@ -55,7 +54,7 @@ func (nm *NpmModule) CalcDependencies() error {
 	if !nm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}
-	buildInfoDependencies, err := buildutils.CalculateDependenciesList(nm.typeRestriction, nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, nm.containingBuild.logger)
+	buildInfoDependencies, err := buildutils.CalculateDependenciesList(nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, nm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
@@ -66,10 +65,6 @@ func (nm *NpmModule) CalcDependencies() error {
 
 func (nm *NpmModule) SetName(name string) {
 	nm.name = name
-}
-
-func (nm *NpmModule) SetTypeRestriction(typeRestriction buildutils.TypeRestriction) {
-	nm.typeRestriction = typeRestriction
 }
 
 func (nm *NpmModule) SetNpmArgs(npmArgs []string) {

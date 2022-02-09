@@ -2,8 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,217 +16,186 @@ import (
 	"github.com/jfrog/gofrog/version"
 )
 
-type TypeRestriction int
-
-const (
-	DefaultRestriction TypeRestriction = iota
-	All
-	DevOnly
-	ProdOnly
-)
-
-// A partial (dependencies only) struct of the package-lock.json file.
-type packageLock struct {
-	// This is an object that maps dependencies locations in the node_modules folder to an object containing the information about that dependency.
-	// The root project is typically listed with a key of "", and all other dependencies are listed with their relative paths (e.g. node_modules/dependency_name).
-	Dependencies map[string]dependencyInfo `json:"Packages,omitempty"`
-
-	// Legacy data structure of Dependencies, used for backward compitability with npm v6.
-	LegacyDependencies map[string]dependencyInfo `json:"dependencies,omitempty"`
-}
-
-// A dependency (package) info structure as in package-lock.json
-type dependencyInfo struct {
-	Version   string
-	Integrity string
-}
-
-func newPackageLock(srcPath string) (*packageLock, error) {
-	packageLock := packageLock{}
-	path := filepath.Join(srcPath, "package-lock.json")
-	exists, err := utils.IsFileExists(path, false)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.New("failed to calculate npm dependencies tree, package-lock.json isn't found in " + path)
-	}
-	return &packageLock, utils.Unmarshal(path, &packageLock)
-}
-
-// Returns a map of dependency-name:dependency-version -> integrity from the package-lock.json
-func (pl *packageLock) getIntegrityMap() map[string]string {
-	idToIntegrity := make(map[string]string)
-	if pl.Dependencies != nil {
-		for name, info := range pl.Dependencies {
-			idx := strings.LastIndex(name, "node_modules/")
-			if idx == -1 {
-				continue
-			}
-			name := name[idx+len("node_modules/"):]
-			idToIntegrity[name+":"+info.Version] = info.Integrity
-		}
-		return idToIntegrity
-	}
-	for k, v := range pl.LegacyDependencies {
-		idToIntegrity[k+":"+v.Version] = v.Integrity
-	}
-	return idToIntegrity
-}
-
-// cachePath - the npm global cache dir.
-// integrity - the dependency integrity.
-// Return the path of a dependency tarball based on its integrity.
-func getTarball(cachePath, integrity string) (string, error) {
-	hashAlgorithms, hash, err := integrityToSha(integrity)
-	if err != nil {
-		return "", err
-	}
-	if len(hash) < 5 {
-		return "", errors.New("failed to calculate npm dependencies tree, bad dependency integrity " + integrity)
-	}
-	tarballPath := filepath.Join(cachePath, "content-v2", hashAlgorithms, hash[0:2], hash[2:4], hash[4:])
-	found, err := utils.IsFileExists(tarballPath, false)
-	if err != nil {
-		return "", err
-	}
-	if !found {
-		return "", errors.New("failed to locate dependency integrity '" + integrity + " 'tarball at " + tarballPath)
-	}
-	return tarballPath, nil
-}
-
-func integrityToSha(integrity string) (string, string, error) {
-	data := strings.SplitN(integrity, "-", 2)
-	if len(data) != 2 {
-		return "", "", errors.New("the integrity '" + integrity + "' has bad format (valid format is HashAlgorithms-Hash)")
-	}
-	hashAlgorithm, hash := data[0], data[1]
-	decoded, err := base64.StdEncoding.DecodeString(hash)
-	return hashAlgorithm, hex.EncodeToString(decoded), err
-}
-
-// Return the local npm cache dir.
-// it uses the command 'npm config get cache'
-func getNpmConfigCache(srcPath, executablePath string, npmArgs []string, log utils.Log) (string, error) {
-	npmArgs = append([]string{"get", "cache"}, npmArgs...)
-	data, errData, err := RunNpmCmd(executablePath, srcPath, Config, append(npmArgs, "--json=false"), log)
-	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
-	if len(errData) > 0 {
-		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
-	}
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("npm config command failed with an error: %s", err.Error()))
-	}
-	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
-	found, err := utils.IsDirExists(cachePath, false)
-	if err != nil {
-		return "", err
-	}
-	if !found {
-		return "", errors.New("failed to locate '_cacache' folder in " + cachePath)
-	}
-	return cachePath, nil
-}
-
 // CalculateDependenciesList gets an npm project's dependencies.
-// It sends each of them as a parameter to traverseDependenciesFunc and based on its return values, they will be returned from CalculateDependenciesList.
-func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) ([]entities.Dependency, error) {
+func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (dependenciesList []entities.Dependency, err error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
-	dependenciesMap, err := createDependenciesList(typeRestriction, executablePath, srcPath, moduleId, npmArgs, log)
+	// Get local npm cache.
+	cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmArgs, log)
 	if err != nil {
 		return nil, err
 	}
-	return calculateChecksum(dependenciesMap, executablePath, srcPath, moduleId, npmArgs, log)
-}
-
-func createDependenciesList(typeRestriction TypeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (dependenciesMap map[string]*entities.Dependency, err error) {
-	dependenciesMap = make(map[string]*entities.Dependency)
-	if typeRestriction != ProdOnly {
-		if err = prepareDependencies("dev", executablePath, srcPath, moduleId, npmArgs, dependenciesMap, log); err != nil {
-			return
-		}
+	cacache := NewCacache(cacheLocation)
+	prototypeTree, err := CalculatePrototypeTree(executablePath, srcPath, moduleId, npmArgs, cacache, log)
+	if err != nil {
+		return nil, err
 	}
-	if typeRestriction != DevOnly {
-		err = prepareDependencies("prod", executablePath, srcPath, moduleId, npmArgs, dependenciesMap, log)
+	var missingPeerDeps, missingBundledDeps []string
+	for _, dep := range prototypeTree {
+		if dep.npmLsDependency.Integrity == "" && dep.npmLsDependency.InBundle {
+			missingBundledDeps = append(missingBundledDeps, dep.Id)
+			continue
+		}
+		if dep.npmLsDependency.Integrity == "" && len(dep.PeerMissing) > 0 {
+			missingPeerDeps = append(missingPeerDeps, dep.Id)
+			continue
+		}
+		dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity, log)
+		if err != nil {
+			// Here, we don't know where is the tarball (or if it is actually exists in the filesystem) so we can't calculate the dependency checksum.
+			// This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
+			// Seems like the compatibility upgrades may result in dependencies losing their integrity.
+			// We use the integrity to get's the dependencies tarball
+			log.Error("couldn't calculate checksum for : '" + dep.Id + "'. Try to delete 'node_models' and/or 'package-lock.json'.")
+			return nil, err
+		}
+
+		dependenciesList = append(dependenciesList, dep.Dependency)
+	}
+	if len(missingPeerDeps) > 0 {
+		log.Info("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return its integrity.\nThe reason why the version wasn't returned may be because the package is a 'peerDependency', which was not manually installed.\n It is therefore okay to skip this dependency: \n" + strings.Join(missingPeerDeps, "\n"))
+	}
+	if len(missingBundledDeps) > 0 {
+		log.Info("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return its integrity.\nThe reason why the version wasn't returned may be because the package is a 'bundleDependencies', which was not manually installed.\n It is therefore okay to skip this dependency." + strings.Join(missingBundledDeps, "\n"))
 	}
 	return
 }
 
-func calculateChecksum(dependenciesMap map[string]*entities.Dependency, executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) ([]entities.Dependency, error) {
-	packageLock, err := newPackageLock(srcPath)
-	if err != nil {
-		return nil, err
-	}
-	integrityMap := packageLock.getIntegrityMap()
-	cacheLocation, err := getNpmConfigCache(srcPath, executablePath, npmArgs, log)
-	if err != nil {
-		return nil, err
-	}
-	var dependenciesList []entities.Dependency
-	for _, dependency := range dependenciesMap {
-		path, err := getTarball(cacheLocation, integrityMap[dependency.Id])
-		if err != nil {
-			return nil, err
-		}
-		dependency.Md5, dependency.Sha1, dependency.Sha256, err = utils.GetFileChecksums(path)
-		if err != nil {
-			return nil, err
-		}
-		dependenciesList = append(dependenciesList, *dependency)
-	}
-	return dependenciesList, nil
+type prototypeNode struct {
+	entities.Dependency
+	*npmLsDependency
 }
 
-// Run npm list and parse the returned JSON.
-// typeRestriction must be one of: 'dev' or 'prod'!
-func prepareDependencies(typeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, results map[string]*entities.Dependency, log utils.Log) error {
-	// Run npm list
-	// Although this command can get --development as a flag (according to npm docs), it's not working on npm 6.
-	// Although this command can get --only=development as a flag (according to npm docs), it's not working on npm 7.
+// Run 'npm list ...' command and parse the returned result to create a dependencies map of .
+// The dependencies map looks like name:version -> entities.Dependency
+func CalculatePrototypeTree(executablePath, srcPath, moduleId string, npmArgs []string, cacache *cacache, log utils.Log) (map[string]*prototypeNode, error) {
+	dependenciesMap := make(map[string]*prototypeNode)
+
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
-	npmArgs = append(npmArgs, "--json=true", "--all", "--"+typeRestriction)
+	npmArgs = append(npmArgs, "--json=true", "--all", "--long")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if len(errData) > 0 {
 		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
 	}
 	if err != nil {
-		return errors.New(fmt.Sprintf("npm list command failed with an error: %s", err.Error()))
+		log.Warn("npm list command failed with error:", err.Error())
 	}
+	npmVersion, err := GetNpmVersion(executablePath, log)
+	if err != nil {
+		return nil, err
+	}
+	parseFunc := parseNpmLsDependencyFunc(npmVersion)
 
-	// Parse the dependencies json object
-	return jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
+	// Parse the dependencies json object.
+	return dependenciesMap, jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
 		if string(key) == "dependencies" {
-			err = parseDependencies(value, typeRestriction, []string{moduleId}, results, log)
+			err = parseDependencies(value, []string{moduleId}, dependenciesMap, cacache, parseFunc, log)
 		}
 		return err
 	})
 }
 
+func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
+	versionData, _, err := RunNpmCmd(executablePath, "", Version, nil, log)
+	if err != nil {
+		return nil, err
+	}
+	return version.NewVersion(string(versionData)), nil
+}
+
+// A partial struct of the dependency json object coming from npm ls output.
+type npmLsDependency struct {
+	Name      string
+	Version   string
+	Integrity string
+	InBundle  bool
+	Dev       bool
+	// Missing peer dependency in npm version 7/8
+	Missing bool
+	// Problems with missing peer dependency in npm version 7/8
+	Problems []string
+	// Missing  peer dependency in npm version 6
+	// Bound to 'legacyNpmLsDependency' struct
+	PeerMissing []*peerMissing
+}
+
+type legacyNpmLsDependency struct {
+	Name        string
+	Version     string
+	Integrity   string `json:"_integrity,omitempty"`
+	InBundle    bool   `json:"_inBundle,omitempty"`
+	Dev         bool   `json:"_development,omitempty"`
+	PeerMissing []*peerMissing
+}
+
+type peerMissing struct {
+	RequiredBy string
+	Requires   string
+}
+
+func (lnld *legacyNpmLsDependency) toNpmLsDependency() *npmLsDependency {
+	return &npmLsDependency{
+		Name:        lnld.Name,
+		Version:     lnld.Version,
+		Integrity:   lnld.Integrity,
+		InBundle:    lnld.InBundle,
+		Dev:         lnld.Dev,
+		PeerMissing: lnld.PeerMissing,
+	}
+}
+
+// Return name:version of a dependency
+func (nld *npmLsDependency) id() string {
+	return nld.Name + ":" + nld.Version
+}
+
+func (nld *npmLsDependency) getScopes() (scopes []string) {
+	if nld.Dev {
+		scopes = append(scopes, "dev")
+	} else {
+		scopes = append(scopes, "prod")
+	}
+	if strings.HasPrefix(nld.Name, "@") {
+		splitValues := strings.Split(nld.Name, "/")
+		if len(splitValues) > 2 {
+			scopes = append(scopes, splitValues[0])
+		}
+	}
+	return
+}
+
 // Parses npm dependencies recursively and adds the collected dependencies to the given dependencies map.
-func parseDependencies(data []byte, scope string, pathToRoot []string, dependencies map[string]*entities.Dependency, log utils.Log) error {
+func parseDependencies(data []byte, pathToRoot []string, dependencies map[string]*prototypeNode, cacache *cacache, parseFunc func(data []byte) (*npmLsDependency, error), log utils.Log) error {
 	return jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-		depName := string(key)
-		ver, _, _, err := jsonparser.Get(data, depName, "version")
-		if err != nil && err != jsonparser.KeyPathNotFoundError {
+		if string(value) == "{}" {
+			// Skip missing optional dependency.
+			log.Debug(fmt.Sprintf("%s is missing, this may be the result of an optional dependency.", key))
+			return nil
+		}
+		npmLsDependency, err := parseFunc(value)
+		if err != nil {
 			return err
-		} else if err == jsonparser.KeyPathNotFoundError {
-			log.Debug(fmt.Sprintf("%s dependency will not be included in the build-info, because the 'npm ls' command did not return its version.\nThe reason why the version wasn't returned may be because the package is a 'peerdependency', which was not manually installed.\n'npm install' does not download 'peerdependencies' automatically. It is therefore okay to skip this dependency.", depName))
 		}
-		depVersion := string(ver)
-		depId := depName + ":" + depVersion
-		if err == nil {
-			appendDependency(dependencies, depId, scope, pathToRoot)
+		if npmLsDependency.Version == "" {
+			if npmLsDependency.Missing || npmLsDependency.Problems != nil {
+				// Skip missing peer dependency.
+				log.Debug(fmt.Sprintf("%s is missing, this may be the result of an peer dependency.", key))
+				return nil
+			}
+			return errors.New("failed to parse '" + string(value) + "' from npm ls output.")
 		}
-		transitive, _, _, err := jsonparser.Get(data, depName, "dependencies")
+		if err := appendDependency(dependencies, npmLsDependency, cacache, pathToRoot, log); err != nil {
+			return err
+		}
+		transitive, _, _, err := jsonparser.Get(value, "dependencies")
 		if err != nil && err.Error() != "Key path not found" {
 			return err
 		}
 		if len(transitive) > 0 {
-			if err := parseDependencies(transitive, scope, append([]string{depId}, pathToRoot...), dependencies, log); err != nil {
+			if err := parseDependencies(transitive, append([]string{npmLsDependency.id()}, pathToRoot...), dependencies, cacache, parseFunc, log); err != nil {
 				return err
 			}
 		}
@@ -236,22 +203,69 @@ func parseDependencies(data []byte, scope string, pathToRoot []string, dependenc
 	})
 }
 
-func appendDependency(dependencies map[string]*entities.Dependency, depId, scope string, pathToRoot []string) {
-	if (dependencies)[depId] == nil {
-		(dependencies)[depId] = &entities.Dependency{Id: depId, Scopes: []string{scope}}
-	} else if !scopeAlreadyExists(scope, (dependencies)[depId].Scopes) {
-		(dependencies)[depId].Scopes = append((dependencies)[depId].Scopes, scope)
+func parseNpmLsDependencyFunc(npmVersion *version.Version) func(data []byte) (*npmLsDependency, error) {
+	// If npm older than v7, use legacy struct for npm ls output.
+	if npmVersion.Compare("7.0.0") > 0 {
+		return legacyNpmLsDependencyParser
 	}
-	(dependencies)[depId].RequestedBy = append((dependencies)[depId].RequestedBy, pathToRoot)
+	return npmLsDependencyParser
 }
 
-func scopeAlreadyExists(scope string, existingScopes []string) bool {
-	for _, existingScope := range existingScopes {
-		if existingScope == scope {
-			return true
-		}
+func legacyNpmLsDependencyParser(data []byte) (*npmLsDependency, error) {
+	legacyNpmLsDependency := new(legacyNpmLsDependency)
+	err := json.Unmarshal(data, &legacyNpmLsDependency)
+	if err != nil {
+		return nil, err
 	}
-	return false
+	return legacyNpmLsDependency.toNpmLsDependency(), nil
+}
+
+func npmLsDependencyParser(data []byte) (*npmLsDependency, error) {
+	npmLsDependency := new(npmLsDependency)
+	return npmLsDependency, json.Unmarshal(data, &npmLsDependency)
+}
+
+func appendDependency(dependencies map[string]*prototypeNode, dep *npmLsDependency, cacache *cacache, pathToRoot []string, log utils.Log) (err error) {
+	depId := dep.id()
+	scopes := dep.getScopes()
+	if (dependencies)[depId] == nil {
+		dependency := &prototypeNode{
+			Dependency:      entities.Dependency{Id: depId},
+			npmLsDependency: dep,
+		}
+
+		(dependencies)[depId] = dependency
+	}
+	if (dependencies)[depId].Integrity == "" {
+		(dependencies)[depId].Integrity = dep.Integrity
+	}
+	(dependencies)[depId].Scopes = appendScopes((dependencies)[depId].Scopes, scopes)
+	(dependencies)[depId].RequestedBy = append((dependencies)[depId].RequestedBy, pathToRoot)
+	return
+}
+
+// Lookup for a dependency's tarball in npm cache, and calculate checksum.
+// Return (md5,sha1,sha256,error)
+func calculateChecksum(cacache *cacache, name, version, integrity string, log utils.Log) (string, string, string, error) {
+	if integrity == "" {
+		info, err := cacache.GetInfo(name + "@" + version)
+		if err != nil {
+			return "", "", "", err
+		}
+		integrity = info.Integrity
+	}
+	path, err := cacache.GetTarball(integrity)
+	if err != nil {
+		return "", "", "", err
+	}
+	return utils.GetFileChecksums(path)
+}
+
+// Merge two scopes and remove duplicates.
+func appendScopes(oldScopes []string, newScopes []string) []string {
+	set := utils.NewStringSet(oldScopes...)
+	set.AddAll(newScopes...)
+	return set.ToSlice()
 }
 
 type NpmCmd int
@@ -260,10 +274,13 @@ const (
 	Ls NpmCmd = iota
 	Config
 	Install
+	Ci
+	Pack
+	Version
 )
 
 func (nc NpmCmd) String() string {
-	return [...]string{"ls", "config", "install"}[nc]
+	return [...]string{"ls", "config", "install", "ci", "pack", "-version"}[nc]
 }
 
 func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
@@ -279,11 +296,11 @@ func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, 
 	command.Stderr = errBuffer
 	err = command.Run()
 	errResult = errBuffer.Bytes()
+	stdResult = outBuffer.Bytes()
 	if err != nil {
 		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(cmdArgs, " ") + "'\nError output is:\n" + string(errResult))
 		return
 	}
-	stdResult = outBuffer.Bytes()
 	log.Debug("npm " + npmCmd.String() + " standard output is:\n" + string(stdResult))
 	return
 }
@@ -303,24 +320,12 @@ func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 
 	log.Debug("Using npm executable:", npmExecPath)
 
-	npmVersion, err := getVersion(npmExecPath)
+	versionData, _, err := RunNpmCmd(npmExecPath, "", Version, nil, log)
 	if err != nil {
 		return nil, "", err
 	}
-	log.Debug("Using npm version:", npmVersion)
-	return version.NewVersion(npmVersion), npmExecPath, nil
-}
-
-func getVersion(executablePath string) (string, error) {
-	command := exec.Command(executablePath, "-version")
-	buffer := bytes.NewBuffer([]byte{})
-	command.Stderr = buffer
-	command.Stdout = buffer
-	err := command.Run()
-	if _, ok := err.(*exec.ExitError); ok {
-		err = errors.New(err.Error())
-	}
-	return buffer.String(), err
+	log.Debug("Using npm version:", string(versionData))
+	return version.NewVersion(string(versionData)), npmExecPath, nil
 }
 
 type PackageInfo struct {
@@ -385,4 +390,27 @@ func splitScopeFromName(packageInfo *PackageInfo) {
 func removeVersionPrefixes(packageInfo *PackageInfo) {
 	packageInfo.Version = strings.TrimPrefix(packageInfo.Version, "v")
 	packageInfo.Version = strings.TrimPrefix(packageInfo.Version, "=")
+}
+
+// Return the npm cache path.
+// Default: Windows: %LocalAppData%\npm-cache, Posix: ~/.npm
+func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log utils.Log) (string, error) {
+	npmArgs = append([]string{"get", "cache"}, npmArgs...)
+	data, errData, err := RunNpmCmd(executablePath, srcPath, Config, append(npmArgs, "--json=false"), log)
+	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
+	if len(errData) > 0 {
+		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+	}
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("npm config command failed with an error: %s", err.Error()))
+	}
+	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
+	found, err := utils.IsDirExists(cachePath, true)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", errors.New("failed to locate '_cacache' folder in " + cachePath)
+	}
+	return cachePath, nil
 }

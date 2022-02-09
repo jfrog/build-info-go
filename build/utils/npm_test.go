@@ -2,13 +2,10 @@ package utils
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
-	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -64,7 +61,7 @@ func TestGetDeployPath(t *testing.T) {
 }
 
 func TestParseDependencies(t *testing.T) {
-	dependenciesJsonList, err := ioutil.ReadFile(filepath.Join("..", "testdata", "dependenciesList.json"))
+	dependenciesJsonList, err := ioutil.ReadFile(filepath.Join("..", "testdata", "npm", "dependenciesList.json"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -89,9 +86,9 @@ func TestParseDependencies(t *testing.T) {
 		{"nub:1.0.0", [][]string{{"find:0.2.7", "root"}, {"root"}}},
 		{"shopify-liquid:1.d7.9", [][]string{{"xpm:0.1.1", "@jfrog/npm_scoped:1.0.0", "root"}}},
 	}
-	dependencies := make(map[string]*entities.Dependency)
-	nullLog := &utils.NullLog{}
-	err = parseDependencies([]byte(dependenciesJsonList), "myScope", []string{"root"}, dependencies, nullLog)
+	dependencies := make(map[string]*prototypeNode)
+	cacache := NewCacache(filepath.Join("..", "testdata", "npm", "_cacache"))
+	err = parseDependencies([]byte(dependenciesJsonList), []string{"root"}, dependencies, cacache, npmLsDependencyParser, utils.NewDefaultLogger(utils.DEBUG))
 	if err != nil {
 		t.Error(err)
 	}
@@ -113,96 +110,4 @@ func TestParseDependencies(t *testing.T) {
 			t.Error("The expected dependency:", eDependency, "is missing from the actual dependencies list:\n", dependencies)
 		}
 	}
-}
-
-func TestCalculateDependencies(t *testing.T) {
-	// Create npm project.
-	projectPath, err := filepath.Abs(filepath.Join("..", "testdata", "npm", "project"))
-	assert.NoError(t, err)
-	tmpProjectPath, cleanup := CreateTestProject(t, projectPath)
-	defer cleanup()
-
-	// Install dependencies in the npm project.
-	_, _, err = RunNpmCmd("npm", tmpProjectPath, Install, nil, &utils.NullLog{})
-	assert.NoError(t, err)
-
-	// Calculate dependencies.
-	dependenciesList, err := CalculateDependenciesList(All, "npm", tmpProjectPath, "", nil, &utils.NullLog{})
-	assert.NoError(t, err)
-	assert.NotEmpty(t, dependenciesList)
-}
-
-func TestPackageLock(t *testing.T) {
-	projectPath, err := filepath.Abs(filepath.Join("..", "testdata", "npm", "project"))
-	assert.NoError(t, err)
-
-	packageLock, err := newPackageLock(projectPath)
-	assert.NoError(t, err)
-	assert.Len(t, packageLock.Dependencies, 3)
-	assert.Equal(t, "1.0.1", packageLock.Dependencies["node_modules/xml"].Version)
-	assert.Equal(t, "sha1-eLpyAgApxbyHuKgaPPzXS0ovweU=", packageLock.Dependencies["node_modules/xml"].Integrity)
-	assert.Equal(t, "9.0.6", packageLock.Dependencies["node_modules/json"].Version)
-	assert.Equal(t, "sha1-eXLCpaSKQmeNsnMMfCxO5uTiRYU=", packageLock.Dependencies["node_modules/json"].Integrity)
-
-	assert.Len(t, packageLock.LegacyDependencies, 2)
-	assert.Equal(t, "1.0.1", packageLock.LegacyDependencies["xml"].Version)
-	assert.Equal(t, "sha1-eLpyAgApxbyHuKgaPPzXS0ovweU=", packageLock.LegacyDependencies["xml"].Integrity)
-	assert.Equal(t, "9.0.6", packageLock.LegacyDependencies["json"].Version)
-	assert.Equal(t, "sha1-eXLCpaSKQmeNsnMMfCxO5uTiRYU=", packageLock.LegacyDependencies["json"].Integrity)
-
-	integrity := packageLock.getIntegrityMap()
-	assert.Equal(t, "sha1-eLpyAgApxbyHuKgaPPzXS0ovweU=", integrity["xml:1.0.1"])
-	assert.Equal(t, "sha1-eXLCpaSKQmeNsnMMfCxO5uTiRYU=", integrity["json:9.0.6"])
-
-}
-
-func TestGetDepTarball(t *testing.T) {
-	projectPath, err := filepath.Abs(filepath.Join("..", "testdata", "npm", "_cacache"))
-	assert.NoError(t, err)
-
-	// Get tarball sha512 hash
-	path, err := getTarball(projectPath, "sha512-dWe4nWO/ruEOY7HkUJ5gFt1DCFV9zPRoJr8pV0/ASQermOZjtq8jMjOprC0Kd10GLN+l7xaUPvxzJFWtxGu8Fg==")
-	assert.NoError(t, err)
-	assert.True(t, strings.HasSuffix(path, filepath.Join("testdata", "npm", "_cacache", "content-v2", "sha512", "75", "67", "b89d63bfaee10e63b1e4509e6016dd4308557dccf46826bf29574fc04907ab98e663b6af233233a9ac2d0a775d062cdfa5ef16943efc732455adc46bbc16")))
-
-	// Get tarball sha1 hash
-	path, err = getTarball(projectPath, "sha1-Z29us8OZl8LuGsOpJP1hJHSPV40=")
-	assert.NoError(t, err)
-	assert.True(t, strings.HasSuffix(path, filepath.Join("testdata", "npm", "_cacache", "content-v2", "sha1", "67", "6f", "6eb3c39997c2ee1ac3a924fd6124748f578d")))
-}
-
-func TestIntegrityToSha(t *testing.T) {
-	hashAlgorithm, hash, err := integrityToSha("sha512-dWe4nWO/ruEOY7HkUJ5gFt1DCFV9zPRoJr8pV0/ASQermOZjtq8jMjOprC0Kd10GLN+l7xaUPvxzJFWtxGu8Fg==")
-	assert.NoError(t, err)
-	assert.Equal(t, "7567b89d63bfaee10e63b1e4509e6016dd4308557dccf46826bf29574fc04907ab98e663b6af233233a9ac2d0a775d062cdfa5ef16943efc732455adc46bbc16", hash)
-	assert.Equal(t, "sha512", hashAlgorithm)
-
-	hashAlgorithm, hash, err = integrityToSha("sha1-Z29us8OZl8LuGsOpJP1hJHSPV40=")
-	assert.NoError(t, err)
-	assert.Equal(t, "676f6eb3c39997c2ee1ac3a924fd6124748f578d", hash)
-	assert.Equal(t, "sha1", hashAlgorithm)
-
-}
-
-func TestGetNpmConfigCache(t *testing.T) {
-	// Create npm project.
-	projectPath, err := filepath.Abs(filepath.Join("..", "testdata", "npm", "project"))
-	assert.NoError(t, err)
-	tmpProjectPath, cleanup := CreateTestProject(t, projectPath)
-	defer cleanup()
-
-	cachePath, err := getNpmConfigCache(tmpProjectPath, "npm", []string{"--cache=abc"}, &utils.NullLog{})
-	assert.NoError(t, err)
-	assert.True(t, strings.HasSuffix(cachePath, filepath.Join("abc","_cacache")))
-
-	oldCache := os.Getenv("npm_config_cache")
-	if oldCache != "" {
-		defer func(){
-			assert.NoError(t,os.Setenv("npm_config_cache",oldCache))
-		}()
-	}
-	assert.NoError(t,os.Setenv("npm_config_cache","def"))
-	cachePath, err = getNpmConfigCache(tmpProjectPath, "npm", []string{}, &utils.NullLog{})
-	assert.NoError(t, err)
-	assert.True(t, strings.HasSuffix(cachePath, filepath.Join("def","_cacache")))
 }

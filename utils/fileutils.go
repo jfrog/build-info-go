@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -470,4 +471,31 @@ func Unmarshal(filePath string, loadTarget interface{}) (err error) {
 		return
 	}
 	return json.Unmarshal(byteValue, &loadTarget)
+}
+
+// strip '\n' or read until EOF, return error if read error
+// readNLines reads up to 'total' number of lines separated by \n.
+func ReadNLines(path string, total int) (lines []string, err error) {
+	reader, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		deferErr := reader.Close()
+		if err == nil {
+			err = deferErr
+		}
+	}()
+	r := bufio.NewReader(reader)
+	for i := 0; i < total; i++ {
+		line, _, err := r.ReadLine()
+		lines = append(lines, string(line))
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return lines, nil
 }

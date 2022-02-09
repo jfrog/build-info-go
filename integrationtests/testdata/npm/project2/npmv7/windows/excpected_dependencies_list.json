@@ -1,0 +1,3947 @@
+[
+    {
+        "id": "p-map:3.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "istanbul-lib-processinfo:2.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "d704d9af8a2ba684e2600d9a215983d4141a979d",
+        "md5": "3b38970091b03645f6f4d6680ada671d",
+        "sha256": "79f172094ebdfe97403e3f80ed8cc1bb10e533213a6fbe458ef79004c5aab296"
+    },
+    {
+        "id": "istanbul-lib-report:3.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-reports:3.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "7518fe52ea44de372f460a76b5ecda9ffb73d8a6",
+        "md5": "87a16f7a36e489fdd042510550872167",
+        "sha256": "0c3149f3222df87e1980647ec9904bb4452b996772e62b3827d4399b831cae3a"
+    },
+    {
+        "id": "argparse:1.0.10",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "js-yaml:3.14.1",
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "bcd6791ea5ae09725e17e5ad988134cd40b3d911",
+        "md5": "d96ffb030eff598e8f3eb48b6257bdaf",
+        "sha256": "7faa149cd7811b7e11fc8353dc6e4e9c4de68a02f8221aa8f7dc22108315ac0d"
+    },
+    {
+        "id": "is-plain-obj:2.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs-unparser:2.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "45e42e37fccf1f40da8e5f76ee21515840c09287",
+        "md5": "23b716d73535a85a95b57d53d7ac5df6",
+        "sha256": "6b6423e1b1aa7427594b9d5a69d430ab309d47ed71a31cfc0306f2b47e070fb5"
+    },
+    {
+        "id": "escalade:3.1.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "d8cfdc7000965c5a0174b4a82eaa5c0552742e40",
+        "md5": "61feaad8ca2ae37eff46aa4818a7b045",
+        "sha256": "60f830428beb9022a2da1a31a41eef5aee4b27013f88d16535322b9a238ba79d"
+    },
+    {
+        "id": "spawn-wrap:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "103685b8b8f9b79771318827aa78650a610d457e",
+        "md5": "300df23ba641ba293cd9907ddf1b7552",
+        "sha256": "839a710cd6d6ca7bcd2788208e51436b27558548015c073ff278ce546d0b5748"
+    },
+    {
+        "id": "test-exclude:6.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "04a8698661d805ea6fa293b6cb9e63ac044ef15e",
+        "md5": "c9d2be086d4d740f9999b77971777008",
+        "sha256": "e77c50f9beeebe95b599dff7f94c539dad4ab2326ee4048e1f22105e4c15c66e"
+    },
+    {
+        "id": "color-convert:2.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "ansi-styles:4.3.0",
+                "chalk:4.1.2",
+                "log-symbols:4.1.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "72d3a68d598c9bdb3af2ad1e84f21d896abd4de3",
+        "md5": "0248ebc952524207e296a622372faa1f",
+        "sha256": "920fa43538c019a085dbbf04cb6f72cc337624e5f5217519f0e7b2ef784e7ce1"
+    },
+    {
+        "id": "serialize-javascript:6.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "efae5d88f45d7924141da8b5c3a7a7e663fefeb8",
+        "md5": "900d6fc6f653ed171f0e54507edb0e43",
+        "sha256": "284d917617d342241bc32f4d56bf97e32ff08d26e4d5c9704edf8952640e02fc"
+    },
+    {
+        "id": "@babel/parser:7.12.16",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/template:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "cc31257419d2c3189d394081635703f549fc1ed4",
+        "md5": "f573e5455fa39afadc1bb30f724622dd",
+        "sha256": "33a407b6bf6c30fdeda12d1373fb192b49be135a0c48bc58040d9dfcebefd210"
+    },
+    {
+        "id": "gensync:1.0.0-beta.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "32a6ee76c3d7f52d46b2b1ae5d93fea8580a25e0",
+        "md5": "3d1e68bdacb4e8046ccabff0019e916b",
+        "sha256": "df9f92ef26a35d4f92cb8a73415dfea8dadaf294a03e60e4d176df82f38d17c9"
+    },
+    {
+        "id": "semver:5.7.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "a954f931aeba508d307bbf069eff0c01c96116f7",
+        "md5": "99453010ab0aad4c49dba769e6193c35",
+        "sha256": "fef2fb32aa27fc28c2e834336469d84615cb187449e3622caa2897a0535db56d"
+    },
+    {
+        "id": "set-blocking:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "045f9782d011ae9a6803ddd382b24392b3d890f7",
+        "md5": "ff057cf430b35ecb25780f94cd051ab3",
+        "sha256": "d934aee7db9e09da09e87724743315ffe888130aa6e04fbbdecac985f6ae693d"
+    },
+    {
+        "id": "p-locate:5.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "locate-path:6.0.0",
+                "find-up:5.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "83c8315c6785005e3bd021839411c9e110e6d834",
+        "md5": "f179aa668706b232c29cb580eea96619",
+        "sha256": "2ec11480a90965a753b141be5432d24f4ca98860b844fd1b10cab0a1023423fc"
+    },
+    {
+        "id": "strip-json-comments:3.1.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "31f1281b3832630434831c310c01cccda8cbe006",
+        "md5": "58e65c07bc47365a2acc9129b810130c",
+        "sha256": "0213fe6b1c1c470cf5c60ffca0d362142117c8e303ffbcabbd9a4c4700b6ceed"
+    },
+    {
+        "id": "find-up:4.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "pkg-dir:4.2.0",
+                "find-cache-dir:3.3.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "97afe7d6cdc0bc5928584b7c8d7b16e8a9aa5d19",
+        "md5": "aa0b377135f4af38d106db8b84606924",
+        "sha256": "33a9b0535306d2e05e0a27088b68344b52ac767d576ef60b7ab173aa0d5a26eb"
+    },
+    {
+        "id": "@istanbuljs/schema:0.1.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "test-exclude:6.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e45e384e4b8ec16bce2fd903af78450f6bf7ec98",
+        "md5": "868e08ce450f7d9d5cd29997f0865f17",
+        "sha256": "1d7cba774f9a37f770cb5e5f56727342c98ab5ee517b6862d56aa2df82b6e5e0"
+    },
+    {
+        "id": "write-file-atomic:3.0.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "56bd5c5a5c70481cd19c571bd39ab965a5de56e8",
+        "md5": "53e54080c22253705daa1c3115c02220",
+        "sha256": "e960a6846f713b6b0d16b6a7d98d47f6fc29610f6e59eb5587fd9d48d455fa66"
+    },
+    {
+        "id": "color-name:1.1.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "color-convert:1.9.3",
+                "ansi-styles:3.2.1",
+                "chalk:2.4.2",
+                "@babel/highlight:7.12.13",
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "a7d0558bd89c42f795dd42328f740831ca53bc25",
+        "md5": "b45186c4fe76a2450ec484149ade0066",
+        "sha256": "b0ef3371fb2563cbeb6379f1639dc2a8c0a895d1d48ac72c7ad43c5ff409784e"
+    },
+    {
+        "id": "@babel/helper-module-transforms:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "01afb052dcad2044289b7b20beb3fa8bd0265bea",
+        "md5": "35ed5d6f6c5aca458691c5729eb86c20",
+        "sha256": "224d45efb03f780a2b7fb9cf0b300c2e12e1901cc61dfe8dfc1943aa3b3b2542"
+    },
+    {
+        "id": "minimist:1.2.5",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "json5:2.2.0",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "67d66014b66a6a8aaa0c083c5fd58df4e4e97602",
+        "md5": "522d37fe79e519d03574fd979abd7e4f",
+        "sha256": "a1800ce4d39356e96497bd09a41fad0033a13dd8eeb469008333547505ce4350"
+    },
+    {
+        "id": "ansi-styles:4.3.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chalk:4.1.2",
+                "log-symbols:4.1.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "wrap-ansi:7.0.0",
+                "cliui:7.0.4",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "wrap-ansi:6.2.0",
+                "cliui:6.0.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "edd803628ae71c04c85ae7a0906edad34b648937",
+        "md5": "0534616a9bab55e3e2d350f9ab77ea22",
+        "sha256": "2c539a46d85ab6033183997434d2d9a5ca2ceefc12b4db9022f564784cd7987f"
+    },
+    {
+        "id": "color-name:1.1.4",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "color-convert:2.0.1",
+                "ansi-styles:4.3.0",
+                "chalk:4.1.2",
+                "log-symbols:4.1.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "c2a09a87acbde69543de6f63fa3995c826c536a2",
+        "md5": "a8d4412852471526b8027af2532d0d2b",
+        "sha256": "507b7c4461e8eb941355af9a59e9a7e02cd0e7c6176b48d1809766344f3f1708"
+    },
+    {
+        "id": "caching-transform:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "00d297a4206d71e2163c39eaffa8157ac0651f0f",
+        "md5": "82a03704703e883379f146caa805b457",
+        "sha256": "9734acc0e8f17d4261eb9bd13f3edd6cc7941e3ddfa15626a5259786dc478d44"
+    },
+    {
+        "id": "@babel/helper-validator-identifier:7.12.11",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/highlight:7.12.13",
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/types:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "c9a1f021917dcb5ccf0d4e453e399022981fc9ed",
+        "md5": "7a8722e18203cfdb8c195ad276589390",
+        "sha256": "be0aac74011d70fcf9b20951c875572c0ed8f4738d3f00999f15393e7628f40a"
+    },
+    {
+        "id": "escape-string-regexp:1.0.5",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chalk:2.4.2",
+                "@babel/highlight:7.12.13",
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "1b61c0562190a8dff6ae3bb2cf0200ca130b86d4",
+        "md5": "02440084832abe665260d5db1da1dd9e",
+        "sha256": "e50c792e76763d0c74506297add779755967ca9bbd288e2677966a6b7394c347"
+    },
+    {
+        "id": "jsesc:2.5.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/generator:7.12.15",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "80564d2e483dacf6e8ef209650a67df3f0c283a4",
+        "md5": "73267fc7ff79ed59ec4c02cfb29d8a8b",
+        "sha256": "ae5a2bdb55e44862273f1e08c3692f8da70ced96f0a4bb8294aa488ca58c258b"
+    },
+    {
+        "id": "uuid:3.4.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "istanbul-lib-processinfo:2.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "b23e4358afa8a202fe7a100af1f5f883f02007ee",
+        "md5": "2fa27207bb65f4e05c6f10bc0448f662",
+        "sha256": "ba77c9306dbc34c7ae503e9eb142e284f98ea9ab609f416052c2fbbefb6df4dd"
+    },
+    {
+        "id": "aggregate-error:3.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "p-map:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "92670ff50f5359bdb7a3e0d40d0ec30c5737687a",
+        "md5": "16dd9122f632da20697f8ed47c7bbcc1",
+        "sha256": "03360cb8b5aba425c69ede72e465bbd7847104209048c95200b6b432c98b205b"
+    },
+    {
+        "id": "ansi-colors:4.1.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "cbb9ae256bf750af1eab344f229aa27fe94ba348",
+        "md5": "ce72bb5360d8326616cae64d8ae9bdfe",
+        "sha256": "24d803210289f2afc6448276aa9d5a9608e86e584698307d2365d93195cf1f44"
+    },
+    {
+        "id": "which-module:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "d9ef07dce77b9902b8a3a8fa4b31c3e3f7e6e87a",
+        "md5": "ce028f30082fbbea9861a40437d17bd3",
+        "sha256": "4fbf12fbe1ebf9360acf140231a7ee2156298058b8166f53df1302109f1028ea"
+    },
+    {
+        "id": "hasha:5.2.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "package-hash:4.0.0",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "a48477989b3b327aea3c04f53096d816d97522a1",
+        "md5": "e115dd4df0b0ac30070f0d3e7a99bd10",
+        "sha256": "71ab42b150104fff441f2317540af19dd5b08fd0a23f0a4fbad5bcc700d0b82d"
+    },
+    {
+        "id": "ansi-styles:3.2.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chalk:2.4.2",
+                "@babel/highlight:7.12.13",
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "41fbb20243e50b12be0f04b8dedbf07520ce841d",
+        "md5": "32f5aaf7b10b2d222566c733fb1cab0a",
+        "sha256": "7318625e1aa6768258ca472572b254711de4ac35f1ee49c4c1a9044c1f020df3"
+    },
+    {
+        "id": "@babel/helper-optimise-call-expression:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-replace-supers:7.12.13",
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "5c02d171b4c8615b1e7163f888c1c81c30a2aaea",
+        "md5": "b06d494852b8183bbceff5cedb7b35d4",
+        "sha256": "bf99da6d67ff090a4b3d417a8c6724a2f6f9315d6dfc7da7b64d4eba76e588f4"
+    },
+    {
+        "id": "@istanbuljs/load-nyc-config:1.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "fd3db1d59ecf7cf121e80650bb86712f9b55eced",
+        "md5": "d46010939e33d1d4e7dfce54fc60d89a",
+        "sha256": "4ad534a19208b4f8ae1b7e659635c2a74933f1ee0061de7adf100c6e1128b39e"
+    },
+    {
+        "id": "binary-extensions:2.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "is-binary-path:2.1.0",
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "75f502eeaf9ffde42fc98829645be4ea76bd9e2d",
+        "md5": "bb73db2f62b2dbe0cd6f73eef702c994",
+        "sha256": "0f81fa2208e48444f1314a44320e6a50e5786ffe35bf5e377854120204c7d623"
+    },
+    {
+        "id": "p-limit:3.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "p-locate:5.0.0",
+                "locate-path:6.0.0",
+                "find-up:5.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e1daccbe78d0d1388ca18c64fea38e3e57e3706b",
+        "md5": "1362f362e00b9e967f1f922cf1a0a872",
+        "sha256": "36e6519736cafaa158dc1bca8137683f5bf1bc1c476d40519028b3f3a96bc9e0"
+    },
+    {
+        "id": "minimatch:3.0.4",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "glob:7.1.7",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "glob:7.2.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "test-exclude:6.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "5166e286457f03306064be5497e8dbb0c3d32083",
+        "md5": "6a2c6f3ffed6ed50faaff89ef8eab0a0",
+        "sha256": "426a24d79bb6f0d3bb133e62cec69021836d254b39d931c104ddd7c464adea71"
+    },
+    {
+        "id": "esprima:4.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "js-yaml:3.14.1",
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "13b04cdb3e6c5d19df91ab6987a8695619b0aa71",
+        "md5": "c9d44a818c324d707a81b08dd36cd079",
+        "sha256": "d8a1910e9cbecc95b4c5df75376c46a7a9261859c294ef91505c1442e093cc74"
+    },
+    {
+        "id": "make-dir:3.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "find-cache-dir:3.3.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-processinfo:2.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-report:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "spawn-wrap:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "415e967046b3a7f1d185277d84aa58203726a13f",
+        "md5": "e47d13370c2b27671a13f28ebc27585f",
+        "sha256": "ec54ab8aa54b1161fd346e870e587be6595d9c8ea90f5485b7367df7575674dc"
+    },
+    {
+        "id": "shebang-regex:3.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "shebang-command:2.0.0",
+                "cross-spawn:7.0.3",
+                "foreground-child:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "ae16f1644d873ecad843b0307b143362d4c42172",
+        "md5": "800d00b53670160a44fa6116b1cbb6e5",
+        "sha256": "fedbabaa6db26c6be0183f82777dfa852d59a62f8885de93bd32ebc28758958f"
+    },
+    {
+        "id": "default-require-extensions:3.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "append-transform:2.0.0",
+                "istanbul-lib-hook:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e03f93aac9b2b6443fc52e5e4a37b3ad9ad8df96",
+        "md5": "7f046d603b546f69f7ab4d7ef2b41b28",
+        "sha256": "ea5eeead2e3b0bd77faad8b6d9bfa30bd65cc6943e1779be958c872065fb62ba"
+    },
+    {
+        "id": "is-glob:4.0.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "glob-parent:5.1.2",
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "64f61e42cbbb2eec2071a9dac0b28ba1e65d5084",
+        "md5": "f2ae49ffa6c02bb48edae7c9360785b9",
+        "sha256": "3fe453fb193bb58f6f0505dfb1151230935380b5b55e1f9864261c2aafc1bec6"
+    },
+    {
+        "id": "@babel/helper-member-expression-to-functions:7.12.16",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-replace-supers:7.12.13",
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "41e0916b99f8d5f43da4f05d85f4930fa3d62b22",
+        "md5": "619982af14ec79e31231427db61fc8dd",
+        "sha256": "cbfff31d7b38d87e1511a3762aac2a797f77d353806228ad10edda9808050641"
+    },
+    {
+        "id": "globals:11.12.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "ab8795338868a0babd8525758018c2a7eb95c42e",
+        "md5": "712d15395573404a3ddb37ce395d948b",
+        "sha256": "38a58c45c2857fdca4db807682e46ad9da6b59ed2080c308b84bcfbdf7eb5af6"
+    },
+    {
+        "id": "indent-string:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "aggregate-error:3.1.0",
+                "p-map:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "624f8f4497d619b2d9768531d58f4122854d7251",
+        "md5": "ad188c269f2d9181da4321f8803a4cde",
+        "sha256": "bc6b74d3d74eb341c8b590c697c7fcd259c6fd1223c4b44dbfb11887ce9842a0"
+    },
+    {
+        "id": "source-map:0.5.7",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/generator:7.12.15",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8a039d2d1021d22d1ea14c80d8ea468ba2ef3fcc",
+        "md5": "3773f963d18f1aca320fae40b04aded2",
+        "sha256": "e1de289bc493154f00a11cb4e363e0bb37619537d44b36b8112bba4924116b67"
+    },
+    {
+        "id": "chalk:4.1.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "log-symbols:4.1.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "aac4e2b7734a740867aeb16bf02aad556a1e7a01",
+        "md5": "cf76e256de1debce9c7a21cd18df954d",
+        "sha256": "e84c643aa53e87ace6c3d368b3cddda24a2d1434a06b6dfbdb628ad2107df90a"
+    },
+    {
+        "id": "strip-ansi:6.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "cliui:7.0.4",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "wrap-ansi:7.0.0",
+                "cliui:7.0.4",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "string-width:4.2.3",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "9e26c63d30f53443e9489495b2105d37b67a85d9",
+        "md5": "85cbf58500e3b9a7d62e1f7f580c8a45",
+        "sha256": "9bdb75d0bff49f156dd8c3bcb0e06b3fa96c3d88ddd4c342a4345866a40c08ca"
+    },
+    {
+        "id": "signal-exit:3.0.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "write-file-atomic:3.0.3",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "foreground-child:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "spawn-wrap:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "a1410c2edd8f077b08b4e253c8eacfcaf057461c",
+        "md5": "ae863f6e95a6a6050bc0e70c9ddb0688",
+        "sha256": "15efc9bad612c82f7bea7037c0ae575d015452ae383df94424d489b0f67101c7"
+    },
+    {
+        "id": "@babel/template:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helpers:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-function-name:7.12.13",
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "530265be8a2589dbb37523844c5bcb55947fb327",
+        "md5": "0326d436b3127e3419765111a116a58b",
+        "sha256": "36d2d87b053e91827083d0d94364c7f673536aa963add7a3c10129d816a2ef71"
+    },
+    {
+        "id": "@babel/helpers:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "3c75e993632e4dadc0274eae219c73eb7645ba47",
+        "md5": "580610ed8e4e8c7a416fa66bf972b22c",
+        "sha256": "146b595a980720a5e0e98c7e04fdab2b72c41843a3c0189978b2bd5489439364"
+    },
+    {
+        "id": "yargs:15.4.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "0d87a16de01aee9d8bec2bfbf74f67851730f4f8",
+        "md5": "091d0cc9d7347925d73455bd991e6639",
+        "sha256": "41abfec6a74cfb4fa330af2a33b867dfa06a9b2b439bb01244c4f47c585de535"
+    },
+    {
+        "id": "diff:5.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "7ed6ad76d859d030787ec35855f5b1daf31d852b",
+        "md5": "a6db67e2eeb11fd4cf5135da638e2157",
+        "sha256": "f8911521b249c1171e3be1e728e6490e761c032f89d5c9f2e418dc0bdaba8b33"
+    },
+    {
+        "id": "y18n:5.0.8",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "7f4934d0f7ca8c56f95314939ddcd2dd91ce1d55",
+        "md5": "6018afaa99207dafc81cb56404a31454",
+        "sha256": "d43743bad3a7cb3af5d3b6bf70fd32fe3923ea86e4148109c6dd0126deada769"
+    },
+    {
+        "id": "p-try:2.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "p-limit:2.3.0",
+                "p-locate:4.1.0",
+                "locate-path:5.0.0",
+                "find-up:4.1.0",
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "p-limit:2.3.0",
+                "p-locate:4.1.0",
+                "locate-path:5.0.0",
+                "find-up:4.1.0",
+                "pkg-dir:4.2.0",
+                "find-cache-dir:3.3.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "p-limit:2.3.0",
+                "p-locate:4.1.0",
+                "locate-path:5.0.0",
+                "find-up:4.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "cb2868540e313d61de58fafbe35ce9004d5540e6",
+        "md5": "49994562e1f3cbe260710598cbb3edf7",
+        "sha256": "a390b2b89899df950afc0304eaba7cd1f5e3746b2e370758a9b50f177e713790"
+    },
+    {
+        "id": "append-transform:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "istanbul-lib-hook:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "99d9d29c7b38391e6f428d28ce136551f0b77e12",
+        "md5": "3fdaa8ee7fab3c1ab71b4ef98a55a239",
+        "sha256": "4d56be51c38f3dff577e6160df3dd080d710b58eaa62de66534f504d11da9e43"
+    },
+    {
+        "id": "archy:1.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "istanbul-lib-processinfo:2.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f9c8c13757cc1dd7bc379ac77b2c62a5c2868c40",
+        "md5": "b2a24c65e2212f53168f984b5a693dbd",
+        "sha256": "1659a980f11d9df11cd89bfda2e21db3a7e1ed821c96a0d88d4ff0fad5370c26"
+    },
+    {
+        "id": "fsevents:2.3.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8a526f78b8fdf4623b709e0b975c52c24c02fd1a",
+        "md5": "3cf04486705de7ad22df4b2e51ec4893",
+        "sha256": "e17ade950c193fe09adfc7915fe29ac26166c8782d00e7c3879e7e9de02c5428"
+    },
+    {
+        "id": "is-unicode-supported:0.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "log-symbols:4.1.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "3f26c76a809593b52bfa2ecb5710ed2779b522a7",
+        "md5": "5fa12001af4a22129166b9c7262d5fb2",
+        "sha256": "7c15fefe222c2ec445ebf1d1b7c9ceb6e9513ce6195b002b7b8c3280ca9ecabe"
+    },
+    {
+        "id": "camelcase:6.2.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs-unparser:2.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "250fd350cfd555d0d2160b1d51510eaf8326e86e",
+        "md5": "d14a653ec4c2bdbc4a054b0dbce79d87",
+        "sha256": "07b3b755b39bbc93fed6f67753d4ed3f1a606ebeedc860678162bd9fe30b45c1"
+    },
+    {
+        "id": "camelcase:5.3.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "yargs-parser:18.1.3",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e3c9b31569e106811df242f715725a1f4c494320",
+        "md5": "efcf73180d9b7001c92f574d4ae7f908",
+        "sha256": "c609324ab889515f2f7354ddcc319b6080c9b76f2ac1441c03da031c85458696"
+    },
+    {
+        "id": "decamelize:1.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "yargs-parser:18.1.3",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f6534d15148269b20352e7bee26f501f9a191290",
+        "md5": "330932e4de0e60c36114facb6d3dfafa",
+        "sha256": "b4adeff510e38c3a02703bcba72ffbe3c65b591f13c78c6a459b5e801a3e2864"
+    },
+    {
+        "id": "foreground-child:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "spawn-wrap:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "71b32800c9f15aa8f2f83f4a6bd9bff35d861a53",
+        "md5": "a40037cbec5e1d0f5428d9c99a9e91cf",
+        "sha256": "142a7ad241b5dbd9cc55a3194b217953cc08d2cbeb5bfe8ad9f8127b9a724e3c"
+    },
+    {
+        "id": "chalk:2.4.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/highlight:7.12.13",
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "cd42541677a54333cf541a49108c1432b44c9424",
+        "md5": "2c0467f3f122da3e7a9fccf05418b2c8",
+        "sha256": "d0884e52e616cba08dead7b848b06b86c2d7a279eaa17091154bb2572c85c671"
+    },
+    {
+        "id": "@babel/helper-get-function-arity:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-function-name:7.12.13",
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "bc63451d403a3b3082b97e1d8b3fe5bd4091e583",
+        "md5": "7a40ffef4058eead9c8b98d56d03ccc4",
+        "sha256": "516342bff750abb2e2200520e63156dbf7b58cd3764cf5a26517a0c45ec32b9f"
+    },
+    {
+        "id": "js-yaml:4.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "c1fb65f8f5017901cdd2c951864ba18458a10602",
+        "md5": "fba4491839b7fa47c38f639ac243b22d",
+        "sha256": "0dae332559cf22b21c26ea70e732afd8303ff99412f9c3d9d209faa8882cf2ca"
+    },
+    {
+        "id": "istanbul-lib-source-maps:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "75743ce6d96bb86dc7ee4352cf6366a23f0b1ad9",
+        "md5": "fc78a9f50db7d57da55a839bac0e65da",
+        "sha256": "001db60e8967172df66953d5377a521fa02f167d8bdf3c25a748d8eb896f7fd8"
+    },
+    {
+        "id": "rimraf:3.0.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "istanbul-lib-processinfo:2.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "spawn-wrap:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f1a5402ba6220ad52cc1282bac1ae3aa49fd061a",
+        "md5": "c794495fee118854a7cbd585a19a0fa8",
+        "sha256": "5876c20fd84707b7056ec61ccee1a71e80fec1657650010bd4dac828bb977f52"
+    },
+    {
+        "id": "is-binary-path:2.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "ea1f7f3b80f064236e83470f86c09c254fb45b09",
+        "md5": "bd33f08c47fb70bb6d1b11ae6c760437",
+        "sha256": "a076b203c5bd01082c17de903fd872d282d223aca47830047183228010c64def"
+    },
+    {
+        "id": "is-stream:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "hasha:5.2.2",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "bde9c32680d6fae04129d6ac9d921ce7815f78e3",
+        "md5": "d4612a02df79da69a9743e26e8a37da6",
+        "sha256": "d6412611e731caafb1796ca17f9aa3104e8ae72517d122c2b313bcf2bb43de54"
+    },
+    {
+        "id": "process-on-spawn:1.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "node-preload:0.2.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "95b05a23073d30a17acfdc92a440efd2baefdc93",
+        "md5": "acaca9f6065528d5b79d3d3501b5a745",
+        "sha256": "d3ce9515289d5350cdfa10cff7bb163650d4713ea72ad99cffe0a99b075bea03"
+    },
+    {
+        "id": "ansi-regex:5.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "strip-ansi:6.0.0",
+                "cliui:6.0.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "388539f55179bf39339c81af30a654d69f87cb75",
+        "md5": "69fd1c7bc68c850139d20aefed955a71",
+        "sha256": "6ee1bda34e578b6da23ca5ffda9dc971748c3c542f5fa999f818df5dc0323b99"
+    },
+    {
+        "id": "@types/mocha:9.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "3205bcd15ada9bc681ac20bef64e9e6df88fd297",
+        "md5": "bf15e99c50d65300ef0110e5742ea07b",
+        "sha256": "077e99cc0d2957b15ce5620565b49e790cf4bda0243883af048d72e90cedc05b"
+    },
+    {
+        "id": "path-exists:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "find-up:5.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "find-up:4.1.0",
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "find-up:4.1.0",
+                "pkg-dir:4.2.0",
+                "find-cache-dir:3.3.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "find-up:4.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "513bdbe2d3b95d7762e8c1137efa195c6c61b5b3",
+        "md5": "d3652d47b80b1aa623e820d7d276b27b",
+        "sha256": "dbb535c9302ce9b3f777ece3ff055cc8d88890a1e1deddc045340aef76fb775c"
+    },
+    {
+        "id": "workerpool:6.1.5",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "0f7cf076b6215fd7e1da903ff6f22ddd1886b581",
+        "md5": "d94ad5a124d3e57d0a4d9367ab982088",
+        "sha256": "dbe03b6ff8657ea015656292577c97fbc8d628fe24794799f751a66d753a70aa"
+    },
+    {
+        "id": "is-fullwidth-code-point:3.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "string-width:4.2.3",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "string-width:4.2.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f116f8064fe90b3f7844a38997c0b75051269f1d",
+        "md5": "87c5848714e5ed8e25abbdc13cfe3995",
+        "sha256": "6f415dae5dc6070f1b42daee6165eab941a97101982305facc8bafdaf300bc4a"
+    },
+    {
+        "id": "p-limit:2.3.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "p-locate:4.1.0",
+                "locate-path:5.0.0",
+                "find-up:4.1.0",
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "p-locate:4.1.0",
+                "locate-path:5.0.0",
+                "find-up:4.1.0",
+                "pkg-dir:4.2.0",
+                "find-cache-dir:3.3.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "p-locate:4.1.0",
+                "locate-path:5.0.0",
+                "find-up:4.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "3dd33c647a214fdfffd835933eb086da0dc21db1",
+        "md5": "002eb5aeebd77c4c6a6570c7be31c0e9",
+        "sha256": "384b452409cfeb5c6fa82dc68ebfa498b24717b74fb8d3fe6eb2bb89908db295"
+    },
+    {
+        "id": "debug:4.3.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-source-maps:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f0d229c505e0c6d8c49ac553d1b13dc183f6b2ee",
+        "md5": "690937c36f84e02c3d67193c2b867b76",
+        "sha256": "34ccfe056d27979867bc08e7449f3a2b1170e9d16591532d4202fb08eb39a38c"
+    },
+    {
+        "id": "json5:2.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "2dfefe720c6ba525d9ebd909950f0515316c89a3",
+        "md5": "e4711e39d31c4887d0c727ee258c7b40",
+        "sha256": "37875a2bd12417df58f547acc8b909db3a2cb437511f44516a6871e344c0b1fe"
+    },
+    {
+        "id": "to-regex-range:5.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "fill-range:7.0.1",
+                "braces:3.0.2",
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "1648c44aae7c8d988a326018ed72f5b4dd0392e4",
+        "md5": "5ef0a1bd28f353c14bf940103a879257",
+        "sha256": "a63a255ec20a935c3a3334a6645f9245db36e2319ddf1eb6bc0eab2bfe5b42d7"
+    },
+    {
+        "id": "brace-expansion:1.1.11",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "minimatch:3.0.4",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "3c7fcbf529d87226f3d2f52b966ff5271eb441dd",
+        "md5": "02822e3db48e8c5b844fa309fa2cc56b",
+        "sha256": "84bd645925eb665a04c19c66eb9da8499d9c17d0d62b4b979d085dcae99695da"
+    },
+    {
+        "id": "which:2.0.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "cross-spawn:7.0.3",
+                "foreground-child:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "spawn-wrap:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "7c6a8dd0a636a0327e10b59c9286eee93f3f51b1",
+        "md5": "9556a736013ff5223cc9731d9f32b55f",
+        "sha256": "a13adf5fddeb769655edce551e81fbb11904b9c9be76d95e41da8c4c499d4edc"
+    },
+    {
+        "id": "p-locate:4.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "locate-path:5.0.0",
+                "find-up:4.1.0",
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "locate-path:5.0.0",
+                "find-up:4.1.0",
+                "pkg-dir:4.2.0",
+                "find-cache-dir:3.3.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "locate-path:5.0.0",
+                "find-up:4.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "a3428bb7088b3a60292f66919278b7c297ad4f07",
+        "md5": "ef4841bc32d15f49592f42a89d3f8cfd",
+        "sha256": "d95a6ae462e3d967deb0c250bda1c3bbebfe86a58832d27b204c7b74a76fa5f0"
+    },
+    {
+        "id": "supports-color:5.5.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chalk:2.4.2",
+                "@babel/highlight:7.12.13",
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e2e69a44ac8772f78a1ec0b35b689df6530efc8f",
+        "md5": "17b1003344e0e0d2719205be85946698",
+        "sha256": "058a32ad244fcf4b4a7240c3ec9afc14ff78c3f9beba691922695460c9a4e0aa"
+    },
+    {
+        "id": "escape-string-regexp:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "14ba83a5d373e3d311e5afca29cf5bfad965bf34",
+        "md5": "6c4ea446a9f85d76c9b3e599a9ea25b5",
+        "sha256": "4b44a14da6987a3c0585c2ff16b3800425732ff35cad710c65e72d7f8e33b11b"
+    },
+    {
+        "id": "supports-color:7.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chalk:4.1.2",
+                "log-symbols:4.1.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-report:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "1b7dcdcb32b8138801b3e478ba6a51caa89648da",
+        "md5": "da58ae58b985905e1445bc447625dc1b",
+        "sha256": "f16acafd1634624e60c24a5538004c4e168c82607f10dbe28395e9df3e7d5e4a"
+    },
+    {
+        "id": "package-hash:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "3537f654665ec3cc38827387fc904c163c54f506",
+        "md5": "0f9f3fd2b83a4aaf53ca7436bcc76845",
+        "sha256": "35f3408c1370c166c2b8197656437bce5f47e505074fcf288e492919694a15e6"
+    },
+    {
+        "id": "is-typedarray:1.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "write-file-atomic:3.0.3",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "typedarray-to-buffer:3.1.5",
+                "write-file-atomic:3.0.3",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e479c80858df0c1b11ddda6940f96011fcda4a9a",
+        "md5": "d5efec2afc8b29ff367a2127cd1890b2",
+        "sha256": "0d5c97ab733832aa006929b933decd71af74d92dcc857637840cb47496c83845"
+    },
+    {
+        "id": "cross-spawn:7.0.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "foreground-child:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-processinfo:2.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f73a85b9d5d41d045551c177e2882d4ac85728a6",
+        "md5": "e8b91e2f179097df541bc96ebb11b8bf",
+        "sha256": "11c58814090217e3effa2b4c28e0398683da87d6cb35441d846c2a38cf4a7205"
+    },
+    {
+        "id": "he:1.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "84ae65fa7eafb165fddb61566ae14baf05664f0f",
+        "md5": "59dd519e72954845f5a01d23c2695903",
+        "sha256": "777a7c030c1b6c0bbe8638136dcc5cedbb36b1082f821b06648de5d7d11c1b68"
+    },
+    {
+        "id": "picomatch:2.3.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "anymatch:3.1.2",
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "readdirp:3.6.0",
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f1f061de8f6a4bf022892e2d128234fb98302972",
+        "md5": "21b93be8448e9e1f9167e305ad1b4c79",
+        "sha256": "ec81cbb36546358b4369be6521148b129569dc0a51fd0154af618326f89a3596"
+    },
+    {
+        "id": "has-flag:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "supports-color:7.2.0",
+                "chalk:4.1.2",
+                "log-symbols:4.1.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "supports-color:8.1.1",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "supports-color:7.2.0",
+                "istanbul-lib-report:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "944771fd9c81c81265c4d6941860da06bb59479b",
+        "md5": "d48b4e68ca6cd00a3f95a43f88625684",
+        "sha256": "77a7eb1411d927bb8a5ca7069dbe168886d63c88f446f0b81500a2cf23ddb5b1"
+    },
+    {
+        "id": "yargs-unparser:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f131f9226911ae5d9ad38c432fe809366c2325eb",
+        "md5": "f9482cf08bacd4b85c2f4aa27215e73b",
+        "sha256": "c9224d53839022b885216ed18127198abc15e38a242ced14d74b11fafc0ba97c"
+    },
+    {
+        "id": "wrap-ansi:7.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "cliui:7.0.4",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "67e145cff510a6a6984bdf1152911d69d2eb9e43",
+        "md5": "85a965a6e2a0944eafcbca7e5ab07ed5",
+        "sha256": "0795b3510bd2e938f6a415396de3d4f58fd76ef1f8249a07196444eaf85ca42f"
+    },
+    {
+        "id": "graceful-fs:4.2.6",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "package-hash:4.0.0",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "ff040b2b0853b23c3d31027523706f1885d76bee",
+        "md5": "daa4c01f4d01fa7976a43c17cf2f9454",
+        "sha256": "25334251eddf26a85b59b6c7c994b954cbae4831640881fba46bef3f26cbe537"
+    },
+    {
+        "id": "shebang-command:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "cross-spawn:7.0.3",
+                "foreground-child:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "ccd0af4f8835fbdc265b82461aaf0c36663f34ea",
+        "md5": "aa7675df57afd8404d9aaa55e659f7a8",
+        "sha256": "9acba5bd18a51e9cdf5898380e4df63f803e1844def64ae1a46f88cff86d556e"
+    },
+    {
+        "id": "has-flag:3.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "supports-color:5.5.0",
+                "chalk:2.4.2",
+                "@babel/highlight:7.12.13",
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "b5d454dc2199ae225699f3467e5a07f3b955bafd",
+        "md5": "1fa1fa951639c7058277abcecca86922",
+        "sha256": "ed4b713220dc22ae02d063c210225ee2274a7905c9cd7db041ba6ef511a9e0ea"
+    },
+    {
+        "id": "normalize-path:3.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "anymatch:3.1.2",
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "0dcd69ff23a1c9b11fd0978316644a0388216a65",
+        "md5": "2821b760c1df5dcc38328f154a6ea3cb",
+        "sha256": "0b983cca55c555cdc0e919ed5ecd0e4648f6e303f9dffeb449f1ad760d4f84fe"
+    },
+    {
+        "id": "lodash:4.17.21",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/types:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "679591c564c3bffaae8454cf0b3df370c3d6911c",
+        "md5": "25247d3dd7029d08a6ac99adab09086b",
+        "sha256": "6a087ac9e5702a0c9d60fbcd48696012646ec8df1491dea472b150e79fcaf804"
+    },
+    {
+        "id": "@babel/helper-module-imports:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "ec67e4404f41750463e455cc3203f6a32e93fcb0",
+        "md5": "e2c6246894aa90be1363b5a444fe4f2a",
+        "sha256": "68b836938f51fac48c1bd8d6d70ed65e76ee52d31798b57ef728d1530c8746c8"
+    },
+    {
+        "id": "ansi-regex:5.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "strip-ansi:6.0.1",
+                "cliui:7.0.4",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "082cb2c89c9fe8659a311a53bd6a4dc5301db304",
+        "md5": "7a0bb891f3a7cd9b174af62beb4de186",
+        "sha256": "0e0eadcdaada805db5d85b53ad5cdca0760b996ee199ec9658e7b34aa6c8e0d9"
+    },
+    {
+        "id": "require-main-filename:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "d0b329ecc7cc0f61649f62215be69af54aa8989b",
+        "md5": "8b45166659a670e83387649f79c641ad",
+        "sha256": "c5bb566318fb6091c7c2ac7c0aba6eeb7b332ffcfafad2268a2dc12a4d428e00"
+    },
+    {
+        "id": "y18n:4.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8db2b83c31c5d75099bb890b23f3094891e247d4",
+        "md5": "cb26f5963c1a3702dbb487448bd1f052",
+        "sha256": "cd11c323020c227a1dbebbae09c435d255a12a62586789129e5f178694f49fd8"
+    },
+    {
+        "id": "glob-parent:5.1.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "869832c58034fe68a4093c17dc15e8340d8401c4",
+        "md5": "b10ba1a21ff8ef737fe83ca5f33684a0",
+        "sha256": "9616afebd18b93592a79d48cce6a841604593ae90563f0ec5554a07b6952d6d5"
+    },
+    {
+        "id": "yargs-parser:20.2.4",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "b42890f14566796f85ae8e3a25290d205f154a54",
+        "md5": "dded5e7456c94ffc7f4ffddddcac0681",
+        "sha256": "4fe61652a7e5375530ef19f941238fec925f34c7cad78f45bc73afad66bd0121"
+    },
+    {
+        "id": "safe-buffer:5.1.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "convert-source-map:1.7.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "991ec69d296e0313747d59bdfd2b745c35f8828d",
+        "md5": "dc7142b470e0957c5c34098b6fced0ab",
+        "sha256": "e09206c60fccafb952c854af7629cbb031a98d6da2e143fb3aa3c8a48402aa22"
+    },
+    {
+        "id": "glob:7.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "rimraf:3.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "test-exclude:6.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "d15535af7732e02e948f4c41628bd910293f6023",
+        "md5": "05f5ea4a12aecafd90fe04c32385ce80",
+        "sha256": "f6ee73de2fedc6931cbe3df9f8a7d8fd34e8a869ca2e8c8b624e9ea2647a051b"
+    },
+    {
+        "id": "randombytes:2.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "serialize-javascript:6.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "df6f84372f0270dc65cdf6291349ab7a473d4f2a",
+        "md5": "efb164d8addf215512a3bb6dd19a1496",
+        "sha256": "b8a6d3e6532817912ad3dacbb0e64be75026941a5167549aa1d7fecbafd1bcaa"
+    },
+    {
+        "id": "require-directory:2.1.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8c64ad5fd30dab1c976e2344ffe7f792a6a6df42",
+        "md5": "f3a9010155b6a46066afbe2d07f624bd",
+        "sha256": "703bee0844360383fe4a8792d4a5a562647426a053e7597a1d272ac554f386c8"
+    },
+    {
+        "id": "es6-error:4.1.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "release-zalgo:1.0.0",
+                "package-hash:4.0.0",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "9e3af407459deed47e9a91f9b885a84eb05c561d",
+        "md5": "9aeb9c257e683268999655a2071219f2",
+        "sha256": "e10aaeb70548afb2f3e50eb92d4411bdf4a73b2b366b75b32d7c7fdf9985997a"
+    },
+    {
+        "id": "find-cache-dir:3.3.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "89b33fad4a4670daa94f855f7fbe31d6d84fe880",
+        "md5": "d3957f330dbccdcb14916e19c68ad692",
+        "sha256": "c78bf4bf2e8a6d55e7d41cd5f3ead9ef1d0b03e47cfa60ceb0b2cf7f8be1da0e"
+    },
+    {
+        "id": "commondir:1.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "find-cache-dir:3.3.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "ddd800da0c66127393cca5950ea968a3aaf1253b",
+        "md5": "329b8682e83ec34dfe1c58ae90b84988",
+        "sha256": "5b89851be4f799923e48320a13165883d2ffcb8cd4ec71023263255497c251b0"
+    },
+    {
+        "id": "@babel/traverse:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-replace-supers:7.12.13",
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helpers:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "689f0e4b4c08587ad26622832632735fb8c4e0c0",
+        "md5": "cba92dc1fa690a08b0973ce36cb0b3af",
+        "sha256": "b4fcdc925b833ad532b6e68a276c6f1b9b5d26d07c63464c8f00dddc82f06be7"
+    },
+    {
+        "id": "to-fast-properties:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/types:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "dc5e698cbd079265bc73e0377681a4e4e83f616e",
+        "md5": "ac0b1f7eef6a645d444e9ad835d1950a",
+        "sha256": "c713fe48bc243fb0505dfc66f0c9fda8aec9c98c152b80cf44d459345f4e0983"
+    },
+    {
+        "id": "source-map:0.6.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "istanbul-lib-source-maps:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "74722af32e9614e9c287a8d0bbde48b5e2f1a263",
+        "md5": "79c3ddee196e8b414e8b5c3b9caa8581",
+        "sha256": "bdbca10d17ff5a5802d5acfc7b2f22f9f9bf587632a95650d3c5f513c7092b86"
+    },
+    {
+        "id": "argparse:2.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "js-yaml:4.1.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "246f50f3ca78a3240f6c997e8a9bd1eac49e4b38",
+        "md5": "864f41f5cacfed3315deeba37ba7954b",
+        "sha256": "27903847fc8215e6fc5a33e81490f7baba66403f8aade33771b988cca097728c"
+    },
+    {
+        "id": "cliui:6.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "511d702c0c4e41ca156d7d0e96021f23e13225b1",
+        "md5": "9065a0615794d52f19cffa078701d382",
+        "sha256": "538bfc9753338f8eb816c46e7e541b3bbada18446cf8b5149cfaaafff01acbd8"
+    },
+    {
+        "id": "lodash.flattendeep:4.4.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "package-hash:4.0.0",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "fb030917f86a3134e5bc9bec0d69e0013ddfedb2",
+        "md5": "17ca06c4643969cb10e948854434eba0",
+        "sha256": "02cd21eeeb3f2713b129c76333e861657ed74a6a83f3c4dc0e5dacebcd9b21c8"
+    },
+    {
+        "id": "@babel/generator:7.12.15",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "4617b5d0b25cc572474cc1aafee1edeaf9b5368f",
+        "md5": "76f9f743c12a36ed324ac0957e3194ff",
+        "sha256": "c0c80724343fde3d974a40d37dc1362473fa078f85eccdda032190e827146a16"
+    },
+    {
+        "id": "@babel/helper-simple-access:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8478bcc5cacf6aa1672b251c1d2dde5ccd61a6c4",
+        "md5": "e84bc3d78539d7dfdf173b23509b9110",
+        "sha256": "2e4854abdaebdb65d6fde6d39cf8606245a8e8f89c922eab28166433d6cd2105"
+    },
+    {
+        "id": "inflight:1.0.6",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "glob:7.1.7",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "glob:7.2.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "49bd6331d7d02d0c09bc910a1075ba8165b56df9",
+        "md5": "dd31215ede2e0da80f8e31c9f93d8ace",
+        "sha256": "5a9fdcf59874af6ad3b413b6815d5afaaea34939a3bee20e1e50f7830031889b"
+    },
+    {
+        "id": "growl:1.10.5",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f2735dc2283674fa67478b10181059355c369e5e",
+        "md5": "47fb3a576f5916564687b683b1bcea68",
+        "sha256": "ba0cc1c69259c6097c62ab156401d00308c129f5776869d365f779f12e6dd912"
+    },
+    {
+        "id": "imurmurhash:0.1.4",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "write-file-atomic:3.0.3",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "9218b9b2b928a238b13dc4fb6b6d576f231453ea",
+        "md5": "54bf7101d59d33d9b13d6a91a72bc9b7",
+        "sha256": "ac23a031966a7371d192e35c7852ab31c772b7d4e468ddd886ad3c014372cb60"
+    },
+    {
+        "id": "typedarray-to-buffer:3.1.5",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "write-file-atomic:3.0.3",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "a97ee7a9ff42691b9f783ff1bc5112fe3fca9080",
+        "md5": "d693220f5eabe1359169bb992abaa064",
+        "sha256": "2b264d84a680cb57b9ee9e6f0bf8a365c79465408509116a2c52461dcc1ff936"
+    },
+    {
+        "id": "@babel/highlight:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8ab538393e00370b26271b01fa08f7f27f2e795c",
+        "md5": "55ef0df1b744cf4957c1ac4c8283ad13",
+        "sha256": "0b7c3a161e990fc34f22549b01436e8116c2d0038e47b6aaecb27be602ea852d"
+    },
+    {
+        "id": "html-escaper:2.0.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "istanbul-reports:3.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "dfd60027da36a36dfcbe236262c00a5822681453",
+        "md5": "81b8d8f735c3d68acd4c6a5cf0b8e5de",
+        "sha256": "8ab75514cf8515cf43f7b69fef645b952c6577026554eb306cc4c17b37c6fad7"
+    },
+    {
+        "id": "is-windows:1.0.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "spawn-wrap:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "d1850eb9791ecd18e6182ce12a30f396634bb19d",
+        "md5": "bcc9525ed3558792d281951c90ad366e",
+        "sha256": "7b1128270d2aafc5a03af6e5cc5336eab331dd7cfbae805f76da6867fe8731a2"
+    },
+    {
+        "id": "debug:4.3.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f0a49c18ac8779e31d4a0c6029dfb76873c7428b",
+        "md5": "e6cb523b95d83bb1d087255046eb4d0b",
+        "sha256": "06b5b98471dc02410003e8bf34cf9e96afbadc30a83b19f5c9376faa817fa7bb"
+    },
+    {
+        "id": "path-is-absolute:1.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "glob:7.1.7",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "glob:7.2.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "174b9268735534ffbc7ace6bf53a5a9e1b5c5f5f",
+        "md5": "18bfccb10294ae19e7eb616ed1c05176",
+        "sha256": "6e6d709f1a56942514e4e2c2709b30c7b1ffa46fbed70e714904a3d63b01f75c"
+    },
+    {
+        "id": "safe-buffer:5.2.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "randombytes:2.1.0",
+                "serialize-javascript:6.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "1eaf9fa9bdb1fdd4ec75f58f9cdb4e6b7827eec6",
+        "md5": "ea7cf66fcf04485e195b1bd3a3551fc9",
+        "sha256": "5d181804516c4a693a384272a7bd0e42d17e0d4b301ccfbe408669ccafdcb3e8"
+    },
+    {
+        "id": "emoji-regex:8.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "string-width:4.2.3",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "string-width:4.2.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e818fd69ce5ccfcb404594f842963bf53164cc37",
+        "md5": "598b731d8d33cfff04377ad55da187b0",
+        "sha256": "b5ccd9fbfb08098eefbeb6b6b4b40db6db3acf9243e327e039925aa8661cb107"
+    },
+    {
+        "id": "nyc:15.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "1335dae12ddc87b6e249d5a1994ca4bdaea75f02",
+        "md5": "28c5baf103508c15fc352a367910f0c4",
+        "sha256": "b6977f5b5a89c9c7036c09d618d576d30ecdd7773ef39e3075090dc9a60625c8"
+    },
+    {
+        "id": "istanbul-lib-instrument:4.0.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "873c6fff897450118222774696a3f28902d77c1d",
+        "md5": "ee314a8a3153abd9396916f9e141d374",
+        "sha256": "d9840e3cd2576110a2ef1a3984fabc9450229bc2fc4950153e49c84bd83e465a"
+    },
+    {
+        "id": "@babel/code-frame:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/template:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "dcfc826beef65e75c50e21d3837d7d95798dd658",
+        "md5": "6727735f1d373c0716142eb14e7260e3",
+        "sha256": "b5faeba1c9a62366179479a572b09a898a78e5d4dd07e06c98318a48dac0236f"
+    },
+    {
+        "id": "@babel/helper-function-name:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "93ad656db3c3c2232559fd7b2c3dbdcbe0eb377a",
+        "md5": "e71e30bb9170aca538674078c5cf4188",
+        "sha256": "f8fe08fb616ea9442dbf6ef6fff18970188705d2f41a2e120e8c6472c49608cb"
+    },
+    {
+        "id": "chokidar:3.5.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "dba3976fcadb016f66fd365021d91600d01c1e75",
+        "md5": "99944b98cf9fc62c83010c80c2c12e7b",
+        "sha256": "5e3a0ebe621c47dc9348991eaed90e59221d40edd555556df15e46b3b36888da"
+    },
+    {
+        "id": "node-preload:0.2.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "c03043bb327f417a18fee7ab7ee57b408a144301",
+        "md5": "120f936cf9cfb9aaf63819850ee25dab",
+        "sha256": "a8fb3ae5af7dda060ad407826c101393134b25d040996e6586b9a77722563cb6"
+    },
+    {
+        "id": "js-yaml:3.14.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "dae812fdb3825fa306609a8717383c50c36a0537",
+        "md5": "2a522c3e23f7999abd8f852c012c20dd",
+        "sha256": "935a5f5939a5d5f0d1c4d85e7bf8b8a42b432d8692a82bce611720b8d72dbeca"
+    },
+    {
+        "id": "clean-stack:2.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "aggregate-error:3.1.0",
+                "p-map:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "ee8472dbb129e727b31e8a10a427dee9dfe4008b",
+        "md5": "98495454e4106c25e5ed97ae9a6b1148",
+        "sha256": "056c37660ab8c6ff60e5b25b883241c335478fee9c1ab1ec4c15bf891cf55655"
+    },
+    {
+        "id": "flat:5.0.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs-unparser:2.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8ca6fe332069ffa9d324c327198c598259ceb241",
+        "md5": "c215e59da15d7b8eccb1db3e47366cb5",
+        "sha256": "d772de42fa0c5e2b3d940c351873743d9149e5d343f11523dcfb6619f8feed42"
+    },
+    {
+        "id": "yocto-queue:0.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "p-limit:3.1.0",
+                "p-locate:5.0.0",
+                "locate-path:6.0.0",
+                "find-up:5.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "0294eb3dee05028d31ee1a5fa2c556a6aaf10a1b",
+        "md5": "69e27040e38c5b03127488546dc282ea",
+        "sha256": "c772bceca58f20f0ea08ac6121ba385f55db715cd3c2c46b2b38d06d3c6129f1"
+    },
+    {
+        "id": "yargs:16.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "1c82bf0f6b6a66eafce7ef30e376f49a12477f66",
+        "md5": "23787ef1801c6394b3bdee59580dd6c8",
+        "sha256": "461dfd148ca865daeaaac4922e6b8ffd999f802589d0cd373a32bb4ddc76abf5"
+    },
+    {
+        "id": "type-fest:0.8.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "hasha:5.2.2",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "09e249ebde851d3b1e48d27c105444667f17b83d",
+        "md5": "4bcceb8c6c02dfd452ce9f2564eed691",
+        "sha256": "9f196f4105285775fc89dc50afe583e8576cf2043e111430159c4c3dc8b2f5c7"
+    },
+    {
+        "id": "release-zalgo:1.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "package-hash:4.0.0",
+                "caching-transform:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "09700b7e5074329739330e535c5a90fb67851730",
+        "md5": "2e431e2016bfc667a21974c2c818d769",
+        "sha256": "3f586b2c471263a7b7f304267b550de0c3f0236336dd8c509c9e8585928234a3"
+    },
+    {
+        "id": "istanbul-lib-hook:3.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8f84c9434888cc6b1d0a9d7092a76d239ebf0cc6",
+        "md5": "5602d9c25a554fbcca017c4df471866e",
+        "sha256": "b1409b73f51457d3cb29de5a6d5568c3bf19d1654cc1584bb3f0269398b3539c"
+    },
+    {
+        "id": "js-tokens:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/highlight:7.12.13",
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "19203fb59991df98e3a287050d4647cdeaf32499",
+        "md5": "325b11b965688c69ae45a3cf771fbc5c",
+        "sha256": "d884c7a2d8adb5568c1272d92b4f9c62707f4226cf9e7b22e7b957c7361e3c53"
+    },
+    {
+        "id": "@babel/types:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/generator:7.12.15",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-module-imports:7.12.13",
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-member-expression-to-functions:7.12.16",
+                "@babel/helper-replace-supers:7.12.13",
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-optimise-call-expression:7.12.13",
+                "@babel/helper-replace-supers:7.12.13",
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-replace-supers:7.12.13",
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-simple-access:7.12.13",
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-split-export-declaration:7.12.13",
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helpers:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/template:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-get-function-arity:7.12.13",
+                "@babel/helper-function-name:7.12.13",
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/helper-function-name:7.12.13",
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8be1aa8f2c876da11a9cf650c0ecf656913ad611",
+        "md5": "3ce6b4a1e29cf8b4ef61d92e899b05a0",
+        "sha256": "2843deaf5baef5bacee86f17b2814c64668a42fba87c8e0a14f7e224022458d5"
+    },
+    {
+        "id": "readdirp:3.6.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "74a370bd857116e245b29cc97340cd431a02a6c7",
+        "md5": "ebf6617dc3578eb7d4560f0baa3c8273",
+        "sha256": "f1d3b6f146a9f11a0f07827b9bbfa3017d7fb1a420d37acd321ef56ba77099ca"
+    },
+    {
+        "id": "locate-path:5.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "find-up:4.1.0",
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "find-up:4.1.0",
+                "pkg-dir:4.2.0",
+                "find-cache-dir:3.3.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "find-up:4.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "1afba396afd676a6d42504d0a67a3a7eb9f62aa0",
+        "md5": "13cc8f708d7f9f5ad9cda1a3c5ff3344",
+        "sha256": "ae3d1b9360a435840a81a8c7da29f59630dd793c3f39a08f15f73fd3894053b7"
+    },
+    {
+        "id": "@babel/core:7.12.16",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8c6ba456b23b680a6493ddcfcd9d3c3ad51cab7c",
+        "md5": "fc251c62b2de391930fd421ca5debd1b",
+        "sha256": "407b393b5e00eecf5f597665815fd196395479958f18be218a932374aa339d12"
+    },
+    {
+        "id": "log-symbols:4.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "3fbdbb95b4683ac9fc785111e792e558d4abd503",
+        "md5": "6b7e77c65213bd66f0e775dd1a501ef1",
+        "sha256": "32e706aac11b2ba4c0e9647a3a6738bcd9eb6615bf8ad9f157282e8ed9701323"
+    },
+    {
+        "id": "get-package-type:0.1.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8de2d803cff44df3bc6c456e6668b36c3926e11a",
+        "md5": "53c447a09cbf8afb25d97e78bf4a1397",
+        "sha256": "f1c3619acfbbbb090e054336310cf1cdb7761a0a843733e77b1d5b877f72b210"
+    },
+    {
+        "id": "pkg-dir:4.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "find-cache-dir:3.3.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f099133df7ede422e81d1d8448270eeb3e4261f3",
+        "md5": "5e6cbcda90ee1b6006cbf5a5945048eb",
+        "sha256": "a7f4456094d571d70d29f32aa5fa1c738cb8c7087034661078b8678f0153224d"
+    },
+    {
+        "id": "color-convert:1.9.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "ansi-styles:3.2.1",
+                "chalk:2.4.2",
+                "@babel/highlight:7.12.13",
+                "@babel/code-frame:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "bb71850690e1f136567de629d2d5471deda4c1e8",
+        "md5": "b4f847ea1c00c2fdf3e4ff91864b1b1f",
+        "sha256": "12c413e46434f562cf3aa9a76080b71cfde72e0ce39c0df7a7fce1b0b56e0baa"
+    },
+    {
+        "id": "@babel/helper-replace-supers:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "00ec4fb6862546bd3d0aff9aac56074277173121",
+        "md5": "1b61afebfcef69d7e33415f68fce3913",
+        "sha256": "774bb7c311010fc27d82dd8546b22e3fa7c5af922928ca86a9377807e57dda54"
+    },
+    {
+        "id": "string-width:4.2.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "cliui:7.0.4",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "wrap-ansi:7.0.0",
+                "cliui:7.0.4",
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "269c7117d27b05ad2e536830a8ec895ef9c6d010",
+        "md5": "41b9a8984f249b332c0ae05f8b4688a9",
+        "sha256": "adbb4fb1b26e8069af99adff0079369c93f17cf887b91086691d671ddbd52934"
+    },
+    {
+        "id": "ms:2.1.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "574c8138ce1d2b5861f0b44579dbadd60c6615b2",
+        "md5": "a50e4bf82f754914316bfca3dfbcf352",
+        "sha256": "f6616e15e530ed552f9daa2d3ce71963947c6bc7c98c9b64fd3e673fd02622c6"
+    },
+    {
+        "id": "concat-map:0.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "brace-expansion:1.1.11",
+                "minimatch:3.0.4",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "d8a96bd77fd68df7793a73036a3ba0d5405d477b",
+        "md5": "d11d2d19ce6c3d9326cb3e987e8bcd23",
+        "sha256": "35902dd620cf0058c49ea614120f18a889d984269a90381b7622e79c2cfe4261"
+    },
+    {
+        "id": "fs.realpath:1.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "glob:7.1.7",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "glob:7.2.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "1504ad2523158caa40db4a2787cb01411994ea4f",
+        "md5": "9f790d7180667e1d8d1110f2cf321b62",
+        "sha256": "9e80cb8713125aa53df81a29626f7b81f26a9be1cd41840b3ccdcae4d52e8f9c"
+    },
+    {
+        "id": "once:1.4.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "inflight:1.0.6",
+                "glob:7.1.7",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "glob:7.1.7",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "glob:7.2.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "583b1aa775961d4b113ac17d9c50baef9dd76bd1",
+        "md5": "fac2afc3cbe5e133d7a5c34ec3f862ac",
+        "sha256": "cf51460ba370c698f68b976e514d113497339ba018b6003e8e8eb569c6fccfcf"
+    },
+    {
+        "id": "nanoid:3.1.25",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "09ca32747c0e543f0e1814b7d3793477f9c8e152",
+        "md5": "cf82465d90a5f488901aa5b70eeed864",
+        "sha256": "1835a342a119a6ad8bcff0c9290ff73d87c8f6f760a16a32de6adec2f3e04a2d"
+    },
+    {
+        "id": "get-caller-file:2.0.5",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "4f94412a82db32f36e3b0b9741f8a97feb031f7e",
+        "md5": "1b9de5ead51b8886be998f58fdb96476",
+        "sha256": "7b13e1c81949ff4c1baae4ac4e34990492d5e8a86dab7e3b90027b1f5126935f"
+    },
+    {
+        "id": "sprintf-js:1.0.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "argparse:1.0.10",
+                "js-yaml:3.14.1",
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "04e6926f662895354f3dd015203633b857297e2c",
+        "md5": "8e6b31a052754055683e4a35a317feab",
+        "sha256": "3afb26bcc328dc90f516515acf2783ad35b08dbfe9e0ada18264c3c4ddaa1a83"
+    },
+    {
+        "id": "fromentries:1.3.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "process-on-spawn:1.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e4bca6808816bf8f93b52750f1127f5a6fd86e3a",
+        "md5": "f13c076f7541b0f2993f537b46768314",
+        "sha256": "88e46e565906b37d81da80cd8785c057f71ca7da9d1eb1272c09c07725f270d2"
+    },
+    {
+        "id": "yargs-parser:18.1.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "be68c4975c6b2abf469236b0c870362fab09a7b0",
+        "md5": "4d5c278a0e6c1d7a11f1ae5079f57602",
+        "sha256": "0c9135ee2330fd9cdc19fed11b8d9a7b292f5dd8ddf40c13b051340693ebbe58"
+    },
+    {
+        "id": "braces:3.0.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "3454e1a462ee8d599e236df336cd9ea4f8afe107",
+        "md5": "3ed11e666a13cb0da288c6f445b2601f",
+        "sha256": "735881928fd4cf6e0c469c7ec6f66f49133563b840ef2f6c6098943a4250eace"
+    },
+    {
+        "id": "browser-stdout:1.3.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "baa559ee14ced73452229bad7326467c61fabd60",
+        "md5": "82ebb0cdcee39bc8953381ac71cad549",
+        "sha256": "bf7534c1382579f4e8856acc39b3e34c49a1ce94171ad1eaabfab320369bb111"
+    },
+    {
+        "id": "anymatch:3.1.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "c0557c096af32f106198f4f4e2a383537e378716",
+        "md5": "b71f406c504180e27c3c7fa72d0e6a8f",
+        "sha256": "ca680b3cae7eef97d0c5b95156587a30cd082941e9ce43d2bdf264573eea5b14"
+    },
+    {
+        "id": "ms:2.1.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "debug:4.3.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "debug:4.3.1",
+                "istanbul-lib-source-maps:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "d09d1f357b443f493382a8eb3ccd183872ae6009",
+        "md5": "5a8310f20fd4b97c7f8eeaf65f896a7a",
+        "sha256": "1157a6e30d3ffe1b9fcaf3a39caf159f8dc981199a3380c78ddd89f73bcefb48"
+    },
+    {
+        "id": "locate-path:6.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "find-up:5.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "55321eb309febbc59c4801d931a72452a681d286",
+        "md5": "88dec34f94138c96fd50374b3ff54935",
+        "sha256": "71d20b2743581b997191a760edc54df51dcea7c53b12c613cabc360f636d832a"
+    },
+    {
+        "id": "inherits:2.0.4",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "glob:7.1.7",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "glob:7.2.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "0fa2c64f932917c3433a0ded55363aae37416b7c",
+        "md5": "bf725b87e6485c1d9db0279cce76a4a7",
+        "sha256": "d94dbc6c1bb3c5ac0fb12a73ade187108fc60de273a1b754f55044eb5e24afaf"
+    },
+    {
+        "id": "convert-source-map:1.7.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "17a2cb882d7f77d3490585e2ce6c524424a3a442",
+        "md5": "0e5204f1f071e85179a46cb16f500ac1",
+        "sha256": "2c691638758a2d21562c31b10f2784d8be585158da080877ea7b6da0d82503d9"
+    },
+    {
+        "id": "wrap-ansi:6.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "cliui:6.0.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e9393ba07102e6c91a3b221478f0257cd2856e53",
+        "md5": "f8917d0c5de3cfd4ab98a235260b3951",
+        "sha256": "d46fc412f04d873700a557bc9686d42c0d6c7979e1825cefebf4279ca9d678f8"
+    },
+    {
+        "id": "mocha:9.1.3",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "8a623be6b323810493d8c8f6f7667440fa469fdb",
+        "md5": "6d0631780adf286526d8e07e316cfe2c",
+        "sha256": "5c2b78c19bb5508986be1cbb3a0eda7e291b804fbda9307669505d2767a59953"
+    },
+    {
+        "id": "isexe:2.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "which:2.0.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e8fbf374dc556ff8947a10dcb0572d633f2cfa10",
+        "md5": "02bf57881fa200bcd6501e4ded2b1b3a",
+        "sha256": "47cfe872e088e28c53b736fef305324b57cc1cfc9f72a9b0f769f92731cb8359"
+    },
+    {
+        "id": "string-width:4.2.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "cliui:6.0.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "wrap-ansi:6.2.0",
+                "cliui:6.0.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "952182c46cc7b2c313d1596e623992bd163b72b5",
+        "md5": "d7e1202535d01c2d692f15b4259d6130",
+        "sha256": "b6b0c19edc66b57cea414591d74a0ea206b4baa1deebbf4b06193759f6233e3e"
+    },
+    {
+        "id": "wrappy:1.0.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "inflight:1.0.6",
+                "glob:7.1.7",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ],
+            [
+                "once:1.4.0",
+                "glob:7.1.7",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "b5243d8f3ec1aa35f1364605bc0d1036e30ab69f",
+        "md5": "567b1699cfae49cb20f598571a6c90c7",
+        "sha256": "aff3730d91b7b1e143822956d14608f563163cf11b9d0ae602df1fe1e430fdfb"
+    },
+    {
+        "id": "supports-color:8.1.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "cd6fc17e28500cff56c1b86c0a7fd4a54a73005c",
+        "md5": "16e8e38709a4675f8ea1482806cb050c",
+        "sha256": "ea69d9b5801e109932f9f12b5499c06de3fde936119a21c5941b2759d4364fb0"
+    },
+    {
+        "id": "path-key:3.1.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "cross-spawn:7.0.3",
+                "foreground-child:2.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "581f6ade658cbba65a0d3380de7753295054f375",
+        "md5": "4f4b9beb2d53481341e16133a8570dc5",
+        "sha256": "4b8999acb914830edcd3c5b8fec632b32c6bc759ac3edc86336f5a9e08ba7b92"
+    },
+    {
+        "id": "istanbul-lib-coverage:3.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-processinfo:2.0.2",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-report:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "istanbul-lib-source-maps:4.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "f5944a37c70b550b02a78a5c3b2055b280cec8ec",
+        "md5": "08af9082d6a9899699db1c8742ba1aa6",
+        "sha256": "0e39da48fc4d638d67545543b0d0ed604a41b9e977cc74e96bcd1010ff8db0af"
+    },
+    {
+        "id": "semver:6.3.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "make-dir:3.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "ee0a64c8af5e8ceea67687b133761e1becbd1d3d",
+        "md5": "e0836faadf4b192c3987c5117d62fff6",
+        "sha256": "6bf14af3333843b62526ced99519918c7f6bf2cfe1c111556d36cf239a4c6745"
+    },
+    {
+        "id": "istanbul-reports:3.0.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "d593210e5000683750cb09fc0644e4b6e27fd53b",
+        "md5": "1a146a208081fca710ec9ac5686ff870",
+        "sha256": "ac20ddc4f84e2135f064d94014e190d9a2d4f4b73e2f6b4513b896409d1bc1db"
+    },
+    {
+        "id": "fill-range:7.0.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "braces:3.0.2",
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "1919a6a7c75fe38b2c7c77e5198535da9acdda40",
+        "md5": "279e60751b8b0e89226a9e9bd5b8f275",
+        "sha256": "28cdfdbcf2b2d92ef67ed76097017c5220b0dee95898184d6c8dfde7781de972"
+    },
+    {
+        "id": "balanced-match:1.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "brace-expansion:1.1.11",
+                "minimatch:3.0.4",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "89b4d199ab2bee49de164ea02b89ce462d71b767",
+        "md5": "83d3f9f047e9700f6c4ac4028c4c5c53",
+        "sha256": "2896602c12d3cef566bfbed7ccdef79232f4f1e00622fc5c9b40737465baffad"
+    },
+    {
+        "id": "resolve-from:5.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@istanbuljs/load-nyc-config:1.1.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "c35225843df8f776df21c57557bc087e9dfdfc69",
+        "md5": "23cff3fc62d9dd916e67da9c9505603f",
+        "sha256": "fdf7cffeccad13cf433fe9399b291c5437de4b43c83ea0d535294e1b3d4f25e3"
+    },
+    {
+        "id": "istanbul-lib-processinfo:2.0.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e1426514662244b2f25df728e8fd1ba35fe53b9c",
+        "md5": "93131ca838a58e819813b733c606bd8d",
+        "sha256": "7e529f7767219df1b357ae5b65949760f40516c6fd3743218c6b05b7ca86dd81"
+    },
+    {
+        "id": "strip-ansi:6.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "cliui:6.0.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "wrap-ansi:6.2.0",
+                "cliui:6.0.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "string-width:4.2.0",
+                "yargs:15.4.1",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "0b1571dd7669ccd4f3e06e14ef1eed26225ae532",
+        "md5": "767c76e38fb2bb82a3da65412b4610ad",
+        "sha256": "26bc5904a8e6afdf4d2d05d69fa91fec48879917582aa892029695506a0b5653"
+    },
+    {
+        "id": "@ungap/promise-all-settled:1.1.2",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "aa58042711d6e3275dd37dc597e5d31e8c290a44",
+        "md5": "b2752b39b9322878e731606f6ec568a1",
+        "sha256": "1ecc2fc041eb44df4cc2d9c574ad862ac02b050c8e49b5590aed9058ae3671d4"
+    },
+    {
+        "id": "is-extglob:2.1.1",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "is-glob:4.0.3",
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "a88c02535791f02ed37c76a1b9ea9773c833f8c2",
+        "md5": "f84c2f17059e807664dd8e3acc0c34c5",
+        "sha256": "8c5d4286146ad62fc1096981700ce1c22a167708926fca01f9ca74f9bb50bc19"
+    },
+    {
+        "id": "find-up:5.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "4c92819ecb7083561e4f4a240a86be5198f536fc",
+        "md5": "f30df2388d75158c7361f549edfe9bef",
+        "sha256": "f4a64efb583769c09638d81963fd3f7aa883b632f9992a256de3fbe962ca75b4"
+    },
+    {
+        "id": "glob:7.1.7",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "3b193e9233f01d42d0b3f78294bbeeb418f94a90",
+        "md5": "b76e2faffe41be9df3f1ff4605ee1a63",
+        "sha256": "0504b3ddde68d1a93b4b9ef150cdff61e033df5f17cf7858c0d9fe1b412e9bee"
+    },
+    {
+        "id": "decamelize:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs-unparser:2.0.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "aa472d7bf660eb15f3494efd531cab7f2a709837",
+        "md5": "17113f86fb93e54ad64017cac7c80002",
+        "sha256": "e4533ffad5fe578500b72f12bea96e226251ed6034162af1fb99bff93416f59f"
+    },
+    {
+        "id": "cliui:7.0.4",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "yargs:16.2.0",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "a0265ee655476fc807aea9df3df8df7783808b4f",
+        "md5": "c3a8fba555857874ad0dffba34a2289f",
+        "sha256": "a7f4835b8683e8826a4313c1022ee78f1fd94f77806995be5e5e6daaca5403bb"
+    },
+    {
+        "id": "strip-bom:4.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "default-require-extensions:3.0.0",
+                "append-transform:2.0.0",
+                "istanbul-lib-hook:3.0.0",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "9c3505c1db45bcedca3d9cf7a16f5c5aa3901878",
+        "md5": "ba5ded28e859d1030ed2f1369e379f67",
+        "sha256": "8880c5faaa4073b8236a50470b966eecf11ee63d5026299e4bb21e5147e3dcab"
+    },
+    {
+        "id": "@babel/helper-split-export-declaration:7.12.13",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "@babel/helper-module-transforms:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ],
+            [
+                "@babel/traverse:7.12.13",
+                "@babel/core:7.12.16",
+                "istanbul-lib-instrument:4.0.3",
+                "nyc:15.1.0",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "e9430be00baf3e88b0e13e6f9d4eaf2136372b05",
+        "md5": "8db09a6f5e6d9084dbf2df40154de08f",
+        "sha256": "c62fe860b48645cb4e2bdbe1089cc97a369f5dcc1970b42c6b9782f8da1ca818"
+    },
+    {
+        "id": "is-number:7.0.0",
+        "scopes": [
+            "dev"
+        ],
+        "requestedBy": [
+            [
+                "to-regex-range:5.0.1",
+                "fill-range:7.0.1",
+                "braces:3.0.2",
+                "chokidar:3.5.2",
+                "mocha:9.1.3",
+                "jfrogtest"
+            ]
+        ],
+        "sha1": "7535345b896734d5f80c4d06c50955527a14f12b",
+        "md5": "6c6e00114e00c2815fc0aeae3da1af23",
+        "sha256": "7b75c1057198cf97696909a9bee176c9c5e9bcb5b03bf3ecef2f484defadd51e"
+    }
+]

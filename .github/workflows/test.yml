@@ -3,14 +3,14 @@ name: Test
 on: [push, pull_request]
 
 jobs:
-  test:
+  unit-test:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
@@ -18,4 +18,26 @@ jobs:
       - name: Lint
         run: go vet ./...
       - name: Tests
-        run: go test -v -race -cover ./...
+        run: go test -v -race -timeout 0 -cover ./...
+  npm-integration-test:
+    name: npm integrations / Node.js v${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        node: [14, 16.9, 16]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node }}
+          check-latest: true
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "^1.16"
+      - name: Lint
+        run: go vet ./...
+      - name: Tests
+        run: go test -v -race -timeout 0 -cover ./integrationtests/npm_test.go -npmIntegration
