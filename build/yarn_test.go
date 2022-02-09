@@ -159,7 +159,7 @@ func TestCollectDepsForYarnProjectWithErrorInTraverse(t *testing.T) {
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
 
 	service := NewBuildInfoService()
-	yarnBuild, err := service.GetOrCreateBuild("build-info-go-test-yarn", "2")
+	yarnBuild, err := service.GetOrCreateBuild("build-info-go-test-yarn", "3")
 	assert.NoError(t, err)
 	defer func() {
 		assert.NoError(t, yarnBuild.Clean())
@@ -171,4 +171,29 @@ func TestCollectDepsForYarnProjectWithErrorInTraverse(t *testing.T) {
 	})
 	err = yarnModule.Build()
 	assert.Error(t, err)
+}
+
+func TestBuildYarnProjectWithArgs(t *testing.T) {
+	// Copy the project directory to a temporary directory
+	tempDirPath, createTempDirCallback := createTempDirWithCallbackAndAssert(t)
+	defer createTempDirCallback()
+	testDataSource := filepath.Join("testdata", "yarn")
+	testDataTarget := filepath.Join(tempDirPath, "yarn")
+	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
+
+	service := NewBuildInfoService()
+	yarnBuild, err := service.GetOrCreateBuild("build-info-go-test-yarn", "4")
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, yarnBuild.Clean())
+	}()
+	yarnModule, err := yarnBuild.AddYarnModule(filepath.Join(testDataTarget, "project"))
+	assert.NoError(t, err)
+	yarnModule.SetArgs([]string{"add", "statuses@1.5.0"})
+	err = yarnModule.Build()
+	assert.NoError(t, err)
+	buildInfo, err := yarnBuild.ToBuildInfo()
+	assert.NoError(t, err)
+	assert.Len(t, buildInfo.Modules, 1)
+	validateModule(t, buildInfo.Modules[0], 3, 0, "jfrog-cli-tests:v1.0.0", entities.Npm, false)
 }
