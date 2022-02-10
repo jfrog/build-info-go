@@ -698,7 +698,7 @@ return true, nil
 })
 // By default, your project will be built with the 'yarn install' command. If you want, you can set another command.
 yarnModule.SetArgs([]string{"install", "--json"})
-// Calculate the dependencies used by this module, and store them in the module struct.
+// Build the project, calculate the dependencies used by it and store them in the module struct.
 err = yarnModule.Build()
 
 // You can also add artifacts to that module:
