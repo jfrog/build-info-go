@@ -36,7 +36,7 @@ func newGoModule(srcPath string, containingBuild *Build) (*GoModule, error) {
 }
 
 func (gm *GoModule) CalcDependencies() error {
-	if !gm.containingBuild.ShouldSave() {
+	if !gm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}
 	buildInfoDependencies, err := gm.loadDependencies()
@@ -55,7 +55,7 @@ func (gm *GoModule) SetName(name string) {
 }
 
 func (gm *GoModule) AddArtifacts(artifacts ...entities.Artifact) error {
-	if !gm.containingBuild.ShouldSave() {
+	if !gm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to add artifacts")
 	}
 	partial := &entities.Partial{ModuleId: gm.name, ModuleType: entities.Go, Artifacts: artifacts}

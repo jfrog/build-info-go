@@ -92,7 +92,7 @@ func (b *Build) AddYarnModule(srcPath string) (*YarnModule, error) {
 }
 
 func (b *Build) CollectEnv() error {
-	if !b.ShouldSave() {
+	if !b.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect environment variables")
 	}
 	envMap := make(map[string]string)
@@ -122,7 +122,7 @@ func (b *Build) Clean() error {
 }
 
 func (b *Build) ToBuildInfo() (*entities.BuildInfo, error) {
-	if !b.ShouldSave() {
+	if !b.buildNameAndNumberProvided() {
 		return nil, errors.New("a build name must be provided in order to generate build-info")
 	}
 	buildInfo, err := b.createBuildInfoFromPartials()
@@ -348,7 +348,7 @@ func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
 	return details, nil
 }
 
-func (b *Build) ShouldSave() bool {
+func (b *Build) buildNameAndNumberProvided() bool {
 	return len(b.buildName) > 0 && len(b.buildNumber) > 0
 }
 

@@ -67,7 +67,7 @@ func (ym *YarnModule) Build() error {
 	if err != nil {
 		return err
 	}
-	if !ym.containingBuild.ShouldSave() {
+	if !ym.containingBuild.buildNameAndNumberProvided() {
 		return nil
 	}
 	dependenciesMap, err := ym.getDependenciesMap()
@@ -189,7 +189,7 @@ func (ym *YarnModule) SetTraverseDependenciesFunc(traverseDependenciesFunc func(
 }
 
 func (ym *YarnModule) AddArtifacts(artifacts ...entities.Artifact) error {
-	if !ym.containingBuild.ShouldSave() {
+	if !ym.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to add artifacts")
 	}
 	partial := &entities.Partial{ModuleId: ym.name, ModuleType: entities.Npm, Artifacts: artifacts}

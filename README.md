@@ -646,7 +646,7 @@ goModule, err := bld.AddGoModule(goProjectPath)
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = goModule.CalcDependencies()
 
-// You can also add artifacts to that module:
+// You can also add artifacts to that module.
 artifact1 := entities.Artifact{Name: "v1.0.0.mod", Type: "mod", Checksum: &entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}}
 err = goModule.AddArtifacts(artifact1, artifact2, ...)
 ```
@@ -674,14 +674,14 @@ err = gradleModule.CalcDependencies()
 // You can pass an empty string as an argument, if the root of the npm project is the working directory.
 npmModule, err := bld.AddNpmModule(npmProjectPath)
 // Checksum calculation is not supported for npm projects, so you can add a function that calculates them.
-npmModule.SetTraverseDependenciesFunc(func(dependency *entities.Dependency) (bool, error) {
+npmModule.SetTraverseDependenciesFunc(func (dependency *entities.Dependency) (bool, error) {
 dependency.Checksum = &entities.Checksum{Sha1: "123"}
 return true, nil
 })
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = npmModule.CalcDependencies()
 
-// You can also add artifacts to that module:
+// You can also add artifacts to that module.
 artifact1 := entities.Artifact{Name: "json", Type: "tgz", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
 err = npmModule.AddArtifacts(artifact1, artifact2, ...)
 ```
@@ -701,7 +701,7 @@ yarnModule.SetArgs([]string{"install", "--json"})
 // Build the project, calculate the dependencies used by it and store them in the module struct.
 err = yarnModule.Build()
 
-// You can also add artifacts to that module:
+// You can also add artifacts to that module.
 artifact1 := entities.Artifact{Name: "json", Type: "tgz", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
 err = yarnModule.AddArtifacts(artifact1, artifact2, ...)
 ```
