@@ -1,0 +1,199 @@
+package build
+
+import (
+	"errors"
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/parallel"
+	"github.com/stretchr/testify/assert"
+	"path/filepath"
+	"reflect"
+	"testing"
+)
+
+func TestYarnDependencyName(t *testing.T) {
+	testCases := []struct {
+		dependencyValue string
+		expectedName    string
+	}{
+		{"yargs-unparser@npm:2.0.0", "yargs-unparser"},
+		{"typescript@patch:typescript@npm%3A3.9.9#builtin<compat/typescript>::version=3.9.9&hash=a45b0e", "typescript"},
+		{"@babel/highlight@npm:7.14.0", "@babel/highlight"},
+		{"@types/tmp@patch:@types/tmp@npm%3A0.1.0#builtin<compat/typescript>::version=0.1.0&hash=a45b0e", "@types/tmp"},
+	}
+
+	for _, testCase := range testCases {
+		dependency := &YarnDependency{Value: testCase.dependencyValue}
+		assert.Equal(t, testCase.expectedName, dependency.Name())
+	}
+}
+
+func TestGetYarnDependencyKeyFromLocator(t *testing.T) {
+	testCases := []struct {
+		yarnDepLocator string
+		expectedDepKey string
+	}{
+		{"camelcase@npm:6.2.0", "camelcase@npm:6.2.0"},
+		{"@babel/highlight@npm:7.14.0", "@babel/highlight@npm:7.14.0"},
+		{"fsevents@patch:fsevents@npm%3A2.3.2#builtin<compat/fsevents>::version=2.3.2&hash=11e9ea", "fsevents@patch:fsevents@npm%3A2.3.2#builtin<compat/fsevents>::version=2.3.2&hash=11e9ea"},
+		{"follow-redirects@virtual:c192f6b3b32cd5d11a443145a3883a70c04cbd7c813b53085dbaf50263735f1162f10fdbddd53c24e162ec3bc#npm:1.14.1", "follow-redirects@npm:1.14.1"},
+	}
+
+	for _, testCase := range testCases {
+		assert.Equal(t, testCase.expectedDepKey, getYarnDependencyKeyFromLocator(testCase.yarnDepLocator))
+	}
+}
+
+func TestAppendDependencyRecursively(t *testing.T) {
+	dependenciesMap := map[string]*YarnDependency{
+		// For test 1:
+		"pack1@npm:1.0.0": {Value: "pack1@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0"}},
+		"pack2@npm:1.0.0": {Value: "pack2@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0"}},
+		"pack3@npm:1.0.0": {Value: "pack3@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{{Locator: "pack1@virtual:c192f6b3b32cd5d11a443144e162ec3bc#npm:1.0.0"}, {Locator: "pack2@npm:1.0.0"}}}},
+		// For test 2:
+		"pack4@npm:1.0.0": {Value: "pack4@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{{Locator: "pack5@npm:1.0.0"}}}},
+		"pack5@npm:1.0.0": {Value: "pack5@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{{Locator: "pack6@npm:1.0.0"}}}},
+		"pack6@npm:1.0.0": {Value: "pack6@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{{Locator: "pack4@npm:1.0.0"}}}},
+	}
+	yarmModule := &YarnModule{}
+
+	testCases := []struct {
+		dependency           *YarnDependency
+		expectedDependencies map[string]*entities.Dependency
+	}{
+		{
+			dependenciesMap["pack3@npm:1.0.0"],
+			map[string]*entities.Dependency{
+				"pack1:1.0.0": {Id: "pack1:1.0.0", RequestedBy: [][]string{{"pack3:1.0.0", "rootpack:1.0.0"}}},
+				"pack2:1.0.0": {Id: "pack2:1.0.0", RequestedBy: [][]string{{"pack3:1.0.0", "rootpack:1.0.0"}}},
+				"pack3:1.0.0": {Id: "pack3:1.0.0", RequestedBy: [][]string{{"rootpack:1.0.0"}}},
+			},
+		}, {
+			dependenciesMap["pack6@npm:1.0.0"],
+			map[string]*entities.Dependency{
+				"pack4:1.0.0": {Id: "pack4:1.0.0", RequestedBy: [][]string{{"pack6:1.0.0", "rootpack:1.0.0"}}},
+				"pack5:1.0.0": {Id: "pack5:1.0.0", RequestedBy: [][]string{{"pack4:1.0.0", "pack6:1.0.0", "rootpack:1.0.0"}}},
+				"pack6:1.0.0": {Id: "pack6:1.0.0", RequestedBy: [][]string{{"rootpack:1.0.0"}}},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		producerConsumer := parallel.NewBounedRunner(1, false)
+		biDependencies := make(map[string]*entities.Dependency)
+		go func() {
+			defer producerConsumer.Done()
+			err := yarmModule.appendDependencyRecursively(testCase.dependency, []string{"rootpack:1.0.0"}, dependenciesMap, biDependencies)
+			assert.NoError(t, err)
+		}()
+		producerConsumer.Run()
+		assert.True(t, reflect.DeepEqual(testCase.expectedDependencies, biDependencies), "The result dependencies tree doesn't match the expected. expected: %s, actual: %s", testCase.expectedDependencies, biDependencies)
+	}
+}
+
+func TestGenerateBuildInfoForYarnProject(t *testing.T) {
+	// Copy the project directory to a temporary directory
+	tempDirPath, createTempDirCallback := createTempDirWithCallbackAndAssert(t)
+	defer createTempDirCallback()
+	testDataSource := filepath.Join("testdata", "yarn")
+	testDataTarget := filepath.Join(tempDirPath, "yarn")
+	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
+
+	service := NewBuildInfoService()
+	yarnBuild, err := service.GetOrCreateBuild("build-info-go-test-yarn", "1")
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, yarnBuild.Clean())
+	}()
+	yarnModule, err := yarnBuild.AddYarnModule(filepath.Join(testDataTarget, "project"))
+	assert.NoError(t, err)
+	err = yarnModule.Build()
+	assert.NoError(t, err)
+	err = yarnModule.AddArtifacts(entities.Artifact{Name: "artifactName", Type: "artifactType", Path: "artifactPath", Checksum: entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}})
+	assert.NoError(t, err)
+	buildInfo, err := yarnBuild.ToBuildInfo()
+	assert.NoError(t, err)
+	assert.Len(t, buildInfo.Modules, 1)
+	validateModule(t, buildInfo.Modules[0], 2, 1, "jfrog-cli-tests:v1.0.0", entities.Npm, false)
+}
+
+func TestCollectDepsForYarnProjectWithTraverse(t *testing.T) {
+	// Copy the project directory to a temporary directory
+	tempDirPath, createTempDirCallback := createTempDirWithCallbackAndAssert(t)
+	defer createTempDirCallback()
+	testDataSource := filepath.Join("testdata", "yarn")
+	testDataTarget := filepath.Join(tempDirPath, "yarn")
+	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
+
+	service := NewBuildInfoService()
+	yarnBuild, err := service.GetOrCreateBuild("build-info-go-test-yarn", "2")
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, yarnBuild.Clean())
+	}()
+	yarnModule, err := yarnBuild.AddYarnModule(filepath.Join(testDataTarget, "project"))
+	assert.NoError(t, err)
+	yarnModule.SetTraverseDependenciesFunc(func(dependency *entities.Dependency) (bool, error) {
+		if dependency.Id == "xml:1.0.1" {
+			return false, nil
+		}
+		dependency.Checksum = entities.Checksum{Sha1: "test123", Md5: "test456", Sha256: "test789"}
+		return true, nil
+	})
+	err = yarnModule.Build()
+	assert.NoError(t, err)
+	buildInfo, err := yarnBuild.ToBuildInfo()
+	assert.NoError(t, err)
+	assert.Len(t, buildInfo.Modules, 1)
+	validateModule(t, buildInfo.Modules[0], 1, 0, "jfrog-cli-tests:v1.0.0", entities.Npm, true)
+	assert.Equal(t, "json:9.0.6", buildInfo.Modules[0].Dependencies[0].Id)
+	assert.Equal(t, "test123", buildInfo.Modules[0].Dependencies[0].Sha1)
+}
+
+func TestCollectDepsForYarnProjectWithErrorInTraverse(t *testing.T) {
+	// Copy the project directory to a temporary directory
+	tempDirPath, createTempDirCallback := createTempDirWithCallbackAndAssert(t)
+	defer createTempDirCallback()
+	testDataSource := filepath.Join("testdata", "yarn")
+	testDataTarget := filepath.Join(tempDirPath, "yarn")
+	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
+
+	service := NewBuildInfoService()
+	yarnBuild, err := service.GetOrCreateBuild("build-info-go-test-yarn", "3")
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, yarnBuild.Clean())
+	}()
+	yarnModule, err := yarnBuild.AddYarnModule(filepath.Join(testDataTarget, "project"))
+	assert.NoError(t, err)
+	yarnModule.SetTraverseDependenciesFunc(func(dependency *entities.Dependency) (bool, error) {
+		return false, errors.New("test error")
+	})
+	err = yarnModule.Build()
+	assert.Error(t, err)
+}
+
+func TestBuildYarnProjectWithArgs(t *testing.T) {
+	// Copy the project directory to a temporary directory
+	tempDirPath, createTempDirCallback := createTempDirWithCallbackAndAssert(t)
+	defer createTempDirCallback()
+	testDataSource := filepath.Join("testdata", "yarn")
+	testDataTarget := filepath.Join(tempDirPath, "yarn")
+	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
+
+	service := NewBuildInfoService()
+	yarnBuild, err := service.GetOrCreateBuild("build-info-go-test-yarn", "4")
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, yarnBuild.Clean())
+	}()
+	yarnModule, err := yarnBuild.AddYarnModule(filepath.Join(testDataTarget, "project"))
+	assert.NoError(t, err)
+	yarnModule.SetArgs([]string{"add", "statuses@1.5.0"})
+	err = yarnModule.Build()
+	assert.NoError(t, err)
+	buildInfo, err := yarnBuild.ToBuildInfo()
+	assert.NoError(t, err)
+	assert.Len(t, buildInfo.Modules, 1)
+	validateModule(t, buildInfo.Modules[0], 3, 0, "jfrog-cli-tests:v1.0.0", entities.Npm, false)
+}
