@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	clitool "github.com/urfave/cli/v2"
 	"os"
+	"strings"
 )
 
 const (
@@ -35,7 +36,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
 				service.SetLogger(logger)
-				bld, err := service.GetOrCreateBuild("", "")
+				bld, err := service.GetOrCreateBuild("go-build", "1")
 				if err != nil {
 					return
 				}
@@ -64,7 +65,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
 				service.SetLogger(logger)
-				bld, err := service.GetOrCreateBuild("", "")
+				bld, err := service.GetOrCreateBuild("mvn-build", "1")
 				if err != nil {
 					return
 				}
@@ -93,7 +94,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
 				service.SetLogger(logger)
-				bld, err := service.GetOrCreateBuild("", "")
+				bld, err := service.GetOrCreateBuild("gradle-build", "1")
 				if err != nil {
 					return
 				}
@@ -122,7 +123,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
 				service.SetLogger(logger)
-				bld, err := service.GetOrCreateBuild("", "")
+				bld, err := service.GetOrCreateBuild("npm-build", "1")
 				if err != nil {
 					return
 				}
@@ -141,6 +142,41 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				return printBuild(bld, context.String(formatFlag))
+			},
+		},
+		{
+			Name:            "yarn",
+			Usage:           "Build a Yarn project and generate build-info for it",
+			UsageText:       "bi yarn [yarn command] [command options]",
+			Flags:           flags,
+			SkipFlagParsing: true,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("yarn-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
+				yarnModule, err := bld.AddYarnModule("")
+				if err != nil {
+					return
+				}
+				formatValue, filteredArgs, err := extractStringFlag(context.Args().Slice(), formatFlag)
+				if err != nil {
+					return
+				}
+				yarnModule.SetArgs(filteredArgs)
+				err = yarnModule.Build()
+				if err != nil {
+					return
+				}
+				return printBuild(bld, formatValue)
 			},
 		},
 	}
@@ -189,4 +225,23 @@ func printBuild(bld *build.Build, format string) error {
 	}
 
 	return nil
+}
+
+func extractStringFlag(args []string, flagName string) (flagValue string, filteredArgs []string, err error) {
+	filteredArgs = []string{}
+	for argIndex := 0; argIndex < len(args); argIndex++ {
+		fullFlagName := "--" + flagName
+		if args[argIndex] == fullFlagName {
+			if len(args) <= argIndex+1 || strings.HasPrefix(args[argIndex+1], "-") {
+				return "", nil, errors.New("Failed extracting value of provided flag: " + flagName)
+			}
+			flagValue = args[argIndex+1]
+			argIndex++
+		} else if argPrefix := fullFlagName + "="; strings.HasPrefix(args[argIndex], argPrefix) {
+			flagValue = strings.TrimPrefix(args[argIndex], argPrefix)
+		} else {
+			filteredArgs = append(filteredArgs, args[argIndex])
+		}
+	}
+	return
 }

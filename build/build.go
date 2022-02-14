@@ -81,11 +81,20 @@ func (b *Build) AddGradleModule(srcPath string) (*GradleModule, error) {
 	return newGradleModule(b, srcPath)
 }
 
+// AddNpmModule adds an npm module to this Build. Pass srcPath as an empty string if the root of the npm project is the working directory.
 func (b *Build) AddNpmModule(srcPath string) (*NpmModule, error) {
 	return newNpmModule(srcPath, b)
 }
 
+// AddYarnModule adds a Yarn module to this Build. Pass srcPath as an empty string if the root of the Yarn project is the working directory.
+func (b *Build) AddYarnModule(srcPath string) (*YarnModule, error) {
+	return newYarnModule(srcPath, b)
+}
+
 func (b *Build) CollectEnv() error {
+	if !b.buildNameAndNumberProvided() {
+		return errors.New("a build name must be provided in order to collect environment variables")
+	}
 	envMap := make(map[string]string)
 	for _, e := range os.Environ() {
 		pair := strings.Split(e, "=")
@@ -113,6 +122,9 @@ func (b *Build) Clean() error {
 }
 
 func (b *Build) ToBuildInfo() (*entities.BuildInfo, error) {
+	if !b.buildNameAndNumberProvided() {
+		return nil, errors.New("a build name must be provided in order to generate build-info")
+	}
 	buildInfo, err := b.createBuildInfoFromPartials()
 	if err != nil {
 		return nil, err
@@ -334,6 +346,10 @@ func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
 		return nil, err
 	}
 	return details, nil
+}
+
+func (b *Build) buildNameAndNumberProvided() bool {
+	return len(b.buildName) > 0 && len(b.buildNumber) > 0
 }
 
 type partialModule struct {
