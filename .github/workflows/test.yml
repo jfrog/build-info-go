@@ -27,12 +27,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         node: [
-          // npm v6
+          # npm v6
           12,
           14,
-          // npm v7
+          # npm v7
           16.9,
-          // npm v8
+          # npm v8
           16
         ]
     steps:
