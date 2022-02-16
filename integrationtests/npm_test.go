@@ -33,7 +33,7 @@ func TestBundledDependenciesList(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
-	dependencies, err := buildutils.CalculateDependenciesList("npm", tmpProject1Path, "jfrog-cli-tests", npmArgs, logger)
+	dependencies, err := buildutils.CalculateDependenciesList("npm", tmpProject1Path, "build-info-go-tests", npmArgs, logger)
 	assert.NoError(t, err)
 
 	// Check peer dependency is not found.

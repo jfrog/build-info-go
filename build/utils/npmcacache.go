@@ -22,19 +22,19 @@ type cacache struct {
 	cachePath string
 }
 
-func NewCacache(cachePath string) *cacache {
+func NewNpmCacache(cachePath string) *cacache {
 	return &cacache{cachePath: cachePath}
 }
 
 // Return the tarball path base on the supplied integrity.
-// integrity - A sha512 or sha1 of the dependency tarball that was unpacked in node_modules(https://w3c.github.io/webappsec-subresource-integrity/).
+// integrity - A sha512 or sha1 of the dependency tarball that was unpacked in node_modules (https://w3c.github.io/webappsec-subresource-integrity/).
 func (c *cacache) GetTarball(integrity string) (string, error) {
 	hashAlgorithms, hash, err := integrityToSha(integrity)
 	if err != nil {
 		return "", err
 	}
 	if len(hash) < 5 {
-		return "", errors.New("failed to calculate npm dependencies tree, bad dependency integrity " + integrity)
+		return "", errors.New("failed to calculate npm dependencies tree. Bad dependency integrity " + integrity)
 	}
 	// Current format of content file path:
 	//
@@ -62,7 +62,7 @@ func integrityToSha(integrity string) (hashAlgorithm string, sha string, err err
 	hashAlgorithm, integrityDigest = data[0], data[1]
 	decoded, err := base64.StdEncoding.DecodeString(integrityDigest)
 	if err != nil {
-		err = errors.New("fail to decode integrity hash. Error: " + err.Error())
+		err = errors.New("failed to decode integrity hash. Error: " + err.Error())
 		return
 	}
 	sha = hex.EncodeToString(decoded)
@@ -73,7 +73,7 @@ type cacacheInfo struct {
 	Integrity string
 }
 
-// Looks up key in the cache index(~/.my-cache/index-v5/...), returning information about the entry
+// Looks up key in the cache index (~/.my-cache/index-v5/...), and return information about the entry.
 // id - Dependency specifier like foo@version.
 func (c *cacache) GetInfo(id string) (*cacacheInfo, error) {
 	// Extraction by key.

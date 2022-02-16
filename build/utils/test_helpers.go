@@ -12,7 +12,7 @@ import (
 
 // Copy a project from path to temp dir.
 // projectPath - Local path to a project
-// return the copied project location and a cleanup function to delete it.
+// Return the copied project location and a cleanup function to delete it.
 func CreateTestProject(t *testing.T, projectPath string) (tmpProjectPath string, cleanup func()) {
 	var err error
 	tmpProjectPath, err = utils.CreateTempDir()

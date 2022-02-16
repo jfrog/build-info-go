@@ -8,7 +8,7 @@
     "modules": [
         {
             "type": "npm",
-            "id": "jfrog-cli-tests:v1.0.0",
+            "id": "build-info-go-tests:v1.0.0",
             "dependencies": [
                 {
                     "id": "xml:1.0.1",
@@ -17,7 +17,7 @@
                     ],
                     "requestedBy": [
                         [
-                            "jfrog-cli-tests:v1.0.0"
+                            "build-info-go-tests:v1.0.0"
                         ]
                     ],
                     "sha1": "78ba72020029c5bc87b8a81a3cfcd74b4a2fc1e5",
@@ -31,7 +31,7 @@
                     ],
                     "requestedBy": [
                         [
-                            "jfrog-cli-tests:v1.0.0"
+                            "build-info-go-tests:v1.0.0"
                         ]
                     ],
                     "sha1": "7972c2a5a48a42678db2730c7c2c4ee6e4e24585",

@@ -22,10 +22,10 @@ func TestReadPackageInfoFromPackageJson(t *testing.T) {
 		json string
 		pi   *PackageInfo
 	}{
-		{`{ "name": "jfrog-cli-tests", "version": "1.0.0", "description": "test package"}`,
-			&PackageInfo{Name: "jfrog-cli-tests", Version: "1.0.0", Scope: ""}},
-		{`{ "name": "@jfrog/jfrog-cli-tests", "version": "1.0.0", "description": "test package"}`,
-			&PackageInfo{Name: "jfrog-cli-tests", Version: "1.0.0", Scope: "@jfrog"}},
+		{`{ "name": "build-info-go-tests", "version": "1.0.0", "description": "test package"}`,
+			&PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: ""}},
+		{`{ "name": "@jfrog/build-info-go-tests", "version": "1.0.0", "description": "test package"}`,
+			&PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: "@jfrog"}},
 	}
 	for _, test := range tests {
 		t.Run(test.json, func(t *testing.T) {
@@ -47,8 +47,8 @@ func TestGetDeployPath(t *testing.T) {
 		expectedPath string
 		pi           *PackageInfo
 	}{
-		{`jfrog-cli-tests/-/jfrog-cli-tests-1.0.0.tgz`, &PackageInfo{Name: "jfrog-cli-tests", Version: "1.0.0", Scope: ""}},
-		{`@jfrog/jfrog-cli-tests/-/jfrog-cli-tests-1.0.0.tgz`, &PackageInfo{Name: "jfrog-cli-tests", Version: "1.0.0", Scope: "@jfrog"}},
+		{`build-info-go-tests/-/build-info-go-tests-1.0.0.tgz`, &PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: ""}},
+		{`@jfrog/build-info-go-tests/-/build-info-go-tests-1.0.0.tgz`, &PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: "@jfrog"}},
 	}
 	for _, test := range tests {
 		t.Run(test.expectedPath, func(t *testing.T) {
@@ -87,7 +87,7 @@ func TestParseDependencies(t *testing.T) {
 		{"shopify-liquid:1.d7.9", [][]string{{"xpm:0.1.1", "@jfrog/npm_scoped:1.0.0", "root"}}},
 	}
 	dependencies := make(map[string]*prototypeNode)
-	cacache := NewCacache(filepath.Join("..", "testdata", "npm", "_cacache"))
+	cacache := NewNpmCacache(filepath.Join("..", "testdata", "npm", "_cacache"))
 	err = parseDependencies([]byte(dependenciesJsonList), []string{"root"}, dependencies, cacache, npmLsDependencyParser, utils.NewDefaultLogger(utils.DEBUG))
 	if err != nil {
 		t.Error(err)

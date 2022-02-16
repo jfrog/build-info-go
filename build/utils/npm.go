@@ -26,7 +26,7 @@ func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs
 	if err != nil {
 		return nil, err
 	}
-	cacache := NewCacache(cacheLocation)
+	cacache := NewNpmCacache(cacheLocation)
 	prototypeTree, err := CalculatePrototypeTree(executablePath, srcPath, moduleId, npmArgs, cacache, log)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ type prototypeNode struct {
 	*npmLsDependency
 }
 
-// Run 'npm list ...' command and parse the returned result to create a dependencies map of .
+// Run 'npm list ...' command and parse the returned result to create a dependencies map of.
 // The dependencies map looks like name:version -> entities.Dependency
 func CalculatePrototypeTree(executablePath, srcPath, moduleId string, npmArgs []string, cacache *cacache, log utils.Log) (map[string]*prototypeNode, error) {
 	dependenciesMap := make(map[string]*prototypeNode)
@@ -75,7 +75,6 @@ func CalculatePrototypeTree(executablePath, srcPath, moduleId string, npmArgs []
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
 	npmArgs = append(npmArgs, "--json=true", "--all", "--long")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
-
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if len(errData) > 0 {
 		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
@@ -172,7 +171,7 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 	return jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
 		if string(value) == "{}" {
 			// Skip missing optional dependency.
-			log.Debug(fmt.Sprintf("%s is missing, this may be the result of an optional dependency.", key))
+			log.Debug(fmt.Sprintf("%s is missing. This may be the result of an optional dependency.", key))
 			return nil
 		}
 		npmLsDependency, err := parseFunc(value)
@@ -228,35 +227,36 @@ func npmLsDependencyParser(data []byte) (*npmLsDependency, error) {
 func appendDependency(dependencies map[string]*prototypeNode, dep *npmLsDependency, cacache *cacache, pathToRoot []string, log utils.Log) (err error) {
 	depId := dep.id()
 	scopes := dep.getScopes()
-	if (dependencies)[depId] == nil {
+	if dependencies[depId] == nil {
 		dependency := &prototypeNode{
 			Dependency:      entities.Dependency{Id: depId},
 			npmLsDependency: dep,
 		}
 
-		(dependencies)[depId] = dependency
+		dependencies[depId] = dependency
 	}
-	if (dependencies)[depId].Integrity == "" {
-		(dependencies)[depId].Integrity = dep.Integrity
+	if dependencies[depId].Integrity == "" {
+		dependencies[depId].Integrity = dep.Integrity
 	}
-	(dependencies)[depId].Scopes = appendScopes((dependencies)[depId].Scopes, scopes)
-	(dependencies)[depId].RequestedBy = append((dependencies)[depId].RequestedBy, pathToRoot)
+	dependencies[depId].Scopes = appendScopes(dependencies[depId].Scopes, scopes)
+	dependencies[depId].RequestedBy = append(dependencies[depId].RequestedBy, pathToRoot)
 	return
 }
 
 // Lookup for a dependency's tarball in npm cache, and calculate checksum.
-// Return (md5,sha1,sha256,error)
-func calculateChecksum(cacache *cacache, name, version, integrity string, log utils.Log) (string, string, string, error) {
+func calculateChecksum(cacache *cacache, name, version, integrity string, log utils.Log) (md5 string, sha1 string, sha256 string, err error) {
 	if integrity == "" {
-		info, err := cacache.GetInfo(name + "@" + version)
+		var info *cacacheInfo
+		info, err = cacache.GetInfo(name + "@" + version)
 		if err != nil {
-			return "", "", "", err
+			return
 		}
 		integrity = info.Integrity
 	}
-	path, err := cacache.GetTarball(integrity)
+	var path string
+	path, err = cacache.GetTarball(integrity)
 	if err != nil {
-		return "", "", "", err
+		return
 	}
 	return utils.GetFileChecksums(path)
 }
@@ -298,7 +298,7 @@ func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, 
 	errResult = errBuffer.Bytes()
 	stdResult = outBuffer.Bytes()
 	if err != nil {
-		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(cmdArgs, " ") + "'\nError output is:\n" + string(errResult))
+		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(cmdArgs, " ") + "'\nError output is:\n" + string(errResult) + "'\nCommand error: is:\n" + string(err.Error()))
 		return
 	}
 	log.Debug("npm " + npmCmd.String() + " standard output is:\n" + string(stdResult))
@@ -399,10 +399,10 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Config, append(npmArgs, "--json=false"), log)
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if len(errData) > 0 {
-		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+		log.Warn("error while running the command :'" + executablePath + " " + strings.Join(npmArgs, " ") + ":\n" + string(errData))
 	}
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("npm config command failed with an error: %s", err.Error()))
+		return "", errors.New(fmt.Sprintf("'%s %s' npm config command failed with an error: %s", executablePath, strings.Join(npmArgs, " "), err.Error()))
 	}
 	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
 	found, err := utils.IsDirExists(cachePath, true)
