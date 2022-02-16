@@ -78,9 +78,9 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if err != nil {
-		found, err := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
-		if err != nil {
-			return nil, err
+		found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
+		if isDirExistsErr != nil {
+			return nil, isDirExistsErr
 		}
 		if !found {
 			return nil, errors.New("node_modules isn't found in '" + srcPath + "'. Hint: Restore node_modules folder by running npm install or npm ci.")
