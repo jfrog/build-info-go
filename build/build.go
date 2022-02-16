@@ -16,7 +16,10 @@ import (
 	"github.com/jfrog/build-info-go/utils"
 )
 
-const BuildInfoDetails = "details"
+const (
+	BuildInfoDetails    = "details"
+	dependenciesDirName = ".build-info"
+)
 
 type Build struct {
 	buildName         string

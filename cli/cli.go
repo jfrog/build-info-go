@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	clitool "github.com/urfave/cli/v2"
 	"os"
-	"strings"
 )
 
 const (
@@ -180,12 +179,22 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 func filterCliFlags(allArgs []string, cliFlags []clitool.Flag) []string {
 	var filteredArgs []string
 	for _, arg := range allArgs {
-		if !strings.HasPrefix(arg, "-") {
-
+		if !hasFlag(cliFlags, arg) {
 			filteredArgs = append(filteredArgs, arg)
 		}
 	}
 	return filteredArgs
+}
+
+func hasFlag(flagsList []clitool.Flag, arg string) bool {
+	for _, flag := range flagsList {
+		for _, name := range flag.Names() {
+			if name == arg {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func printBuild(bld *build.Build, format string) error {

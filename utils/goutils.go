@@ -33,20 +33,17 @@ var autoModify *bool = nil
 // Used for masking basic auth credentials as part of a URL.
 var protocolRegExp *gofrogcmd.CmdOutputPattern
 
-func goCmd(cmdArgs []string) (*Cmd, error) {
-	return NewCmd("go", cmdArgs)
-}
-
-func RunGo(commandArgs []string, repoUrl string) error {
+func RunGo(goArg []string, repoUrl string) error {
 	err := os.Setenv("GOPROXY", repoUrl)
 	if err != nil {
 		return err
 	}
 
-	goCmd, err := goCmd(commandArgs)
+	goCmd, err := NewCmd("go", goArg)
 	if err != nil {
 		return err
 	}
+	goCmd.Command = goArg
 	err = prepareGlobalRegExp()
 	if err != nil {
 		return err
@@ -102,11 +99,11 @@ func GetDependenciesList(projectDir string, log Log) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}:{{.Version}}{{end}}", "all"), log)
+	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
 	if err != nil {
 		// Errors occurred while running "go list". Run again and this time ignore errors (with '-e')
 		log.Warn("Errors occurred while building the Go dependency tree. The dependency tree may be incomplete:" + err.Error())
-		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}:{{.Version}}{{end}}", "all"), log)
+		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +148,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 			}
 		}()
 	}
-	goCmd, err := goCmd(commandArgs)
+	goCmd, err := NewCmd("go", commandArgs)
 	if err != nil {
 		return "", err
 	}
@@ -235,7 +232,7 @@ func getParsedGoVersion() (*version.Version, error) {
 }
 
 func getGoVersion() (string, error) {
-	goCmd, err := goCmd([]string{"version"})
+	goCmd, err := NewCmd("go", []string{"version"})
 	if err != nil {
 		return "", err
 	}
@@ -296,7 +293,7 @@ func GetGoModCachePath() (string, error) {
 
 // GetGOPATH returns the location of the GOPATH
 func getGOPATH() (string, error) {
-	goCmd, err := goCmd([]string{"env", "GOPATH"})
+	goCmd, err := NewCmd("go", []string{"env", "GOPATH"})
 	if err != nil {
 		return "", err
 	}
@@ -329,8 +326,8 @@ func listToMap(output string) map[string]bool {
 	lineOutput := strings.Split(output, "\n")
 	mapOfDeps := map[string]bool{}
 	for _, line := range lineOutput {
-		// The expected syntax : github.com/name:v1.2.3
-		if len(strings.Split(line, ":")) == 2 && mapOfDeps[line] == false {
+		// The expected syntax : github.com/name@v1.2.3
+		if len(strings.Split(line, "@")) == 2 && mapOfDeps[line] == false {
 			mapOfDeps[line] = true
 			continue
 		}
@@ -343,7 +340,7 @@ func graphToMap(output string) map[string][]string {
 	mapOfDeps := map[string][]string{}
 	for _, line := range lineOutput {
 		// The expected syntax : github.com/parentname@v1.2.3 github.com/childname@v1.2.3
-		line = strings.ReplaceAll(line, "@v", ":v")
+		line = strings.ReplaceAll(line, "@v", ":")
 		splitLine := strings.Split(line, " ")
 		if len(splitLine) == 2 {
 			parent := splitLine[0]

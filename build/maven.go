@@ -16,7 +16,6 @@ import (
 
 const (
 	MavenHome                       = "M2_HOME"
-	dependenciesDirName             = ".build-info"
 	MavenExtractorFileName          = "build-info-extractor-maven3-%s-uber.jar"
 	classworldsConfFileName         = "classworlds.conf"
 	PropertiesTempfolderName        = "properties"
@@ -112,7 +111,7 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 	if javaHome != "" {
 		javaExecPath = filepath.Join(javaHome, "bin", "java")
 	} else {
-		javaExecPath, err = exec.LookPath("java")
+		javaExecPath, err = utils.GetExecutablePath("java")
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +174,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 		// We need to grab the location using the mvn --version command
 
 		// First we will try lo look for 'mvn' in PATH.
-		mvnPath, err := exec.LookPath("mvn")
+		mvnPath, err := utils.GetExecutablePath("mvn")
 		if err != nil || mvnPath == "" {
 			return "", errors.New(err.Error() + "Hint: The mvn command may not be included in the PATH. Either add it to the path, or set the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
 		}

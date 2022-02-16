@@ -1,124 +1,60 @@
 package pythonutils
 
 import (
-	"fmt"
+	"encoding/json"
 	"github.com/jfrog/build-info-go/utils"
-	gofrogcmd "github.com/jfrog/gofrog/io"
-	"regexp"
-	"strings"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 )
 
-type PipCommand struct {
-	*utils.Cmd
+// Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
+func RunPipDepTree(pythonExecPath, dependenciesDirName string) (map[string][]string, []string, error) {
+	pipDependencyMapScriptPath, err := GetDepTreeScriptPath(dependenciesDirName)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := utils.RunCommandWithOutput(pythonExecPath, []string{pipDependencyMapScriptPath, "--json"})
+	if err != nil {
+		return nil, nil, err
+	}
+	// Parse into array.
+	packages := make([]pythonDependencyPackage, 0)
+	if err = json.Unmarshal(data, &packages); err != nil {
+		return nil, nil, err
+	}
+
+	return parseDependenciesToGraph(packages)
 }
 
-func NewPipCommand() (*PipCommand, error) {
-	pipCmd, err := utils.NewCmd("pip")
+// Return path to the dependency-tree script, if not exists it creates the file.
+func GetDepTreeScriptPath(dependenciesDirName string) (string, error) {
+	depTreeScriptName := "pipdeptree.py"
+	pipDependenciesPath := filepath.Join(dependenciesDirName, "pip", pipDepTreeVersion)
+	depTreeScriptPath := filepath.Join(pipDependenciesPath, depTreeScriptName)
+	err := writeScriptIfNeeded(pipDependenciesPath, depTreeScriptName)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return &PipCommand{Cmd: pipCmd}, nil
+	return depTreeScriptPath, err
 }
 
-// Run pip-install command while parsing the logs for downloaded packages.
-// Supports running pip either in non-verbose and verbose mode.
-// Populates 'dependencyToFileMap' with downloaded package-name and its actual downloaded file (wheel/egg/zip...).
-func (pec *PipenvCommand) PipInstallWithLogParsing(log utils.Log) (map[string]string, error) {
-	// Create regular expressions for log parsing.
-	collectingPackageRegexp, err := regexp.Compile(`^Collecting\s(\w[\w-\.]+)`)
+// Creates local python script on jfrog dependencies path folder if such not exists
+func writeScriptIfNeeded(targetDirPath, scriptName string) error {
+	scriptPath := filepath.Join(targetDirPath, scriptName)
+	exists, err := utils.IsFileExists(scriptPath, false)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	downloadFileRegexp, err := regexp.Compile(`^\s\sDownloading\s[^\s]*\/([^\s]*)`)
-	if err != nil {
-		return nil, err
+	if !exists {
+		err = os.MkdirAll(targetDirPath, os.ModeDir|os.ModePerm)
+		if err != nil {
+			return err
+		}
+		err = ioutil.WriteFile(scriptPath, pipDepTreeContent, os.ModePerm)
+		if err != nil {
+			return err
+		}
 	}
-	installedPackagesRegexp, err := regexp.Compile(`^Requirement\salready\ssatisfied\:\s(\w[\w-\.]+)`)
-	if err != nil {
-		return nil, err
-	}
-
-	downloadedDependencies := make(map[string]string)
-	var packageName string
-	expectingPackageFilePath := false
-
-	// Extract downloaded package name.
-	dependencyNameParser := gofrogcmd.CmdOutputPattern{
-		RegExp: collectingPackageRegexp,
-		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-			// If this pattern matched a second time before downloaded-file-name was found, prompt a message.
-			if expectingPackageFilePath {
-				// This may occur when a package-installation file is saved in pip-cache-dir, thus not being downloaded during the installation.
-				// Re-running pip-install with 'no-cache-dir' fixes this issue.
-				log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", packageName))
-
-				// Save package with empty file path.
-				downloadedDependencies[strings.ToLower(packageName)] = ""
-			}
-
-			// Check for out of bound results.
-			if len(pattern.MatchedResults)-1 < 0 {
-				log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
-				return pattern.Line, nil
-			}
-
-			// Save dependency information.
-			expectingPackageFilePath = true
-			packageName = pattern.MatchedResults[1]
-
-			return pattern.Line, nil
-		},
-	}
-
-	// Extract downloaded file, stored in Artifactory.
-	dependencyFileParser := gofrogcmd.CmdOutputPattern{
-		RegExp: downloadFileRegexp,
-		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-			// Check for out of bound results.
-			if len(pattern.MatchedResults)-1 < 0 {
-				log.Debug(fmt.Sprintf("Failed extracting download path from line: %s", pattern.Line))
-				return pattern.Line, nil
-			}
-
-			// If this pattern matched before package-name was found, do not collect this path.
-			if !expectingPackageFilePath {
-				log.Debug(fmt.Sprintf("Could not resolve package name for download path: %s , continuing...", packageName))
-				return pattern.Line, nil
-			}
-
-			// Save dependency information.
-			filePath := pattern.MatchedResults[1]
-			downloadedDependencies[strings.ToLower(packageName)] = filePath
-			expectingPackageFilePath = false
-
-			log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, filePath))
-			return pattern.Line, nil
-		},
-	}
-
-	// Extract already installed packages names.
-	installedPackagesParser := gofrogcmd.CmdOutputPattern{
-		RegExp: installedPackagesRegexp,
-		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-			// Check for out of bound results.
-			if len(pattern.MatchedResults)-1 < 0 {
-				log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
-				return pattern.Line, nil
-			}
-
-			// Save dependency with empty file name.
-			downloadedDependencies[strings.ToLower(pattern.MatchedResults[1])] = ""
-
-			log.Debug(fmt.Sprintf("Found package: %s already installed", pattern.MatchedResults[1]))
-			return pattern.Line, nil
-		},
-	}
-
-	// Execute command.
-	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(pec.Cmd, true, &dependencyNameParser, &dependencyFileParser, &installedPackagesParser)
-	if err != nil {
-		return nil, err
-	}
-
-	return downloadedDependencies, nil
+	return nil
 }

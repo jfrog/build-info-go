@@ -4,85 +4,110 @@ import (
 	"fmt"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/build-info-go/utils/pythonutils"
 	gofrogcmd "github.com/jfrog/gofrog/io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
 
 type PipModule struct {
-	containingBuild *Build
-	name            string
-	srcPath         string
+	containingBuild     *Build
+	name                string
+	srcPath             string
+	dependencyLocalPath string
+	// GetDependenciesChecksumsFunc
+	UpdateDepsChecksumInfoFunc func(dependenciesMap map[string]entities.Dependency) error
 }
 
 func newPipModule(srcPath string, containingBuild *Build) (*PipModule, error) {
 	var err error
 	if srcPath == "" {
-		srcPath, err = utils.GetProjectRoot()
+		srcPath, err = os.Getwd()
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	// Read module name
-	name, err := utils.GetModuleNameByDir(srcPath, containingBuild.logger)
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
 	}
-
-	return &PipModule{name: name, srcPath: srcPath, containingBuild: containingBuild}, nil
+	dependencyLocalPath := filepath.Join(home, dependenciesDirName, "pip")
+	return &PipModule{srcPath: srcPath, containingBuild: containingBuild, dependencyLocalPath: dependencyLocalPath}, nil
 }
 
 func (pm *PipModule) RunCommandAndCollectDependencies(commandArgs []string) error {
 	if commandArgs[0] == "install" {
-		pipCmd, err := utils.NewCmd("pip", commandArgs)
+		downloadedDependencies, err := pm.InstallWithLogParsing(commandArgs)
 		if err != nil {
 			return err
 		}
-		// Run pip install command and parse logs to get a map of downloaded dependency files
-		dependenciesList, err := pm.InstallWithLogParsing(pipCmd)
+
+		dependenciesMap := make(map[string]entities.Dependency, len(downloadedDependencies))
+		for depName, fileName := range downloadedDependencies {
+			dependenciesMap[depName] = entities.Dependency{Id: fileName}
+		}
+		if pm.UpdateDepsChecksumInfoFunc != nil {
+			err = pm.UpdateDepsChecksumInfoFunc(dependenciesMap)
+			if err != nil {
+				return err
+			}
+		}
+
+		pythonExecPath, err := utils.GetExecutablePath("python3")
 		if err != nil {
 			return err
 		}
-		pythonExecutablePath, err := getExecutablePath("python")
+
+		// Get package-name.
+		packageName, pkgNameErr := pythonutils.GetPackageNameFromSetuppy(pythonExecPath)
+		if pkgNameErr != nil {
+			pm.containingBuild.logger.Debug("Couldn't retrieve the package name from Setup.py. Reason: ", pkgNameErr.Error())
+		}
+		// If module-name was set by the command, don't change it.
+		if pm.name == "" {
+			// If the package name is unknown, set the module name to be the build name.
+			if packageName == "" {
+				pm.name = pm.containingBuild.buildName
+				pm.containingBuild.logger.Debug(fmt.Sprintf("Using build name: %s as module name.", pm.name))
+			} else {
+				pm.name = packageName
+			}
+		}
+		err = pythonutils.UpdateDepsIdsAndRequestedBy(dependenciesMap, packageName, pm.name, pm.dependencyLocalPath, pythonExecPath)
 		if err != nil {
 			return err
 		}
-		dependenciesGraph, topLevelPackagesList, err := piputils.RunPipDepTree(pythonExecutablePath)
-		if err != nil {
-			return err
-		}
-		if err := pic.collectBuildInfo(projectsDirPath, pythonExecutablePath, dependenciesList, dependenciesGraph, topLevelPackagesList); err != nil {
-			return err
-		}
+		buildInfoModule := entities.Module{Id: pm.name, Type: entities.Python, Dependencies: dependenciesMapToList(dependenciesMap)}
+		buildInfo := &entities.BuildInfo{Modules: []entities.Module{buildInfoModule}}
+
+		return pm.containingBuild.SaveBuildInfo(buildInfo)
 	}
-	//buildInfoDependencies, err := pm.loadDependencies()
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//buildInfoModule := entities.Module{Id: pm.name, Type: entities.Go, Dependencies: buildInfoDependencies}
-	//buildInfo := &entities.BuildInfo{Modules: []entities.Module{buildInfoModule}}
-	//
-	//return pm.containingBuild.SaveBuildInfo(buildInfo)
 	return nil
 }
 
 // Run pip-install command while parsing the logs for downloaded packages.
 // Supports running pip either in non-verbose and verbose mode.
 // Populates 'dependencyToFileMap' with downloaded package-name and its actual downloaded file (wheel/egg/zip...).
-func (pm *PipModule) InstallWithLogParsing(cmd *utils.Cmd) (map[string]*entities.Dependency, error) {
+func (pm *PipModule) InstallWithLogParsing(commandArgs []string) (map[string]string, error) {
 	log := pm.containingBuild.logger
+
+	pipCmd, err := utils.NewCmd("pip", commandArgs)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create regular expressions for log parsing.
-	collectingPackageRegexp, err := regexp.Compile(`^Collecting\s(\w[\w-\.]+)`)
+	collectingPackageRegexp, err := regexp.Compile(`^Collecting\s(\w[\w-.]+)`)
 	if err != nil {
 		return nil, err
 	}
-	downloadFileRegexp, err := regexp.Compile(`^\s\sDownloading\s[^\s]*\/([^\s]*)`)
+	downloadFileRegexp, err := regexp.Compile(`^\s*Downloading\s([^\s]*)\s\(`)
 	if err != nil {
 		return nil, err
 	}
-	installedPackagesRegexp, err := regexp.Compile(`^Requirement\salready\ssatisfied\:\s(\w[\w-\.]+)`)
+	installedPackagesRegexp, err := regexp.Compile(`^Requirement\salready\ssatisfied:\s(\w[\w-.]+)`)
 	if err != nil {
 		return nil, err
 	}
@@ -162,29 +187,13 @@ func (pm *PipModule) InstallWithLogParsing(cmd *utils.Cmd) (map[string]*entities
 			return pattern.Line, nil
 		},
 	}
-
 	// Execute command.
-	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(cmd, true, &dependencyNameParser, &dependencyFileParser, &installedPackagesParser)
+	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(pipCmd, true, &dependencyNameParser, &dependencyFileParser, &installedPackagesParser)
 	if err != nil {
 		return nil, err
 	}
 
-	dependenciesMap := make(map[string]*entities.Dependency, len(downloadedDependencies))
-	for depName, fileName := range downloadedDependencies {
-		dependenciesMap[depName] = &entities.Dependency{Id: fileName}
-	}
-
-	return dependenciesMap, nil
-}
-
-// Convert dependencyToFileMap to Dependencies map.
-func (pm *PipModule) getAllDependencies(dependencyToFileMap map[string]string) map[string]*entities.Dependency {
-	dependenciesMap := make(map[string]*entities.Dependency, len(dependencyToFileMap))
-	for depName, fileName := range dependencyToFileMap {
-		dependenciesMap[depName] = &entities.Dependency{Id: fileName}
-	}
-
-	return dependenciesMap
+	return downloadedDependencies, nil
 }
 
 func (pm *PipModule) SetName(name string) {
