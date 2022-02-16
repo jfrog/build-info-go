@@ -7,6 +7,7 @@ import (
 	"github.com/jfrog/gofrog/parallel"
 )
 
+// Executes traverseDependenciesFunc on all dependencies in dependenciesMap. Each dependency that gets true in return, is added to dependenciesList.
 func TraverseDependencies(dependenciesMap map[string]*entities.Dependency, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error), threads int) (dependenciesList []entities.Dependency, err error) {
 	producerConsumer := parallel.NewBounedRunner(threads, false)
 	dependenciesChan := make(chan *entities.Dependency)

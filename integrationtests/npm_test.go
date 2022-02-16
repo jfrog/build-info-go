@@ -10,20 +10,21 @@ import (
 	"time"
 
 	"github.com/jfrog/build-info-go/build"
+	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
 )
 
-var runNpmIntegrationTests = flag.Bool("npmIntegration", false, "Run the integration tests (in addition to the unit tests)")
-var logger = utils.NewDefaultLogger(utils.DEBUG)
+var runNpmIntegrationTests = flag.Bool("npmIntegration", false, "Run the npm integration tests, additionally to the unit tests")
+var logger = utils.NewDefaultLogger(utils.INFO)
 
 func TestBundledDependenciesList(t *testing.T) {
 	initNpmIntegrationTests(t)
 
 	path := getTestDir(t, "project1", false)
-	tmpProject1Path, p1Cleanup := buildutils.CreateTestProject(t, path)
+	tmpProject1Path, p1Cleanup := testdatautils.CreateTestProject(t, path)
 	defer p1Cleanup()
 	cacachePath := filepath.Join(tmpProject1Path, "tmpcache")
 	npmArgs := []string{"--cache=" + cacachePath}
@@ -45,12 +46,12 @@ func TestBundledDependenciesList(t *testing.T) {
 // This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
 // Seems like the compatibility upgrades may result in dependencies losing their integrity.
 // We try to get the integrity from the cache index.
-func TestDependencyWithNogIntegrity(t *testing.T) {
+func TestDependencyWithNoIntegrity(t *testing.T) {
 	initNpmIntegrationTests(t)
 
 	// Create the second npm project which has a transitive dependency without integrity (ansi-regex:5.0.0).
 	path := getTestDir(t, "project2", true)
-	tmpProject2Path, p2Cleanup := buildutils.CreateTestProject(t, path)
+	tmpProject2Path, p2Cleanup := testdatautils.CreateTestProject(t, path)
 	defer p2Cleanup()
 
 	// Run npm CI to create this special case where the 'ansi-regex:5.0.0' is missing the integrity.
@@ -81,7 +82,7 @@ func TestGenerateBuildInfoForNpm(t *testing.T) {
 	// Create npm project.
 	path := getTestDir(t, "project3", false)
 
-	tmpProjectPath, cleanup := buildutils.CreateTestProject(t, path)
+	tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, path)
 	defer cleanup()
 	npmArgs := []string{"--cache=" + filepath.Join(tmpProjectPath, "tmpcache")}
 
@@ -98,7 +99,7 @@ func TestGenerateBuildInfoForNpm(t *testing.T) {
 
 	// Verify results.
 	expectedBuildInfoJson := filepath.Join(path, "expected_npm_buildinfo.json")
-	expectedBuildInfo := buildutils.GetBuildInfo(t, expectedBuildInfoJson)
+	expectedBuildInfo := testdatautils.GetBuildInfo(t, expectedBuildInfoJson)
 	entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules)
 }
 
@@ -106,7 +107,7 @@ func TestGenerateBuildInfoForNpm(t *testing.T) {
 func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	initNpmIntegrationTests(t)
 	path := getTestDir(t, "project4", true)
-	tmpProject4Path, p1Cleanup := buildutils.CreateTestProject(t, path)
+	tmpProject4Path, p1Cleanup := testdatautils.CreateTestProject(t, path)
 	defer p1Cleanup()
 	cacachePath := filepath.Join(tmpProject4Path, "tmpcache")
 
@@ -129,7 +130,7 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	initNpmIntegrationTests(t)
 	path := getTestDir(t, "project1", false)
 	// Create the first npm project which containes peerDependencies, devDependencies & bundledDependencies
-	tmpProject1Path, p1Cleanup := buildutils.CreateTestProject(t, path)
+	tmpProject1Path, p1Cleanup := testdatautils.CreateTestProject(t, path)
 	defer p1Cleanup()
 	cachePath := filepath.Join(tmpProject1Path, "tmpcache")
 	npmArgs := []string{"--cache=" + cachePath}

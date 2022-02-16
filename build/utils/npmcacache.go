@@ -88,12 +88,13 @@ func (c *cacache) GetInfo(id string) (*cacacheInfo, error) {
 		return nil, err
 	}
 	if len(lines) != 2 {
-		return nil, errors.New("the file " + path + " have missing or invalid format")
+		return nil, errors.New("the index entry " + path + " in npm cache is empty")
 	}
 	// To parse the json content, split it from the rest.
 	indexData := strings.Split(lines[1], "\t")
+	// Format of each line line: hash \t entry-content (dependency info).
 	if len(indexData) != 2 {
-		return nil, errors.New("the file " + path + " at line 2 have missing or invalid format")
+		return nil, errors.New("the index entry " + path + " has an invalid format")
 	}
 	var result *cacacheInfo
 	return result, json.Unmarshal([]byte(indexData[1]), &result)

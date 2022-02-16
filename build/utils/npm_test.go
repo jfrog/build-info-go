@@ -86,9 +86,8 @@ func TestParseDependencies(t *testing.T) {
 		{"nub:1.0.0", [][]string{{"find:0.2.7", "root"}, {"root"}}},
 		{"shopify-liquid:1.d7.9", [][]string{{"xpm:0.1.1", "@jfrog/npm_scoped:1.0.0", "root"}}},
 	}
-	dependencies := make(map[string]*prototypeNode)
-	cacache := NewNpmCacache(filepath.Join("..", "testdata", "npm", "_cacache"))
-	err = parseDependencies([]byte(dependenciesJsonList), []string{"root"}, dependencies, cacache, npmLsDependencyParser, utils.NewDefaultLogger(utils.DEBUG))
+	dependencies := make(map[string]*dependencyInfo)
+	err = parseDependencies([]byte(dependenciesJsonList), []string{"root"}, dependencies,  npmLsDependencyParser, utils.NewDefaultLogger(utils.INFO))
 	if err != nil {
 		t.Error(err)
 	}
@@ -110,4 +109,32 @@ func TestParseDependencies(t *testing.T) {
 			t.Error("The expected dependency:", eDependency, "is missing from the actual dependencies list:\n", dependencies)
 		}
 	}
+}
+
+func TestAppendScopes(t *testing.T) {
+	var scopes = []struct {
+		a        []string
+		b        []string
+		expected []string
+	}{
+		{[]string{"item"}, []string{}, []string{"item"}},
+		{[]string{"item"}, []string{""}, []string{"item"}},
+		{[]string{}, []string{"item"}, []string{"item"}},
+		{[]string{"item1"}, []string{"item2"}, []string{"item1", "item2"}},
+		{[]string{"item"}, []string{"item"}, []string{"item"}},
+		{[]string{"item1","item2"}, []string{"item2"}, []string{"item1", "item2"}},
+		{[]string{"item1"}, []string{"item2","item1"}, []string{"item1", "item2"}},
+		{[]string{"item1","item1"}, []string{"item2"}, []string{"item1", "item2"}},
+		{[]string{"item1"}, []string{"item2","item2"}, []string{"item1", "item2"}},
+		{[]string{"item1","item2"}, []string{"item2","item1","item2"}, []string{"item1", "item2"}},
+		{[]string{"item1","item1"}, []string{"item1","item1","item1"}, []string{"item1"}},
+
+	}
+	for _, v := range scopes {
+		result := appendScopes(v.a, v.b)
+		if !assert.ElementsMatch(t, result, v.expected) {
+			t.Errorf("appendScopes(\"%s\",\"%s\") => '%s', want '%s'", v.a, v.b, result, v.expected)
+		}
+	}
+
 }

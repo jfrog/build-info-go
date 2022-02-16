@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
-	buildutils"github.com/jfrog/build-info-go/build/utils"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +44,7 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	assert.NoError(t, err)
 	// Create maven project
 	projectPath := filepath.Join(testdataDir, "maven", "project")
-	tmpProjectPath, cleanup := buildutils.CreateTestProject(t, projectPath)
+	tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, projectPath)
 	defer cleanup()
 	// Add maven project as module in build-info.
 	mavenModule, err := mavenBuild.AddMavenModule(tmpProjectPath)
