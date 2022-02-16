@@ -212,27 +212,6 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 	}
 }
 
-func filterCliFlags(allArgs []string, cliFlags []clitool.Flag) []string {
-	var filteredArgs []string
-	for _, arg := range allArgs {
-		if !hasFlag(cliFlags, arg) {
-			filteredArgs = append(filteredArgs, arg)
-		}
-	}
-	return filteredArgs
-}
-
-func hasFlag(flagsList []clitool.Flag, arg string) bool {
-	for _, flag := range flagsList {
-		for _, name := range flag.Names() {
-			if name == arg {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func printBuild(bld *build.Build, format string) error {
 	buildInfo, err := bld.ToBuildInfo()
 	if err != nil {
@@ -295,4 +274,25 @@ func extractStringFlag(args []string, flagName string) (flagValue string, filter
 		}
 	}
 	return
+}
+
+func filterCliFlags(allArgs []string, cliFlags []clitool.Flag) []string {
+	var filteredArgs []string
+	for _, arg := range allArgs {
+		if !hasFlag(cliFlags, arg) {
+			filteredArgs = append(filteredArgs, arg)
+		}
+	}
+	return filteredArgs
+}
+
+func hasFlag(flagsList []clitool.Flag, arg string) bool {
+	for _, flag := range flagsList {
+		for _, name := range flag.Names() {
+			if name == arg {
+				return true
+			}
+		}
+	}
+	return false
 }
