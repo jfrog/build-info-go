@@ -89,12 +89,20 @@ func (b *Build) AddNpmModule(srcPath string) (*NpmModule, error) {
 	return newNpmModule(srcPath, b)
 }
 
-// AddPipModule adds a Npm module to this Build. Pass srcPath as an empty string if the root of the Pip project is the working directory.
+// AddPipModule adds a Pip module to this Build. Pass srcPath as an empty string if the root of the Pip project is the working directory.
 func (b *Build) AddPipModule(srcPath string) (*PipModule, error) {
 	return newPipModule(srcPath, b)
 }
 
+// AddYarnModule adds a Yarn module to this Build. Pass srcPath as an empty string if the root of the Yarn project is the working directory.
+func (b *Build) AddYarnModule(srcPath string) (*YarnModule, error) {
+	return newYarnModule(srcPath, b)
+}
+
 func (b *Build) CollectEnv() error {
+	if !b.buildNameAndNumberProvided() {
+		return errors.New("a build name must be provided in order to collect environment variables")
+	}
 	envMap := make(map[string]string)
 	for _, e := range os.Environ() {
 		pair := strings.Split(e, "=")
@@ -122,6 +130,9 @@ func (b *Build) Clean() error {
 }
 
 func (b *Build) ToBuildInfo() (*entities.BuildInfo, error) {
+	if !b.buildNameAndNumberProvided() {
+		return nil, errors.New("a build name must be provided in order to generate build-info")
+	}
 	buildInfo, err := b.createBuildInfoFromPartials()
 	if err != nil {
 		return nil, err
@@ -345,6 +356,10 @@ func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
 	return details, nil
 }
 
+func (b *Build) buildNameAndNumberProvided() bool {
+	return len(b.buildName) > 0 && len(b.buildNumber) > 0
+}
+
 type partialModule struct {
 	moduleType   entities.ModuleType
 	artifacts    map[string]entities.Artifact
@@ -360,6 +375,11 @@ func extractBuildInfoData(partials entities.Partials) ([]entities.Module, entiti
 	issuesMap := make(map[string]*entities.AffectedIssue)
 	for _, partial := range partials {
 		moduleId := partial.ModuleId
+		// If type is not set but module has artifacts / dependencies, throw error.
+		if (partial.Artifacts != nil || partial.Dependencies != nil) && partial.ModuleType == "" {
+			return nil, nil, nil, entities.Issues{}, errors.New("module with artifacts or dependencies but no Type is not supported")
+		}
+		// Avoid adding redundant modules without type (for issues, env, etc)
 		if partialModules[moduleId] == nil && partial.ModuleType != "" {
 			partialModules[moduleId] = &partialModule{moduleType: partial.ModuleType}
 		}

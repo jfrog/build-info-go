@@ -3,11 +3,12 @@ package build
 import (
 	"errors"
 	"fmt"
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
 	"path/filepath"
 	"strings"
 	"unicode"
+
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
 )
 
 type GoModule struct {
@@ -35,6 +36,9 @@ func newGoModule(srcPath string, containingBuild *Build) (*GoModule, error) {
 }
 
 func (gm *GoModule) CalcDependencies() error {
+	if !gm.containingBuild.buildNameAndNumberProvided() {
+		return errors.New("a build name must be provided in order to collect the project's dependencies")
+	}
 	buildInfoDependencies, err := gm.loadDependencies()
 	if err != nil {
 		return err
@@ -51,6 +55,9 @@ func (gm *GoModule) SetName(name string) {
 }
 
 func (gm *GoModule) AddArtifacts(artifacts ...entities.Artifact) error {
+	if !gm.containingBuild.buildNameAndNumberProvided() {
+		return errors.New("a build name must be provided in order to add artifacts")
+	}
 	partial := &entities.Partial{ModuleId: gm.name, ModuleType: entities.Go, Artifacts: artifacts}
 	return gm.containingBuild.SavePartialBuildInfo(partial)
 }
@@ -157,12 +164,12 @@ func (gm *GoModule) getPackagePathIfExists(cachePath, encodedDependencyId string
 func populateZip(packageId, zipPath string) (zipDependency entities.Dependency, err error) {
 	// Zip file dependency for the build-info
 	zipDependency = entities.Dependency{Id: packageId}
-	checksums, err := utils.GetFileChecksums(zipPath)
+	md5, sha1, sha2, err := utils.GetFileChecksums(zipPath)
 	if err != nil {
 		return
 	}
 	zipDependency.Type = "zip"
-	zipDependency.Checksum = entities.Checksum{Sha1: checksums.Sha1, Md5: checksums.Md5, Sha256: checksums.Sha256}
+	zipDependency.Checksum = entities.Checksum{Sha1: sha1, Md5: md5, Sha256: sha2}
 	return
 }
 

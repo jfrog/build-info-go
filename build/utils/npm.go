@@ -5,15 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/buger/jsonparser"
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/gofrog/parallel"
-	"github.com/jfrog/gofrog/version"
 	"io/ioutil"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/buger/jsonparser"
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/parallel"
+	"github.com/jfrog/gofrog/version"
 )
 
 type TypeRestriction int
@@ -27,9 +29,9 @@ const (
 
 // CalculateDependenciesList gets an npm project's dependencies.
 // It sends each of them as a parameter to traverseDependenciesFunc and based on its return values, they will be returned from CalculateDependenciesList.
-func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error), threads int, log Log) (dependenciesList []entities.Dependency, err error) {
+func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error), threads int, log utils.Log) (dependenciesList []entities.Dependency, err error) {
 	if log == nil {
-		log = &NullLog{}
+		log = &utils.NullLog{}
 	}
 	dependenciesMap := make(map[string]*entities.Dependency)
 	if typeRestriction != ProdOnly {
@@ -43,6 +45,10 @@ func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, 
 		}
 	}
 
+	return TraverseDependencies(dependenciesMap, traverseDependenciesFunc, threads)
+}
+
+func TraverseDependencies(dependenciesMap map[string]*entities.Dependency, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error), threads int) (dependenciesList []entities.Dependency, err error) {
 	producerConsumer := parallel.NewBounedRunner(threads, false)
 	dependenciesChan := make(chan *entities.Dependency)
 	errorChan := make(chan error, 1)
@@ -87,7 +93,6 @@ func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, 
 	default:
 		return
 	}
-
 	return
 }
 
@@ -112,7 +117,7 @@ func createHandlerFunc(dep *entities.Dependency, dependenciesChan chan *entities
 
 // Run npm list and parse the returned JSON.
 // typeRestriction must be one of: 'dev' or 'prod'!
-func prepareDependencies(typeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, results *map[string]*entities.Dependency, log Log) error {
+func prepareDependencies(typeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, results *map[string]*entities.Dependency, log utils.Log) error {
 	// Run npm list
 	// Although this command can get --development as a flag (according to npm docs), it's not working on npm 6.
 	// Although this command can get --only=development as a flag (according to npm docs), it's not working on npm 7.
@@ -135,7 +140,7 @@ func prepareDependencies(typeRestriction, executablePath, srcPath, moduleId stri
 }
 
 // Parses npm dependencies recursively and adds the collected dependencies to the given dependencies map.
-func parseDependencies(data []byte, scope string, pathToRoot []string, dependencies *map[string]*entities.Dependency, log Log) error {
+func parseDependencies(data []byte, scope string, pathToRoot []string, dependencies *map[string]*entities.Dependency, log utils.Log) error {
 	return jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
 		depName := string(key)
 		ver, _, _, err := jsonparser.Get(data, depName, "version")
@@ -180,7 +185,7 @@ func scopeAlreadyExists(scope string, existingScopes []string) bool {
 	return false
 }
 
-func runList(typeRestriction, executablePath, srcPath string, npmArgs []string, log Log) (stdResult, errResult []byte, err error) {
+func runList(typeRestriction, executablePath, srcPath string, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
 	log.Debug("Running npm list command.")
 	cmdArgs := []string{"list"}
 	cmdArgs = append(cmdArgs, npmArgs...)
@@ -208,9 +213,9 @@ func runList(typeRestriction, executablePath, srcPath string, npmArgs []string, 
 	return
 }
 
-func GetNpmVersionAndExecPath(log Log) (*version.Version, string, error) {
+func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 	if log == nil {
-		log = &NullLog{}
+		log = &utils.NullLog{}
 	}
 	npmExecPath, err := GetExecutablePath("npm")
 	if err != nil {
@@ -263,7 +268,7 @@ func ReadPackageInfo(data []byte, npmVersion *version.Version) (*PackageInfo, er
 		return nil, err
 	}
 	// If npm older than v7, remove prefixes.
-	if npmVersion == nil || npmVersion.Compare("7.0.0") > 0 {
+	if npmVersion != nil && npmVersion.Compare("7.0.0") > 0 {
 		removeVersionPrefixes(parsedResult)
 	}
 	splitScopeFromName(parsedResult)
