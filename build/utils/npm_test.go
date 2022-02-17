@@ -219,8 +219,39 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	assert.True(t, entities.IsEqualDependencySlices(excpected, dependencies))
 }
 
+func TestNpmDevProdFlags(t *testing.T) {
+	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+	assert.NoError(t, err)
+	path, err := filepath.Abs(filepath.Join("..", "testdata"))
+	assert.NoError(t, err)
+	testDependencyScopes := []struct {
+		scope     string
+		totalDeps int
+	}{
+		{"", 201},
+		{"--prod", 55},
+		{"--dev", 150},
+	}
+	for _, entry := range testDependencyScopes {
+
+		projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project1", false, npmVersion)
+		defer cleanup()
+		cacachePath := filepath.Join(projectPath, "tmpcache")
+		npmArgs := []string{"--cache=" + cacachePath, entry.scope}
+
+		// Install dependencies in the npm project.
+		_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
+		assert.NoError(t, err)
+
+		// Calculate dependencies with scope.
+		dependencies, err := CalculateDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, logger)
+		assert.NoError(t, err)
+		assert.Len(t, dependencies, entry.totalDeps)
+	}
+}
+
 func TestGetConfigCacheNpmIntegration(t *testing.T) {
-	var innerLogger = utils.NewDefaultLogger(utils.DEBUG)
+	innerLogger := utils.NewDefaultLogger(utils.DEBUG)
 	npmVersion, _, err := GetNpmVersionAndExecPath(innerLogger)
 	assert.NoError(t, err)
 

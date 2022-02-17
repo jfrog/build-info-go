@@ -31,7 +31,7 @@ jobs:
           # npm v6
           node-version: 14
           check-latest: true
-      - name: npm-test-node14
+      - name: Tests
         run: go test -v -race -timeout 0 -cover "github.com/jfrog/build-info-go/build/utils" "github.com/jfrog/build-info-go/build"
       - name: Setup Node.js V16.9
         uses: actions/setup-node@v2
@@ -39,7 +39,7 @@ jobs:
           # npm v7
           node-version: 16.9
           check-latest: true
-      - name: npm-test-node16.9
+      - name: Tests
         run: go test -v -race -timeout 0 -cover "github.com/jfrog/build-info-go/build/utils" "github.com/jfrog/build-info-go/build"
       - name: Setup Node.js V16
         uses: actions/setup-node@v2
@@ -47,5 +47,5 @@ jobs:
           # npm v8
           node-version: 16
           check-latest: true
-      - name: npm-test-node16
+      - name: Tests
         run: go test -v -race -timeout 0 -cover "github.com/jfrog/build-info-go/build/utils" "github.com/jfrog/build-info-go/build"

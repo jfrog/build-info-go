@@ -302,7 +302,13 @@ func (nc NpmCmd) String() string {
 func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
 	log.Debug("Running npm " + npmCmd.String() + " command.")
 	cmdArgs := []string{npmCmd.String()}
-	cmdArgs = append(cmdArgs, npmArgs...)
+	tmpArgs := make([]string, 0)
+	for i := 0; i < len(npmArgs); i++ {
+		if strings.TrimSpace(npmArgs[i]) != "" {
+			tmpArgs = append(tmpArgs, npmArgs[i])
+		}
+	}
+	cmdArgs = append(cmdArgs, tmpArgs...)
 
 	command := exec.Command(executablePath, cmdArgs...)
 	command.Dir = srcPath
