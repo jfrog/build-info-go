@@ -1,0 +1,31 @@
+{
+  "name": "bundle-dependencies",
+  "description": "Generates bundledDependencies package.json.",
+  "version": "1.0.2",
+  "main": "./dist/index.js",
+  "bin": "./dist/bin/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gajus/bundle-dependencies"
+  },
+  "keywords": [
+    "npm",
+    "bundle",
+    "dependencies"
+  ],
+  "author": {
+    "name": "JFROG",
+    "email": "JFROG@JFROG.com",
+    "url": "http://JFROG.com"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "yargs": "^4.1.0"
+  },
+  "devDependencies": {
+    "pragmatist": "^3.0.9"
+  },
+  "bundledDependencies": [
+    "yargs"
+  ]
+}

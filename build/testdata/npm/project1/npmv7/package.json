@@ -1,0 +1,23 @@
+{
+  "name": "build-info-go-tests",
+  "version": "v1.0.0",
+  "description": "test package",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "debug": "4.3.3",
+    "xml": "1.0.1",
+    "yargs": "4.1.0"
+  },
+  "devDependencies": {
+    "@types/mocha": "^9.0.0",
+    "nyc": "^15.1.0"
+  },
+  "bundledDependencies": [
+    "yargs"
+  ]
+}

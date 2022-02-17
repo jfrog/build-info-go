@@ -1,10 +1,12 @@
 package utils
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFindFileInDirAndParents(t *testing.T) {
@@ -27,4 +29,28 @@ func TestFindFileInDirAndParents(t *testing.T) {
 	// Look for a file that doesn't exist
 	_, err = FindFileInDirAndParents(projectRoot, "notexist")
 	assert.Error(t, err)
+}
+
+func TestReadNLines(t *testing.T) {
+	wd, err := os.Getwd()
+	assert.NoError(t, err)
+	path := filepath.Join(wd, "testdata", "oneline")
+	lines,err := ReadNLines(path,2)
+	assert.NoError(t, err)
+	assert.Len(t,lines,1)
+	assert.True(t,strings.HasPrefix(lines[0],""))
+
+	path = filepath.Join(wd, "testdata", "twolines")
+	lines,err = ReadNLines(path,2)
+	assert.NoError(t, err)
+	assert.Len(t,lines,2)
+	assert.True(t,strings.HasPrefix(lines[1],"781"))
+	assert.True(t,strings.HasSuffix(lines[1],":true}}}"))
+
+	path = filepath.Join(wd, "testdata", "threelines")
+	lines,err = ReadNLines(path,2)
+	assert.NoError(t, err)
+	assert.Len(t,lines,2)
+	assert.True(t,strings.HasPrefix(lines[1],"781"))
+	assert.True(t,strings.HasSuffix(lines[1],":true}}}"))
 }

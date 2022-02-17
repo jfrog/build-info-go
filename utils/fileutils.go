@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -446,4 +448,54 @@ func IsPathSymlink(path string) bool {
 
 func IsFileSymlink(file os.FileInfo) bool {
 	return file.Mode()&os.ModeSymlink != 0
+}
+
+// Parses the JSON-encoded data and stores the result in the value pointed to by 'loadTarget'.
+// filePath - Path to json file.
+// loadTarget - Pointer to a struct
+func Unmarshal(filePath string, loadTarget interface{}) (err error) {
+	var jsonFile *os.File
+	jsonFile, err = os.Open(filePath)
+	if err != nil {
+		return
+	}
+	defer func() {
+		closeErr := jsonFile.Close()
+		if err == nil {
+			err = closeErr
+		}
+	}()
+	var byteValue []byte
+	byteValue, err = ioutil.ReadAll(jsonFile)
+	if err != nil {
+		return
+	}
+	return json.Unmarshal(byteValue, &loadTarget)
+}
+
+// strip '\n' or read until EOF, return error if read error
+// readNLines reads up to 'total' number of lines separated by \n.
+func ReadNLines(path string, total int) (lines []string, err error) {
+	reader, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		deferErr := reader.Close()
+		if err == nil {
+			err = deferErr
+		}
+	}()
+	r := bufio.NewReader(reader)
+	for i := 0; i < total; i++ {
+		line, _, err := r.ReadLine()
+		lines = append(lines, string(line))
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return lines, nil
 }

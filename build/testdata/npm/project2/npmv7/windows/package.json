@@ -1,0 +1,52 @@
+{
+  "name": "jfrogtest",
+  "version": "5.2.0",
+  "description": "jfrogtest client for Node.js",
+  "files": [
+    "dist/"
+  ],
+  "homepage": "https://jfrogtest.net",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "cross-os _test ",
+    "build": "tsc",
+    "build:test": "tsc -p tsconfig.test.json",
+    "watch": "tsc --watch",
+    "watch:test": "tsc && tsc --watch -p tsconfig.test.json",
+    "test:debug": "cross-os _test:debug",
+    "lint": "tslint src/**/*.ts && tslint test/**/*.ts",
+    "check-exports": "node ./scripts/reportMissingTopLevelExports.js",
+    "check-imports": "node scripts/clearGlobalExports.js && tsc -p tsconfig.imports-check.json",
+    "coverage": "tsc -p tsconfig.test.json && copy test\\Assets\\* .test\\test\\Assets && nyc --exclude=.test/test/** --reporter=html --reporter=text mocha .test\\test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jfrogtest/jfrogtest-nodejs-client"
+  },
+  "bugs": {
+    "email": "support@jfrogtest.net",
+    "url": "http://issues.jfrogtest.com"
+  },
+  "contributors": [
+    "jfrogtest"
+  ],
+  "engines": {
+    "node": ">=6.0.0"
+  },
+  "keywords": [
+    "jfrogtest",
+    "jfrogtest-client",
+    "typescript",
+    "node",
+    "nodejs",
+    "nosql"
+  ],
+  "author": "jfrogtest",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/mocha": "^9.0.0",
+    "mocha": "^9.1.3",
+    "nyc": "^15.1.0"
+  }
+}

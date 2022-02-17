@@ -5,9 +5,9 @@ __metadata:
   version: 5
   cacheKey: 8
 
-"jfrog-cli-tests@workspace:.":
+"build-info-go-tests@workspace:.":
   version: 0.0.0-use.local
-  resolution: "jfrog-cli-tests@workspace:."
+  resolution: "build-info-go-tests@workspace:."
   dependencies:
     json: 9.0.6
     xml: 1.0.1

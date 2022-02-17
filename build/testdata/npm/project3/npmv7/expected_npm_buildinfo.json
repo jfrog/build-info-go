@@ -1,0 +1,44 @@
+{
+    "name": "build-info-go-test-npm",
+    "number": "2",
+    "agent": {},
+    "buildAgent": {
+        "name": "GENERIC"
+    },
+    "modules": [
+        {
+            "type": "npm",
+            "id": "build-info-go-tests:v1.0.0",
+            "dependencies": [
+                {
+                    "id": "xml:1.0.1",
+                    "scopes": [
+                        "prod"
+                    ],
+                    "requestedBy": [
+                        [
+                            "build-info-go-tests:v1.0.0"
+                        ]
+                    ],
+                    "sha1": "78ba72020029c5bc87b8a81a3cfcd74b4a2fc1e5",
+                    "md5": "cd0657e89d77ec585fe29c9b568d16c9",
+                    "sha256": "38032bd701fa20427b2ee31ed55e6761ce1a881a6eabcd90005ebe74ab04a623"
+                },
+                {
+                    "id": "json:9.0.6",
+                    "scopes": [
+                        "dev"
+                    ],
+                    "requestedBy": [
+                        [
+                            "build-info-go-tests:v1.0.0"
+                        ]
+                    ],
+                    "sha1": "7972c2a5a48a42678db2730c7c2c4ee6e4e24585",
+                    "md5": "6569c5e23ea8e451a2ab10a66b5814ee",
+                    "sha256": "6e8bfb5cbb7e7ee53231d3e3439b2ab1de58caed81b8abb30b9e1168e8ac01e2"
+                }
+            ]
+        }
+    ]
+}
