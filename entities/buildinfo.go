@@ -413,6 +413,10 @@ func (d *Dependency) IsEqual(other Dependency) bool {
 	return d.Id == other.Id && d.Type == other.Type && d.Checksum.IsEqual(other.Checksum) && utils.IsEqualSlices(d.Scopes, other.Scopes) && utils.IsEqual2DSlices(d.RequestedBy, other.RequestedBy)
 }
 
+func IsEqualDependencySlices(a, b []Dependency) bool {
+	return IsEqualModuleSlices([]Module{{Dependencies: a}}, []Module{{Dependencies: b}})
+}
+
 func isEqualDependencySlices(a, b []Dependency) bool {
 	visitedIndexes := make(map[int]bool)
 	for _, aEl := range a {

@@ -2,13 +2,14 @@ package build
 
 import (
 	"errors"
+	"path/filepath"
+	"reflect"
+	"testing"
+
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/parallel"
 	"github.com/stretchr/testify/assert"
-	"path/filepath"
-	"reflect"
-	"testing"
 )
 
 func TestYarnDependencyName(t *testing.T) {
@@ -114,7 +115,7 @@ func TestGenerateBuildInfoForYarnProject(t *testing.T) {
 	buildInfo, err := yarnBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 2, 1, "jfrog-cli-tests:v1.0.0", entities.Npm, false)
+	validateModule(t, buildInfo.Modules[0], 2, 1, "build-info-go-tests:v1.0.0", entities.Npm, false)
 }
 
 func TestCollectDepsForYarnProjectWithTraverse(t *testing.T) {
@@ -145,7 +146,7 @@ func TestCollectDepsForYarnProjectWithTraverse(t *testing.T) {
 	buildInfo, err := yarnBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 1, 0, "jfrog-cli-tests:v1.0.0", entities.Npm, true)
+	validateModule(t, buildInfo.Modules[0], 1, 0, "build-info-go-tests:v1.0.0", entities.Npm, true)
 	assert.Equal(t, "json:9.0.6", buildInfo.Modules[0].Dependencies[0].Id)
 	assert.Equal(t, "test123", buildInfo.Modules[0].Dependencies[0].Sha1)
 }
@@ -195,5 +196,5 @@ func TestBuildYarnProjectWithArgs(t *testing.T) {
 	buildInfo, err := yarnBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 3, 0, "jfrog-cli-tests:v1.0.0", entities.Npm, false)
+	validateModule(t, buildInfo.Modules[0], 3, 0, "build-info-go-tests:v1.0.0", entities.Npm, false)
 }
