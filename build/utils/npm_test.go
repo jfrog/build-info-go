@@ -220,7 +220,8 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 }
 
 func TestGetConfigCacheNpmIntegration(t *testing.T) {
-	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+	var innerLogger = utils.NewDefaultLogger(utils.DEBUG)
+	npmVersion, _, err := GetNpmVersionAndExecPath(innerLogger)
 	assert.NoError(t, err)
 
 	// Create the first npm project which contains peerDependencies, devDependencies & bundledDependencies
@@ -232,10 +233,10 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	npmArgs := []string{"--cache=" + cachePath}
 
 	// Install dependencies in the npm project.
-	_, _, err = RunNpmCmd("npm", projectPath, Install, npmArgs, logger)
+	_, _, err = RunNpmCmd("npm", projectPath, Install, npmArgs, innerLogger)
 	assert.NoError(t, err)
 
-	configCache, err := GetNpmConfigCache(projectPath, "npm", npmArgs, logger)
+	configCache, err := GetNpmConfigCache(projectPath, "npm", npmArgs, innerLogger)
 	assert.NoError(t, err)
 	assert.Equal(t, filepath.Join(cachePath, "_cacache"), configCache)
 
@@ -246,7 +247,7 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 		}()
 	}
 	assert.NoError(t, os.Setenv("npm_config_cache", cachePath))
-	configCache, err = GetNpmConfigCache(projectPath, "npm", []string{}, logger)
+	configCache, err = GetNpmConfigCache(projectPath, "npm", []string{}, innerLogger)
 	assert.NoError(t, err)
 	assert.Equal(t, filepath.Join(cachePath, "_cacache"), configCache)
 }
