@@ -98,11 +98,11 @@ func GetDependenciesList(projectDir string, log Log) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
+	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}:{{.Version}}{{end}}", "all"), log)
 	if err != nil {
 		// Errors occurred while running "go list". Run again and this time ignore errors (with '-e')
 		log.Warn("Errors occurred while building the Go dependency tree. The dependency tree may be incomplete:" + err.Error())
-		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"), log)
+		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}:{{.Version}}{{end}}", "all"), log)
 		if err != nil {
 			return nil, err
 		}
