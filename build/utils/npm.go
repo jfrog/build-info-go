@@ -9,157 +9,199 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/buger/jsonparser"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
-	"github.com/jfrog/gofrog/parallel"
 	"github.com/jfrog/gofrog/version"
 )
 
-type TypeRestriction int
-
-const (
-	DefaultRestriction TypeRestriction = iota
-	All
-	DevOnly
-	ProdOnly
-)
-
 // CalculateDependenciesList gets an npm project's dependencies.
-// It sends each of them as a parameter to traverseDependenciesFunc and based on its return values, they will be returned from CalculateDependenciesList.
-func CalculateDependenciesList(typeRestriction TypeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error), threads int, log utils.Log) (dependenciesList []entities.Dependency, err error) {
+func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (dependenciesList []entities.Dependency, err error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
-	dependenciesMap := make(map[string]*entities.Dependency)
-	if typeRestriction != ProdOnly {
-		if err = prepareDependencies("dev", executablePath, srcPath, moduleId, npmArgs, &dependenciesMap, log); err != nil {
-			return
-		}
-	}
-	if typeRestriction != DevOnly {
-		if err = prepareDependencies("prod", executablePath, srcPath, moduleId, npmArgs, &dependenciesMap, log); err != nil {
-			return
-		}
-	}
-
-	return TraverseDependencies(dependenciesMap, traverseDependenciesFunc, threads)
-}
-
-func TraverseDependencies(dependenciesMap map[string]*entities.Dependency, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error), threads int) (dependenciesList []entities.Dependency, err error) {
-	producerConsumer := parallel.NewBounedRunner(threads, false)
-	dependenciesChan := make(chan *entities.Dependency)
-	errorChan := make(chan error, 1)
-
-	go func() {
-		defer producerConsumer.Done()
-		for _, dep := range dependenciesMap {
-			handlerFunc := createHandlerFunc(dep, dependenciesChan, traverseDependenciesFunc)
-			_, err = producerConsumer.AddTaskWithError(handlerFunc, func(err error) {
-				// Write the error to the channel, but don't wait if the channel buffer is full.
-				select {
-				case errorChan <- err:
-				default:
-					return
-				}
-			})
-			if err != nil {
-				return
-			}
-		}
-	}()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		for dep := range dependenciesChan {
-			dependenciesList = append(dependenciesList, *dep)
-		}
-		wg.Done()
-	}()
-
-	producerConsumer.Run()
+	// Calculate npm dependency tree using 'npm ls...'.
+	dependenciesMap, err := CalculateDependenciesMap(executablePath, srcPath, moduleId, npmArgs, log)
 	if err != nil {
-		return
+		return nil, err
 	}
-	close(dependenciesChan)
-	wg.Wait()
+	// Get local npm cache.
+	cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmArgs, log)
+	if err != nil {
+		return nil, err
+	}
+	cacache := NewNpmCacache(cacheLocation)
+	var missingPeerDeps, missingBundledDeps []string
+	for _, dep := range dependenciesMap {
+		if dep.npmLsDependency.Integrity == "" && dep.npmLsDependency.InBundle {
+			missingBundledDeps = append(missingBundledDeps, dep.Id)
+			continue
+		}
+		if dep.npmLsDependency.Integrity == "" && len(dep.PeerMissing) > 0 {
+			missingPeerDeps = append(missingPeerDeps, dep.Id)
+			continue
+		}
+		dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity, log)
+		if err != nil {
+			// Here, we don't know where is the tarball (or if it is actually exists in the filesystem) so we can't calculate the dependency checksum.
+			// This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
+			// Seems like the compatibility upgrades may result in dependencies losing their integrity.
+			// We use the integrity to get's the dependencies tarball
+			log.Error("couldn't calculate checksum for : '" + dep.Id + "'. Hint: Try to delete 'node_models' and/or 'package-lock.json'.")
+			return nil, err
+		}
 
-	// Read the error from the channel, but don't wait if the channel buffer is empty.
-	select {
-	case err = <-errorChan:
-	default:
-		return
+		dependenciesList = append(dependenciesList, dep.Dependency)
+	}
+	if len(missingPeerDeps) > 0 {
+		printMissingDependenciesWarning("peerDependency", missingPeerDeps, log)
+	}
+	if len(missingBundledDeps) > 0 {
+		printMissingDependenciesWarning("bundleDependencies", missingBundledDeps, log)
 	}
 	return
 }
 
-// createHandlerFunc creates a function that runs traverseDependenciesFunc (if it's not nil) with dep as its parameter.
-// If traverseDependenciesFunc returns false, then dep will not be saved in the module's dependencies list.
-func createHandlerFunc(dep *entities.Dependency, dependenciesChan chan *entities.Dependency, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error)) func(threadId int) error {
-	return func(threadId int) error {
-		var err error
-		saveDep := true
-		if traverseDependenciesFunc != nil {
-			saveDep, err = traverseDependenciesFunc(dep)
-			if err != nil {
-				return err
-			}
-		}
-		if saveDep {
-			dependenciesChan <- dep
-		}
-		return nil
-	}
+type dependencyInfo struct {
+	entities.Dependency
+	*npmLsDependency
 }
 
-// Run npm list and parse the returned JSON.
-// typeRestriction must be one of: 'dev' or 'prod'!
-func prepareDependencies(typeRestriction, executablePath, srcPath, moduleId string, npmArgs []string, results *map[string]*entities.Dependency, log utils.Log) error {
-	// Run npm list
-	// Although this command can get --development as a flag (according to npm docs), it's not working on npm 6.
-	// Although this command can get --only=development as a flag (according to npm docs), it's not working on npm 7.
-	data, errData, err := runList(typeRestriction, executablePath, srcPath, npmArgs, log)
+// Run 'npm list ...' command and parse the returned result to create a dependencies map of.
+// The dependencies map looks like name:version -> entities.Dependency
+func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (map[string]*dependencyInfo, error) {
+	dependenciesMap := make(map[string]*dependencyInfo)
+
+	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
+	npmArgs = append(npmArgs, "--json", "--all", "--long")
+	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
+	if err != nil {
+		found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
+		if isDirExistsErr != nil {
+			return nil, isDirExistsErr
+		}
+		if !found {
+			return nil, errors.New("node_modules isn't found in '" + srcPath + "'. Hint: Restore node_modules folder by running npm install or npm ci.")
+		}
+		log.Warn("npm list command failed with error:", err.Error())
+	}
 	if len(errData) > 0 {
 		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
 	}
+	npmVersion, err := GetNpmVersion(executablePath, log)
 	if err != nil {
-		return errors.New(fmt.Sprintf("npm list command failed with an error: %s", err.Error()))
+		return nil, err
 	}
+	parseFunc := parseNpmLsDependencyFunc(npmVersion)
 
-	// Parse the dependencies json object
-	return jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
+	// Parse the dependencies json object.
+	return dependenciesMap, jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
 		if string(key) == "dependencies" {
-			err = parseDependencies(value, typeRestriction, []string{moduleId}, results, log)
+			err = parseDependencies(value, []string{moduleId}, dependenciesMap, parseFunc, log)
 		}
 		return err
 	})
 }
 
+func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
+	versionData, _, err := RunNpmCmd(executablePath, "", Version, nil, log)
+	if err != nil {
+		return nil, err
+	}
+	return version.NewVersion(string(versionData)), nil
+}
+
+// npm >=7 ls results for a single dependency
+type npmLsDependency struct {
+	Name      string
+	Version   string
+	Integrity string
+	InBundle  bool
+	Dev       bool
+	// Missing peer dependency in npm version 7/8
+	Missing bool
+	// Problems with missing peer dependency in npm version 7/8
+	Problems []string
+	// Missing  peer dependency in npm version 6
+	// Bound to 'legacyNpmLsDependency' struct
+	PeerMissing []*peerMissing
+}
+
+// npm 6 ls results for a single dependency
+type legacyNpmLsDependency struct {
+	Name        string
+	Version     string
+	Integrity   string `json:"_integrity,omitempty"`
+	InBundle    bool   `json:"_inBundle,omitempty"`
+	Dev         bool   `json:"_development,omitempty"`
+	PeerMissing []*peerMissing
+}
+
+type peerMissing struct {
+	RequiredBy string
+	Requires   string
+}
+
+func (lnld *legacyNpmLsDependency) toNpmLsDependency() *npmLsDependency {
+	return &npmLsDependency{
+		Name:        lnld.Name,
+		Version:     lnld.Version,
+		Integrity:   lnld.Integrity,
+		InBundle:    lnld.InBundle,
+		Dev:         lnld.Dev,
+		PeerMissing: lnld.PeerMissing,
+	}
+}
+
+// Return name:version of a dependency
+func (nld *npmLsDependency) id() string {
+	return nld.Name + ":" + nld.Version
+}
+
+func (nld *npmLsDependency) getScopes() (scopes []string) {
+	if nld.Dev {
+		scopes = append(scopes, "dev")
+	} else {
+		scopes = append(scopes, "prod")
+	}
+	if strings.HasPrefix(nld.Name, "@") {
+		splitValues := strings.Split(nld.Name, "/")
+		if len(splitValues) > 2 {
+			scopes = append(scopes, splitValues[0])
+		}
+	}
+	return
+}
+
 // Parses npm dependencies recursively and adds the collected dependencies to the given dependencies map.
-func parseDependencies(data []byte, scope string, pathToRoot []string, dependencies *map[string]*entities.Dependency, log utils.Log) error {
+func parseDependencies(data []byte, pathToRoot []string, dependencies map[string]*dependencyInfo, parseFunc func(data []byte) (*npmLsDependency, error), log utils.Log) error {
 	return jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-		depName := string(key)
-		ver, _, _, err := jsonparser.Get(data, depName, "version")
-		if err != nil && err != jsonparser.KeyPathNotFoundError {
+		if string(value) == "{}" {
+			// Skip missing optional dependency.
+			log.Debug(fmt.Sprintf("%s is missing. This may be the result of an optional dependency.", key))
+			return nil
+		}
+		npmLsDependency, err := parseFunc(value)
+		if err != nil {
 			return err
-		} else if err == jsonparser.KeyPathNotFoundError {
-			log.Debug(fmt.Sprintf("%s dependency will not be included in the build-info, because the 'npm ls' command did not return its version.\nThe reason why the version wasn't returned may be because the package is a 'peerdependency', which was not manually installed.\n'npm install' does not download 'peerdependencies' automatically. It is therefore okay to skip this dependency.", depName))
 		}
-		depVersion := string(ver)
-		depId := depName + ":" + depVersion
-		if err == nil {
-			appendDependency(dependencies, depId, scope, pathToRoot)
+		if npmLsDependency.Version == "" {
+			if npmLsDependency.Missing || npmLsDependency.Problems != nil {
+				// Skip missing peer dependency.
+				log.Debug(fmt.Sprintf("%s is missing, this may be the result of an peer dependency.", key))
+				return nil
+			}
+			return errors.New("failed to parse '" + string(value) + "' from npm ls output.")
 		}
-		transitive, _, _, err := jsonparser.Get(data, depName, "dependencies")
+		appendDependency(dependencies, npmLsDependency, pathToRoot, log)
+		transitive, _, _, err := jsonparser.Get(value, "dependencies")
 		if err != nil && err.Error() != "Key path not found" {
 			return err
 		}
 		if len(transitive) > 0 {
-			if err := parseDependencies(transitive, scope, append([]string{depId}, pathToRoot...), dependencies, log); err != nil {
+			if err := parseDependencies(transitive, append([]string{npmLsDependency.id()}, pathToRoot...), dependencies, parseFunc, log); err != nil {
 				return err
 			}
 		}
@@ -167,31 +209,106 @@ func parseDependencies(data []byte, scope string, pathToRoot []string, dependenc
 	})
 }
 
-func appendDependency(dependencies *map[string]*entities.Dependency, depId, scope string, pathToRoot []string) {
-	if (*dependencies)[depId] == nil {
-		(*dependencies)[depId] = &entities.Dependency{Id: depId, Scopes: []string{scope}}
-	} else if !scopeAlreadyExists(scope, (*dependencies)[depId].Scopes) {
-		(*dependencies)[depId].Scopes = append((*dependencies)[depId].Scopes, scope)
+func parseNpmLsDependencyFunc(npmVersion *version.Version) func(data []byte) (*npmLsDependency, error) {
+	// If npm older than v7, use legacy struct for npm ls output.
+	if npmVersion.Compare("7.0.0") > 0 {
+		return legacyNpmLsDependencyParser
 	}
-	(*dependencies)[depId].RequestedBy = append((*dependencies)[depId].RequestedBy, pathToRoot)
+	return npmLsDependencyParser
 }
 
-func scopeAlreadyExists(scope string, existingScopes []string) bool {
-	for _, existingScope := range existingScopes {
-		if existingScope == scope {
-			return true
+func legacyNpmLsDependencyParser(data []byte) (*npmLsDependency, error) {
+	legacyNpmLsDependency := new(legacyNpmLsDependency)
+	err := json.Unmarshal(data, &legacyNpmLsDependency)
+	if err != nil {
+		return nil, err
+	}
+	return legacyNpmLsDependency.toNpmLsDependency(), nil
+}
+
+func npmLsDependencyParser(data []byte) (*npmLsDependency, error) {
+	npmLsDependency := new(npmLsDependency)
+	return npmLsDependency, json.Unmarshal(data, &npmLsDependency)
+}
+
+func appendDependency(dependencies map[string]*dependencyInfo, dep *npmLsDependency, pathToRoot []string, log utils.Log) {
+	depId := dep.id()
+	scopes := dep.getScopes()
+	if dependencies[depId] == nil {
+		dependency := &dependencyInfo{
+			Dependency:      entities.Dependency{Id: depId},
+			npmLsDependency: dep,
+		}
+
+		dependencies[depId] = dependency
+	}
+	if dependencies[depId].Integrity == "" {
+		dependencies[depId].Integrity = dep.Integrity
+	}
+	dependencies[depId].Scopes = appendScopes(dependencies[depId].Scopes, scopes)
+	dependencies[depId].RequestedBy = append(dependencies[depId].RequestedBy, pathToRoot)
+	return
+}
+
+// Lookup for a dependency's tarball in npm cache, and calculate checksum.
+func calculateChecksum(cacache *cacache, name, version, integrity string, log utils.Log) (md5 string, sha1 string, sha256 string, err error) {
+	if integrity == "" {
+		var info *cacacheInfo
+		info, err = cacache.GetInfo(name + "@" + version)
+		if err != nil {
+			return
+		}
+		integrity = info.Integrity
+	}
+	var path string
+	path, err = cacache.GetTarball(integrity)
+	if err != nil {
+		return
+	}
+	return utils.GetFileChecksums(path)
+}
+
+// Merge two scopes and remove duplicates.
+func appendScopes(oldScopes []string, newScopes []string) []string {
+	contained := make(map[string]bool)
+	allScopes := []string{}
+	for _, scope := range append(oldScopes, newScopes...) {
+		if scope == "" {
+			continue
+		}
+		if !contained[scope] {
+			allScopes = append(allScopes, scope)
+		}
+		contained[scope] = true
+	}
+	return allScopes
+}
+
+type NpmCmd int
+
+const (
+	Ls NpmCmd = iota
+	Config
+	Install
+	Ci
+	Pack
+	Version
+)
+
+func (nc NpmCmd) String() string {
+	return [...]string{"ls", "config", "install", "ci", "pack", "-version"}[nc]
+}
+
+func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
+	log.Debug("Running npm " + npmCmd.String() + " command.")
+	cmdArgs := []string{npmCmd.String()}
+	tmpArgs := make([]string, 0)
+	for i := 0; i < len(npmArgs); i++ {
+		if strings.TrimSpace(npmArgs[i]) != "" {
+			tmpArgs = append(tmpArgs, npmArgs[i])
 		}
 	}
-	return false
-}
-
-func runList(typeRestriction, executablePath, srcPath string, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
-	log.Debug("Running npm list command.")
-	cmdArgs := []string{"list"}
-	cmdArgs = append(cmdArgs, npmArgs...)
-
-	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
-	cmdArgs = append(cmdArgs, "--json=true", "--all", "--"+typeRestriction)
+	cmdArgs = append(cmdArgs, tmpArgs...)
 
 	command := exec.Command(executablePath, cmdArgs...)
 	command.Dir = srcPath
@@ -201,15 +318,12 @@ func runList(typeRestriction, executablePath, srcPath string, npmArgs []string, 
 	command.Stderr = errBuffer
 	err = command.Run()
 	errResult = errBuffer.Bytes()
-	log.Debug("npm list error output is:\n" + string(errResult))
+	stdResult = outBuffer.Bytes()
 	if err != nil {
-		if _, ok := err.(*exec.ExitError); ok {
-			err = errors.New(err.Error())
-		}
+		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(cmdArgs, " ") + "'\nError output is:\n" + string(errResult) + "'\nCommand error: is:\n" + string(err.Error()))
 		return
 	}
-	stdResult = outBuffer.Bytes()
-	log.Debug("npm list standard output is:\n" + string(stdResult))
+	log.Debug("npm " + npmCmd.String() + " standard output is:\n" + string(stdResult))
 	return
 }
 
@@ -228,24 +342,12 @@ func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 
 	log.Debug("Using npm executable:", npmExecPath)
 
-	npmVersion, err := getVersion(npmExecPath)
+	versionData, _, err := RunNpmCmd(npmExecPath, "", Version, nil, log)
 	if err != nil {
 		return nil, "", err
 	}
-	log.Debug("Using npm version:", npmVersion)
-	return version.NewVersion(npmVersion), npmExecPath, nil
-}
-
-func getVersion(executablePath string) (string, error) {
-	command := exec.Command(executablePath, "-version")
-	buffer := bytes.NewBuffer([]byte{})
-	command.Stderr = buffer
-	command.Stdout = buffer
-	err := command.Run()
-	if _, ok := err.(*exec.ExitError); ok {
-		err = errors.New(err.Error())
-	}
-	return buffer.String(), err
+	log.Debug("Using npm version:", string(versionData))
+	return version.NewVersion(string(versionData)), npmExecPath, nil
 }
 
 type PackageInfo struct {
@@ -310,4 +412,31 @@ func splitScopeFromName(packageInfo *PackageInfo) {
 func removeVersionPrefixes(packageInfo *PackageInfo) {
 	packageInfo.Version = strings.TrimPrefix(packageInfo.Version, "v")
 	packageInfo.Version = strings.TrimPrefix(packageInfo.Version, "=")
+}
+
+// Return the npm cache path.
+// Default: Windows: %LocalAppData%\npm-cache, Posix: ~/.npm
+func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log utils.Log) (string, error) {
+	npmArgs = append([]string{"get", "cache"}, npmArgs...)
+	data, errData, err := RunNpmCmd(executablePath, srcPath, Config, append(npmArgs, "--json=false"), log)
+	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
+	if len(errData) > 0 {
+		log.Warn("error while running the command :'" + executablePath + " " + strings.Join(npmArgs, " ") + ":\n" + string(errData))
+	}
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("'%s %s' npm config command failed with an error: %s", executablePath, strings.Join(npmArgs, " "), err.Error()))
+	}
+	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
+	found, err := utils.IsDirExists(cachePath, true)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", errors.New("_cacache folder is not found in '" + cachePath + "'. Hint: Delete node_modules directory and run npm install or npm ci.")
+	}
+	return cachePath, nil
+}
+
+func printMissingDependenciesWarning(dependencyType string, dependencies []string, log utils.Log) {
+	log.Info("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\n It is therefore okay to skip this dependency: \n" + strings.Join(dependencies, "\n"))
 }

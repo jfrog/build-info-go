@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,11 +43,11 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
 	assert.NoError(t, err)
 	// Create maven project
-	projectPath, cleanup := copyTestProject(t, testdataDir)
-	assert.NoError(t, err)
+	projectPath := filepath.Join(testdataDir, "maven", "project")
+	tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, projectPath)
 	defer cleanup()
 	// Add maven project as module in build-info.
-	mavenModule, err := mavenBuild.AddMavenModule(projectPath)
+	mavenModule, err := mavenBuild.AddMavenModule(tmpProjectPath)
 	assert.NoError(t, err)
 	mavenModule.SetMavenGoals("compile", "--no-transfer-progress")
 	// Calculate build-info.
@@ -61,18 +63,6 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 		got, err := json.MarshalIndent(buildInfo.Modules, "", "  ")
 		assert.NoError(t, err)
 		t.Errorf("build-info don't match. want: \n %v\n got:\n%s\n", string(excpected), string(got))
-	}
-}
-
-func copyTestProject(t *testing.T, testdataDir string) (string, func()) {
-	projectRoot := filepath.Join(testdataDir, "maven", "project")
-	path, err := utils.CreateTempDir()
-	assert.NoError(t, err)
-	err = utils.CopyDir(projectRoot, path, true, nil)
-	assert.NoError(t, err)
-
-	return path, func() {
-		assert.NoError(t, utils.RemoveTempDir(path))
 	}
 }
 
