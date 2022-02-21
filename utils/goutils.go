@@ -39,11 +39,10 @@ func RunGo(goArg []string, repoUrl string) error {
 		return err
 	}
 
-	goCmd, err := NewCmd("go", goArg)
+	goCmd, err := NewCmd("go", "", goArg)
 	if err != nil {
 		return err
 	}
-	goCmd.Command = goArg
 	err = prepareGlobalRegExp()
 	if err != nil {
 		return err
@@ -148,7 +147,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 			}
 		}()
 	}
-	goCmd, err := NewCmd("go", commandArgs)
+	goCmd, err := NewCmd("go", "", commandArgs)
 	if err != nil {
 		return "", err
 	}
@@ -163,17 +162,18 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 		return "", err
 	}
 	var executionError error
+	var errorOut string
 	if performPasswordMask {
-		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
+		output, errorOut, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
 	} else {
-		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
+		output, errorOut, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	}
 	if len(output) != 0 {
 		log.Debug(output)
 	}
 	if executionError != nil {
 		// If the command fails, the mod stays the same, therefore, don't need to be restored.
-		errorString := fmt.Sprintf("Failed running Go command: 'go %s' in %s with error: '%s'", strings.Join(commandArgs, " "), projectDir, executionError.Error())
+		errorString := fmt.Sprintf("Failed running Go command: 'go %s' in %s with error: '%s - %s'", strings.Join(commandArgs, " "), projectDir, executionError.Error(), errorOut)
 		return "", errors.New(errorString)
 	}
 
@@ -232,7 +232,7 @@ func getParsedGoVersion() (*version.Version, error) {
 }
 
 func getGoVersion() (string, error) {
-	goCmd, err := NewCmd("go", []string{"version"})
+	goCmd, err := NewCmd("go", "version", nil)
 	if err != nil {
 		return "", err
 	}
@@ -293,7 +293,7 @@ func GetGoModCachePath() (string, error) {
 
 // GetGOPATH returns the location of the GOPATH
 func getGOPATH() (string, error) {
-	goCmd, err := NewCmd("go", []string{"env", "GOPATH"})
+	goCmd, err := NewCmd("go", "env", []string{"GOPATH"})
 	if err != nil {
 		return "", err
 	}

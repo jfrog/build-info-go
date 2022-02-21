@@ -217,7 +217,7 @@ func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
-	npmExecPath, err := GetExecutablePath("npm")
+	npmExecPath, err := utils.GetExecutablePath("npm")
 	if err != nil {
 		return nil, "", err
 	}

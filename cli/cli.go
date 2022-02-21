@@ -202,7 +202,37 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
-				err = pipModule.RunCommandAndCollectDependencies(filteredArgs)
+				err = pipModule.RunCommandAndCollectDependencies(filteredArgs[0], filteredArgs[1:])
+				if err != nil {
+					return
+				}
+				return printBuild(bld, context.String(formatFlag))
+			},
+		},
+		{
+			Name:      "pipenv",
+			Usage:     "Generate build-info for an pipenv project",
+			UsageText: "bi pipenv",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("pipenv-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
+				pipenvModule, err := bld.AddPipenvModule("")
+				if err != nil {
+					return
+				}
+				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
+				err = pipenvModule.RunCommandAndCollectDependencies(filteredArgs[0], filteredArgs[1:])
 				if err != nil {
 					return
 				}

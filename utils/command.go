@@ -44,24 +44,30 @@ func GetExecutablePath(executableName string) (executablePath string, err error)
 
 type Cmd struct {
 	Executable string
-	Command    []string
+	CmdName    string
+	CmdArgs    []string
 	Dir        string
 	StrWriter  io.WriteCloser
 	ErrWriter  io.WriteCloser
 }
 
-func NewCmd(executableName string, cmdArgs []string) (*Cmd, error) {
+func NewCmd(executableName, cmdName string, cmdArgs []string) (*Cmd, error) {
 	execPath, err := GetExecutablePath(executableName)
 	if err != nil {
 		return nil, err
 	}
-	return &Cmd{Executable: execPath, Command: cmdArgs}, nil
+	return &Cmd{Executable: execPath, CmdName: cmdName, CmdArgs: cmdArgs}, nil
 }
 
 func (config *Cmd) GetCmd() (cmd *exec.Cmd) {
 	var cmdStr []string
 	cmdStr = append(cmdStr, config.Executable)
-	cmdStr = append(cmdStr, config.Command...)
+	if config.CmdName != "" {
+		cmdStr = append(cmdStr, config.CmdName)
+	}
+	if len(config.CmdArgs) > 0 {
+		cmdStr = append(cmdStr, config.CmdArgs...)
+	}
 	cmd = exec.Command(cmdStr[0], cmdStr[1:]...)
 	cmd.Dir = config.Dir
 	return

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jfrog/build-info-go/utils/pythonutils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -89,9 +90,14 @@ func (b *Build) AddNpmModule(srcPath string) (*NpmModule, error) {
 	return newNpmModule(srcPath, b)
 }
 
-// AddPipModule adds a Pip module to this Build. Pass srcPath as an empty string if the root of the Pip project is the working directory.
-func (b *Build) AddPipModule(srcPath string) (*PipModule, error) {
-	return newPipModule(srcPath, b)
+// AddPipModule adds a Python module to this Build. Pass srcPath as an empty string if the root of the pip project is the working directory.
+func (b *Build) AddPipModule(srcPath string) (*PythonModule, error) {
+	return newPythonModule(srcPath, pythonutils.Pip, b)
+}
+
+// AddPipenvModule adds a Python module to this Build. Pass srcPath as an empty string if the root of the pipenv project is the working directory.
+func (b *Build) AddPipenvModule(srcPath string) (*PythonModule, error) {
+	return newPythonModule(srcPath, pythonutils.Pipenv, b)
 }
 
 // AddYarnModule adds a Yarn module to this Build. Pass srcPath as an empty string if the root of the Yarn project is the working directory.
