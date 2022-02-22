@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	Pip    = "Pip"
-	Pipenv = "Pipenv"
+	Pip    = "pip"
+	Pipenv = "pipenv"
 )
 
 type PythonTool string
