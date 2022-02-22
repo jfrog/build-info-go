@@ -52,12 +52,16 @@ func RunGo(goArg []string, repoUrl string) error {
 	if err != nil {
 		return err
 	}
+	errorOut := ""
 	if performPasswordMask {
-		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
+		_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
 	} else {
-		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
+		_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	}
-	return err
+	if err != nil {
+		return errors.New(fmt.Sprintf("Failed running 'go %s' command with error: '%s - %s'", strings.Join(goArg, " "), err.Error(), errorOut))
+	}
+	return nil
 }
 
 // Runs 'go list -m' command and returns module name
