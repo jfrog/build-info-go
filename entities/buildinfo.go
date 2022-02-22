@@ -14,8 +14,9 @@ import (
 type ModuleType string
 
 const (
-	TimeFormat         = "2006-01-02T15:04:05.000-0700"
-	BuildInfoEnvPrefix = "buildInfo.env."
+	TimeFormat           = "2006-01-02T15:04:05.000-0700"
+	BuildInfoEnvPrefix   = "buildInfo.env."
+	RequestedByMaxLength = 10
 
 	// Build type
 	Build ModuleType = "build"
