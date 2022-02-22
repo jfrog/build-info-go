@@ -34,24 +34,22 @@ func newPythonModule(srcPath string, tool pythonutils.PythonTool, containingBuil
 
 func (pm *PythonModule) RunCommandAndCollectDependencies(cmdName string, commandArgs []string) error {
 	if cmdName == "install" {
-		downloadedDependencies, err := pm.InstallWithLogParsing(cmdName, commandArgs)
+		downloadedFilesMap, err := pm.InstallWithLogParsing(cmdName, commandArgs)
 		if err != nil {
 			return err
 		}
-		dependenciesMap := make(map[string]entities.Dependency, len(downloadedDependencies))
-		var dependenciesGraph map[string][]string
-		var topLevelPackagesList []string
 		pythonExecPath, err := utils.GetExecutablePath("python")
 		if err != nil {
 			return err
 		}
-		dependenciesGraph, topLevelPackagesList, err = pythonutils.GetPythonDependencies(pm.tool, pythonExecPath, pm.localDependenciesPath)
+		dependenciesGraph, topLevelPackagesList, err := pythonutils.GetPythonDependencies(pm.tool, pythonExecPath, pm.localDependenciesPath)
 		if err != nil {
 			return err
 		}
-		for depId, _ := range dependenciesGraph {
+		dependenciesMap := make(map[string]entities.Dependency, len(dependenciesGraph))
+		for depId := range dependenciesGraph {
 			depName := depId[0:strings.Index(depId, ":")]
-			dependenciesMap[depName] = entities.Dependency{Id: downloadedDependencies[depName]}
+			dependenciesMap[depId] = entities.Dependency{Id: downloadedFilesMap[depName]}
 		}
 		// Get package-name.
 		packageName, pkgNameErr := pythonutils.GetPackageNameFromSetuppy(pythonExecPath)
@@ -67,16 +65,15 @@ func (pm *PythonModule) RunCommandAndCollectDependencies(cmdName string, command
 				pm.containingBuild.logger.Debug(fmt.Sprintf("Using build name: %s as module name.", pm.name))
 			}
 		}
-		err = pythonutils.UpdateDepsRequestedBy(dependenciesMap, dependenciesGraph, topLevelPackagesList, packageName, pm.name)
-		if err != nil {
-			return err
-		}
-
 		if pm.updateDepsChecksumInfoFunc != nil {
 			err = pm.updateDepsChecksumInfoFunc(dependenciesMap, pm.srcPath)
 			if err != nil {
 				return err
 			}
+		}
+		err = pythonutils.UpdateDepsIdsAndRequestedBy(dependenciesMap, dependenciesGraph, topLevelPackagesList, packageName, pm.name)
+		if err != nil {
+			return err
 		}
 		buildInfoModule := entities.Module{Id: pm.name, Type: entities.Python, Dependencies: dependenciesMapToList(dependenciesMap)}
 		buildInfo := &entities.BuildInfo{Modules: []entities.Module{buildInfoModule}}

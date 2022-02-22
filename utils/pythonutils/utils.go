@@ -3,7 +3,6 @@ package pythonutils
 import (
 	"errors"
 	buildinfo "github.com/jfrog/build-info-go/entities"
-	"strings"
 )
 
 const (
@@ -74,7 +73,7 @@ func GetPythonDependencies(tool PythonTool, pythonExecPath, localDependenciesPat
 // topLevelPackagesList - The direct dependencies
 // packageName          - The resolved package name of the Python project, may be empty if we couldn't resolve it
 // moduleName           - The input module name from the user, or the packageName
-func UpdateDepsRequestedBy(dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string, topLevelPackagesList []string, packageName, moduleName string) error {
+func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string, topLevelPackagesList []string, packageName, moduleName string) error {
 	if packageName == "" {
 		// Projects without setup.py
 		dependenciesGraph[moduleName] = topLevelPackagesList
@@ -83,14 +82,14 @@ func UpdateDepsRequestedBy(dependenciesMap map[string]buildinfo.Dependency, depe
 		dependenciesGraph[moduleName] = dependenciesGraph[packageName]
 	}
 	rootModule := buildinfo.Dependency{Id: moduleName, RequestedBy: [][]string{{}}}
-	updateDepsRequestedBy(moduleName, rootModule, dependenciesMap, dependenciesGraph)
+	updateDepsIdsAndRequestedBy(moduleName, rootModule, dependenciesMap, dependenciesGraph)
 	return nil
 }
 
-func updateDepsRequestedBy(parentName string, parentDependency buildinfo.Dependency, dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string) {
+func updateDepsIdsAndRequestedBy(parentName string, parentDependency buildinfo.Dependency, dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string) {
 	for _, childName := range dependenciesGraph[parentName] {
-		childKey := childName[0:strings.Index(childName, ":")]
-		if childDep, ok := dependenciesMap[childKey]; ok {
+		//childKey := childName[0:strings.Index(childName, ":")]
+		if childDep, ok := dependenciesMap[childName]; ok {
 			if childDep.NodeHasLoop() {
 				continue
 			}
@@ -98,10 +97,11 @@ func updateDepsRequestedBy(parentName string, parentDependency buildinfo.Depende
 				childRequestedBy := append([]string{parentName}, parentRequestedBy...)
 				childDep.RequestedBy = append(childDep.RequestedBy, childRequestedBy)
 			}
+			childDep.Id = childName
 			// Reassign map entry with new entry copy
-			dependenciesMap[childKey] = childDep
+			dependenciesMap[childName] = childDep
 			// Run recursive call on child dependencies
-			updateDepsRequestedBy(childName, childDep, dependenciesMap, dependenciesGraph)
+			updateDepsIdsAndRequestedBy(childName, childDep, dependenciesMap, dependenciesGraph)
 		}
 	}
 }
