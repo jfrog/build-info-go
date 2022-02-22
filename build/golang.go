@@ -176,12 +176,12 @@ func populateZip(packageId, zipPath string) (zipDependency entities.Dependency, 
 func populateRequestedByField(parentId string, parentRequestedBy [][]string, dependenciesMap map[string]entities.Dependency, dependenciesGraph map[string][]string) {
 	for _, childName := range dependenciesGraph[parentId] {
 		if childDep, ok := dependenciesMap[childName]; ok {
+			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= entities.RequestedByMaxLength {
+				continue
+			}
 			for _, requestedBy := range parentRequestedBy {
 				childRequestedBy := append([]string{parentId}, requestedBy...)
 				childDep.RequestedBy = append(childDep.RequestedBy, childRequestedBy)
-			}
-			if childDep.NodeHasLoop() {
-				continue
 			}
 			// Reassign map entry with new entry copy
 			dependenciesMap[childName] = childDep
