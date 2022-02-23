@@ -90,7 +90,7 @@ func updateDepsIdsAndRequestedBy(parentName string, parentDependency buildinfo.D
 	for _, childName := range dependenciesGraph[parentName] {
 		//childKey := childName[0:strings.Index(childName, ":")]
 		if childDep, ok := dependenciesMap[childName]; ok {
-			if childDep.NodeHasLoop() {
+			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= buildinfo.RequestedByMaxLength {
 				continue
 			}
 			for _, parentRequestedBy := range parentDependency.RequestedBy {
