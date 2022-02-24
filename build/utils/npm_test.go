@@ -163,7 +163,9 @@ func TestBundledDependenciesList(t *testing.T) {
 	// Check peer dependency is not found.
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	assert.True(t, entities.IsEqualDependencySlices(excpected, dependencies))
+	if !entities.IsEqualDependencySlices(excpected, dependencies) {
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+	}
 }
 
 // This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
@@ -191,7 +193,9 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	// Verify results.
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	assert.True(t, entities.IsEqualDependencySlices(excpected, dependencies))
+	if !entities.IsEqualDependencySlices(excpected, dependencies) {
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+	}
 }
 
 // A project built differently for each operating system.
@@ -216,7 +220,9 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	// Verify results.
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	assert.True(t, entities.IsEqualDependencySlices(excpected, dependencies))
+	if !entities.IsEqualDependencySlices(excpected, dependencies) {
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+	}
 }
 
 func TestNpmDevProdFlags(t *testing.T) {
