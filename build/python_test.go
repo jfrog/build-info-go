@@ -1,7 +1,6 @@
 package build
 
 import (
-	"encoding/json"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 	"path/filepath"
@@ -61,10 +60,6 @@ func testGenerateBuildInfoForPython(t *testing.T, pythonTool pythonutils.PythonT
 	expectedBuildInfoJson := filepath.Join(projectPath, expectedResultsJson)
 	expectedBuildInfo := testdatautils.GetBuildInfo(t, expectedBuildInfoJson)
 	if !entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules) {
-		expected, err := json.MarshalIndent(expectedBuildInfo.Modules, "", "  ")
-		assert.NoError(t, err)
-		got, err := json.MarshalIndent(buildInfo.Modules, "", "  ")
-		assert.NoError(t, err)
-		t.Errorf("build-info don't match. want: \n %v\n got:\n%s\n", string(expected), string(got))
+		testdatautils.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
 	}
 }
