@@ -46,5 +46,7 @@ func TestGenerateBuildInfoForNpm(t *testing.T) {
 	// Verify results.
 	expectedBuildInfoJson := filepath.Join(projectPath, "expected_npm_buildinfo.json")
 	expectedBuildInfo := testdatautils.GetBuildInfo(t, expectedBuildInfoJson)
-	entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules)
+	if !entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules) {
+		testdatautils.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
+	}
 }

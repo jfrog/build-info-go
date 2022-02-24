@@ -65,3 +65,11 @@ func CreateNpmTest(t *testing.T, testdataPath, projectDirName string, withOsInPa
 	path := filepath.Join(testdataPath, "npm", projectDirName, npmVersionDir)
 	return CreateTestProject(t, path)
 }
+
+func PrintBuildInfoMismatch(t *testing.T, expected, actual []entities.Module) {
+	excpectedStr, err := json.MarshalIndent(expected, "", "  ")
+	assert.NoError(t, err)
+	actualStr, err := json.MarshalIndent(actual, "", "  ")
+	assert.NoError(t, err)
+	t.Errorf("build-info don't match. want: \n %v\n got:\n%s\n", string(excpectedStr), string(actualStr))
+}
