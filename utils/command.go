@@ -42,14 +42,13 @@ func (config *Command) RunWithOutput() (data []byte, err error) {
 
 func (config *Command) GetCmd() (cmd *exec.Cmd) {
 	var cmdStr []string
-	cmdStr = append(cmdStr, config.Executable)
 	if config.CmdName != "" {
 		cmdStr = append(cmdStr, config.CmdName)
 	}
 	if config.CmdArgs != nil && len(config.CmdArgs) > 0 {
 		cmdStr = append(cmdStr, config.CmdArgs...)
 	}
-	cmd = exec.Command(cmdStr[0], cmdStr[1:]...)
+	cmd = exec.Command(config.Executable, cmdStr...)
 	cmd.Dir = config.Dir
 	return
 }

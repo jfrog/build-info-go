@@ -58,33 +58,28 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	if err != nil {
 		return nil, nil, err
 	}
-	var cmdArgs []string
-	pythonExecutablePath, err := exec.LookPath("python3")
+	cmdName := ""
+	pythonExecutable, err := exec.LookPath("python3")
 	if err != nil {
 		return nil, nil, err
 	}
-	if pythonExecutablePath == "" && runtime.GOOS == "windows" {
+
+	if pythonExecutable == "" && runtime.GOOS == "windows" {
 		// If the OS is Windows try using Py Launcher: 'py -3'
-		pythonExecutablePath, err = exec.LookPath("py")
+		pythonExecutable, err = exec.LookPath("py")
 		if err != nil {
 			return nil, nil, err
 		}
-		if pythonExecutablePath != "" {
-			cmdArgs = append(cmdArgs, "-3")
+		if pythonExecutable != "" {
+			cmdName = "-3"
 		}
 	}
-	// Try using 'python' path if python3 couldn't been found
-	if pythonExecutablePath == "" {
-		pythonExecutablePath, err = exec.LookPath("python")
-		if err != nil {
-			return nil, nil, err
-		}
-		if pythonExecutablePath == "" {
-			return nil, nil, errors.New("Could not find python executable in PATH")
-		}
+	// Try using 'python' if 'python3' couldn't been found
+	if pythonExecutable == "" {
+		pythonExecutable = "python"
 	}
 	// Run pipdeptree script
-	pipdeptreeCmd := utils.NewCommand(pythonExecutablePath, pipDependencyMapScriptPath, []string{"--json"})
+	pipdeptreeCmd := utils.NewCommand(pythonExecutable, cmdName, []string{pipDependencyMapScriptPath, "--json"})
 	pipdeptreeCmd.Dir = srcPath
 	output, err := pipdeptreeCmd.RunWithOutput()
 	if err != nil {
