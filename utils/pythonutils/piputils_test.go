@@ -1,9 +1,8 @@
 package pythonutils
 
 import (
-	"github.com/jfrog/build-info-go/utils"
+	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	"github.com/stretchr/testify/assert"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -43,32 +42,15 @@ var moduleNameTestProvider = []struct {
 }
 
 func TestDetermineModuleName(t *testing.T) {
-	pythonExecutablePath, err := utils.GetExecutablePath("python")
-	assert.NoError(t, err)
-
 	for _, test := range moduleNameTestProvider {
 		t.Run(strings.Join([]string{test.projectName, test.moduleName}, "/"), func(t *testing.T) {
-			// Prepare test
-			restoreCwd := changeToProjectDir(t, test.projectName)
+			tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, filepath.Join("..", "testdata", "pip", test.projectName))
+			defer cleanup()
 
 			// Determine module name
-			packageName, err := GetPackageNameFromSetuppy(pythonExecutablePath)
+			packageName, err := GetPackageNameFromSetuppy(tmpProjectPath)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedPackageName, packageName)
-
-			// Cleanup
-			restoreCwd()
 		})
-	}
-}
-
-func changeToProjectDir(t *testing.T, projectName string) func() {
-	cwd, err := os.Getwd()
-	assert.NoError(t, err)
-
-	testdataDir := filepath.Join("..", "testdata", "pip", projectName)
-	assert.NoError(t, os.Chdir(testdataDir))
-	return func() {
-		assert.NoError(t, os.Chdir(cwd))
 	}
 }
