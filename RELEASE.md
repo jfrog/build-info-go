@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.1.0 (February 24, 2022)
+- Support for yarn
+- Add checksum to npm dependencies
+- Bug fix - Limit the total for RequestedBy, to avoid out-of-memory errors
+
 ## 1.0.1 (January 30, 2022)
 - Bug fix - Gradle - Avoid potential ambigues task error
 - Bug fix - Go - Change Go dependency ID syntax to '{dependencyName}:v{dependecyVersion)
