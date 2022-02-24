@@ -7,6 +7,7 @@ import (
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/build-info-go/utils/pythonutils"
 	"github.com/pkg/errors"
 	clitool "github.com/urfave/cli/v2"
 	"os"
@@ -197,16 +198,20 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 						err = e
 					}
 				}()
-				pipModule, err := bld.AddPipModule("")
+				pythonModule, err := bld.AddPythonModule("", pythonutils.Pip)
 				if err != nil {
 					return
 				}
 				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
-				err = pipModule.RunCommandAndCollectDependencies(filteredArgs[0], filteredArgs[1:])
-				if err != nil {
-					return
+				if filteredArgs[0] == "install" {
+					err = pythonModule.RunInstallAndCollectDependencies(filteredArgs[1:])
+					if err != nil {
+						return
+					}
+					return printBuild(bld, context.String(formatFlag))
+				} else {
+					return errors.New(fmt.Sprintf("Build info dependencies collection for %s command is not supported.", filteredArgs[0]))
 				}
-				return printBuild(bld, context.String(formatFlag))
 			},
 		},
 		{
@@ -227,16 +232,20 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 						err = e
 					}
 				}()
-				pipenvModule, err := bld.AddPipenvModule("")
+				pythonModule, err := bld.AddPythonModule("", pythonutils.Pipenv)
 				if err != nil {
 					return
 				}
 				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
-				err = pipenvModule.RunCommandAndCollectDependencies(filteredArgs[0], filteredArgs[1:])
-				if err != nil {
-					return
+				if filteredArgs[0] == "install" {
+					err = pythonModule.RunInstallAndCollectDependencies(filteredArgs[1:])
+					if err != nil {
+						return
+					}
+					return printBuild(bld, context.String(formatFlag))
+				} else {
+					return errors.New(fmt.Sprintf("Build info dependencies collection for %s command is not supported.", filteredArgs[0]))
 				}
-				return printBuild(bld, context.String(formatFlag))
 			},
 		},
 	}

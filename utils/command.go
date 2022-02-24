@@ -5,44 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strings"
 )
 
-func RunCommand(execPath string, cmdArgs []string) error {
-	_, err := RunCommandWithOutput(execPath, cmdArgs)
-	return err
-}
-
-func RunCommandWithOutput(execPath string, cmdArgs []string) (data []byte, err error) {
-	cmd := exec.Command(execPath, cmdArgs...)
-	cmd.Env = os.Environ()
-	//	log.Debug(fmt.Sprintf("running command: %v", cmd.Args))
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Failed running command: '%s %s' with error: %s - %s", execPath, strings.Join(cmdArgs, " "), err.Error(), stderr.String()))
-	}
-	return stdout.Bytes(), nil
-}
-
-func GetExecutablePath(executableName string) (executablePath string, err error) {
-	executablePath, err = exec.LookPath(executableName)
-	if err != nil {
-		return
-	}
-	if executablePath == "" {
-		return "", errors.New("Could not find the" + executableName + " executable in the system PATH")
-	}
-
-	return executablePath, nil
-}
-
-type Cmd struct {
+type Command struct {
 	Executable string
 	CmdName    string
 	CmdArgs    []string
@@ -51,21 +18,35 @@ type Cmd struct {
 	ErrWriter  io.WriteCloser
 }
 
-func NewCmd(executableName, cmdName string, cmdArgs []string) (*Cmd, error) {
-	execPath, err := GetExecutablePath(executableName)
-	if err != nil {
-		return nil, err
-	}
-	return &Cmd{Executable: execPath, CmdName: cmdName, CmdArgs: cmdArgs}, nil
+func NewCommand(executable, cmdName string, cmdArgs []string) *Command {
+	return &Command{Executable: executable, CmdName: cmdName, CmdArgs: cmdArgs}
 }
 
-func (config *Cmd) GetCmd() (cmd *exec.Cmd) {
+func (config *Command) RunWithOutput() (data []byte, err error) {
+	cmd := config.GetCmd()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("Failed running command: '%s %s' with error: %s - %s",
+			cmd.Path,
+			strings.Join(cmd.Args, " "),
+			err.Error(),
+			stderr.String(),
+		))
+	}
+	return stdout.Bytes(), nil
+}
+
+func (config *Command) GetCmd() (cmd *exec.Cmd) {
 	var cmdStr []string
 	cmdStr = append(cmdStr, config.Executable)
 	if config.CmdName != "" {
 		cmdStr = append(cmdStr, config.CmdName)
 	}
-	if len(config.CmdArgs) > 0 {
+	if config.CmdArgs != nil && len(config.CmdArgs) > 0 {
 		cmdStr = append(cmdStr, config.CmdArgs...)
 	}
 	cmd = exec.Command(cmdStr[0], cmdStr[1:]...)
@@ -73,14 +54,14 @@ func (config *Cmd) GetCmd() (cmd *exec.Cmd) {
 	return
 }
 
-func (config *Cmd) GetEnv() map[string]string {
+func (config *Command) GetEnv() map[string]string {
 	return map[string]string{}
 }
 
-func (config *Cmd) GetStdWriter() io.WriteCloser {
+func (config *Command) GetStdWriter() io.WriteCloser {
 	return config.StrWriter
 }
 
-func (config *Cmd) GetErrWriter() io.WriteCloser {
+func (config *Command) GetErrWriter() io.WriteCloser {
 	return config.ErrWriter
 }

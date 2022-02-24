@@ -53,18 +53,46 @@ func RunVirtualEnv() (venvPath string, err error) {
 }
 
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
-func getPipDependencies(pythonExecPath, dependenciesDirName string) (map[string][]string, []string, error) {
+func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]string, []string, error) {
 	pipDependencyMapScriptPath, err := GetDepTreeScriptPath(dependenciesDirName)
 	if err != nil {
 		return nil, nil, err
 	}
-	data, err := utils.RunCommandWithOutput(pythonExecPath, []string{pipDependencyMapScriptPath, "--json"})
+	var cmdArgs []string
+	pythonExecutablePath, err := exec.LookPath("python3")
+	if err != nil {
+		return nil, nil, err
+	}
+	if pythonExecutablePath == "" && runtime.GOOS == "windows" {
+		// If the OS is Windows try using Py Launcher: 'py -3'
+		pythonExecutablePath, err = exec.LookPath("py")
+		if err != nil {
+			return nil, nil, err
+		}
+		if pythonExecutablePath != "" {
+			cmdArgs = append(cmdArgs, "-3")
+		}
+	}
+	// Try using 'python' path if python3 couldn't been found
+	if pythonExecutablePath == "" {
+		pythonExecutablePath, err = exec.LookPath("python")
+		if err != nil {
+			return nil, nil, err
+		}
+		if pythonExecutablePath == "" {
+			return nil, nil, errors.New("Could not find python executable in PATH")
+		}
+	}
+	// Run pipdeptree script
+	pipdeptreeCmd := utils.NewCommand(pythonExecutablePath, pipDependencyMapScriptPath, []string{"--json"})
+	pipdeptreeCmd.Dir = srcPath
+	output, err := pipdeptreeCmd.RunWithOutput()
 	if err != nil {
 		return nil, nil, err
 	}
 	// Parse into array.
 	packages := make([]pythonDependencyPackage, 0)
-	if err = json.Unmarshal(data, &packages); err != nil {
+	if err = json.Unmarshal(output, &packages); err != nil {
 		return nil, nil, err
 	}
 
@@ -110,15 +138,15 @@ func writeScriptIfNeeded(targetDirPath, scriptName string) error {
 	return nil
 }
 
-func GetPackageNameFromSetuppy(pythonExecutablePath string) (string, error) {
-	filePath, err := getSetupPyFilePath()
+func GetPackageNameFromSetuppy(srcPath string) (string, error) {
+	filePath, err := getSetupPyFilePath(srcPath)
 	if err != nil || filePath == "" {
 		// Error was returned or setup.py does not exist in directory.
 		return "", err
 	}
 
 	// Extract package name from setup.py.
-	packageName, err := ExtractPackageNameFromSetupPy(filePath, pythonExecutablePath)
+	packageName, err := ExtractPackageNameFromSetupPy(filePath)
 	if err != nil {
 		// If setup.py egg_info command failed we use build name as module name and continue to pip-install execution
 		return "", errors.New("Couldn't determine module-name after running the 'egg_info' command: " + err.Error())
@@ -128,13 +156,8 @@ func GetPackageNameFromSetuppy(pythonExecutablePath string) (string, error) {
 
 // Look for 'setup.py' file in current work dir.
 // If found, return its absolute path.
-func getSetupPyFilePath() (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	filePath := filepath.Join(wd, "setup.py")
+func getSetupPyFilePath(srcPath string) (string, error) {
+	filePath := filepath.Join(srcPath, "setup.py")
 	// Check if setup.py exists.
 	validPath, err := utils.IsFileExists(filePath, false)
 	if err != nil {
@@ -148,9 +171,9 @@ func getSetupPyFilePath() (string, error) {
 }
 
 // Get the project-name by running 'egg_info' command on setup.py and extracting it from 'PKG-INFO' file.
-func ExtractPackageNameFromSetupPy(setuppyFilePath, pythonExecutablePath string) (string, error) {
+func ExtractPackageNameFromSetupPy(setuppyFilePath string) (string, error) {
 	// Execute egg_info command and return PKG-INFO content.
-	content, err := getEgginfoPkginfoContent(setuppyFilePath, pythonExecutablePath)
+	content, err := getEgginfoPkginfoContent(setuppyFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -161,7 +184,7 @@ func ExtractPackageNameFromSetupPy(setuppyFilePath, pythonExecutablePath string)
 
 // Run egg-info command on setup.py, the command generates metadata files.
 // Return the content of the 'PKG-INFO' file.
-func getEgginfoPkginfoContent(setuppyFilePath, pythonExecutablePath string) (output []byte, err error) {
+func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error) {
 	eggBase, err := utils.CreateTempDir()
 	if err != nil {
 		return nil, err
@@ -174,6 +197,13 @@ func getEgginfoPkginfoContent(setuppyFilePath, pythonExecutablePath string) (out
 	}()
 
 	// Run python 'egg_info --egg-base <eggBase>' command.
+	pythonExecutablePath, err := exec.LookPath("python")
+	if err != nil {
+		return nil, err
+	}
+	if pythonExecutablePath == "" {
+		return nil, errors.New("Could not find python executable in PATH")
+	}
 	if err = exec.Command(pythonExecutablePath, setuppyFilePath, "egg_info", "--egg-base", eggBase).Run(); err != nil {
 		return nil, err
 	}

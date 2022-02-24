@@ -1,0 +1,45 @@
+{
+  "name": "build-info-go-test-pipenv",
+  "number": "1645714664",
+  "agent": {},
+  "buildAgent": {
+    "name": "GENERIC"
+  },
+  "modules": [
+    {
+      "type": "python",
+      "id": "testModuleName:1.0.0",
+      "dependencies": [
+        {
+          "id": "pexpect:4.8.0",
+          "type": "whl",
+          "requestedBy": [
+            [
+              "testModuleName:1.0.0"
+            ]
+          ]
+        },
+        {
+          "id": "ptyprocess:0.7.0",
+          "type": "whl",
+          "requestedBy": [
+            [
+              "pexpect:4.8.0",
+              "testModuleName:1.0.0"
+            ]
+          ]
+        },
+        {
+          "id": "toml:0.10.2",
+          "type": "whl",
+          "requestedBy": [
+            [
+              "testModuleName:1.0.0"
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "started": "2022-02-24T16:57:44.021+0200"
+}

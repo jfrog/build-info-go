@@ -3,6 +3,7 @@ package pythonutils
 import (
 	"errors"
 	buildinfo "github.com/jfrog/build-info-go/entities"
+	"strings"
 )
 
 const (
@@ -55,12 +56,12 @@ type dependency struct {
 	InstalledVersion string `json:"installed_version,omitempty"`
 }
 
-func GetPythonDependencies(tool PythonTool, pythonExecPath, localDependenciesPath string) (dependenciesGraph map[string][]string, topLevelDependencies []string, err error) {
+func GetPythonDependencies(tool PythonTool, srcPath, localDependenciesPath string) (dependenciesGraph map[string][]string, topLevelDependencies []string, err error) {
 	switch tool {
 	case Pip:
-		return getPipDependencies(pythonExecPath, localDependenciesPath)
+		return getPipDependencies(srcPath, localDependenciesPath)
 	case Pipenv:
-		return getPipenvDependencies()
+		return getPipenvDependencies(srcPath)
 	default:
 		return nil, nil, errors.New(string(tool) + " commands are not supported.")
 	}
@@ -73,7 +74,7 @@ func GetPythonDependencies(tool PythonTool, pythonExecPath, localDependenciesPat
 // topLevelPackagesList - The direct dependencies
 // packageName          - The resolved package name of the Python project, may be empty if we couldn't resolve it
 // moduleName           - The input module name from the user, or the packageName
-func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string, topLevelPackagesList []string, packageName, moduleName string) error {
+func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string, topLevelPackagesList []string, packageName, moduleName string) {
 	if packageName == "" {
 		// Projects without setup.py
 		dependenciesGraph[moduleName] = topLevelPackagesList
@@ -83,12 +84,12 @@ func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency
 	}
 	rootModule := buildinfo.Dependency{Id: moduleName, RequestedBy: [][]string{{}}}
 	updateDepsIdsAndRequestedBy(moduleName, rootModule, dependenciesMap, dependenciesGraph)
-	return nil
+	return
 }
 
 func updateDepsIdsAndRequestedBy(parentName string, parentDependency buildinfo.Dependency, dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string) {
-	for _, childName := range dependenciesGraph[parentName] {
-		//childKey := childName[0:strings.Index(childName, ":")]
+	for _, childId := range dependenciesGraph[parentName] {
+		childName := childId[0:strings.Index(childId, ":")]
 		if childDep, ok := dependenciesMap[childName]; ok {
 			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= buildinfo.RequestedByMaxLength {
 				continue
@@ -97,11 +98,22 @@ func updateDepsIdsAndRequestedBy(parentName string, parentDependency buildinfo.D
 				childRequestedBy := append([]string{parentName}, parentRequestedBy...)
 				childDep.RequestedBy = append(childDep.RequestedBy, childRequestedBy)
 			}
-			childDep.Id = childName
+			// Set dependency type
+			if childDep.Type == "" {
+				fileType := ""
+				if i := strings.LastIndex(childDep.Id, ".tar."); i != -1 {
+					fileType = childDep.Id[i+1:]
+				} else if i := strings.LastIndex(childDep.Id, "."); i != -1 {
+					fileType = childDep.Id[i+1:]
+				}
+				childDep.Type = fileType
+			}
+			// Convert Id field from filename to dependency id
+			childDep.Id = childId
 			// Reassign map entry with new entry copy
 			dependenciesMap[childName] = childDep
 			// Run recursive call on child dependencies
-			updateDepsIdsAndRequestedBy(childName, childDep, dependenciesMap, dependenciesGraph)
+			updateDepsIdsAndRequestedBy(childId, childDep, dependenciesMap, dependenciesGraph)
 		}
 	}
 }

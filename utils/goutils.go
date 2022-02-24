@@ -39,10 +39,7 @@ func RunGo(goArg []string, repoUrl string) error {
 		return err
 	}
 
-	goCmd, err := NewCmd("go", "", goArg)
-	if err != nil {
-		return err
-	}
+	goCmd := NewCommand("go", "", goArg)
 	err = prepareGlobalRegExp()
 	if err != nil {
 		return err
@@ -151,10 +148,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 			}
 		}()
 	}
-	goCmd, err := NewCmd("go", "", commandArgs)
-	if err != nil {
-		return "", err
-	}
+	goCmd := NewCommand("go", "", commandArgs)
 	goCmd.Dir = projectDir
 
 	err = prepareGlobalRegExp()
@@ -236,10 +230,7 @@ func getParsedGoVersion() (*version.Version, error) {
 }
 
 func getGoVersion() (string, error) {
-	goCmd, err := NewCmd("go", "version", nil)
-	if err != nil {
-		return "", err
-	}
+	goCmd := NewCommand("go", "version", nil)
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
 	return output, err
 }
@@ -297,10 +288,7 @@ func GetGoModCachePath() (string, error) {
 
 // GetGOPATH returns the location of the GOPATH
 func getGOPATH() (string, error) {
-	goCmd, err := NewCmd("go", "env", []string{"GOPATH"})
-	if err != nil {
-		return "", err
-	}
+	goCmd := NewCommand("go", "env", []string{"GOPATH"})
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
 	if err != nil {
 		return "", fmt.Errorf("Could not find GOPATH env: %s", err.Error())

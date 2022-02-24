@@ -32,70 +32,54 @@ func newPythonModule(srcPath string, tool pythonutils.PythonTool, containingBuil
 	return &PythonModule{srcPath: srcPath, containingBuild: containingBuild, tool: tool}, nil
 }
 
-func (pm *PythonModule) RunCommandAndCollectDependencies(cmdName string, commandArgs []string) error {
-	if cmdName == "install" {
-		downloadedFilesMap, err := pm.InstallWithLogParsing(cmdName, commandArgs)
-		if err != nil {
-			return err
-		}
-		pythonExecPath, err := utils.GetExecutablePath("python")
-		if err != nil {
-			return err
-		}
-		dependenciesGraph, topLevelPackagesList, err := pythonutils.GetPythonDependencies(pm.tool, pythonExecPath, pm.localDependenciesPath)
-		if err != nil {
-			return err
-		}
-		dependenciesMap := make(map[string]entities.Dependency, len(dependenciesGraph))
-		for depId := range dependenciesGraph {
-			depName := depId[0:strings.Index(depId, ":")]
-			dependenciesMap[depId] = entities.Dependency{Id: downloadedFilesMap[depName]}
-		}
-		// Get package-name.
-		packageName, pkgNameErr := pythonutils.GetPackageNameFromSetuppy(pythonExecPath)
-		if pkgNameErr != nil {
-			pm.containingBuild.logger.Debug("Couldn't retrieve the package name from Setup.py. Reason: ", pkgNameErr.Error())
-		}
-		// If module-name was set by the command, don't change it.
-		if pm.name == "" {
-			// If the package name is unknown, set the module name to be the build name.
-			pm.name = packageName
-			if pm.name == "" {
-				pm.name = pm.containingBuild.buildName
-				pm.containingBuild.logger.Debug(fmt.Sprintf("Using build name: %s as module name.", pm.name))
-			}
-		}
-		if pm.updateDepsChecksumInfoFunc != nil {
-			err = pm.updateDepsChecksumInfoFunc(dependenciesMap, pm.srcPath)
-			if err != nil {
-				return err
-			}
-		}
-		err = pythonutils.UpdateDepsIdsAndRequestedBy(dependenciesMap, dependenciesGraph, topLevelPackagesList, packageName, pm.name)
-		if err != nil {
-			return err
-		}
-		buildInfoModule := entities.Module{Id: pm.name, Type: entities.Python, Dependencies: dependenciesMapToList(dependenciesMap)}
-		buildInfo := &entities.BuildInfo{Modules: []entities.Module{buildInfoModule}}
-
-		return pm.containingBuild.SaveBuildInfo(buildInfo)
+func (pm *PythonModule) RunInstallAndCollectDependencies(commandArgs []string) error {
+	dependenciesMap, err := pm.InstallWithLogParsing("install", commandArgs)
+	if err != nil {
+		return err
 	}
-	return nil
+	dependenciesGraph, topLevelPackagesList, err := pythonutils.GetPythonDependencies(pm.tool, pm.srcPath, pm.localDependenciesPath)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Failed while attempting to get %s dependencies graph: %s", string(pm.tool), err.Error()))
+	}
+	// Get package-name.
+	packageName, pkgNameErr := pythonutils.GetPackageNameFromSetuppy(pm.srcPath)
+	if pkgNameErr != nil {
+		pm.containingBuild.logger.Debug("Couldn't retrieve the package name from Setup.py. Reason: ", pkgNameErr.Error())
+	}
+	// If module-name was set by the command, don't change it.
+	if pm.name == "" {
+		// If the package name is unknown, set the module name to be the build name.
+		pm.name = packageName
+		if pm.name == "" {
+			pm.name = pm.containingBuild.buildName
+			pm.containingBuild.logger.Debug(fmt.Sprintf("Using build name: %s as module name.", pm.name))
+		}
+	}
+	if pm.updateDepsChecksumInfoFunc != nil {
+		err = pm.updateDepsChecksumInfoFunc(dependenciesMap, pm.srcPath)
+		if err != nil {
+			return err
+		}
+	}
+	pythonutils.UpdateDepsIdsAndRequestedBy(dependenciesMap, dependenciesGraph, topLevelPackagesList, packageName, pm.name)
+	buildInfoModule := entities.Module{Id: pm.name, Type: entities.Python, Dependencies: dependenciesMapToList(dependenciesMap)}
+	buildInfo := &entities.BuildInfo{Modules: []entities.Module{buildInfoModule}}
+
+	return pm.containingBuild.SaveBuildInfo(buildInfo)
 }
 
 // Run install command while parsing the logs for downloaded packages.
-// Supports running pip either in non-verbose and verbose mode.
-// Populates 'dependencyToFileMap' with downloaded package-name and its actual downloaded file (wheel/egg/zip...).
-func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []string) (map[string]string, error) {
+// Populates 'downloadedDependencies' with downloaded package-name and its actual downloaded file (wheel/egg/zip...).
+func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []string) (map[string]entities.Dependency, error) {
 	log := pm.containingBuild.logger
 	if pm.tool == pythonutils.Pipenv {
-		// Add verbosity flag to pipenv commands to collect neccecery data
+		// Add verbosity flag to pipenv commands to collect necessary data
 		commandArgs = append(commandArgs, "-v")
 	}
-	pipCmd, err := utils.NewCmd(string(pm.tool), cmdName, commandArgs)
-	if err != nil {
-		return nil, err
-	}
+	pipCmd := utils.NewCommand(string(pm.tool), cmdName, commandArgs)
+	pipCmd.Dir = pm.srcPath
+
+	dependenciesMap := map[string]entities.Dependency{}
 
 	// Create regular expressions for log parsing.
 	collectingRegexp, err := regexp.Compile(`^Collecting\s(\w[\w-.]+)`)
@@ -115,7 +99,6 @@ func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []stri
 		return nil, err
 	}
 
-	downloadedDependencies := make(map[string]string)
 	var packageName string
 	expectingPackageFilePath := false
 
@@ -130,7 +113,7 @@ func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []stri
 				log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", packageName))
 
 				// Save package with empty file path.
-				downloadedDependencies[strings.ToLower(packageName)] = ""
+				dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: ""}
 			}
 
 			// Check for out of bound results.
@@ -172,7 +155,7 @@ func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []stri
 			} else {
 				fileName = filePath[lastSlashIndex+1:]
 			}
-			downloadedDependencies[strings.ToLower(packageName)] = fileName
+			dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
 			expectingPackageFilePath = false
 
 			log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
@@ -196,8 +179,7 @@ func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []stri
 			}
 
 			// Save dependency with empty file name.
-			downloadedDependencies[strings.ToLower(pattern.MatchedResults[1])] = ""
-
+			dependenciesMap[strings.ToLower(pattern.MatchedResults[1])] = entities.Dependency{Id: ""}
 			log.Debug(fmt.Sprintf("Found package: %s already installed", pattern.MatchedResults[1]))
 			return pattern.Line, nil
 		},
@@ -209,8 +191,7 @@ func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []stri
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("Failed running %s command with error: '%s - %s'", string(pm.tool), err.Error(), errorOut))
 	}
-
-	return downloadedDependencies, nil
+	return dependenciesMap, nil
 }
 
 func (pm *PythonModule) SetName(name string) {
