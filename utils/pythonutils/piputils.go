@@ -1,10 +1,8 @@
 package pythonutils
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/jfrog/build-info-go/utils"
 	"io/ioutil"
 	"os"
@@ -14,63 +12,6 @@ import (
 	"runtime"
 	"strings"
 )
-
-// Execute virtualenv command: "virtualenv venvdir" / "python3 -m venv venvdir" and set path
-func SetVirtualEnvPath() (func() error, error) {
-	var cmdArgs []string
-	execPath, err := exec.LookPath("virtualenv")
-	if err != nil || execPath == "" {
-		// If virtualenv not installed try "venv"
-		if runtime.GOOS == "windows" {
-			// If the OS is Windows try using Py Launcher: "py -3 -m venv"
-			execPath, err = exec.LookPath("py")
-			cmdArgs = append(cmdArgs, "-3", "-m", "venv")
-		} else {
-			// If the OS is Linux try using python3 executable: "python3 -m venv"
-			execPath, err = exec.LookPath("python3")
-			cmdArgs = append(cmdArgs, "-m", "venv")
-		}
-		if err != nil {
-			return nil, err
-		}
-		if execPath == "" {
-			return nil, errors.New("Could not find python3 or virtualenv executable in PATH")
-		}
-	}
-	cmdArgs = append(cmdArgs, "venvdir")
-	var stderr bytes.Buffer
-	pipVenv := exec.Command(execPath, cmdArgs...)
-	pipVenv.Stderr = &stderr
-	err = pipVenv.Run()
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("pipenv install command failed: %s - %s", err.Error(), stderr.String()))
-	}
-
-	// Keep original value of 'PATH'.
-	pathValue, exists := os.LookupEnv("PATH")
-	if !exists {
-		return nil, errors.New(fmt.Sprintf("couldn't find PATH variable."))
-	}
-	var newPathValue string
-	var virtualEnvPath string
-	if runtime.GOOS == "windows" {
-		virtualEnvPath, err = filepath.Abs(filepath.Join("venvdir", "Scripts"))
-		newPathValue = fmt.Sprintf("%s;", virtualEnvPath)
-	} else {
-		virtualEnvPath, err = filepath.Abs(filepath.Join("venvdir", "bin"))
-		newPathValue = fmt.Sprintf("%s:", virtualEnvPath)
-	}
-	if err != nil {
-		return nil, err
-	}
-	err = os.Setenv("PATH", newPathValue)
-	if err != nil {
-		return nil, err
-	}
-	return func() error {
-		return os.Setenv("PATH", pathValue)
-	}, nil
-}
 
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
 func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]string, []string, error) {
