@@ -79,23 +79,16 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 		return nil, nil, err
 	}
 	cmdName := ""
-	pythonExecutable, err := exec.LookPath("python3")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if pythonExecutable == "" {
+	pythonExecutable, pathErr := exec.LookPath("python3")
+	if pathErr != nil || pythonExecutable == "" {
 		if runtime.GOOS == "windows" {
 			// If the OS is Windows try using Py Launcher: 'py -3'
-			pythonExecutable, err = exec.LookPath("py")
-			if err != nil {
-				return nil, nil, err
-			}
-			if pythonExecutable != "" {
+			pythonExecutable, pathErr = exec.LookPath("py")
+			if pathErr != nil && pythonExecutable != "" {
 				cmdName = "-3"
 			}
 		}
-		// Try using 'python' if 'python3' couldn't been found
+		// Try using 'python' if 'python3'/'py' couldn't been found
 		if pythonExecutable == "" {
 			pythonExecutable = "python"
 		}
