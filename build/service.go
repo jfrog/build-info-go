@@ -73,5 +73,5 @@ func saveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath s
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(detailsFilePath, []byte(content.String()), 0600)
+	return ioutil.WriteFile(detailsFilePath, content.Bytes(), 0600)
 }
