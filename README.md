@@ -2,7 +2,7 @@
 <img src="images/build-info.png">
 
 ## Project Status
-[![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml)
+[![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml) [![Static Analysis](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml/badge.svg?branch=v2)](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml)
 
 ## Table of Contents
 
