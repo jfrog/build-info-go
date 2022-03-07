@@ -3,7 +3,6 @@ package utils
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -313,7 +312,7 @@ func FindFileInDirAndParents(dirPath, fileName string) (string, error) {
 
 		// If we already visited this directory, it means that there's a loop and we can stop.
 		if visitedPaths[currDir] {
-			return "", errors.New(fmt.Sprintf("could not find the %s file of the project", fileName))
+			return "", fmt.Errorf("could not find the %s file of the project", fileName)
 		}
 	}
 }
@@ -359,12 +358,17 @@ func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) e
 	return err
 }
 
-func CopyFile(dst, src string) error {
+func CopyFile(dst, src string) (err error) {
 	srcFile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer func() {
+		e := srcFile.Close()
+		if err == nil {
+			err = e
+		}
+	}()
 	fileName, _ := GetFileAndDirFromPath(src)
 	dstPath, err := CreateFilePath(dst, fileName)
 	if err != nil {
@@ -374,7 +378,12 @@ func CopyFile(dst, src string) error {
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() {
+		e := dstFile.Close()
+		if err == nil {
+			err = e
+		}
+	}()
 	_, err = io.Copy(dstFile, srcFile)
 	return err
 }

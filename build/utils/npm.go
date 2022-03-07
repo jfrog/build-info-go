@@ -247,7 +247,6 @@ func appendDependency(dependencies map[string]*dependencyInfo, dep *npmLsDepende
 	}
 	dependencies[depId].Scopes = appendScopes(dependencies[depId].Scopes, scopes)
 	dependencies[depId].RequestedBy = append(dependencies[depId].RequestedBy, pathToRoot)
-	return
 }
 
 // Lookup for a dependency's tarball in npm cache, and calculate checksum.
@@ -424,7 +423,7 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 		log.Warn("error while running the command :'" + executablePath + " " + strings.Join(npmArgs, " ") + ":\n" + string(errData))
 	}
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("'%s %s' npm config command failed with an error: %s", executablePath, strings.Join(npmArgs, " "), err.Error()))
+		return "", fmt.Errorf("'%s %s' npm config command failed with an error: %s", executablePath, strings.Join(npmArgs, " "), err.Error())
 	}
 	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
 	found, err := utils.IsDirExists(cachePath, true)

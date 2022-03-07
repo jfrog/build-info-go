@@ -125,6 +125,9 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 		return nil, errors.New("couldn't find plexus-classworlds-x.x.x.jar in Maven installation path, please check M2_HOME environment variable")
 	}
 	buildInfoPath, err := createEmptyBuildInfoFile(mm.containingBuild)
+	if err != nil {
+		return nil, err
+	}
 	extractorProps, err := utils.CreateExtractorPropsFile(mm.extractorDetails.propsDir, buildInfoPath, mm.containingBuild.buildName, mm.containingBuild.buildNumber, mm.containingBuild.projectKey, mm.extractorDetails.props)
 	if err != nil {
 		return nil, err
@@ -196,6 +199,9 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 					mavenHome = strings.TrimSuffix(mavenHome, "\r")
 				}
 				mavenHome, err = filepath.Abs(mavenHome)
+				if err != nil {
+					return "", err
+				}
 				break
 			}
 		}

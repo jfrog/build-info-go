@@ -2,7 +2,9 @@ package utils
 
 import (
 	"bufio"
+	//#nosec G501 -- md5 is supported by Artifactory.
 	"crypto/md5"
+	//#nosec G505 -- sha1 is supported by Artifactory.
 	"crypto/sha1"
 	"fmt"
 	"hash"

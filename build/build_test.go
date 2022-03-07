@@ -48,7 +48,7 @@ func TestCollectEnv(t *testing.T) {
 
 	// Set environment variables
 	defer func() {
-		for key, _ := range env {
+		for key := range env {
 			assert.NoError(t, os.Unsetenv(key))
 		}
 	}()
