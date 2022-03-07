@@ -150,7 +150,7 @@ func (gm *GoModule) getPackagePathIfExists(cachePath, encodedDependencyId string
 	zipPath = filepath.Join(cachePath, dependencyName, "@v", version+".zip")
 	fileExists, err := utils.IsFileExists(zipPath, true)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Could not find zip binary for dependency '%s' at %s: %s", dependencyName, zipPath, err))
+		return "", fmt.Errorf("could not find zip binary for dependency '%s' at %s: %s", dependencyName, zipPath, err)
 	}
 	// Zip binary does not exist, so we skip it by returning a nil dependency.
 	if !fileExists {
