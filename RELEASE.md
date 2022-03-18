@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.1.1 (March 18, 2022)
+- Upgrade maven & gradle build-info extractors
+- New static code analysis badges added to README
+
 ## 1.1.0 (February 24, 2022)
 - Support for yarn
 - Add checksum to npm dependencies

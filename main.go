@@ -9,7 +9,7 @@ import (
 )
 
 var log utils.Log
-var cliVersion = "1.1.0"
+var cliVersion = "1.1.1"
 
 func main() {
 	log = utils.NewDefaultLogger(getCliLogLevel())
