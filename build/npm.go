@@ -12,11 +12,11 @@ import (
 const minSupportedNpmVersion = "5.4.0"
 
 type NpmModule struct {
-	containingBuild          *Build
-	name                     string
-	srcPath                  string
-	executablePath           string
-	npmArgs                  []string
+	containingBuild *Build
+	name            string
+	srcPath         string
+	executablePath  string
+	npmArgs         []string
 }
 
 // Pass an empty string for srcPath to find the npm project in the working directory.
@@ -54,7 +54,7 @@ func (nm *NpmModule) CalcDependencies() error {
 	if !nm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}
-	buildInfoDependencies, err := buildutils.CalculateDependenciesList(nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, nm.containingBuild.logger)
+	buildInfoDependencies, err := buildutils.CalculateNpmDependenciesList(nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, true, nm.containingBuild.logger)
 	if err != nil {
 		return err
 	}

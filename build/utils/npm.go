@@ -16,8 +16,8 @@ import (
 	"github.com/jfrog/gofrog/version"
 )
 
-// CalculateDependenciesList gets an npm project's dependencies.
-func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (dependenciesList []entities.Dependency, err error) {
+// CalculateNpmDependenciesList gets an npm project's dependencies.
+func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, calculateChecksums bool, log utils.Log) (dependenciesList []entities.Dependency, err error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
@@ -26,12 +26,15 @@ func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs
 	if err != nil {
 		return nil, err
 	}
-	// Get local npm cache.
-	cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmArgs, log)
-	if err != nil {
-		return nil, err
+	var cacache *cacache
+	if calculateChecksums {
+		// Get local npm cache.
+		cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmArgs, log)
+		if err != nil {
+			return nil, err
+		}
+		cacache = NewNpmCacache(cacheLocation)
 	}
-	cacache := NewNpmCacache(cacheLocation)
 	var missingPeerDeps, missingBundledDeps []string
 	for _, dep := range dependenciesMap {
 		if dep.npmLsDependency.Integrity == "" && dep.npmLsDependency.InBundle {
@@ -42,14 +45,16 @@ func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs
 			missingPeerDeps = append(missingPeerDeps, dep.Id)
 			continue
 		}
-		dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity, log)
-		if err != nil {
-			// Here, we don't know where is the tarball (or if it is actually exists in the filesystem) so we can't calculate the dependency checksum.
-			// This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
-			// Seems like the compatibility upgrades may result in dependencies losing their integrity.
-			// We use the integrity to get's the dependencies tarball
-			log.Error("couldn't calculate checksum for : '" + dep.Id + "'. Hint: Try to delete 'node_models' and/or 'package-lock.json'.")
-			return nil, err
+		if calculateChecksums {
+			dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity, log)
+			if err != nil {
+				// Here, we don't know where is the tarball (or if it is actually exists in the filesystem) so we can't calculate the dependency checksum.
+				// This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
+				// Seems like the compatibility upgrades may result in dependencies losing their integrity.
+				// We use the integrity to get's the dependencies tarball
+				log.Error("couldn't calculate checksum for : '" + dep.Id + "'. Hint: Try to delete 'node_models' and/or 'package-lock.json'.")
+				return nil, err
+			}
 		}
 
 		dependenciesList = append(dependenciesList, dep.Dependency)
