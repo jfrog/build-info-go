@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
   "title": "build-info",
-  "description": "Artifactory build-info",
+  "description": "build-info",
   "type": "object",
   "properties": {
     "properties": {
@@ -98,7 +98,7 @@
     }
   },
   "modules": {
-    "description": "Artifactory License Control Information",
+    "description": "Build-info modules",
     "type": "array",
     "items": {
       "type": "object",
