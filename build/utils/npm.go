@@ -146,6 +146,7 @@ type npmLsDependency struct {
 type legacyNpmLsDependency struct {
 	Name        string
 	Version     string
+	Missing     bool
 	Integrity   string `json:"_integrity,omitempty"`
 	InBundle    bool   `json:"_inBundle,omitempty"`
 	Dev         bool   `json:"_development,omitempty"`
@@ -166,6 +167,7 @@ func (lnld *legacyNpmLsDependency) toNpmLsDependency() *npmLsDependency {
 		InBundle:    lnld.InBundle,
 		Dev:         lnld.Dev,
 		Optional:    lnld.Optional,
+		Missing:     lnld.Missing,
 		PeerMissing: lnld.PeerMissing,
 	}
 }
