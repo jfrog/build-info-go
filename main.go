@@ -8,6 +8,8 @@ import (
 	clitool "github.com/urfave/cli/v2"
 )
 
+const logLevelEnv = "BUILD_INFO_LOG_LEVEL"
+
 var log utils.Log
 var cliVersion = "1.1.1"
 
@@ -27,7 +29,7 @@ func main() {
 }
 
 func getCliLogLevel() utils.LevelType {
-	switch os.Getenv("BUILD_INFO_LOG_LEVEL") {
+	switch os.Getenv(logLevelEnv) {
 	case "ERROR":
 		return utils.ERROR
 	case "WARN":
