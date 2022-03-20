@@ -157,7 +157,7 @@ func TestBundledDependenciesList(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
-	dependencies, err := CalculateDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, logger)
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
 	assert.NoError(t, err)
 
 	// Check peer dependency is not found.
@@ -187,7 +187,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
-	dependencies, err := CalculateDependenciesList("npm", projectPath, "jfrogtest", npmArgs, logger)
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "jfrogtest", npmArgs, true, logger)
 	assert.NoError(t, err)
 
 	// Verify results.
@@ -214,7 +214,7 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
-	dependencies, err := CalculateDependenciesList("npm", projectPath, "bundle-dependencies", npmArgs, logger)
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "bundle-dependencies", npmArgs, true, logger)
 	assert.NoError(t, err)
 
 	// Verify results.
@@ -250,7 +250,7 @@ func TestNpmDevProdFlags(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Calculate dependencies with scope.
-		dependencies, err := CalculateDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, logger)
+		dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
 		assert.NoError(t, err)
 		assert.Len(t, dependencies, entry.totalDeps)
 	}
