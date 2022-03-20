@@ -144,19 +144,27 @@ type npmLsDependency struct {
 
 // npm 6 ls results for a single dependency
 type legacyNpmLsDependency struct {
-	Name        string
-	Version     string
-	Missing     bool
-	Integrity   string `json:"_integrity,omitempty"`
-	InBundle    bool   `json:"_inBundle,omitempty"`
-	Dev         bool   `json:"_development,omitempty"`
-	Optional    bool   `json:"_optional,omitempty"`
-	PeerMissing []*peerMissing
+	Name          string
+	Version       string
+	Missing       bool
+	Integrity     string `json:"_integrity,omitempty"`
+	InBundle      bool   `json:"_inBundle,omitempty"`
+	Dev           bool   `json:"_development,omitempty"`
+	InnerOptional bool   `json:"_optional,omitempty"`
+	Optional      bool
+	PeerMissing   []*peerMissing
 }
 
 type peerMissing struct {
 	RequiredBy string
 	Requires   string
+}
+
+func (lnld *legacyNpmLsDependency) optional() bool {
+	if lnld.Optional {
+		return true
+	}
+	return lnld.InnerOptional
 }
 
 func (lnld *legacyNpmLsDependency) toNpmLsDependency() *npmLsDependency {
@@ -166,7 +174,7 @@ func (lnld *legacyNpmLsDependency) toNpmLsDependency() *npmLsDependency {
 		Integrity:   lnld.Integrity,
 		InBundle:    lnld.InBundle,
 		Dev:         lnld.Dev,
-		Optional:    lnld.Optional,
+		Optional:    lnld.optional(),
 		Missing:     lnld.Missing,
 		PeerMissing: lnld.PeerMissing,
 	}
