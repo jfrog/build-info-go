@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.0 (March 24, 2022)
+- Allow calculating npm deps without checksums
+- Move build-info schema to a file and allow validating it
+
 ## 1.1.1 (March 18, 2022)
 - Upgrade maven & gradle build-info extractors
 - New static code analysis badges added to README
