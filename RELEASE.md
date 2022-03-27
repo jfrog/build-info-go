@@ -1,5 +1,8 @@
 # Release Notes
 
+## 1.2.1 (March 27, 2022)
+- Upgrade build-info-extractor-maven to 2.36.1 and gradle-artifactory-plugin 4.28.1 
+
 ## 1.2.0 (March 24, 2022)
 - Allow calculating npm deps without checksums
 - Move build-info schema to a file and allow validating it
