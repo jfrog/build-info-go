@@ -11,7 +11,7 @@ import (
 const logLevelEnv = "BUILD_INFO_LOG_LEVEL"
 
 var log utils.Log
-var cliVersion = "1.2.0"
+var cliVersion = "1.2.1"
 
 func main() {
 	log = utils.NewDefaultLogger(getCliLogLevel())
