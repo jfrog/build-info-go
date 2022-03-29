@@ -70,7 +70,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 		printMissingDependenciesWarning("bundleDependencies", missingBundledDeps, log)
 	}
 	if len(missingOptionalDeps) > 0 {
-		printMissingDependenciesWarning("optionalDependencies", missingBundledDeps, log)
+		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
 	}
 	return
 }
@@ -462,5 +462,5 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 }
 
 func printMissingDependenciesWarning(dependencyType string, dependencies []string, log utils.Log) {
-	log.Info("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\n It is therefore okay to skip this dependency: \n" + strings.Join(dependencies, "\n"))
+	log.Debug("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\n It is therefore okay to skip this dependency: " + strings.Join(dependencies, ","))
 }
