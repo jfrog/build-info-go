@@ -16,6 +16,7 @@ import (
 	gofrogcmd "github.com/jfrog/gofrog/io"
 )
 
+//#nosec G101 -- False positive - no hardcoded credentials.
 const credentialsInUrlRegexp = `(http|https|git)://.+@`
 
 // Minimum go version, which its output does not require masking passwords in URLs.
@@ -291,7 +292,7 @@ func getGOPATH() (string, error) {
 	goCmd := NewCommand("go", "env", []string{"GOPATH"})
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
 	if err != nil {
-		return "", fmt.Errorf("Could not find GOPATH env: %s", err.Error())
+		return "", fmt.Errorf("could not find GOPATH env: %s", err.Error())
 	}
 	return strings.TrimSpace(parseGoPath(string(output))), nil
 }
@@ -319,7 +320,7 @@ func listToMap(output string) map[string]bool {
 	mapOfDeps := map[string]bool{}
 	for _, line := range lineOutput {
 		// The expected syntax : github.com/name:v1.2.3
-		if len(strings.Split(line, ":")) == 2 && mapOfDeps[line] == false {
+		if len(strings.Split(line, ":")) == 2 && !mapOfDeps[line] {
 			mapOfDeps[line] = true
 			continue
 		}

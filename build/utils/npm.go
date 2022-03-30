@@ -16,8 +16,8 @@ import (
 	"github.com/jfrog/gofrog/version"
 )
 
-// CalculateDependenciesList gets an npm project's dependencies.
-func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (dependenciesList []entities.Dependency, err error) {
+// CalculateNpmDependenciesList gets an npm project's dependencies.
+func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, calculateChecksums bool, log utils.Log) (dependenciesList []entities.Dependency, err error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
@@ -26,13 +26,16 @@ func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs
 	if err != nil {
 		return nil, err
 	}
-	// Get local npm cache.
-	cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmArgs, log)
-	if err != nil {
-		return nil, err
+	var cacache *cacache
+	if calculateChecksums {
+		// Get local npm cache.
+		cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmArgs, log)
+		if err != nil {
+			return nil, err
+		}
+		cacache = NewNpmCacache(cacheLocation)
 	}
-	cacache := NewNpmCacache(cacheLocation)
-	var missingPeerDeps, missingBundledDeps []string
+	var missingPeerDeps, missingBundledDeps, missingOptionalDeps []string
 	for _, dep := range dependenciesMap {
 		if dep.npmLsDependency.Integrity == "" && dep.npmLsDependency.InBundle {
 			missingBundledDeps = append(missingBundledDeps, dep.Id)
@@ -42,14 +45,20 @@ func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs
 			missingPeerDeps = append(missingPeerDeps, dep.Id)
 			continue
 		}
-		dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity, log)
-		if err != nil {
-			// Here, we don't know where is the tarball (or if it is actually exists in the filesystem) so we can't calculate the dependency checksum.
-			// This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
-			// Seems like the compatibility upgrades may result in dependencies losing their integrity.
-			// We use the integrity to get's the dependencies tarball
-			log.Error("couldn't calculate checksum for : '" + dep.Id + "'. Hint: Try to delete 'node_models' and/or 'package-lock.json'.")
-			return nil, err
+		if calculateChecksums {
+			dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity, log)
+			if err != nil {
+				if dep.Optional {
+					missingOptionalDeps = append(missingOptionalDeps, dep.Id)
+					continue
+				}
+				// Here, we don't know where is the tarball (or if it is actually exists in the filesystem) so we can't calculate the dependency checksum.
+				// This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
+				// Seems like the compatibility upgrades may result in dependencies losing their integrity.
+				// We use the integrity to get's the dependencies tarball
+				log.Error("couldn't calculate checksum for : '" + dep.Id + "'. Hint: Try to delete 'node_models' and/or 'package-lock.json'.")
+				return nil, err
+			}
 		}
 
 		dependenciesList = append(dependenciesList, dep.Dependency)
@@ -59,6 +68,9 @@ func CalculateDependenciesList(executablePath, srcPath, moduleId string, npmArgs
 	}
 	if len(missingBundledDeps) > 0 {
 		printMissingDependenciesWarning("bundleDependencies", missingBundledDeps, log)
+	}
+	if len(missingOptionalDeps) > 0 {
+		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
 	}
 	return
 }
@@ -120,6 +132,7 @@ type npmLsDependency struct {
 	Integrity string
 	InBundle  bool
 	Dev       bool
+	Optional  bool
 	// Missing peer dependency in npm version 7/8
 	Missing bool
 	// Problems with missing peer dependency in npm version 7/8
@@ -131,17 +144,27 @@ type npmLsDependency struct {
 
 // npm 6 ls results for a single dependency
 type legacyNpmLsDependency struct {
-	Name        string
-	Version     string
-	Integrity   string `json:"_integrity,omitempty"`
-	InBundle    bool   `json:"_inBundle,omitempty"`
-	Dev         bool   `json:"_development,omitempty"`
-	PeerMissing []*peerMissing
+	Name          string
+	Version       string
+	Missing       bool
+	Integrity     string `json:"_integrity,omitempty"`
+	InBundle      bool   `json:"_inBundle,omitempty"`
+	Dev           bool   `json:"_development,omitempty"`
+	InnerOptional bool   `json:"_optional,omitempty"`
+	Optional      bool
+	PeerMissing   []*peerMissing
 }
 
 type peerMissing struct {
 	RequiredBy string
 	Requires   string
+}
+
+func (lnld *legacyNpmLsDependency) optional() bool {
+	if lnld.Optional {
+		return true
+	}
+	return lnld.InnerOptional
 }
 
 func (lnld *legacyNpmLsDependency) toNpmLsDependency() *npmLsDependency {
@@ -151,6 +174,8 @@ func (lnld *legacyNpmLsDependency) toNpmLsDependency() *npmLsDependency {
 		Integrity:   lnld.Integrity,
 		InBundle:    lnld.InBundle,
 		Dev:         lnld.Dev,
+		Optional:    lnld.optional(),
+		Missing:     lnld.Missing,
 		PeerMissing: lnld.PeerMissing,
 	}
 }
@@ -247,7 +272,6 @@ func appendDependency(dependencies map[string]*dependencyInfo, dep *npmLsDepende
 	}
 	dependencies[depId].Scopes = appendScopes(dependencies[depId].Scopes, scopes)
 	dependencies[depId].RequestedBy = append(dependencies[depId].RequestedBy, pathToRoot)
-	return
 }
 
 // Lookup for a dependency's tarball in npm cache, and calculate checksum.
@@ -424,7 +448,7 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 		log.Warn("error while running the command :'" + executablePath + " " + strings.Join(npmArgs, " ") + ":\n" + string(errData))
 	}
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("'%s %s' npm config command failed with an error: %s", executablePath, strings.Join(npmArgs, " "), err.Error()))
+		return "", fmt.Errorf("'%s %s' npm config command failed with an error: %s", executablePath, strings.Join(npmArgs, " "), err.Error())
 	}
 	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
 	found, err := utils.IsDirExists(cachePath, true)
@@ -438,5 +462,5 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 }
 
 func printMissingDependenciesWarning(dependencyType string, dependencies []string, log utils.Log) {
-	log.Info("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\n It is therefore okay to skip this dependency: \n" + strings.Join(dependencies, "\n"))
+	log.Debug("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\n It is therefore okay to skip this dependency: " + strings.Join(dependencies, ","))
 }

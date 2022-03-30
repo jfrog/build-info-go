@@ -144,7 +144,7 @@ func (ym *YarnModule) appendDependencyRecursively(yarnDependency *YarnDependency
 		innerDepKey := getYarnDependencyKeyFromLocator(dependencyPtr.Locator)
 		innerYarnDep, exist := yarnDependenciesMap[innerDepKey]
 		if !exist {
-			return errors.New(fmt.Sprintf("An error occurred while creating dependencies tree: dependency %s was not found.", dependencyPtr.Locator))
+			return fmt.Errorf("an error occurred while creating dependencies tree: dependency %s was not found", dependencyPtr.Locator)
 		}
 		err := ym.appendDependencyRecursively(innerYarnDep, append([]string{id}, pathToRoot...), yarnDependenciesMap,
 			buildInfoDependencies)

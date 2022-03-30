@@ -216,7 +216,7 @@ func (b *Build) SaveBuildInfo(buildInfo *entities.BuildInfo) (err error) {
 			err = e
 		}
 	}()
-	_, err = tempFile.Write([]byte(content.String()))
+	_, err = tempFile.Write(content.Bytes())
 	return
 }
 
@@ -248,7 +248,7 @@ func (b *Build) SavePartialBuildInfo(partial *entities.Partial) (err error) {
 			err = e
 		}
 	}()
-	_, err = tempFile.Write([]byte(content.String()))
+	_, err = tempFile.Write(content.Bytes())
 	return
 }
 
@@ -275,9 +275,7 @@ func (b *Build) createBuildInfoFromPartials() (*entities.BuildInfo, error) {
 		buildInfo.Properties = env
 	}
 
-	for _, vcs := range vcsList {
-		buildInfo.VcsList = append(buildInfo.VcsList, vcs)
-	}
+	buildInfo.VcsList = append(buildInfo.VcsList, vcsList...)
 
 	// Check for Tracker as it must be set
 	if issues.Tracker != nil && issues.Tracker.Name != "" {
@@ -335,7 +333,7 @@ func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
 	if err != nil {
 		return nil, err
 	}
-	if fileExists == false {
+	if !fileExists {
 		var buildString string
 		if b.projectKey != "" {
 			buildString = fmt.Sprintf("build-name: <%s>, build-number: <%s> and project: <%s>", b.buildName, b.buildNumber, b.projectKey)
@@ -394,9 +392,7 @@ func extractBuildInfoData(partials entities.Partials) ([]entities.Module, entiti
 				addDependencyToPartialModule(dependency, moduleId, partialModules)
 			}
 		case partial.VcsList != nil:
-			for _, partialVcs := range partial.VcsList {
-				vcs = append(vcs, partialVcs)
-			}
+			vcs = append(vcs, partial.VcsList...)
 			if partial.Issues == nil {
 				continue
 			}
@@ -476,10 +472,10 @@ func createModule(moduleId string, moduleType entities.ModuleType, checksum enti
 	module := createDefaultModule(moduleId)
 	module.Type = moduleType
 	module.Checksum = checksum
-	if artifacts != nil && len(artifacts) > 0 {
+	if len(artifacts) > 0 {
 		module.Artifacts = append(module.Artifacts, artifacts...)
 	}
-	if dependencies != nil && len(dependencies) > 0 {
+	if len(dependencies) > 0 {
 		module.Dependencies = append(module.Dependencies, dependencies...)
 	}
 	return module

@@ -17,7 +17,7 @@ const (
 	GradleExtractorFileName          = "build-info-extractor-gradle-%s-uber.jar"
 	gradleInitScriptTemplate         = "gradle.init"
 	GradleExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
-	GradleExtractorDependencyVersion = "4.26.0"
+	GradleExtractorDependencyVersion = "4.28.1"
 )
 
 type GradleModule struct {
@@ -110,6 +110,9 @@ func (gm *GradleModule) createGradleRunConfig() (*gradleRunConfig, error) {
 		return nil, err
 	}
 	buildInfoPath, err := createEmptyBuildInfoFile(gm.containingBuild)
+	if err != nil {
+		return nil, err
+	}
 	extractorPropsFile, err := utils.CreateExtractorPropsFile(gm.gradleExtractorDetails.propsDir, buildInfoPath, gm.containingBuild.buildName, gm.containingBuild.buildNumber, gm.containingBuild.projectKey, gm.gradleExtractorDetails.props)
 	if err != nil {
 		return nil, err
