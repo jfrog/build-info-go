@@ -18,7 +18,10 @@ import (
 )
 
 const (
-	BuildInfoDetails    = "details"
+	// BuildInfo details dir name
+	BuildInfoDetails = "details"
+
+	// BuildInfo dependencies dir name
 	dependenciesDirName = ".build-info"
 )
 

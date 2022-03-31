@@ -13,8 +13,8 @@ const (
 
 type PythonTool string
 
-// Parse pythonDependencyPackage list to dependencies map (mapping dependency to his child deps)
-// also returns a list of top level dependencies
+// Parse pythonDependencyPackage list to dependencies map. (mapping dependency to his child deps)
+// Also returns a list of project's root dependencies
 func parseDependenciesToGraph(packages []pythonDependencyPackage) (map[string][]string, []string, error) {
 	// Create packages map.
 	packagesMap := map[string][]string{}

@@ -15,7 +15,7 @@ import (
 
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
 func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]string, []string, error) {
-	pipDependencyMapScriptPath, err := GetDepTreeScriptPath(dependenciesDirName)
+	pipDependencyMapScriptPath, err := getDepTreeScriptPath(dependenciesDirName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -29,7 +29,7 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 				cmdName = "-3"
 			}
 		}
-		// Try using 'python' if 'python3'/'py' couldn't been found
+		// Try using 'python' if 'python3'/'py' couldn't be found
 		if pythonExecutable == "" {
 			pythonExecutable = "python"
 		}
@@ -51,8 +51,8 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	return parseDependenciesToGraph(packages)
 }
 
-// Return path to the dependency-tree script, if not exists it creates the file.
-func GetDepTreeScriptPath(dependenciesDirName string) (string, error) {
+// Return path to the dependency-tree script, If it doesnot exist, it creates the file.
+func getDepTreeScriptPath(dependenciesDirName string) (string, error) {
 	if dependenciesDirName == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -134,7 +134,7 @@ func ExtractPackageNameFromSetupPy(setuppyFilePath string) (string, error) {
 	return getProjectIdFromFileContent(content)
 }
 
-// Run egg-info command on setup.py, the command generates metadata files.
+// Run egg-info command on setup.py. The command generates metadata files.
 // Return the content of the 'PKG-INFO' file.
 func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error) {
 	eggBase, err := utils.CreateTempDir()

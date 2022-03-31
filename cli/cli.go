@@ -182,7 +182,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 		},
 		{
 			Name:      "pip",
-			Usage:     "Generate build-info for an pip project",
+			Usage:     "Generate build-info for a pip project",
 			UsageText: "bi pip",
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
@@ -216,7 +216,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 		},
 		{
 			Name:      "pipenv",
-			Usage:     "Generate build-info for an pipenv project",
+			Usage:     "Generate build-info for a pipenv project",
 			UsageText: "bi pipenv",
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
