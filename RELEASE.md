@@ -1,4 +1,7 @@
 # Release Notes
+## 1.2.2 (March 31, 2022)
+- Bug fix - Avoid adding optional npm dependencies to the build-info
+
 ## 1.2.1 (March 27, 2022)
 - Upgrade build-info-extractor-maven to 2.36.1 and gradle-artifactory-plugin 4.28.1 
 
