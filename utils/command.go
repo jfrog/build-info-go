@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -30,12 +29,12 @@ func (config *Command) RunWithOutput() (data []byte, err error) {
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Failed running command: '%s %s' with error: %s - %s",
+		return nil, fmt.Errorf("failed running command: '%s %s' with error: %s - %s",
 			cmd.Path,
 			strings.Join(cmd.Args, " "),
 			err.Error(),
 			stderr.String(),
-		))
+		)
 	}
 	return stdout.Bytes(), nil
 }

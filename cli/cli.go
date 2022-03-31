@@ -210,7 +210,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					}
 					return printBuild(bld, context.String(formatFlag))
 				} else {
-					return errors.New(fmt.Sprintf("Build info dependencies collection for %s command is not supported.", filteredArgs[0]))
+					return fmt.Errorf("build info dependencies collection for %s command is not supported", filteredArgs[0])
 				}
 			},
 		},
@@ -244,7 +244,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					}
 					return printBuild(bld, context.String(formatFlag))
 				} else {
-					return errors.New(fmt.Sprintf("Build info dependencies collection for %s command is not supported.", filteredArgs[0]))
+					return fmt.Errorf("build info dependencies collection for %s command is not supported", filteredArgs[0])
 				}
 			},
 		},
@@ -290,7 +290,7 @@ func printBuild(bld *build.Build, format string) error {
 		}
 		fmt.Println(content.String())
 	default:
-		return errors.New(fmt.Sprintf("'%s' is not a valid value for '%s'", format, formatFlag))
+		return fmt.Errorf("'%s' is not a valid value for '%s'", format, formatFlag)
 	}
 
 	return nil

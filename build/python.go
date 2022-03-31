@@ -1,7 +1,6 @@
 package build
 
 import (
-	"errors"
 	"fmt"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
@@ -39,7 +38,7 @@ func (pm *PythonModule) RunInstallAndCollectDependencies(commandArgs []string) e
 	}
 	dependenciesGraph, topLevelPackagesList, err := pythonutils.GetPythonDependencies(pm.tool, pm.srcPath, pm.localDependenciesPath)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Failed while attempting to get %s dependencies graph: %s", string(pm.tool), err.Error()))
+		return fmt.Errorf("failed while attempting to get %s dependencies graph: %s", string(pm.tool), err.Error())
 	}
 	// Get package-name.
 	packageName, pkgNameErr := pythonutils.GetPackageNameFromSetuppy(pm.srcPath)
@@ -189,7 +188,7 @@ func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []stri
 	var errorOut string
 	_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(pipCmd, true, &dependencyNameParser, &downloadedFileParser, &cachedFileParser, &installedPackagesParser)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Failed running %s command with error: '%s - %s'", string(pm.tool), err.Error(), errorOut))
+		return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(pm.tool), err.Error(), errorOut)
 	}
 	return dependenciesMap, nil
 }

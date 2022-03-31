@@ -310,7 +310,7 @@ func FindFileInDirAndParents(dirPath, fileName string) (string, error) {
 		// CD to the parent directory.
 		currDir = filepath.Dir(currDir)
 
-		// If we already visited this directory, it means that there's a loop and we can stop.
+		// If we already visited this directory, it means that there's a loop, and we can stop.
 		if visitedPaths[currDir] {
 			return "", fmt.Errorf("could not find the %s file of the project", fileName)
 		}

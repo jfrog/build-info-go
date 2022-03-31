@@ -57,7 +57,7 @@ func RunGo(goArg []string, repoUrl string) error {
 		_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	}
 	if err != nil {
-		return errors.New(fmt.Sprintf("Failed running 'go %s' command with error: '%s - %s'", strings.Join(goArg, " "), err.Error(), errorOut))
+		return fmt.Errorf("failed running 'go %s' command with error: '%s - %s'", strings.Join(goArg, " "), err.Error(), errorOut)
 	}
 	return nil
 }
