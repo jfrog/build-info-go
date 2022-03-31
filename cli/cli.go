@@ -221,7 +221,7 @@ func printBuild(bld *build.Build, format string) error {
 		}
 		fmt.Println(content.String())
 	default:
-		return errors.New(fmt.Sprintf("'%s' is not a valid value for '%s'", format, formatFlag))
+		return fmt.Errorf("'%s' is not a valid value for '%s'", format, formatFlag)
 	}
 
 	return nil
