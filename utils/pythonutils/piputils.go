@@ -19,24 +19,9 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	if err != nil {
 		return nil, nil, err
 	}
-	cmdName := ""
-	pythonExecutable, pathErr := exec.LookPath("python3")
-	if pathErr != nil || pythonExecutable == "" {
-		if runtime.GOOS == "windows" {
-			// If the OS is Windows try using Py Launcher: 'py -3'
-			pythonExecutable, pathErr = exec.LookPath("py")
-			if pathErr != nil && pythonExecutable != "" {
-				cmdName = "-3"
-			}
-		}
-		// Try using 'python' if 'python3'/'py' couldn't be found
-		if pythonExecutable == "" {
-			pythonExecutable = "python"
-		}
-	}
-
+	pythonExecutable, windowsPyArg := getPythonExecutable()
 	// Run pipdeptree script
-	pipdeptreeCmd := utils.NewCommand(pythonExecutable, cmdName, []string{pipDependencyMapScriptPath, "--json"})
+	pipdeptreeCmd := utils.NewCommand(pythonExecutable, windowsPyArg, []string{pipDependencyMapScriptPath, "--json"})
 	pipdeptreeCmd.Dir = srcPath
 	output, err := pipdeptreeCmd.RunWithOutput()
 	if err != nil {
@@ -51,7 +36,7 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	return parseDependenciesToGraph(packages)
 }
 
-// Return path to the dependency-tree script, If it doesnot exist, it creates the file.
+// Return path to the dependency-tree script, If it doesn't exist, it creates the file.
 func getDepTreeScriptPath(dependenciesDirName string) (string, error) {
 	if dependenciesDirName == "" {
 		home, err := os.UserHomeDir()
@@ -149,19 +134,41 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 	}()
 
 	// Run python 'egg_info --egg-base <eggBase>' command.
-	pythonExecutablePath, err := exec.LookPath("python")
+	var args []string
+	pythonExecutable, windowsPyArg := getPythonExecutable()
+	if windowsPyArg != "" {
+		args = append(args, windowsPyArg)
+	}
+	args = append(args, setuppyFilePath, "egg_info", "--egg-base", eggBase)
 	if err != nil {
 		return nil, err
 	}
-	if pythonExecutablePath == "" {
-		return nil, errors.New("Could not find python executable in PATH")
-	}
-	if err = exec.Command(pythonExecutablePath, setuppyFilePath, "egg_info", "--egg-base", eggBase).Run(); err != nil {
+	if err = exec.Command(pythonExecutable, args...).Run(); err != nil {
 		return nil, err
 	}
 
 	// Read PKG_INFO under <eggBase>/*.egg-info/PKG-INFO.
 	return extractPackageNameFromEggBase(eggBase)
+}
+
+func getPythonExecutable() (string, string) {
+	windowsPyArg := ""
+	pythonExecutable, pathErr := exec.LookPath("python3")
+	if pathErr != nil || pythonExecutable == "" {
+		if runtime.GOOS == "windows" {
+			// If the OS is Windows try using Py Launcher: 'py -3'
+			pythonExecutable, pathErr = exec.LookPath("py")
+			if pathErr != nil && pythonExecutable != "" {
+				windowsPyArg = "-3"
+			}
+		}
+		// Try using 'python' if 'python3'/'py' couldn't be found
+		if pythonExecutable == "" {
+			pythonExecutable = "python"
+		}
+	}
+	return pythonExecutable, windowsPyArg
+
 }
 
 // Parse the output of 'python egg_info' command, in order to find the path of generated file 'PKG-INFO'.

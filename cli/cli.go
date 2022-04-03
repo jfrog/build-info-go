@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	clitool "github.com/urfave/cli/v2"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -210,7 +211,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					}
 					return printBuild(bld, context.String(formatFlag))
 				} else {
-					return fmt.Errorf("build info dependencies collection for %s command is not supported", filteredArgs[0])
+					return exec.Command("pip", filteredArgs[1:]...).Run()
 				}
 			},
 		},
@@ -244,7 +245,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					}
 					return printBuild(bld, context.String(formatFlag))
 				} else {
-					return fmt.Errorf("build info dependencies collection for %s command is not supported", filteredArgs[0])
+					return exec.Command("pipenv", filteredArgs[1:]...).Run()
 				}
 			},
 		},
