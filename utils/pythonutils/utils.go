@@ -31,7 +31,7 @@ func parseDependenciesToGraph(packages []pythonDependencyPackage) (map[string][]
 
 	var topLevelPackagesList []string
 	for pkgName := range packagesMap {
-		if allSubPackages[pkgName] == false {
+		if !allSubPackages[pkgName] {
 			topLevelPackagesList = append(topLevelPackagesList, pkgName)
 		}
 	}
@@ -84,7 +84,6 @@ func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency
 	}
 	rootModule := buildinfo.Dependency{Id: moduleName, RequestedBy: [][]string{{}}}
 	updateDepsIdsAndRequestedBy(moduleName, rootModule, dependenciesMap, dependenciesGraph)
-	return
 }
 
 func updateDepsIdsAndRequestedBy(parentName string, parentDependency buildinfo.Dependency, dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string) {

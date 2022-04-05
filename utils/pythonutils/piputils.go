@@ -86,7 +86,7 @@ func GetPackageNameFromSetuppy(srcPath string) (string, error) {
 	packageName, err := ExtractPackageNameFromSetupPy(filePath)
 	if err != nil {
 		// If setup.py egg_info command failed we use build name as module name and continue to pip-install execution
-		return "", errors.New("Couldn't determine module-name after running the 'egg_info' command: " + err.Error())
+		return "", errors.New("couldn't determine module-name after running the 'egg_info' command: " + err.Error())
 	}
 	return packageName, nil
 }
@@ -186,7 +186,7 @@ func extractPackageNameFromEggBase(eggBase string) ([]byte, error) {
 				return nil, err
 			}
 			if !pkginfoFileExists {
-				return nil, errors.New("File 'PKG-INFO' couldn't be found in its designated location: " + pkginfoPath)
+				return nil, errors.New("file 'PKG-INFO' couldn't be found in its designated location: " + pkginfoPath)
 			}
 
 			return os.ReadFile(pkginfoPath)
@@ -208,7 +208,7 @@ func getProjectIdFromFileContent(content []byte) (string, error) {
 	// Find first nameMatch of packageNameRegexp.
 	nameMatch := packageNameRegexp.FindStringSubmatch(string(content))
 	if len(nameMatch) < 2 {
-		return "", errors.New("Failed extracting package name from content.")
+		return "", errors.New("failed extracting package name from content")
 	}
 
 	// Create package-version regexp.
@@ -220,7 +220,7 @@ func getProjectIdFromFileContent(content []byte) (string, error) {
 	// Find first match of packageNameRegexp.
 	versionMatch := packageVersionRegexp.FindStringSubmatch(string(content))
 	if len(versionMatch) < 2 {
-		return "", errors.New("Failed extracting package version from content.")
+		return "", errors.New("failed extracting package version from content")
 	}
 
 	return nameMatch[1] + ":" + versionMatch[1], nil
