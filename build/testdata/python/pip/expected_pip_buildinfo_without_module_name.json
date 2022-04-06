@@ -11,7 +11,7 @@
       "id": "jfrog-python-example:1.0",
       "dependencies": [
         {
-          "id": "pyyaml:5.1.2",
+          "id": "PyYAML:5.1.2",
           "type": "tar.gz",
           "requestedBy": [
             [

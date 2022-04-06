@@ -30,6 +30,15 @@
           ]
         },
         {
+          "id": "PyYAML:6.0",
+          "type": "whl",
+          "requestedBy": [
+            [
+              "build-info-go-test-pipenv"
+            ]
+          ]
+        },
+        {
           "id": "toml:0.10.2",
           "type": "whl",
           "requestedBy": [

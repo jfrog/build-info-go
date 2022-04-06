@@ -22,11 +22,11 @@ func parseDependenciesToGraph(packages []pythonDependencyPackage) (map[string][]
 	for _, pkg := range packages {
 		var subPackages []string
 		for _, subPkg := range pkg.Dependencies {
-			subPkgFullName := subPkg.Key + ":" + subPkg.InstalledVersion
+			subPkgFullName := subPkg.PackageName + ":" + subPkg.InstalledVersion
 			subPackages = append(subPackages, subPkgFullName)
 			allSubPackages[subPkgFullName] = true
 		}
-		packagesMap[pkg.Package.Key+":"+pkg.Package.InstalledVersion] = subPackages
+		packagesMap[pkg.Package.PackageName+":"+pkg.Package.InstalledVersion] = subPackages
 	}
 
 	var topLevelPackagesList []string
@@ -78,7 +78,7 @@ func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency
 	if packageName == "" {
 		// Projects without setup.py
 		dependenciesGraph[moduleName] = topLevelPackagesList
-	} else {
+	} else if packageName != moduleName {
 		// Projects with setup.py
 		dependenciesGraph[moduleName] = dependenciesGraph[packageName]
 	}
@@ -88,7 +88,7 @@ func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency
 
 func updateDepsIdsAndRequestedBy(parentName string, parentDependency buildinfo.Dependency, dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string) {
 	for _, childId := range dependenciesGraph[parentName] {
-		childName := childId[0:strings.Index(childId, ":")]
+		childName := strings.ToLower(childId[0:strings.Index(childId, ":")])
 		if childDep, ok := dependenciesMap[childName]; ok {
 			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= buildinfo.RequestedByMaxLength {
 				continue
