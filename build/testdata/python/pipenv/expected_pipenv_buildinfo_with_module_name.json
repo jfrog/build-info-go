@@ -30,7 +30,7 @@
           ]
         },
         {
-          "id": "PyYAML:6.0",
+          "id": "pyyaml:6.0",
           "type": "whl",
           "requestedBy": [
             [
