@@ -32,7 +32,7 @@ func newPythonModule(srcPath string, tool pythonutils.PythonTool, containingBuil
 }
 
 func (pm *PythonModule) RunInstallAndCollectDependencies(commandArgs []string) error {
-	dependenciesMap, err := pm.InstallWithLogParsing("install", commandArgs)
+	dependenciesMap, err := pm.InstallWithLogParsing(commandArgs)
 	if err != nil {
 		return err
 	}
@@ -69,14 +69,14 @@ func (pm *PythonModule) RunInstallAndCollectDependencies(commandArgs []string) e
 
 // Run install command while parsing the logs for downloaded packages.
 // Populates 'downloadedDependencies' with downloaded package-name and its actual downloaded file (wheel/egg/zip...).
-func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []string) (map[string]entities.Dependency, error) {
+func (pm *PythonModule) InstallWithLogParsing(commandArgs []string) (map[string]entities.Dependency, error) {
 	log := pm.containingBuild.logger
 	if pm.tool == pythonutils.Pipenv {
 		// Add verbosity flag to pipenv commands to collect necessary data
 		commandArgs = append(commandArgs, "-v")
 	}
-	pipCmd := utils.NewCommand(string(pm.tool), cmdName, commandArgs)
-	pipCmd.Dir = pm.srcPath
+	installCmd := utils.NewCommand(string(pm.tool), "install", commandArgs)
+	installCmd.Dir = pm.srcPath
 
 	dependenciesMap := map[string]entities.Dependency{}
 
@@ -186,7 +186,7 @@ func (pm *PythonModule) InstallWithLogParsing(cmdName string, commandArgs []stri
 
 	// Execute command.
 	var errorOut string
-	_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(pipCmd, true, &dependencyNameParser, &downloadedFileParser, &cachedFileParser, &installedPackagesParser)
+	_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &cachedFileParser, &installedPackagesParser)
 	if err != nil {
 		return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(pm.tool), err.Error(), errorOut)
 	}
