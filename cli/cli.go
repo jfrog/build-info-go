@@ -7,9 +7,11 @@ import (
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/build-info-go/utils/pythonutils"
 	"github.com/pkg/errors"
 	clitool "github.com/urfave/cli/v2"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -179,6 +181,74 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				return printBuild(bld, formatValue)
 			},
 		},
+		{
+			Name:      "pip",
+			Usage:     "Generate build-info for a pip project",
+			UsageText: "bi pip",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("pip-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
+				pythonModule, err := bld.AddPythonModule("", pythonutils.Pip)
+				if err != nil {
+					return
+				}
+				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
+				if filteredArgs[0] == "install" {
+					err = pythonModule.RunInstallAndCollectDependencies(filteredArgs[1:])
+					if err != nil {
+						return
+					}
+					return printBuild(bld, context.String(formatFlag))
+				} else {
+					return exec.Command("pip", filteredArgs[1:]...).Run()
+				}
+			},
+		},
+		{
+			Name:      "pipenv",
+			Usage:     "Generate build-info for a pipenv project",
+			UsageText: "bi pipenv",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("pipenv-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
+				pythonModule, err := bld.AddPythonModule("", pythonutils.Pipenv)
+				if err != nil {
+					return
+				}
+				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
+				if filteredArgs[0] == "install" {
+					err = pythonModule.RunInstallAndCollectDependencies(filteredArgs[1:])
+					if err != nil {
+						return
+					}
+					return printBuild(bld, context.String(formatFlag))
+				} else {
+					return exec.Command("pipenv", filteredArgs[1:]...).Run()
+				}
+			},
+		},
 	}
 }
 
@@ -221,7 +291,7 @@ func printBuild(bld *build.Build, format string) error {
 		}
 		fmt.Println(content.String())
 	default:
-		return errors.New(fmt.Sprintf("'%s' is not a valid value for '%s'", format, formatFlag))
+		return fmt.Errorf("'%s' is not a valid value for '%s'", format, formatFlag)
 	}
 
 	return nil
@@ -244,4 +314,25 @@ func extractStringFlag(args []string, flagName string) (flagValue string, filter
 		}
 	}
 	return
+}
+
+func filterCliFlags(allArgs []string, cliFlags []clitool.Flag) []string {
+	var filteredArgs []string
+	for _, arg := range allArgs {
+		if !hasFlag(cliFlags, arg) {
+			filteredArgs = append(filteredArgs, arg)
+		}
+	}
+	return filteredArgs
+}
+
+func hasFlag(flagsList []clitool.Flag, arg string) bool {
+	for _, flag := range flagsList {
+		for _, name := range flag.Names() {
+			if name == arg {
+				return true
+			}
+		}
+	}
+	return false
 }

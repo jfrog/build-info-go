@@ -239,12 +239,45 @@ func CreateTempDir() (string, error) {
 }
 
 func RemoveTempDir(dirPath string) error {
-	exists, err := IsDirExists(dirPath, true)
+	exists, err := IsDirExists(dirPath, false)
 	if err != nil {
 		return err
 	}
-	if exists {
-		return os.RemoveAll(dirPath)
+	if !exists {
+		return nil
+	}
+	err = os.RemoveAll(dirPath)
+	if err == nil {
+		return nil
+	}
+	// Sometimes removing the directory fails (in Windows) because it's locked by another process.
+	// That's a known issue, but its cause is unknown (golang.org/issue/30789).
+	// In this case, we'll only remove the contents of the directory, and let CleanOldDirs() remove the directory itself at a later time.
+	return removeDirContents(dirPath)
+}
+
+// RemoveDirContents removes the contents of the directory, without removing the directory itself.
+// If it encounters an error before removing all the files, it stops and returns that error.
+func removeDirContents(dirPath string) (err error) {
+	d, err := os.Open(dirPath)
+	if err != nil {
+		return
+	}
+	defer func() {
+		e := d.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dirPath, name))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -310,7 +343,7 @@ func FindFileInDirAndParents(dirPath, fileName string) (string, error) {
 		// CD to the parent directory.
 		currDir = filepath.Dir(currDir)
 
-		// If we already visited this directory, it means that there's a loop and we can stop.
+		// If we already visited this directory, it means that there's a loop, and we can stop.
 		if visitedPaths[currDir] {
 			return "", fmt.Errorf("could not find the %s file of the project", fileName)
 		}

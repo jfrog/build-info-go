@@ -16,7 +16,6 @@ import (
 
 const (
 	MavenHome                       = "M2_HOME"
-	dependenciesDirName             = ".build-info"
 	MavenExtractorFileName          = "build-info-extractor-maven3-%s-uber.jar"
 	classworldsConfFileName         = "classworlds.conf"
 	PropertiesTempfolderName        = "properties"

@@ -16,16 +16,17 @@ func TestGenerateBuildInfoForGoProject(t *testing.T) {
 		assert.NoError(t, goBuild.Clean())
 	}()
 	goModule, err := goBuild.AddGoModule(filepath.Join("testdata", "golang", "project"))
-	assert.NoError(t, err)
-	err = goModule.CalcDependencies()
-	assert.NoError(t, err)
-	err = goModule.AddArtifacts(entities.Artifact{Name: "artifactName", Type: "artifactType", Path: "artifactPath", Checksum: entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}})
-	assert.NoError(t, err)
-	buildInfo, err := goBuild.ToBuildInfo()
-	assert.NoError(t, err)
-	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 6, 1, "github.com/jfrog/dependency", entities.Go, true)
-	validateRequestedBy(t, buildInfo.Modules[0])
+	if assert.NoError(t, err) {
+		err = goModule.CalcDependencies()
+		assert.NoError(t, err)
+		err = goModule.AddArtifacts(entities.Artifact{Name: "artifactName", Type: "artifactType", Path: "artifactPath", Checksum: entities.Checksum{Sha1: "123", Md5: "456", Sha256: "789"}})
+		assert.NoError(t, err)
+		buildInfo, err := goBuild.ToBuildInfo()
+		assert.NoError(t, err)
+		assert.Len(t, buildInfo.Modules, 1)
+		validateModule(t, buildInfo.Modules[0], 6, 1, "github.com/jfrog/dependency", entities.Go, true)
+		validateRequestedBy(t, buildInfo.Modules[0])
+	}
 }
 
 func validateRequestedBy(t *testing.T, module entities.Module) {
