@@ -1,12 +1,19 @@
-# build-info-go
-<img src="images/build-info.png">
+<div align="center">
 
-## Project Status
+![Introduction gif](images/dark.gif#gh-dark-mode-only)
+![Introduction gif](images/light.gif#gh-light-mode-only)
 
-| Branch |                                                                                                                                                                               Status                                                                                                                                                                                |
-|:------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-|  main  |   [![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml) [![Static Analysis](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml/badge.svg?branch=main)](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml)    |
-|  dev   | [![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg?branch=dev)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml)        [![Static Analysis](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml/badge.svg?branch=dev)](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml) |
+# Build Info Go
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/jfrog/build-info-go)](https://goreportcard.com/report/github.com/jfrog/build-info-go)
+[![license](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat)](./LICENSE) [![Website](https://img.shields.io/badge/buildinfo.org-%F0%9F%8C%8E-blue)](https://buildinfo.org)
+
+</div>
+
+| Branch |                                                                                                                                                                             Status                                                                                                                                                                             |
+| :----: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+|  main  | [![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml) [![Static Analysis](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml/badge.svg?branch=main)](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml) |
+|  dev   |  [![Test](https://github.com/jfrog/build-info-go/actions/workflows/test.yml/badge.svg?branch=dev)](https://github.com/jfrog/build-info-go/actions/workflows/test.yml) [![Static Analysis](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml/badge.svg?branch=dev)](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml)  |
 
 ## Table of Contents
 
@@ -25,11 +32,14 @@
 - [Tests](#tests)
 
 ## Overview
+
 **build-info-go** is a Go library, which allows generating build-info for a source code project. The library is also packaged as a CLI.
 Read more about build-info at [buildinfo.org](https://buildinfo.org/).
 
 ## Schema
+
 The build-info schema is available [here](buildinfo-schema.json).
+
 <details>
   <summary>Example</summary>
   
@@ -285,39 +295,47 @@ The build-info schema is available [here](buildinfo-schema.json).
 </details>
 
 ## Using build-info-go as a CLI
+
 ### Download the CLI executable
 
-|<img src="images/linux.png" valign="middle" width="20"> | Linux | [386](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-386/bi) |[amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-amd64/bi) | [arm](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-arm/bi) | [arm64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-arm64/bi) | [s390x](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-s390x/bi) |  [ppc64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-ppc64/bi) | [ppc64le](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-ppc64le/bi) |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| <img src="images/linux.png" valign="middle" width="20"> | Linux | [386](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-386/bi) | [amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-amd64/bi) | [arm](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-arm/bi) | [arm64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-arm64/bi) | [s390x](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-s390x/bi) | [ppc64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-ppc64/bi) | [ppc64le](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/linux-ppc64le/bi) |
+| :-----------------------------------------------------: | :---: | :------------------------------------------------------------------------: | :----------------------------------------------------------------------------: | :------------------------------------------------------------------------: | :----------------------------------------------------------------------------: | :----------------------------------------------------------------------------: | :----------------------------------------------------------------------------: | :--------------------------------------------------------------------------------: |
 
-|<img src="images/mac.png" valign="middle" width="20"> | Mac | [386](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/mac-386/bi) | 
-| :---: | :---: | :---: |
+| <img src="images/mac.png" valign="middle" width="20"> | Mac | [386](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/mac-386/bi) |
+| :---------------------------------------------------: | :-: | :----------------------------------------------------------------------: |
 
-|<img src="images/windows.png" valign="middle" width="20"> | Windows | [amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/windows-amd64/bi.exe) | 
-| :---: | :---: | :---: |
+| <img src="images/windows.png" valign="middle" width="20"> | Windows | [amd64](https://releases.jfrog.io/artifactory/bi-cli/v1/latest/windows-amd64/bi.exe) |
+| :-------------------------------------------------------: | :-----: | :----------------------------------------------------------------------------------: |
 
 ### Build the CLI from Sources
 
 Make sure Go is installed by running:
+
 ```
 go version
 ```
 
 Clone the sources and CD to the root directory of the project:
+
 ```
 git clone https://github.com/jfrog/build-info-go
 cd build-info-go
 ```
+
 Build the sources as follows:
 
 On Unix based systems run:
-````
+
+```
 ./buildscripts/build.sh
-````
+```
+
 On Windows run:
-````
+
+```
 .\buildscripts\build.bat
-````
+```
+
 Once completed, you'll find the bi executable at the current directory.
 
 ### Generating Build-Info Using the CLI
@@ -363,7 +381,7 @@ Note: checksums calculation is not yet supported for Yarn projects.
 #### Conversion to CycloneDX
 
 You can generate build-info and have it converted into the CycloneDX format by adding to the
-command ```--format cyclonedx/xml``` or ```--format cyclonedx/json```.
+command `--format cyclonedx/xml` or `--format cyclonedx/json`.
 
 ### Logs
 
@@ -394,6 +412,7 @@ It's important to invoke this function at the very beginning of the build, so th
 After you [created a Build](#creating-a-new-build), you can create a new build-info module for your specific project type and collect its dependencies:
 
 #### Go
+
 ```go
 // You can pass an empty string as an argument, if the root of the Go project is the working directory.
 goModule, err := bld.AddGoModule(goProjectPath)
@@ -406,6 +425,7 @@ err = goModule.AddArtifacts(artifact1, artifact2, ...)
 ```
 
 #### Maven
+
 ```go
 // You can pass an empty string as an argument, if the root of the Maven project is the working directory.
 mavenModule, err := bld.AddMavenModule(mavenProjectPath)
