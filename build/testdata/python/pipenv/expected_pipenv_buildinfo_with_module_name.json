@@ -30,8 +30,8 @@
           ]
         },
         {
-          "id": "pyyaml:6.0",
-          "type": "whl",
+          "id": "pyyaml:5.1.2",
+          "type": "tar.gz",
           "requestedBy": [
             [
               "testModuleName:1.0.0"

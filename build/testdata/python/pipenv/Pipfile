@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 toml = "*"
 pexpect = "4.8.0"
-PyYAML = "5.1.2"
+PyYAML = "==5.1.2"
 
 [dev-packages]
 
