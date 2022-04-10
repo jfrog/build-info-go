@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
@@ -347,30 +348,55 @@ type Module struct {
 	Checksum
 }
 
-func (m *Module) isEqual(other Module) bool {
-	return m.Id == other.Id && m.Type == other.Type && m.Checksum.IsEqual(other.Checksum) && isEqualArtifactSlices(m.Artifacts, other.Artifacts) && isEqualDependencySlices(m.Dependencies, other.Dependencies)
+func (m *Module) isEqual(expected Module) (bool, error) {
+	match, err := m.Checksum.IsEqual(expected.Checksum)
+	if !match || err != nil {
+		return false, err
+	}
+	match, err = isEqualArtifactSlices(m.Artifacts, expected.Artifacts)
+	if !match || err != nil {
+		return false, err
+	}
+	match, err = isEqualDependencySlices(m.Dependencies, expected.Dependencies)
+	if !match || err != nil {
+		return false, err
+	}
+	match, err = regexp.MatchString(m.Id, expected.Id)
+	if !match || err != nil {
+		return false, err
+	}
+	return m.Type == expected.Type, nil
 }
 
-func IsEqualModuleSlices(a, b []Module) bool {
-	return isEqualModuleSlices(a, b) && isEqualModuleSlices(b, a)
+func IsEqualModuleSlices(actual, expected []Module) (bool, error) {
+	return isEqualModuleSlices(actual, expected)
 }
 
-func isEqualModuleSlices(a, b []Module) bool {
+func isEqualModuleSlices(actual, expected []Module) (bool, error) {
+	if len(actual) != len(expected) {
+		return false, nil
+	}
 	visitedIndexes := make(map[int]bool)
-	for _, aEl := range a {
+	for _, aEl := range actual {
 		found := false
-		for index, bEl := range b {
-			if _, ok := visitedIndexes[index]; !ok && aEl.isEqual(bEl) {
-				found = true
-				visitedIndexes[index] = true
-				break
+		for index, eEl := range expected {
+			if _, ok := visitedIndexes[index]; !ok {
+				match, err := aEl.isEqual(eEl)
+				if err != nil {
+					return false, err
+				}
+				if match {
+					found = true
+					visitedIndexes[index] = true
+					break
+				}
 			}
 		}
 		if !found {
-			return false
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
 
 type Artifact struct {
@@ -380,26 +406,48 @@ type Artifact struct {
 	Checksum
 }
 
-func (a *Artifact) isEqual(other Artifact) bool {
-	return a.Name == other.Name && a.Path == other.Path && a.Type == other.Type && a.Checksum.IsEqual(other.Checksum)
+func (a *Artifact) isEqual(expected Artifact) (bool, error) {
+	match, err := regexp.MatchString(expected.Name, a.Name)
+	if !match || err != nil {
+		return false, err
+	}
+	match, err = regexp.MatchString(expected.Path, a.Path)
+	if !match || err != nil {
+		return false, err
+	}
+	match, err = a.Checksum.IsEqual(expected.Checksum)
+	if !match || err != nil {
+		return false, err
+	}
+
+	return a.Type == expected.Type, nil
 }
 
-func isEqualArtifactSlices(a, b []Artifact) bool {
+func isEqualArtifactSlices(actual, expected []Artifact) (bool, error) {
+	if len(actual) != len(expected) {
+		return false, nil
+	}
 	visitedIndexes := make(map[int]bool)
-	for _, aEl := range a {
+	for _, aEl := range actual {
 		found := false
-		for index, bEl := range b {
-			if _, ok := visitedIndexes[index]; !ok && aEl.isEqual(bEl) {
-				found = true
-				visitedIndexes[index] = true
-				break
+		for index, eEl := range expected {
+			if _, ok := visitedIndexes[index]; !ok {
+				match, err := aEl.isEqual(eEl)
+				if err != nil {
+					return false, err
+				}
+				if match {
+					found = true
+					visitedIndexes[index] = true
+					break
+				}
 			}
 		}
 		if !found {
-			return false
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
 
 type Dependency struct {
@@ -410,30 +458,47 @@ type Dependency struct {
 	Checksum
 }
 
-func (d *Dependency) IsEqual(other Dependency) bool {
-	return d.Id == other.Id && d.Type == other.Type && d.Checksum.IsEqual(other.Checksum) && utils.IsEqualSlices(d.Scopes, other.Scopes) && utils.IsEqual2DSlices(d.RequestedBy, other.RequestedBy)
+func (d *Dependency) IsEqual(expected Dependency) (bool, error) {
+	match, err := d.Checksum.IsEqual(expected.Checksum)
+	if !match || err != nil {
+		return false, err
+	}
+	match, err = regexp.MatchString(expected.Id, d.Id)
+	if !match || err != nil {
+		return false, err
+	}
+	return d.Type == expected.Type && utils.IsEqualSlices(d.Scopes, expected.Scopes) && utils.IsEqual2DSlices(d.RequestedBy, expected.RequestedBy), nil
 }
 
-func IsEqualDependencySlices(a, b []Dependency) bool {
-	return IsEqualModuleSlices([]Module{{Dependencies: a}}, []Module{{Dependencies: b}})
+func IsEqualDependencySlices(actual, expected []Dependency) (bool, error) {
+	return IsEqualModuleSlices([]Module{{Dependencies: actual}}, []Module{{Dependencies: expected}})
 }
 
-func isEqualDependencySlices(a, b []Dependency) bool {
+func isEqualDependencySlices(actual, expected []Dependency) (bool, error) {
+	if len(actual) != len(expected) {
+		return false, nil
+	}
 	visitedIndexes := make(map[int]bool)
-	for _, aEl := range a {
+	for _, aEl := range actual {
 		found := false
-		for index, bEl := range b {
-			if _, ok := visitedIndexes[index]; !ok && aEl.IsEqual(bEl) {
-				found = true
-				visitedIndexes[index] = true
-				break
+		for index, eEl := range expected {
+			if _, ok := visitedIndexes[index]; !ok {
+				match, err := aEl.IsEqual(eEl)
+				if err != nil {
+					return false, err
+				}
+				if match {
+					found = true
+					visitedIndexes[index] = true
+					break
+				}
 			}
 		}
 		if !found {
-			return false
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
 func (d *Dependency) UpdateRequestedBy(parentId string, parentRequestedBy [][]string) {
 	// Filter all existing paths from parent
@@ -491,8 +556,21 @@ func (c *Checksum) IsEmpty() bool {
 	return c.Md5 == "" && c.Sha1 == "" && c.Sha256 == ""
 }
 
-func (c *Checksum) IsEqual(other Checksum) bool {
-	return c.Md5 == other.Md5 && c.Sha1 == other.Sha1 && c.Sha256 == other.Sha256
+func (c *Checksum) IsEqual(expected Checksum) (bool, error) {
+	match, err := regexp.MatchString(expected.Md5, c.Md5)
+	if !match || err != nil {
+		return false, err
+	}
+	match, err = regexp.MatchString(expected.Sha1, c.Sha1)
+	if !match || err != nil {
+		return false, err
+	}
+	match, err = regexp.MatchString(expected.Sha256, c.Sha256)
+	if !match || err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 type Env map[string]string
