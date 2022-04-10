@@ -1,0 +1,45 @@
+{
+  "name": "build-info-go-test-pip",
+  "number": "1645699899",
+  "agent": {},
+  "buildAgent": {
+    "name": "GENERIC"
+  },
+  "modules": [
+    {
+      "type": "python",
+      "id": "jfrog-python-example:1.0",
+      "dependencies": [
+        {
+          "id": "pyyaml:5.1.2",
+          "type": "tar.gz",
+          "requestedBy": [
+            [
+              "jfrog-python-example:1.0"
+            ]
+          ]
+        },
+        {
+          "id": "nltk:3.4.5",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "jfrog-python-example:1.0"
+            ]
+          ]
+        },
+        {
+          "id": "six:1.16.0",
+          "type": "whl",
+          "requestedBy": [
+            [
+              "nltk:3.4.5",
+              "jfrog-python-example:1.0"
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "started": "2022-02-24T12:51:39.657+0200"
+}

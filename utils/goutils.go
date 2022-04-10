@@ -8,10 +8,8 @@ import (
 
 	"github.com/jfrog/gofrog/version"
 
-	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -36,56 +34,13 @@ var autoModify *bool = nil
 // Used for masking basic auth credentials as part of a URL.
 var protocolRegExp *gofrogcmd.CmdOutputPattern
 
-type Cmd struct {
-	Go           string
-	Command      []string
-	CommandFlags []string
-	Dir          string
-	StrWriter    io.WriteCloser
-	ErrWriter    io.WriteCloser
-}
-
-func newCmd() (*Cmd, error) {
-	execPath, err := exec.LookPath("go")
-	if err != nil {
-		return nil, err
-	}
-	return &Cmd{Go: execPath}, nil
-}
-
-func (config *Cmd) GetCmd() (cmd *exec.Cmd) {
-	var cmdStr []string
-	cmdStr = append(cmdStr, config.Go)
-	cmdStr = append(cmdStr, config.Command...)
-	cmdStr = append(cmdStr, config.CommandFlags...)
-	cmd = exec.Command(cmdStr[0], cmdStr[1:]...)
-	cmd.Dir = config.Dir
-	return
-}
-
-func (config *Cmd) GetEnv() map[string]string {
-	return map[string]string{}
-}
-
-func (config *Cmd) GetStdWriter() io.WriteCloser {
-	return config.StrWriter
-}
-
-func (config *Cmd) GetErrWriter() io.WriteCloser {
-	return config.ErrWriter
-}
-
 func RunGo(goArg []string, repoUrl string) error {
 	err := os.Setenv("GOPROXY", repoUrl)
 	if err != nil {
 		return err
 	}
 
-	goCmd, err := newCmd()
-	if err != nil {
-		return err
-	}
-	goCmd.Command = goArg
+	goCmd := NewCommand("go", "", goArg)
 	err = prepareGlobalRegExp()
 	if err != nil {
 		return err
@@ -95,12 +50,16 @@ func RunGo(goArg []string, repoUrl string) error {
 	if err != nil {
 		return err
 	}
+	errorOut := ""
 	if performPasswordMask {
-		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
+		_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
 	} else {
-		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
+		_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("failed running 'go %s' command with error: '%s - %s'", strings.Join(goArg, " "), err.Error(), errorOut)
+	}
+	return nil
 }
 
 // Runs 'go list -m' command and returns module name
@@ -190,11 +149,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 			}
 		}()
 	}
-	goCmd, err := newCmd()
-	if err != nil {
-		return "", err
-	}
-	goCmd.Command = commandArgs
+	goCmd := NewCommand("go", "", commandArgs)
 	goCmd.Dir = projectDir
 
 	err = prepareGlobalRegExp()
@@ -206,17 +161,18 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 		return "", err
 	}
 	var executionError error
+	var errorOut string
 	if performPasswordMask {
-		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
+		output, errorOut, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
 	} else {
-		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
+		output, errorOut, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	}
 	if len(output) != 0 {
 		log.Debug(output)
 	}
 	if executionError != nil {
 		// If the command fails, the mod stays the same, therefore, don't need to be restored.
-		errorString := fmt.Sprintf("Failed running Go command: 'go %s' in %s with error: '%s'", strings.Join(commandArgs, " "), projectDir, executionError.Error())
+		errorString := fmt.Sprintf("Failed running Go command: 'go %s' in %s with error: '%s - %s'", strings.Join(commandArgs, " "), projectDir, executionError.Error(), errorOut)
 		return "", errors.New(errorString)
 	}
 
@@ -275,11 +231,7 @@ func getParsedGoVersion() (*version.Version, error) {
 }
 
 func getGoVersion() (string, error) {
-	goCmd, err := newCmd()
-	if err != nil {
-		return "", err
-	}
-	goCmd.Command = []string{"version"}
+	goCmd := NewCommand("go", "version", nil)
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
 	return output, err
 }
@@ -337,11 +289,7 @@ func GetGoModCachePath() (string, error) {
 
 // GetGOPATH returns the location of the GOPATH
 func getGOPATH() (string, error) {
-	goCmd, err := newCmd()
-	if err != nil {
-		return "", err
-	}
-	goCmd.Command = []string{"env", "GOPATH"}
+	goCmd := NewCommand("go", "env", []string{"GOPATH"})
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
 	if err != nil {
 		return "", fmt.Errorf("could not find GOPATH env: %s", err.Error())

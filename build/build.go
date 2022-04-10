@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jfrog/build-info-go/utils/pythonutils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -16,7 +17,13 @@ import (
 	"github.com/jfrog/build-info-go/utils"
 )
 
-const BuildInfoDetails = "details"
+const (
+	// BuildInfo details dir name
+	BuildInfoDetails = "details"
+
+	// BuildInfo dependencies dir name
+	dependenciesDirName = ".build-info"
+)
 
 type Build struct {
 	buildName         string
@@ -81,9 +88,14 @@ func (b *Build) AddGradleModule(srcPath string) (*GradleModule, error) {
 	return newGradleModule(b, srcPath)
 }
 
-// AddNpmModule adds an npm module to this Build. Pass srcPath as an empty string if the root of the npm project is the working directory.
+// AddNpmModule adds a Npm module to this Build. Pass srcPath as an empty string if the root of the Npm project is the working directory.
 func (b *Build) AddNpmModule(srcPath string) (*NpmModule, error) {
 	return newNpmModule(srcPath, b)
+}
+
+// AddPythonModule adds a Python module to this Build. Pass srcPath as an empty string if the root of the python project is the working directory.
+func (b *Build) AddPythonModule(srcPath string, tool pythonutils.PythonTool) (*PythonModule, error) {
+	return newPythonModule(srcPath, tool, b)
 }
 
 // AddYarnModule adds a Yarn module to this Build. Pass srcPath as an empty string if the root of the Yarn project is the working directory.

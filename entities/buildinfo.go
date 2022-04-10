@@ -435,6 +435,21 @@ func isEqualDependencySlices(a, b []Dependency) bool {
 	}
 	return true
 }
+func (d *Dependency) UpdateRequestedBy(parentId string, parentRequestedBy [][]string) {
+	// Filter all existing paths from parent
+	var filteredChildRequestedBy [][]string
+	for _, childRequestedBy := range d.RequestedBy {
+		if childRequestedBy[0] != parentId {
+			filteredChildRequestedBy = append(filteredChildRequestedBy, childRequestedBy)
+		}
+	}
+	// Add all updated paths from parent
+	for _, requestedBy := range parentRequestedBy {
+		newRequestedBy := append([]string{parentId}, requestedBy...)
+		filteredChildRequestedBy = append(filteredChildRequestedBy, newRequestedBy)
+	}
+	d.RequestedBy = filteredChildRequestedBy
+}
 
 func (d *Dependency) NodeHasLoop() bool {
 	for _, requestedBy := range d.RequestedBy {

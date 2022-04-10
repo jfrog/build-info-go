@@ -179,10 +179,8 @@ func populateRequestedByField(parentId string, parentRequestedBy [][]string, dep
 			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= entities.RequestedByMaxLength {
 				continue
 			}
-			for _, requestedBy := range parentRequestedBy {
-				childRequestedBy := append([]string{parentId}, requestedBy...)
-				childDep.RequestedBy = append(childDep.RequestedBy, childRequestedBy)
-			}
+			// Update RequestedBy field from parent's RequestedBy.
+			childDep.UpdateRequestedBy(parentId, parentRequestedBy)
 			// Reassign map entry with new entry copy
 			dependenciesMap[childName] = childDep
 			// Run recursive call on child dependencies

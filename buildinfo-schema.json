@@ -181,7 +181,7 @@
                   "description": "List of ancestor dependencies, which caused this dependency to be imported into the build. The first item in the list is the direct ancestor",
                   "type": "array",
                   "items": {
-                    "description": "Depedency ID",
+                    "description": "Dependency ID",
                     "type": "string"
                   }
                 }
