@@ -83,20 +83,19 @@ func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency
 		dependenciesGraph[moduleName] = dependenciesGraph[packageName]
 	}
 	rootModule := buildinfo.Dependency{Id: moduleName, RequestedBy: [][]string{{}}}
-	updateDepsIdsAndRequestedBy(moduleName, rootModule, dependenciesMap, dependenciesGraph)
+	updateDepsIdsAndRequestedBy(rootModule, dependenciesMap, dependenciesGraph)
 }
 
-func updateDepsIdsAndRequestedBy(parentName string, parentDependency buildinfo.Dependency, dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string) {
-	for _, childId := range dependenciesGraph[parentName] {
+func updateDepsIdsAndRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string) {
+	for _, childId := range dependenciesGraph[parentDependency.Id] {
 		childName := childId[0:strings.Index(childId, ":")]
 		if childDep, ok := dependenciesMap[childName]; ok {
 			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= buildinfo.RequestedByMaxLength {
 				continue
 			}
-			for _, parentRequestedBy := range parentDependency.RequestedBy {
-				childRequestedBy := append([]string{parentName}, parentRequestedBy...)
-				childDep.RequestedBy = append(childDep.RequestedBy, childRequestedBy)
-			}
+			// Update RequestedBy field from parent's RequestedBy.
+			childDep.UpdateRequestedBy(parentDependency.Id, parentDependency.RequestedBy)
+
 			// Set dependency type
 			if childDep.Type == "" {
 				fileType := ""
@@ -112,7 +111,7 @@ func updateDepsIdsAndRequestedBy(parentName string, parentDependency buildinfo.D
 			// Reassign map entry with new entry copy
 			dependenciesMap[childName] = childDep
 			// Run recursive call on child dependencies
-			updateDepsIdsAndRequestedBy(childId, childDep, dependenciesMap, dependenciesGraph)
+			updateDepsIdsAndRequestedBy(childDep, dependenciesMap, dependenciesGraph)
 		}
 	}
 }
