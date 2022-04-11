@@ -30,15 +30,6 @@
           ]
         },
         {
-          "id": "pyyaml:5.1.2",
-          "type": "tar.gz",
-          "requestedBy": [
-            [
-              "testModuleName:1.0.0"
-            ]
-          ]
-        },
-        {
           "id": "toml:0.10.2",
           "type": "whl",
           "requestedBy": [
