@@ -160,7 +160,7 @@ func TestIsEqualModuleSlicesRegex(t *testing.T) {
 	assert.False(t, match)
 	actual[0].Dependencies[0].Id = "sha256__7d3b33ae048d1"
 
-// Validate artifact
+	// Validate artifact
 	actual[0].Artifacts[0].Sha1 = ""
 	match, err = IsEqualModuleSlices(actual, expected)
 	assert.NoError(t, err)
@@ -171,7 +171,7 @@ func TestIsEqualModuleSlicesRegex(t *testing.T) {
 	match, err = IsEqualModuleSlices(actual, expected)
 	assert.NoError(t, err)
 	assert.False(t, match)
-	actual[0].Artifacts[0].Sha1 ="image-name-multiarch-image/sha256:a56b64f"
+	actual[0].Artifacts[0].Sha1 = "image-name-multiarch-image/sha256:a56b64f"
 
 	actual[0].Artifacts[0].Name = ""
 	match, err = IsEqualModuleSlices(actual, expected)
