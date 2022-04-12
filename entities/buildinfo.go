@@ -348,12 +348,18 @@ type Module struct {
 	Checksum
 }
 
+// If the 'expected' Module matches the current one, return true.
+// 'expected' Module may contain regex values for Id, Artifacts, ExcludedArtifacts, Dependencies and Checksum.
 func (m *Module) isEqual(expected Module) (bool, error) {
 	match, err := m.Checksum.IsEqual(expected.Checksum)
 	if !match || err != nil {
 		return false, err
 	}
 	match, err = isEqualArtifactSlices(m.Artifacts, expected.Artifacts)
+	if !match || err != nil {
+		return false, err
+	}
+	match, err = isEqualArtifactSlices(m.ExcludedArtifacts, expected.ExcludedArtifacts)
 	if !match || err != nil {
 		return false, err
 	}
@@ -406,6 +412,8 @@ type Artifact struct {
 	Checksum
 }
 
+// If the 'expected' Artifact matches the current one, return true.
+// 'expected' Artifacts may contain regex values for Name, Path, and Checksum.
 func (a *Artifact) isEqual(expected Artifact) (bool, error) {
 	match, err := regexp.MatchString(expected.Name, a.Name)
 	if !match || err != nil {
@@ -458,6 +466,8 @@ type Dependency struct {
 	Checksum
 }
 
+// If the 'expected' Dependency matches the current one, return true.
+// 'expected' Dependency may contain regex values for Id and Checksum.
 func (d *Dependency) IsEqual(expected Dependency) (bool, error) {
 	match, err := d.Checksum.IsEqual(expected.Checksum)
 	if !match || err != nil {
