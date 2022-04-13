@@ -74,7 +74,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
 	}
 	if len(otherMissingDeps) > 0 {
-		log.Info("couldn't calculate checksum for : '" + strings.Join(otherMissingDeps, ",") + "'. Hint: Try to delete 'node_models' and/or 'package-lock.json'.")
+		log.Warn("The following dependencies will not be included in the build-info: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try to delete 'node_models' and/or 'package-lock.json'.")
 	}
 	return
 }
