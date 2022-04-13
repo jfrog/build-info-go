@@ -35,7 +35,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 		}
 		cacache = NewNpmCacache(cacheLocation)
 	}
-	var missingPeerDeps, missingBundledDeps, missingOptionalDeps []string
+	var missingPeerDeps, missingBundledDeps, missingOptionalDeps, otherMissingDeps []string
 	for _, dep := range dependenciesMap {
 		if dep.npmLsDependency.Integrity == "" && dep.npmLsDependency.InBundle {
 			missingBundledDeps = append(missingBundledDeps, dep.Id)
@@ -56,8 +56,9 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 				// This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
 				// Seems like the compatibility upgrades may result in dependencies losing their integrity.
 				// We use the integrity to get's the dependencies tarball
-				log.Error("couldn't calculate checksum for : '" + dep.Id + "'. Hint: Try to delete 'node_models' and/or 'package-lock.json'.")
-				return nil, err
+				otherMissingDeps = append(otherMissingDeps, dep.Id)
+				log.Debug("couldn't calculate checksum for " + dep.Id + ". Error: '" + err.Error() + "'.")
+				continue
 			}
 		}
 
@@ -71,6 +72,9 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 	}
 	if len(missingOptionalDeps) > 0 {
 		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
+	}
+	if len(otherMissingDeps) > 0 {
+		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try to delete 'node_models' and/or 'package-lock.json'.")
 	}
 	return
 }
