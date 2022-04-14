@@ -1,4 +1,10 @@
 # Release Notes
+## 1.2.4 (April 14, 2022)
+- Bug fix - Missing npm depedencies should not return an error
+
+## 1.2.3 (April 11, 2022)
+- Support for Python
+
 ## 1.2.2 (March 31, 2022)
 - Bug fix - Avoid adding optional npm dependencies to the build-info
 
