@@ -41,7 +41,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 			missingBundledDeps = append(missingBundledDeps, dep.Id)
 			continue
 		}
-		if dep.npmLsDependency.Integrity == "" && len(dep.PeerMissing) > 0 {
+		if dep.npmLsDependency.Integrity == "" && dep.PeerMissing != nil {
 			missingPeerDeps = append(missingPeerDeps, dep.Id)
 			continue
 		}
@@ -143,7 +143,7 @@ type npmLsDependency struct {
 	Problems []string
 	// Missing  peer dependency in npm version 6
 	// Bound to 'legacyNpmLsDependency' struct
-	PeerMissing []*peerMissing
+	PeerMissing interface{}
 }
 
 // npm 6 ls results for a single dependency
@@ -156,13 +156,9 @@ type legacyNpmLsDependency struct {
 	Dev           bool   `json:"_development,omitempty"`
 	InnerOptional bool   `json:"_optional,omitempty"`
 	Optional      bool
-	PeerMissing   []*peerMissing
+	PeerMissing   interface{}
 }
 
-type peerMissing struct {
-	RequiredBy string
-	Requires   string
-}
 
 func (lnld *legacyNpmLsDependency) optional() bool {
 	if lnld.Optional {
