@@ -159,7 +159,6 @@ type legacyNpmLsDependency struct {
 	PeerMissing   interface{}
 }
 
-
 func (lnld *legacyNpmLsDependency) optional() bool {
 	if lnld.Optional {
 		return true
