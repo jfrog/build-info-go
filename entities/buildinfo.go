@@ -348,44 +348,44 @@ type Module struct {
 	Checksum
 }
 
-// If the 'expected' Module matches the current one, return true.
-// 'expected' Module may contain regex values for Id, Artifacts, ExcludedArtifacts, Dependencies and Checksum.
-func (m *Module) isEqual(expected Module) (bool, error) {
-	match, err := m.Checksum.IsEqual(expected.Checksum)
+// If the 'other' Module matches the current one, return true.
+// 'other' Module may contain regex values for Id, Artifacts, ExcludedArtifacts, Dependencies and Checksum.
+func (m *Module) isEqual(other Module) (bool, error) {
+	match, err := m.Checksum.IsEqual(other.Checksum)
 	if !match || err != nil {
 		return false, err
 	}
-	match, err = isEqualArtifactSlices(m.Artifacts, expected.Artifacts)
+	match, err = isEqualArtifactSlices(m.Artifacts, other.Artifacts)
 	if !match || err != nil {
 		return false, err
 	}
-	match, err = isEqualArtifactSlices(m.ExcludedArtifacts, expected.ExcludedArtifacts)
+	match, err = isEqualArtifactSlices(m.ExcludedArtifacts, other.ExcludedArtifacts)
 	if !match || err != nil {
 		return false, err
 	}
-	match, err = isEqualDependencySlices(m.Dependencies, expected.Dependencies)
+	match, err = isEqualDependencySlices(m.Dependencies, other.Dependencies)
 	if !match || err != nil {
 		return false, err
 	}
-	match, err = regexp.MatchString(m.Id, expected.Id)
+	match, err = regexp.MatchString(m.Id, other.Id)
 	if !match || err != nil {
 		return false, err
 	}
-	return m.Type == expected.Type, nil
+	return m.Type == other.Type, nil
 }
 
-func IsEqualModuleSlices(actual, expected []Module) (bool, error) {
-	return isEqualModuleSlices(actual, expected)
+func IsEqualModuleSlices(actual, other []Module) (bool, error) {
+	return isEqualModuleSlices(actual, other)
 }
 
-func isEqualModuleSlices(actual, expected []Module) (bool, error) {
-	if len(actual) != len(expected) {
+func isEqualModuleSlices(actual, other []Module) (bool, error) {
+	if len(actual) != len(other) {
 		return false, nil
 	}
 	visitedIndexes := make(map[int]bool)
 	for _, aEl := range actual {
 		found := false
-		for index, eEl := range expected {
+		for index, eEl := range other {
 			if _, ok := visitedIndexes[index]; !ok {
 				match, err := aEl.isEqual(eEl)
 				if err != nil {
@@ -412,33 +412,33 @@ type Artifact struct {
 	Checksum
 }
 
-// If the 'expected' Artifact matches the current one, return true.
-// 'expected' Artifacts may contain regex values for Name, Path, and Checksum.
-func (a *Artifact) isEqual(expected Artifact) (bool, error) {
-	match, err := regexp.MatchString(expected.Name, a.Name)
+// If the 'other' Artifact matches the current one, return true.
+// 'other' Artifacts may contain regex values for Name, Path, and Checksum.
+func (a *Artifact) isEqual(other Artifact) (bool, error) {
+	match, err := regexp.MatchString(other.Name, a.Name)
 	if !match || err != nil {
 		return false, err
 	}
-	match, err = regexp.MatchString(expected.Path, a.Path)
+	match, err = regexp.MatchString(other.Path, a.Path)
 	if !match || err != nil {
 		return false, err
 	}
-	match, err = a.Checksum.IsEqual(expected.Checksum)
+	match, err = a.Checksum.IsEqual(other.Checksum)
 	if !match || err != nil {
 		return false, err
 	}
 
-	return a.Type == expected.Type, nil
+	return a.Type == other.Type, nil
 }
 
-func isEqualArtifactSlices(actual, expected []Artifact) (bool, error) {
-	if len(actual) != len(expected) {
+func isEqualArtifactSlices(actual, other []Artifact) (bool, error) {
+	if len(actual) != len(other) {
 		return false, nil
 	}
 	visitedIndexes := make(map[int]bool)
 	for _, aEl := range actual {
 		found := false
-		for index, eEl := range expected {
+		for index, eEl := range other {
 			if _, ok := visitedIndexes[index]; !ok {
 				match, err := aEl.isEqual(eEl)
 				if err != nil {
@@ -466,32 +466,32 @@ type Dependency struct {
 	Checksum
 }
 
-// If the 'expected' Dependency matches the current one, return true.
-// 'expected' Dependency may contain regex values for Id and Checksum.
-func (d *Dependency) IsEqual(expected Dependency) (bool, error) {
-	match, err := d.Checksum.IsEqual(expected.Checksum)
+// If the 'other' Dependency matches the current one, return true.
+// 'other' Dependency may contain regex values for Id and Checksum.
+func (d *Dependency) IsEqual(other Dependency) (bool, error) {
+	match, err := d.Checksum.IsEqual(other.Checksum)
 	if !match || err != nil {
 		return false, err
 	}
-	match, err = regexp.MatchString(expected.Id, d.Id)
+	match, err = regexp.MatchString(other.Id, d.Id)
 	if !match || err != nil {
 		return false, err
 	}
-	return d.Type == expected.Type && utils.IsEqualSlices(d.Scopes, expected.Scopes) && utils.IsEqual2DSlices(d.RequestedBy, expected.RequestedBy), nil
+	return d.Type == other.Type && utils.IsEqualSlices(d.Scopes, other.Scopes) && utils.IsEqual2DSlices(d.RequestedBy, other.RequestedBy), nil
 }
 
-func IsEqualDependencySlices(actual, expected []Dependency) (bool, error) {
-	return IsEqualModuleSlices([]Module{{Dependencies: actual}}, []Module{{Dependencies: expected}})
+func IsEqualDependencySlices(actual, other []Dependency) (bool, error) {
+	return IsEqualModuleSlices([]Module{{Dependencies: actual}}, []Module{{Dependencies: other}})
 }
 
-func isEqualDependencySlices(actual, expected []Dependency) (bool, error) {
-	if len(actual) != len(expected) {
+func isEqualDependencySlices(actual, other []Dependency) (bool, error) {
+	if len(actual) != len(other) {
 		return false, nil
 	}
 	visitedIndexes := make(map[int]bool)
 	for _, aEl := range actual {
 		found := false
-		for index, eEl := range expected {
+		for index, eEl := range other {
 			if _, ok := visitedIndexes[index]; !ok {
 				match, err := aEl.IsEqual(eEl)
 				if err != nil {
@@ -566,16 +566,18 @@ func (c *Checksum) IsEmpty() bool {
 	return c.Md5 == "" && c.Sha1 == "" && c.Sha256 == ""
 }
 
-func (c *Checksum) IsEqual(expected Checksum) (bool, error) {
-	match, err := regexp.MatchString(expected.Md5, c.Md5)
+// If the 'other' checksum matches the current one, return true.
+// 'other' checksum may contain regex values for sha1, sha256 and md5.
+func (c *Checksum) IsEqual(other Checksum) (bool, error) {
+	match, err := regexp.MatchString(other.Md5, c.Md5)
 	if !match || err != nil {
 		return false, err
 	}
-	match, err = regexp.MatchString(expected.Sha1, c.Sha1)
+	match, err = regexp.MatchString(other.Sha1, c.Sha1)
 	if !match || err != nil {
 		return false, err
 	}
-	match, err = regexp.MatchString(expected.Sha256, c.Sha256)
+	match, err = regexp.MatchString(other.Sha256, c.Sha256)
 	if !match || err != nil {
 		return false, err
 	}
