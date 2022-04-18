@@ -168,6 +168,37 @@ func TestBundledDependenciesList(t *testing.T) {
 	}
 }
 
+// This test runs with npm v6. It collects build-info for npm project that has conflicts in peer dependencies.
+// A scenario like this can result in unexpected parsing results of the npm ls output,
+// such as 'legacyNpmLsDependency.PeerMissing ' may be changed to a different type.
+func TestConflictsDependenciesList(t *testing.T) {
+	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+	if npmVersion.AtLeast("7.0.0") {
+		t.Skip("Running on npm v6 only, skipping...")
+	}
+	assert.NoError(t, err)
+	path, err := filepath.Abs(filepath.Join("..", "testdata"))
+	assert.NoError(t, err)
+
+	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project5", true, npmVersion)
+	defer cleanup()
+	cacachePath := filepath.Join(projectPath, "tmpcache")
+	npmArgs := []string{"--cache=" + cacachePath}
+	// Install dependencies in the npm project.
+	_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
+	assert.NoError(t, err)
+
+	// Calculate dependencies.
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	var excpected []entities.Dependency
+	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
+	if !entities.IsEqualDependencySlices(dependencies, excpected) {
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+	}
+}
+
 // This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
 // Seems like the compatibility upgrades may result in dependencies losing their integrity.
 // We try to get the integrity from the cache index.
