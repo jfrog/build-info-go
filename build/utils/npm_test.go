@@ -163,7 +163,9 @@ func TestBundledDependenciesList(t *testing.T) {
 	// Check peer dependency is not found.
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	if !entities.IsEqualDependencySlices(excpected, dependencies) {
+	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
+	assert.NoError(t, err)
+	if !match {
 		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
 	}
 }
@@ -193,7 +195,9 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	// Verify results.
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	if !entities.IsEqualDependencySlices(excpected, dependencies) {
+	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
+	assert.NoError(t, err)
+	if !match {
 		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
 	}
 }
@@ -220,7 +224,9 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	// Verify results.
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	if !entities.IsEqualDependencySlices(excpected, dependencies) {
+	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
+	assert.NoError(t, err)
+	if !match {
 		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
 	}
 }

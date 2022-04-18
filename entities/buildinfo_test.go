@@ -50,18 +50,26 @@ func TestIsEqualModuleSlices(t *testing.T) {
 			},
 		}},
 	}}
-	assert.True(t, IsEqualModuleSlices(a, b))
+	match, err := IsEqualModuleSlices(a, b)
+	assert.NoError(t, err)
+	assert.True(t, match)
 
 	b[0].Type = "other"
-	assert.False(t, IsEqualModuleSlices(a, b))
+	match, err = IsEqualModuleSlices(a, b)
+	assert.NoError(t, err)
+	assert.False(t, match)
 
 	b[0].Type = "docker"
 	b[0].Id = "other"
-	assert.False(t, IsEqualModuleSlices(a, b))
+	match, err = IsEqualModuleSlices(a, b)
+	assert.NoError(t, err)
+	assert.False(t, match)
 
 	b[0].Id = "manifest"
 	b[0].Artifacts[0].Name = "other"
-	assert.False(t, IsEqualModuleSlices(a, b))
+	match, err = IsEqualModuleSlices(a, b)
+	assert.NoError(t, err)
+	assert.False(t, match)
 
 	b[0].Artifacts[0].Name = "layer"
 	newDependency := Dependency{
@@ -73,9 +81,13 @@ func TestIsEqualModuleSlices(t *testing.T) {
 		},
 	}
 	b[0].Dependencies = append(b[0].Dependencies, newDependency)
-	assert.False(t, IsEqualModuleSlices(a, b))
+	match, err = IsEqualModuleSlices(a, b)
+	assert.NoError(t, err)
+	assert.False(t, match)
 	a[0].Dependencies = append(a[0].Dependencies, newDependency)
-	assert.True(t, IsEqualModuleSlices(a, b))
+	match, err = IsEqualModuleSlices(a, b)
+	assert.NoError(t, err)
+	assert.True(t, match)
 
 	newArtifact := Artifact{
 		Name:     "a",
@@ -84,8 +96,87 @@ func TestIsEqualModuleSlices(t *testing.T) {
 		Checksum: Checksum{},
 	}
 	a[0].Artifacts = append(a[0].Artifacts, newArtifact)
-	assert.False(t, IsEqualModuleSlices(a, b))
+	match, err = IsEqualModuleSlices(a, b)
+	assert.NoError(t, err)
+	assert.False(t, match)
+}
 
+func TestIsEqualModuleSlicesRegex(t *testing.T) {
+	actual := []Module{{
+		Type: "docker",
+		Id:   "manifest",
+		Artifacts: []Artifact{{
+			Name: "sha256__7d3b33ae048d1",
+			Type: "json",
+			Path: "image-name-multiarch-image/sha256:a56b64f",
+			Checksum: Checksum{
+				Sha1: "1",
+				Md5:  "2",
+			},
+		}},
+		Dependencies: []Dependency{{
+			Id:   "sha256__7d3b33ae048d1",
+			Type: "docker",
+			Checksum: Checksum{
+				Sha1: "3",
+				Md5:  "4",
+			},
+		}},
+	}}
+	expected := []Module{{
+		Type: "docker",
+		Id:   "manifest",
+		Artifacts: []Artifact{{
+			Name: "sha256__*",
+			Type: "json",
+			Path: "image-name-multiarch-image*",
+			Checksum: Checksum{
+				Sha1: ".+",
+				Md5:  ".+",
+			},
+		}},
+		Dependencies: []Dependency{{
+			Id:   "sha256__*",
+			Type: "docker",
+			Checksum: Checksum{
+				Sha1: ".+",
+				Md5:  ".+",
+			},
+		}},
+	}}
+	match, err := IsEqualModuleSlices(actual, expected)
+	assert.NoError(t, err)
+	assert.True(t, match)
+	// Validate dependencies
+	actual[0].Dependencies[0].Sha1 = ""
+	match, err = IsEqualModuleSlices(actual, expected)
+	assert.NoError(t, err)
+	assert.False(t, match)
+	actual[0].Dependencies[0].Sha1 = "123"
+
+	actual[0].Dependencies[0].Id = ""
+	match, err = IsEqualModuleSlices(actual, expected)
+	assert.NoError(t, err)
+	assert.False(t, match)
+	actual[0].Dependencies[0].Id = "sha256__7d3b33ae048d1"
+
+	// Validate artifact
+	actual[0].Artifacts[0].Sha1 = ""
+	match, err = IsEqualModuleSlices(actual, expected)
+	assert.NoError(t, err)
+	assert.False(t, match)
+	actual[0].Artifacts[0].Sha1 = "123"
+
+	actual[0].Artifacts[0].Path = "a"
+	match, err = IsEqualModuleSlices(actual, expected)
+	assert.NoError(t, err)
+	assert.False(t, match)
+	actual[0].Artifacts[0].Sha1 = "image-name-multiarch-image/sha256:a56b64f"
+
+	actual[0].Artifacts[0].Name = ""
+	match, err = IsEqualModuleSlices(actual, expected)
+	assert.NoError(t, err)
+	assert.False(t, match)
 }
 
 func TestMergeDependenciesLists(t *testing.T) {
@@ -144,5 +235,7 @@ func TestAppend(t *testing.T) {
 	}
 
 	buildInfo1.Append(&buildInfo2)
-	assert.True(t, IsEqualModuleSlices(expected.Modules, buildInfo1.Modules))
+	results, err := IsEqualModuleSlices(expected.Modules, buildInfo1.Modules)
+	assert.NoError(t, err)
+	assert.True(t, results)
 }
