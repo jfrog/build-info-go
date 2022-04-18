@@ -168,8 +168,9 @@ func TestBundledDependenciesList(t *testing.T) {
 	}
 }
 
-// Only for npm v6.
-// Conflicts in peer dependencies.
+// This test runs with npm v6. It collects build-info for npm project that has conflicts in peer dependencies.
+// A scenario like this can result in unexpected parsing results of the npm ls output,
+// such as 'legacyNpmLsDependency.PeerMissing ' may be changed to a different type.
 func TestConflictsDependenciesList(t *testing.T) {
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	if npmVersion.AtLeast("7.0.0") {
