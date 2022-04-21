@@ -196,7 +196,9 @@ func TestConflictsDependenciesList(t *testing.T) {
 
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	if !entities.IsEqualDependencySlices(dependencies, excpected) {
+	match, err := entities.IsEqualDependencySlices(dependencies, excpected)
+	assert.NoError(t, err)
+	if !match {
 		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
 	}
 }
