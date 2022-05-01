@@ -17,7 +17,7 @@ import (
 )
 
 // CalculateNpmDependenciesList gets an npm project's dependencies.
-func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, calculateChecksums bool, log utils.Log) (dependenciesList []entities.Dependency, err error) {
+func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
@@ -35,6 +35,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 		}
 		cacache = NewNpmCacache(cacheLocation)
 	}
+	var dependenciesList []entities.Dependency
 	var missingPeerDeps, missingBundledDeps, missingOptionalDeps, otherMissingDeps []string
 	for _, dep := range dependenciesMap {
 		if dep.npmLsDependency.Integrity == "" && dep.npmLsDependency.InBundle {
@@ -76,7 +77,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 	if len(otherMissingDeps) > 0 {
 		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try to delete 'node_models' and/or 'package-lock.json'.")
 	}
-	return
+	return dependenciesList, nil
 }
 
 type dependencyInfo struct {
