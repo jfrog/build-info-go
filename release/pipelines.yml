@@ -30,7 +30,6 @@ pipelines:
           integrations:
             - name: il_automation
             - name: entplus_deployer
-            - name: releases_jfrog_io_deployer
         execution:
           onExecute:
             - cd $res_buildinfoGoGit_resourcePath
@@ -73,9 +72,6 @@ pipelines:
             # Distribute release bundle
             - jf ds rbc "build-info-go" $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
             - jf ds rbd "build-info-go" $NEXT_VERSION --site="releases.jfrog.io" --sync
-
-            # Copy version to 'latest' directory in releases.jfrog.io
-            - jf rt cp "bi-cli/v1/$NEXT_VERSION/(*)" "bi-cli/v1/latest/{1}" --url=https://releases.jfrog.io/artifactory/ --access-token=$int_releases_jfrog_io_deployer_access_token
 
             # Push to main
             - git clean -fd
