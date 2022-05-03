@@ -17,7 +17,7 @@ import (
 )
 
 // CalculateNpmDependenciesList gets an npm project's dependencies.
-func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, calculateChecksums bool, log utils.Log) (dependenciesList []entities.Dependency, err error) {
+func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
@@ -35,13 +35,14 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 		}
 		cacache = NewNpmCacache(cacheLocation)
 	}
+	var dependenciesList []entities.Dependency
 	var missingPeerDeps, missingBundledDeps, missingOptionalDeps, otherMissingDeps []string
 	for _, dep := range dependenciesMap {
 		if dep.npmLsDependency.Integrity == "" && dep.npmLsDependency.InBundle {
 			missingBundledDeps = append(missingBundledDeps, dep.Id)
 			continue
 		}
-		if dep.npmLsDependency.Integrity == "" && len(dep.PeerMissing) > 0 {
+		if dep.npmLsDependency.Integrity == "" && dep.PeerMissing != nil {
 			missingPeerDeps = append(missingPeerDeps, dep.Id)
 			continue
 		}
@@ -76,7 +77,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 	if len(otherMissingDeps) > 0 {
 		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try to delete 'node_models' and/or 'package-lock.json'.")
 	}
-	return
+	return dependenciesList, nil
 }
 
 type dependencyInfo struct {
@@ -143,7 +144,7 @@ type npmLsDependency struct {
 	Problems []string
 	// Missing  peer dependency in npm version 6
 	// Bound to 'legacyNpmLsDependency' struct
-	PeerMissing []*peerMissing
+	PeerMissing interface{}
 }
 
 // npm 6 ls results for a single dependency
@@ -156,12 +157,7 @@ type legacyNpmLsDependency struct {
 	Dev           bool   `json:"_development,omitempty"`
 	InnerOptional bool   `json:"_optional,omitempty"`
 	Optional      bool
-	PeerMissing   []*peerMissing
-}
-
-type peerMissing struct {
-	RequiredBy string
-	Requires   string
+	PeerMissing   interface{}
 }
 
 func (lnld *legacyNpmLsDependency) optional() bool {

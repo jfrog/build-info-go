@@ -1,4 +1,9 @@
 # Release Notes
+## 1.2.5 (April 21, 2022)
+- Upgrade build-info-extractor-maven to 2.36.2
+- Upgrade build-info-extractor-gradle to 4.28.2 
+- Bug fix - Build-info collection for npm nay fail due to peer dependencies conflicts
+
 ## 1.2.4 (April 14, 2022)
 - Bug fix - Missing npm depedencies should not return an error
 

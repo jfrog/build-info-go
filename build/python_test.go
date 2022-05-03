@@ -1,12 +1,13 @@
 package build
 
 import (
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils/pythonutils"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils/pythonutils"
 
 	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	"github.com/stretchr/testify/assert"
@@ -59,7 +60,9 @@ func testGenerateBuildInfoForPython(t *testing.T, pythonTool pythonutils.PythonT
 	// Verify results.
 	expectedBuildInfoJson := filepath.Join(projectPath, expectedResultsJson)
 	expectedBuildInfo := testdatautils.GetBuildInfo(t, expectedBuildInfoJson)
-	if !entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules) {
+	match, err := entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules)
+	assert.NoError(t, err)
+	if !match {
 		testdatautils.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
 	}
 }

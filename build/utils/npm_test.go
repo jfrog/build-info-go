@@ -163,7 +163,42 @@ func TestBundledDependenciesList(t *testing.T) {
 	// Check peer dependency is not found.
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	if !entities.IsEqualDependencySlices(excpected, dependencies) {
+	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
+	assert.NoError(t, err)
+	if !match {
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+	}
+}
+
+// This test runs with npm v6. It collects build-info for npm project that has conflicts in peer dependencies.
+// A scenario like this can result in unexpected parsing results of the npm ls output,
+// such as 'legacyNpmLsDependency.PeerMissing ' may be changed to a different type.
+func TestConflictsDependenciesList(t *testing.T) {
+	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+	if npmVersion.AtLeast("7.0.0") {
+		t.Skip("Running on npm v6 only, skipping...")
+	}
+	assert.NoError(t, err)
+	path, err := filepath.Abs(filepath.Join("..", "testdata"))
+	assert.NoError(t, err)
+
+	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project5", true, npmVersion)
+	defer cleanup()
+	cacachePath := filepath.Join(projectPath, "tmpcache")
+	npmArgs := []string{"--cache=" + cacachePath}
+	// Install dependencies in the npm project.
+	_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
+	assert.NoError(t, err)
+
+	// Calculate dependencies.
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	var excpected []entities.Dependency
+	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
+	match, err := entities.IsEqualDependencySlices(dependencies, excpected)
+	assert.NoError(t, err)
+	if !match {
 		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
 	}
 }
@@ -193,7 +228,9 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	// Verify results.
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	if !entities.IsEqualDependencySlices(excpected, dependencies) {
+	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
+	assert.NoError(t, err)
+	if !match {
 		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
 	}
 }
@@ -220,7 +257,9 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	// Verify results.
 	var excpected []entities.Dependency
 	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	if !entities.IsEqualDependencySlices(excpected, dependencies) {
+	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
+	assert.NoError(t, err)
+	if !match {
 		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
 	}
 }
