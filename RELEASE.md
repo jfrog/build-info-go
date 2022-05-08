@@ -1,4 +1,8 @@
 # Release Notes
+## 1.2.6 (May 8, 2022)
+- Added pip & pipenv usage to the README
+- Bug fix - Missing npm dependencies cause an error
+
 ## 1.2.5 (April 21, 2022)
 - Upgrade build-info-extractor-maven to 2.36.2
 - Upgrade build-info-extractor-gradle to 4.28.2 
