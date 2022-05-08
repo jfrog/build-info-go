@@ -378,6 +378,22 @@ bi yarn [Yarn command] [command options]
 
 Note: checksums calculation is not yet supported for Yarn projects.
 
+#### pip
+
+```shell
+bi pip [pip command] [command options]
+```
+
+Note: checksums calculation is not yet supported for pip projects.
+
+#### pipenv
+
+```shell
+bi pipenv [pipenv command] [command options]
+```
+
+Note: checksums calculation is not yet supported for pipenv projects.
+
 #### Conversion to CycloneDX
 
 You can generate build-info and have it converted into the CycloneDX format by adding to the
