@@ -93,6 +93,11 @@ func (b *Build) AddNpmModule(srcPath string) (*NpmModule, error) {
 	return newNpmModule(srcPath, b)
 }
 
+// AddNugetModule adds a Npm module to this Build. Pass srcPath as an empty string if the root of the Npm project is the working directory.
+func (b *Build) AddNugetModule(srcPath string) (*NpmModule, error) {
+	return newNpmModule(srcPath, b)
+}
+
 // AddPythonModule adds a Python module to this Build. Pass srcPath as an empty string if the root of the python project is the working directory.
 func (b *Build) AddPythonModule(srcPath string, tool pythonutils.PythonTool) (*PythonModule, error) {
 	return newPythonModule(srcPath, tool, b)

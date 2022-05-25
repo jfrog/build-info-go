@@ -147,6 +147,35 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			},
 		},
 		{
+			Name:      "nuget",
+			Usage:     "Generate build-info for a nuget project",
+			UsageText: "bi nuget",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("nuget-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
+				npmModule, err := bld.AddNpmModule("")
+				if err != nil {
+					return
+				}
+				err = npmModule.CalcDependencies()
+				if err != nil {
+					return
+				}
+				return printBuild(bld, context.String(formatFlag))
+			},
+		},
+		{
 			Name:            "yarn",
 			Usage:           "Build a Yarn project and generate build-info for it",
 			UsageText:       "bi yarn [yarn command] [command options]",
