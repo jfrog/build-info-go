@@ -2,12 +2,12 @@ package build
 
 import (
 	"errors"
+	"github.com/jfrog/build-info-go/utils"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/parallel"
 	"github.com/stretchr/testify/assert"
 )

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"github.com/jfrog/build-info-go/utils/compareutils"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ func TestIsEqualSlices(t *testing.T) {
 		{nil, nil, true},
 	}
 	for _, d := range data {
-		if got := IsEqualSlices(d.a, d.b); got != d.res {
+		if got := compareutils.IsEqualSlices(d.a, d.b); got != d.res {
 			t.Errorf("IsEqualSlices(%v, %v) == %v, want %v", d.a, d.b, got, d.res)
 		}
 	}
@@ -45,7 +46,7 @@ func TestIsEqual2DSlices(t *testing.T) {
 		{[][]string{{}}, [][]string{{}}, true},
 	}
 	for _, d := range data {
-		if got := IsEqual2DSlices(d.a, d.b); got != d.res {
+		if got := compareutils.IsEqual2DSlices(d.a, d.b); got != d.res {
 			t.Errorf("IsEqual2DSlices(%v, %v) == %v, want %v", d.a, d.b, got, d.res)
 		}
 	}
@@ -61,7 +62,7 @@ func TestTo1DSlice(t *testing.T) {
 		{[][]string{{}}, []string{""}},
 	}
 	for _, d := range data {
-		if got := to1DSlice(d.a); !assert.ElementsMatch(t, got, d.res) {
+		if got := compareutils.to1DSlice(d.a); !assert.ElementsMatch(t, got, d.res) {
 			t.Errorf("to1DSlice(%v) == %v, want %v", d.a, got, d.res)
 		}
 	}

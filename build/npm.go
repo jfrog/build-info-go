@@ -2,11 +2,11 @@ package build
 
 import (
 	"errors"
+	"github.com/jfrog/build-info-go/utils"
 	"os"
 
 	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
 )
 
 const minSupportedNpmVersion = "5.4.0"

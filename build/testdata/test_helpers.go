@@ -2,13 +2,13 @@ package testdata
 
 import (
 	"encoding/json"
+	"github.com/jfrog/build-info-go/utils"
 	"io/ioutil"
 	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/version"
 	"github.com/stretchr/testify/assert"
 )

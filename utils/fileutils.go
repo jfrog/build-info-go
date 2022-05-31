@@ -3,13 +3,16 @@ package utils
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/jfrog/build-info-go/entities"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -174,6 +177,50 @@ func ListFiles(path string, includeDirs bool) ([]string, error) {
 				return nil, err
 			}
 			if isDir {
+				fileList = append(fileList, filePath)
+			}
+		}
+	}
+	return fileList, nil
+}
+
+// Return all files in the specified path who satisfy the filter func. Not recursive.
+func ListFilesByFilterFunc(path string, filterFunc func(filePath string) (bool, error)) ([]string, error) {
+	sep := GetFileSeparator()
+	if !strings.HasSuffix(path, sep) {
+		path += sep
+	}
+	var fileList []string
+	files, _ := ioutil.ReadDir(path)
+	path = strings.TrimPrefix(path, "."+sep)
+
+	for _, f := range files {
+		filePath := path + f.Name()
+		satisfy, err := filterFunc(filePath)
+		if err != nil {
+			return nil, err
+		}
+		if !satisfy {
+			continue
+		}
+		exists, err := IsFileExists(filePath, false)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			fileList = append(fileList, filePath)
+			continue
+		}
+
+		// Checks if the filepath is a symlink.
+		if IsPathSymlink(filePath) {
+			// Gets the file info of the symlink.
+			file, err := GetFileInfo(filePath, false)
+			if err != nil {
+				return nil, err
+			}
+			// Checks if the symlink is a file.
+			if !file.IsDir() {
 				fileList = append(fileList, filePath)
 			}
 		}
@@ -540,4 +587,178 @@ func ReadNLines(path string, total int) (lines []string, err error) {
 		}
 	}
 	return lines, nil
+}
+
+type WalkFunc func(path string, info os.FileInfo, err error) error
+type Stat func(path string) (info os.FileInfo, err error)
+
+var ErrSkipDir = errors.New("skip this directory")
+
+var stat = os.Stat
+var lStat = os.Lstat
+
+func walk(path string, info os.FileInfo, walkFn WalkFunc, visitedDirSymlinks map[string]bool, walkIntoDirSymlink bool) error {
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		realPath = path
+	}
+	isRealPathDir, err := IsDirExists(realPath, false)
+	if err != nil {
+		return err
+	}
+	if walkIntoDirSymlink && IsPathSymlink(path) && isRealPathDir {
+		symlinkRealPath, err := evalPathOfSymlink(path)
+		if err != nil {
+			return err
+		}
+		visitedDirSymlinks[symlinkRealPath] = true
+	}
+	err = walkFn(path, info, nil)
+	if err != nil {
+		if info.IsDir() && err == ErrSkipDir {
+			return nil
+		}
+		return err
+	}
+
+	if !info.IsDir() {
+		return nil
+	}
+
+	names, err := readDirNames(path)
+	if err != nil {
+		return walkFn(path, info, err)
+	}
+
+	for _, name := range names {
+		filename := filepath.Join(path, name)
+		if walkIntoDirSymlink && IsPathSymlink(filename) {
+			symlinkRealPath, err := evalPathOfSymlink(filename)
+			if err != nil {
+				return err
+			}
+			if visitedDirSymlinks[symlinkRealPath] {
+				continue
+			}
+		}
+		var fileHandler Stat
+		if walkIntoDirSymlink {
+			fileHandler = stat
+		} else {
+			fileHandler = lStat
+		}
+		fileInfo, err := fileHandler(filename)
+		if err != nil {
+			if err := walkFn(filename, fileInfo, err); err != nil && err != ErrSkipDir {
+				return err
+			}
+		} else {
+			err = walk(filename, fileInfo, walkFn, visitedDirSymlinks, walkIntoDirSymlink)
+			if err != nil {
+				if !fileInfo.IsDir() || err != ErrSkipDir {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// The same as filepath.Walk the only difference is that we can walk into symlink.
+// Avoiding infinite loops by saving the real paths we already visited.
+func Walk(root string, walkFn WalkFunc, walkIntoDirSymlink bool) error {
+	info, err := stat(root)
+	visitedDirSymlinks := make(map[string]bool)
+	if err != nil {
+		return walkFn(root, nil, err)
+	}
+	return walk(root, info, walkFn, visitedDirSymlinks, walkIntoDirSymlink)
+}
+
+// Gets a path of a file or a directory, and returns its real path (in case the path contains a symlink to a directory).
+// The difference between this function and filepath.EvalSymlinks is that if the path is of a symlink,
+// this function won't return the symlink's target, but the real path to the symlink.
+func evalPathOfSymlink(path string) (string, error) {
+	dirPath := filepath.Dir(path)
+	evalDirPath, err := filepath.EvalSymlinks(dirPath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(evalDirPath, filepath.Base(path)), nil
+}
+
+// readDirNames reads the directory named by dirname and returns
+// a sorted list of directory entries.
+// The same as path/filepath readDirNames function
+func readDirNames(dirname string) ([]string, error) {
+	f, err := os.Open(dirname)
+	if err != nil {
+		return nil, err
+	}
+	names, err := f.Readdirnames(-1)
+	if err != nil {
+		return nil, err
+	}
+	err = f.Close()
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+type FileDetails struct {
+	Checksum entities.Checksum
+	Size     int64
+}
+
+func GetFileDetails(filePath string, includeChecksums bool) (details *FileDetails, err error) {
+	details = new(FileDetails)
+	if includeChecksums {
+		details.Checksum, err = calcChecksumDetails(filePath)
+		if err != nil {
+			return details, err
+		}
+	} else {
+		details.Checksum = entities.Checksum{}
+	}
+
+	file, err := os.Open(filePath)
+	defer func() {
+		e := file.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+	if err != nil {
+		return nil, err
+	}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	details.Size = fileInfo.Size()
+	return details, nil
+}
+
+func calcChecksumDetails(filePath string) (checksum entities.Checksum, err error) {
+	file, err := os.Open(filePath)
+	defer func() {
+		e := file.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+	if err != nil {
+		return entities.Checksum{}, err
+	}
+	return calcChecksumDetailsFromReader(file)
+}
+
+func calcChecksumDetailsFromReader(reader io.Reader) (entities.Checksum, error) {
+	checksumInfo, err := CalcChecksums(reader)
+	if err != nil {
+		return entities.Checksum{}, err
+	}
+	return entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}, nil
 }
