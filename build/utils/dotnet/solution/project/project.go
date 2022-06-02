@@ -20,13 +20,6 @@ func CreateProject(name, rootPath string) Project {
 	return &project{name: name, rootPath: rootPath}
 }
 
-func (project *project) Load(dependenciesSource string, log utils.Log) (Project, error) {
-	var err error
-	project.dependenciesSource = dependenciesSource
-	project.extractor, err = project.getCompatibleExtractor(log)
-	return project, err
-}
-
 func (project *project) getCompatibleExtractor(log utils.Log) (dependencies.Extractor, error) {
 	extractor, err := dependencies.CreateCompatibleExtractor(project.name, project.dependenciesSource, log)
 	return extractor, err
@@ -56,6 +49,13 @@ func (project *project) RootPath() string {
 
 func (project *project) Extractor() dependencies.Extractor {
 	return project.extractor
+}
+
+func (project *project) Load(dependenciesSource string, log utils.Log) (Project, error) {
+	var err error
+	project.dependenciesSource = dependenciesSource
+	project.extractor, err = project.getCompatibleExtractor(log)
+	return project, err
 }
 
 func (project *project) MarshalJSON() ([]byte, error) {

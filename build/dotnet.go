@@ -87,15 +87,15 @@ func (dc *DotnetModule) runDotnetCmd(log utils.Log) (solution.Solution, error) {
 }
 
 // Exec all consume type nuget commands, install, update, add, restore.
-func (dc *DotnetModule) Build(log utils.Log) error {
-	sol, err := dc.runDotnetCmd(log)
+func (dc *DotnetModule) Build() error {
+	sol, err := dc.runDotnetCmd(dc.containingBuild.logger)
 	if err != nil {
 		return err
 	}
 	if !dc.containingBuild.buildNameAndNumberProvided() {
 		return nil
 	}
-	buildInfo, err := sol.BuildInfo(dc.name, log)
+	buildInfo, err := sol.BuildInfo(dc.name, dc.containingBuild.logger)
 	if err != nil {
 		return err
 	}
