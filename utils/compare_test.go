@@ -62,7 +62,7 @@ func TestTo1DSlice(t *testing.T) {
 		{[][]string{{}}, []string{""}},
 	}
 	for _, d := range data {
-		if got := compareutils.to1DSlice(d.a); !assert.ElementsMatch(t, got, d.res) {
+		if got := compareutils.To1DSlice(d.a); !assert.ElementsMatch(t, got, d.res) {
 			t.Errorf("to1DSlice(%v) == %v, want %v", d.a, got, d.res)
 		}
 	}

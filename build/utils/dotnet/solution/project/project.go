@@ -9,14 +9,20 @@ import (
 
 type Project interface {
 	Name() string
+	RootPath() string
 	MarshalJSON() ([]byte, error)
 	Extractor() dependencies.Extractor
 	CreateDependencyTree(log utils.Log) error
+	Load(dependenciesSource string, log utils.Log) (Project, error)
 }
 
-func Load(name, rootPath, dependenciesSource string, log utils.Log) (Project, error) {
+func CreateProject(name, rootPath string) Project {
+	return &project{name: name, rootPath: rootPath}
+}
+
+func (project *project) Load(dependenciesSource string, log utils.Log) (Project, error) {
 	var err error
-	project := &project{name: name, rootPath: rootPath, dependenciesSource: dependenciesSource}
+	project.dependenciesSource = dependenciesSource
 	project.extractor, err = project.getCompatibleExtractor(log)
 	return project, err
 }
@@ -42,6 +48,10 @@ type project struct {
 
 func (project *project) Name() string {
 	return project.name
+}
+
+func (project *project) RootPath() string {
+	return project.rootPath
 }
 
 func (project *project) Extractor() dependencies.Extractor {

@@ -108,6 +108,11 @@ func (b *Build) AddYarnModule(srcPath string) (*YarnModule, error) {
 	return newYarnModule(srcPath, b)
 }
 
+// AddDotnetModule adds a Dotnet module to this Build. Pass srcPath as an empty string if the root of the Dotnet project is the working directory.
+func (b *Build) AddDotnetModule(srcPath string) (*DotnetModule, error) {
+	return newDotnetModule(srcPath, b)
+}
+
 func (b *Build) CollectEnv() error {
 	if !b.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect environment variables")

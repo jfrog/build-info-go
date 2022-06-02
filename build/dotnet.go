@@ -1,117 +1,315 @@
 package build
 
-//
-//import (
-//	"bufio"
-//	"bytes"
-//	"encoding/json"
-//	"errors"
-//	"fmt"
-//	buildutils "github.com/jfrog/build-info-go/build/utils"
-//	"github.com/jfrog/build-info-go/entities"
-//	"github.com/jfrog/build-info-go/utils"
-//	"github.com/jfrog/gofrog/version"
-//	"github.com/jfrog/jfrog-cli-core/v2/artifactory/utils/dotnet/solution"
-//	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-//	"os"
-//	"os/exec"
-//	"strings"
-//)
-//
-//const minSupportedYarnVersion = "2.4.0"
-//
-//type DotnetModule struct {
-//	containingBuild          *Build
-//	name                     string
-//	srcPath                  string
-//	executablePath           string
-//	yarnArgs                 []string
-//	traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error)
-//	threads                  int
-//	packageInfo              *buildutils.PackageInfo
-//}
-//
-//// Pass an empty string for srcPath to find the Yarn project in the working directory.
-//func newDotnetModule(srcPath string, containingBuild *Build) (*DotnetModule, error) {
-//	executablePath, err := getYarnExecutable()
-//	if err != nil {
-//		return nil, err
-//	}
-//	containingBuild.logger.Debug("Found Yarn executable at:", executablePath)
-//	err = validateYarnVersion(executablePath, srcPath)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	if srcPath == "" {
-//		wd, err := os.Getwd()
-//		if err != nil {
-//			return nil, err
-//		}
-//		srcPath, err = utils.FindFileInDirAndParents(wd, "package.json")
-//		if err != nil {
-//			return nil, err
-//		}
-//	}
-//
-//	// Read module name
-//	packageInfo, err := buildutils.ReadPackageInfoFromPackageJson(srcPath, nil)
-//	if err != nil {
-//		return nil, err
-//	}
-//	name := packageInfo.BuildInfoModuleId()
-//
-//	return &DotnetModule{name: name, srcPath: srcPath, containingBuild: containingBuild, executablePath: executablePath, threads: 3, packageInfo: packageInfo, yarnArgs: []string{"install"}}, nil
-//}
-//
-//// Exec all consume type nuget commands, install, update, add, restore.
-//func (dc *DotnetModule) Exec() error {
-//	// Use temp dir to save config file, so that config will be removed at the end.
-//	tempDirPath, err := fileutils.CreateTempDir()
-//	if err != nil {
-//		return err
-//	}
-//	defer fileutils.RemoveTempDir(tempDirPath)
-//
-//	dc.solutionPath, err = changeWorkingDir(dc.solutionPath)
-//	if err != nil {
-//		return err
-//	}
-//
-//	err = dc.prepareAndRunCmd(tempDirPath)
-//	if err != nil {
-//		return err
-//	}
-//	if !dc.containingBuild.buildNameAndNumberProvided() {
-//		return nil
-//	}
-//
-//	slnFile, err := dc.updateSolutionPathAndGetFileName()
-//	if err != nil {
-//		return err
-//	}
-//	sol, err := solution.Load(dc.solutionPath, slnFile)
-//	if err != nil {
-//		return err
-//	}
-//	buildName, err := dc.buildConfiguration.GetBuildName()
-//	if err != nil {
-//		return err
-//	}
-//	buildNumber, err := dc.buildConfiguration.GetBuildNumber()
-//	if err != nil {
-//		return err
-//	}
-//	if err = utils.SaveBuildGeneralDetails(buildName, buildNumber, dc.buildConfiguration.GetProject()); err != nil {
-//		return err
-//	}
-//	buildInfo, err := sol.BuildInfo(dc.buildConfiguration.GetModule())
-//	if err != nil {
-//		return err
-//	}
-//	return utils.SaveBuildInfo(buildName, buildNumber, dc.buildConfiguration.GetProject(), buildInfo)
-//}
-//
+import (
+	"errors"
+	"fmt"
+	buildutils "github.com/jfrog/build-info-go/build/utils"
+	"github.com/jfrog/build-info-go/build/utils/dotnet"
+	"github.com/jfrog/build-info-go/build/utils/dotnet/solution"
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/io"
+
+	"io/ioutil"
+
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+type DotnetModule struct {
+	containingBuild *Build
+	name            string
+	srcPath         string
+	//executablePath           string
+	dotnetArgs               []string
+	traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error)
+	threads                  int
+	packageInfo              *buildutils.PackageInfo
+
+	// from core
+	toolchainType     dotnet.ToolchainType
+	subCommand        string
+	argAndFlags       []string
+	repoName          string
+	solutionPath      string
+	useNugetAddSource bool
+	useNugetV2        bool
+}
+
+// Pass an empty string for srcPath to find the solutions/proj files in the working directory.
+func newDotnetModule(srcPath string, containingBuild *Build) (*DotnetModule, error) {
+	if srcPath == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		srcPath = wd
+	}
+
+	return &DotnetModule{srcPath: srcPath, containingBuild: containingBuild, threads: 3, dotnetArgs: []string{"restore"}}, nil
+}
+
+func (ym *DotnetModule) SetName(name string) {
+	ym.name = name
+}
+
+func (ym *DotnetModule) SetArgs(dotnetArgs []string) {
+	ym.dotnetArgs = dotnetArgs
+}
+
+func (dc *DotnetModule) runDotnetCmd(log utils.Log) (solution.Solution, error) {
+	// Use temp dir to save config file, so that config will be removed at the end.
+	tempDirPath, err := utils.CreateTempDir()
+	if err != nil {
+		return nil, err
+	}
+	defer utils.RemoveTempDir(tempDirPath)
+
+	dc.solutionPath, err = changeWorkingDir(dc.solutionPath)
+	if err != nil {
+		return nil, err
+	}
+
+	err = dc.prepareAndRunCmd(tempDirPath, log)
+	if err != nil {
+		return nil, err
+	}
+	if !dc.containingBuild.buildNameAndNumberProvided() {
+		return nil, nil
+	}
+
+	slnFile, err := dc.updateSolutionPathAndGetFileName()
+	if err != nil {
+		return nil, err
+	}
+	return solution.Load(dc.solutionPath, slnFile, log)
+}
+
+// Exec all consume type nuget commands, install, update, add, restore.
+func (dc *DotnetModule) Build(log utils.Log) error {
+	sol, err := dc.runDotnetCmd(log)
+	if err != nil {
+		return err
+	}
+	if !dc.containingBuild.buildNameAndNumberProvided() {
+		return nil
+	}
+	buildInfo, err := sol.BuildInfo(dc.name, log)
+	if err != nil {
+		return err
+	}
+	return dc.containingBuild.SaveBuildInfo(buildInfo)
+}
+
+// Changes the working directory if provided.
+// Returns the path to the solution
+func changeWorkingDir(newWorkingDir string) (string, error) {
+	var err error
+	if newWorkingDir != "" {
+		err = os.Chdir(newWorkingDir)
+	} else {
+		newWorkingDir, err = os.Getwd()
+	}
+
+	return newWorkingDir, err
+}
+
+// Prepares the nuget configuration file within the temp directory
+// Runs NuGet itself with the arguments and flags provided.
+func (dc *DotnetModule) prepareAndRunCmd(configDirPath string, log utils.Log) error {
+	cmd, err := dc.createCmd()
+	if err != nil {
+		return err
+	}
+	// To prevent NuGet prompting for credentials
+	err = os.Setenv("NUGET_EXE_NO_PROMPT", "true")
+	if err != nil {
+		return err
+	}
+
+	err = dc.prepareConfigFile(cmd, configDirPath, log)
+	if err != nil {
+		return err
+	}
+	err = io.RunCmd(cmd)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Checks if the user provided input such as -configfile flag or -Source flag.
+// If those flags were provided, NuGet will use the provided configs (default config file or the one with -configfile)
+// If neither provided, we are initializing our own config.
+func (dc *DotnetModule) prepareConfigFile(cmd *dotnet.Cmd, configDirPath string, log utils.Log) error {
+	cmdFlag := cmd.GetToolchain().GetTypeFlagPrefix() + "configfile"
+	currentConfigPath, err := getFlagValueIfExists(cmdFlag, cmd)
+	if err != nil {
+		return err
+	}
+	if currentConfigPath != "" {
+		return nil
+	}
+
+	cmdFlag = cmd.GetToolchain().GetTypeFlagPrefix() + "source"
+	sourceCommandValue, err := getFlagValueIfExists(cmdFlag, cmd)
+	if err != nil {
+		return err
+	}
+	if sourceCommandValue != "" {
+		return nil
+	}
+
+	// TODO: take care' create config file using rt url, should be provided in core in setargs probably.
+	configFile, err := dc.InitNewConfig(configDirPath, log)
+	if err == nil {
+		cmd.CommandFlags = append(cmd.CommandFlags, cmd.GetToolchain().GetTypeFlagPrefix()+"configfile", configFile.Name())
+	}
+	return err
+}
+
+// Got to here, means that neither of the flags provided and we need to init our own config.
+func (dc *DotnetModule) InitNewConfig(configDirPath string, log utils.Log) (configFile *os.File, err error) {
+	// Initializing a new NuGet config file that NuGet will use into a temp file
+	configFile, err = ioutil.TempFile(configDirPath, "jfrog.cli.nuget.")
+	if err != nil {
+		return
+	}
+	log.Debug("Nuget config file created at:", configFile.Name())
+	defer func() {
+		e := configFile.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+
+	// We will prefer to write the NuGet configuration using the `nuget add source` command (addSourceToNugetConfig)
+	// Currently the NuGet configuration utility doesn't allow setting protocolVersion.
+	// Until that is supported, the templated method must be used.
+	err = dc.addSourceToNugetTemplate(configFile)
+	return
+}
+
+func (dc *DotnetModule) updateSolutionPathAndGetFileName() (string, error) {
+	// The path argument wasn't provided, sln file will be searched under working directory.
+	if len(dc.argAndFlags) == 0 || strings.HasPrefix(dc.argAndFlags[0], "-") {
+		return "", nil
+	}
+	cmdFirstArg := dc.argAndFlags[0]
+	exist, err := utils.IsDirExists(cmdFirstArg, false)
+	if err != nil {
+		return "", err
+	}
+	// The path argument is a directory. sln/project file will be searched under this directory.
+	if exist {
+		dc.updateSolutionPath(cmdFirstArg)
+		return "", err
+	}
+	exist, err = utils.IsFileExists(cmdFirstArg, false)
+	if err != nil {
+		return "", err
+	}
+	if exist {
+		// The path argument is a .sln file.
+		if strings.HasSuffix(cmdFirstArg, ".sln") {
+			dc.updateSolutionPath(filepath.Dir(cmdFirstArg))
+			return filepath.Base(cmdFirstArg), nil
+		}
+		// The path argument is a .*proj/packages.config file.
+		if strings.HasSuffix(filepath.Ext(cmdFirstArg), "proj") || strings.HasSuffix(cmdFirstArg, "packages.config") {
+			dc.updateSolutionPath(filepath.Dir(cmdFirstArg))
+		}
+	}
+	return "", nil
+}
+
+func (dc *DotnetModule) updateSolutionPath(slnRootPath string) {
+	if filepath.IsAbs(slnRootPath) {
+		dc.solutionPath = slnRootPath
+	} else {
+		dc.solutionPath = filepath.Join(dc.solutionPath, slnRootPath)
+	}
+}
+
+// Returns the value of the flag if exists
+func getFlagValueIfExists(cmdFlag string, cmd *dotnet.Cmd) (string, error) {
+	for i := 0; i < len(cmd.CommandFlags); i++ {
+		if !strings.EqualFold(cmd.CommandFlags[i], cmdFlag) {
+			continue
+		}
+		if i+1 == len(cmd.CommandFlags) {
+			return "", errors.New(fmt.Sprintf("%s flag was provided without value", cmdFlag))
+		}
+		return cmd.CommandFlags[i+1], nil
+	}
+
+	return "", nil
+}
+
+// Adds a source to the nuget config template
+func (dc *DotnetModule) addSourceToNugetTemplate(configFile *os.File) error {
+	sourceUrl, user, password, err := dc.getSourceDetails()
+	if err != nil {
+		return err
+	}
+
+	// Specify the protocolVersion
+	protoVer := "3"
+	if dc.useNugetV2 {
+		protoVer = "2"
+	}
+
+	// Format the templates
+	_, err = fmt.Fprintf(configFile, dotnet.ConfigFileFormat, sourceUrl, protoVer, user, password)
+	return err
+}
+
+func (dc *DotnetModule) getSourceDetails() (sourceURL, user, password string, err error) {
+	//var u *url.URL
+	// TODO: check
+	//u, err = url.Parse(dc.serverDetails.ArtifactoryUrl)
+	//if errorutils.CheckError(err) != nil {
+	//	return
+	//}
+	//nugetApi := "api/nuget/v3"
+	//if dc.useNugetV2 {
+	//	nugetApi = "api/nuget"
+	//}
+	//u.Path = path.Join(u.Path, nugetApi, dc.repoName)
+	//sourceURL = u.String()
+	//
+	//user = dc.serverDetails.User
+	//password = dc.serverDetails.Password
+	//// If access-token is defined, extract user from it.
+	//serverDetails, err := dc.ServerDetails()
+	//if errorutils.CheckError(err) != nil {
+	//	return
+	//}
+	//if serverDetails.AccessToken != "" {
+	//	log.Debug("Using access-token details for nuget authentication.")
+	//	user, err = auth.ExtractUsernameFromAccessToken(serverDetails.AccessToken)
+	//	if err != nil {
+	//		return
+	//	}
+	//	password = serverDetails.AccessToken
+	//}
+	return
+}
+
+func (dc *DotnetModule) createCmd() (*dotnet.Cmd, error) {
+	c, err := dotnet.NewToolchainCmd(dc.toolchainType)
+	if err != nil {
+		return nil, err
+	}
+	if dc.subCommand != "" {
+		c.Command = append(c.Command, strings.Split(dc.subCommand, " ")...)
+	}
+	c.CommandFlags = dc.argAndFlags
+	return c, nil
+}
+
 //// Build builds the project, collects its dependencies and saves them in the build-info module.
 //func (ym *DotnetModule) Build() error {
 //	err := runYarnCommand(ym.executablePath, ym.srcPath, ym.yarnArgs...)
@@ -219,13 +417,9 @@ package build
 //	return nil
 //}
 //
-//func (ym *DotnetModule) SetName(name string) {
-//	ym.name = name
-//}
+
 //
-//func (ym *DotnetModule) SetArgs(yarnArgs []string) {
-//	ym.yarnArgs = yarnArgs
-//}
+
 //
 //func (ym *DotnetModule) SetThreads(threads int) {
 //	ym.threads = threads

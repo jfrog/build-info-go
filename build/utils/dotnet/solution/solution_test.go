@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/stretchr/testify/assert"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -145,4 +147,32 @@ func replaceCarriageSign(results []string) {
 			results[i] = strings.Replace(result, "\r\n", "\n", -1)
 		}
 	}
+}
+
+func TestLoad(t *testing.T) {
+	//TODO: fix log
+	//log.SetDefaultLogger()
+	log := utils.NewDefaultLogger(utils.INFO)
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+	// Run 'nuget restore' command before testing 'Load()' functionality.
+	// The reason is that way the "global packages" directory (which is required for the loading process) will be created.
+	assert.NoError(t, utils.CopyDir(filepath.Join(wd, "testdata", "nugetproj"), filepath.Join(wd, "tmp", "nugetproj"), true, nil))
+	defer func() {
+		assert.NoError(t, utils.RemoveTempDir(filepath.Join(wd, "tmp")))
+	}()
+	nugetCmd := exec.Command("nuget", "restore", filepath.Join(wd, "tmp", "nugetproj", "solutions", "nugetproj.sln"))
+	assert.NoError(t, nugetCmd.Run())
+
+	// 'nugetproj' contains 2 'packages.config' files for 2 projects -
+	// 1. located in the project's root directory.
+	// 2. located in solutions directory.
+	solution := solution{path: filepath.Join(wd, "testdata", "nugetproj", "solutions"), slnFile: "nugetproj.sln"}
+	solutions, err := Load(solution.path, solution.slnFile, log)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 2, len(solutions.GetProjects()))
 }

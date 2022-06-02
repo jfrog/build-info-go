@@ -3,7 +3,7 @@ package dependencies
 import (
 	"encoding/xml"
 	buildinfo "github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/jfrog-cli-core/v2/utils/log"
+	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
 	"path/filepath"
 	"reflect"
@@ -145,11 +145,13 @@ func TestLoadNuspec(t *testing.T) {
 }
 
 func TestExtractDependencies(t *testing.T) {
-	extractor, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcache"))
+	// TODO: fix log
+	log := utils.NewDefaultLogger(utils.INFO)
+	extractor, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcache"), log)
 	assert.NoError(t, err)
 
 	expectedAllDependencies := []string{"id1", "id2"}
-	allDependencies, err := extractor.AllDependencies()
+	allDependencies, err := extractor.AllDependencies(log)
 	assert.NoError(t, err)
 
 	for _, v := range expectedAllDependencies {
@@ -178,18 +180,20 @@ func TestExtractDependencies(t *testing.T) {
 }
 
 func TestPackageNotFoundWithoutFailure(t *testing.T) {
-	log.SetDefaultLogger()
-	_, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcachenotexists"))
+	// TODO: fix log
+	log := utils.NewDefaultLogger(utils.INFO)
+	//log.SetDefaultLogger()
+	_, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcachenotexists"), log)
 	assert.NoError(t, err)
 }
 
-func extractDependencies(globalPackagePath string) (Extractor, error) {
+func extractDependencies(globalPackagePath string, log utils.Log) (Extractor, error) {
 	extractor := &packagesExtractor{allDependencies: map[string]*buildinfo.Dependency{}, childrenMap: map[string][]string{}}
 	packagesConfig, err := extractor.loadPackagesConfig(filepath.Join("testdata", "packagesproject", "packages.config"))
 	if err != nil {
 		return extractor, err
 	}
-	err = extractor.extract(packagesConfig, globalPackagePath)
+	err = extractor.extract(packagesConfig, globalPackagePath, log)
 	if err != nil {
 		return extractor, err
 	}

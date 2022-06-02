@@ -1,8 +1,7 @@
 package dotnet
 
 import (
-	"github.com/jfrog/jfrog-cli-core/v2/utils/coreutils"
-	"github.com/jfrog/jfrog-client-go/utils/errorutils"
+	"github.com/jfrog/build-info-go/utils"
 	"io"
 	"os/exec"
 )
@@ -47,12 +46,12 @@ func (toolchainType ToolchainType) GetAddSourceArgs() []string {
 
 func NewToolchainCmd(cmdType ToolchainType) (*Cmd, error) {
 	// On non Windows OS, NuGet may be run using mono.
-	if cmdType == Nuget && coreutils.IsLinux() {
+	if cmdType == Nuget && utils.IsLinux() {
 		return newNonWindowsNugetCmd()
 	}
 	execPath, err := exec.LookPath(cmdType.String())
 	if err != nil {
-		return nil, errorutils.CheckError(err)
+		return nil, err
 	}
 	return &Cmd{toolchain: cmdType, execPath: execPath}, nil
 }
@@ -70,11 +69,11 @@ func newNonWindowsNugetCmd() (*Cmd, error) {
 	// Mono's first argument is nuget.exe's path, so we will look for both mono and nuget.exe in PATH.
 	monoPath, err := exec.LookPath("mono")
 	if err != nil {
-		return nil, errorutils.CheckError(err)
+		return nil, err
 	}
 	nugetExePath, err := exec.LookPath("nuget.exe")
 	if err != nil {
-		return nil, errorutils.CheckError(err)
+		return nil, err
 	}
 	return &Cmd{toolchain: Nuget, execPath: monoPath, Command: []string{nugetExePath}}, nil
 }
@@ -82,7 +81,7 @@ func newNonWindowsNugetCmd() (*Cmd, error) {
 func CreateDotnetAddSourceCmd(cmdType ToolchainType, sourceUrl string) (*Cmd, error) {
 	addSourceCmd, err := NewToolchainCmd(cmdType)
 	if err != nil {
-		return nil, errorutils.CheckError(err)
+		return nil, err
 	}
 	addSourceCmd.Command = append(addSourceCmd.Command, cmdType.GetAddSourceArgs()...)
 	switch cmdType {
@@ -91,7 +90,7 @@ func CreateDotnetAddSourceCmd(cmdType ToolchainType, sourceUrl string) (*Cmd, er
 	case DotnetCore:
 		addSourceCmd.Command = append(addSourceCmd.Command, sourceUrl)
 		// DotnetCore cli does not support password encryption on non-Windows OS, so we will write the raw password.
-		if !coreutils.IsWindows() {
+		if !utils.IsWindows() {
 			addSourceCmd.CommandFlags = append(addSourceCmd.CommandFlags, "--store-password-in-clear-text")
 		}
 	}

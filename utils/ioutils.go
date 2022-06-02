@@ -69,3 +69,7 @@ func WinToUnixPathSeparator(filePath string) string {
 func IsWindows() bool {
 	return runtime.GOOS == "windows"
 }
+
+func IsLinux() bool {
+	return runtime.GOOS == "linux"
+}
