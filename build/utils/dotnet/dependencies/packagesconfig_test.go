@@ -145,8 +145,7 @@ func TestLoadNuspec(t *testing.T) {
 }
 
 func TestExtractDependencies(t *testing.T) {
-	// TODO: fix log
-	log := utils.NewDefaultLogger(utils.INFO)
+	var log = utils.NewDefaultLogger(utils.INFO)
 	extractor, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcache"), log)
 	assert.NoError(t, err)
 
@@ -180,9 +179,7 @@ func TestExtractDependencies(t *testing.T) {
 }
 
 func TestPackageNotFoundWithoutFailure(t *testing.T) {
-	// TODO: fix log
 	log := utils.NewDefaultLogger(utils.INFO)
-	//log.SetDefaultLogger()
 	_, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcachenotexists"), log)
 	assert.NoError(t, err)
 }

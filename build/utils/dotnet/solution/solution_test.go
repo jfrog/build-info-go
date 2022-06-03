@@ -150,8 +150,6 @@ func replaceCarriageSign(results []string) {
 }
 
 func TestLoad(t *testing.T) {
-	//TODO: fix log
-	//log.SetDefaultLogger()
 	log := utils.NewDefaultLogger(utils.INFO)
 	wd, err := os.Getwd()
 	if err != nil {

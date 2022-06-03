@@ -164,11 +164,40 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 						err = e
 					}
 				}()
-				npmModule, err := bld.AddNpmModule("")
+				nugetModule, err := bld.AddNugetModule("")
 				if err != nil {
 					return
 				}
-				err = npmModule.CalcDependencies()
+				err = nugetModule.Build()
+				if err != nil {
+					return
+				}
+				return printBuild(bld, context.String(formatFlag))
+			},
+		},
+		{
+			Name:      "dotnet",
+			Usage:     "Generate build-info for a dotnet project",
+			UsageText: "bi dotnet",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("dotnet-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
+				dotnetModule, err := bld.AddDotnetModule("")
+				if err != nil {
+					return
+				}
+				err = dotnetModule.Build()
 				if err != nil {
 					return
 				}
