@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	buildinfo "github.com/jfrog/build-info-go/entities"
-	gofrog "github.com/jfrog/gofrog/io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -320,7 +319,7 @@ func (solution *solution) getDependenciesSourcesInProjectsDir(slnProjects []proj
 		// Before running this function we already looked for dependencies sources in solutions directory.
 		// If a project isn't located under solutions' dir - we should look for the dependencies sources in this specific project's directory.
 		if !strings.HasPrefix(project.RootPath(), solution.path) {
-			err := gofrog.Walk(project.RootPath(), func(path string, f os.FileInfo, err error) error {
+			err := utils.Walk(project.RootPath(), func(path string, f os.FileInfo, err error) error {
 				return solution.addPathToDependenciesSourcesIfNeeded(path)
 			}, true)
 			if err != nil {
@@ -333,7 +332,7 @@ func (solution *solution) getDependenciesSourcesInProjectsDir(slnProjects []proj
 
 // Find all potential dependencies sources: packages.config and project.assets.json files.
 func (solution *solution) getDependenciesSourcesInSolutionsDir() error {
-	err := gofrog.Walk(solution.path, func(path string, f os.FileInfo, err error) error {
+	err := utils.Walk(solution.path, func(path string, f os.FileInfo, err error) error {
 		return solution.addPathToDependenciesSourcesIfNeeded(path)
 	}, true)
 

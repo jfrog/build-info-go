@@ -2,7 +2,6 @@ package dependencies
 
 import (
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"github.com/jfrog/build-info-go/utils"
 	"io/ioutil"
@@ -277,7 +276,7 @@ func (extractor *packagesExtractor) getGlobalPackagesCache() (string, error) {
 		return "", err
 	}
 	if !exists {
-		return "", errors.New(fmt.Sprintf("Could not find global packages path at: %s", globalPackagesPath))
+		return "", fmt.Errorf("could not find global packages path at: %s", globalPackagesPath)
 	}
 	return globalPackagesPath, nil
 }

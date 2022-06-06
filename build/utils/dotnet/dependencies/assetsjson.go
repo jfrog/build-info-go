@@ -174,7 +174,7 @@ func (library *library) getNupkgFileName() (string, error) {
 			return strings.TrimSuffix(fileName, ".sha512"), nil
 		}
 	}
-	return "", errors.New(fmt.Sprintf("Could not find nupkg file name for: %s", library.Path))
+	return "", fmt.Errorf("could not find nupkg file name for: %s", library.Path)
 }
 
 type project struct {
