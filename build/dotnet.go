@@ -56,30 +56,23 @@ func (dm *DotnetModule) SetToolchainType(toolchainType dotnet.ToolchainType) {
 	dm.toolchainType = toolchainType
 }
 
-func (dm *DotnetModule) runDotnetCmd(log utils.Log) (solution.Solution, error) {
-	err := dm.runCmd()
-	if err != nil {
-		return nil, err
-	}
-	if !dm.containingBuild.buildNameAndNumberProvided() {
-		return nil, nil
-	}
-
-	slnFile, err := dm.updateSolutionPathAndGetFileName()
-	if err != nil {
-		return nil, err
-	}
-	return solution.Load(dm.solutionPath, slnFile, log)
-}
-
-// Exec all consume type nuget commands, install, update, add, restore.
+// Build exec all consume type dotnet commands, install, update, add, restore.
+// Collects the dotnet project's dependencies and saves them in the build-info module.
 func (dm *DotnetModule) Build() error {
-	sol, err := dm.runDotnetCmd(dm.containingBuild.logger)
+	err := dm.runCmd()
 	if err != nil {
 		return err
 	}
 	if !dm.containingBuild.buildNameAndNumberProvided() {
 		return nil
+	}
+	slnFile, err := dm.updateSolutionPathAndGetFileName()
+	if err != nil {
+		return err
+	}
+	sol, err := solution.Load(dm.solutionPath, slnFile, dm.containingBuild.logger)
+	if err != nil {
+		return err
 	}
 	buildInfo, err := sol.BuildInfo(dm.name, dm.containingBuild.logger)
 	if err != nil {
@@ -88,8 +81,8 @@ func (dm *DotnetModule) Build() error {
 	return dm.containingBuild.SaveBuildInfo(buildInfo)
 }
 
-// Prepares the nuget configuration file within the temp directory
-// Runs NuGet itself with the arguments and flags provided.
+// Prepares the dotnet/nuget configuration file within the temp directory
+// Runs nuget/dotnet itself with the arguments and flags provided.
 func (dm *DotnetModule) runCmd() error {
 	cmd, err := dm.createCmd()
 	if err != nil {
@@ -109,7 +102,6 @@ func (dm *DotnetModule) runCmd() error {
 	return nil
 }
 
-//TODO: duplicated func - split
 func (dm *DotnetModule) createCmd() (*dotnet.Cmd, error) {
 	c, err := dotnet.NewToolchainCmd(dm.toolchainType)
 	if err != nil {

@@ -103,7 +103,7 @@ func (b *Build) AddYarnModule(srcPath string) (*YarnModule, error) {
 	return newYarnModule(srcPath, b)
 }
 
-// AddNugetModule adds a Npm module to this Build. Pass srcPath as an empty string if the root of the Npm project is the working directory.
+// AddNugetModule adds a Nuget module to this Build. Pass srcPath as an empty string if the root of the Nuget project is the working directory.
 func (b *Build) AddNugetModule(srcPath string) (*DotnetModule, error) {
 	return newDotnetModule(srcPath, b)
 }
