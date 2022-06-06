@@ -3,6 +3,8 @@ package utils
 import (
 	"errors"
 	"io"
+	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -54,4 +56,20 @@ func writeData(p []byte, w io.Writer, wg *sync.WaitGroup, errChan chan error) {
 		errChan <- ErrShortWrite
 	}
 	wg.Done()
+}
+
+func UnixToWinPathSeparator(filePath string) string {
+	return strings.Replace(filePath, "/", "\\\\", -1)
+}
+
+func WinToUnixPathSeparator(filePath string) string {
+	return strings.Replace(filePath, "\\", "/", -1)
+}
+
+func IsWindows() bool {
+	return runtime.GOOS == "windows"
+}
+
+func IsLinux() bool {
+	return runtime.GOOS == "linux"
 }
