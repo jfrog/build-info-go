@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jfrog/build-info-go/utils/pythonutils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jfrog/build-info-go/utils/pythonutils"
 
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
@@ -442,7 +443,7 @@ func addArtifactToPartialModule(artifact entities.Artifact, moduleId string, par
 	if partialModules[moduleId].artifacts == nil {
 		partialModules[moduleId].artifacts = make(map[string]entities.Artifact)
 	}
-	key := fmt.Sprintf("%s-%s-%s", artifact.Name, artifact.Sha1, artifact.Md5)
+	key := fmt.Sprintf("%s-%s-%s", artifact.Path, artifact.Sha1, artifact.Md5)
 	partialModules[moduleId].artifacts[key] = artifact
 }
 
