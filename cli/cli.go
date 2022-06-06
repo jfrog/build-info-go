@@ -164,11 +164,11 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 						err = e
 					}
 				}()
-				nugetModule, err := bld.AddNugetModule("")
+				nugetModule, err := bld.AddNugetModules("")
 				if err != nil {
 					return
 				}
-				err = nugetModule.Build()
+				err = nugetModule.CalcDependencies()
 				if err != nil {
 					return
 				}
@@ -193,11 +193,11 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 						err = e
 					}
 				}()
-				dotnetModule, err := bld.AddDotnetModule("")
+				dotnetModule, err := bld.AddDotnetModules("")
 				if err != nil {
 					return
 				}
-				err = dotnetModule.Build()
+				err = dotnetModule.CalcDependencies()
 				if err != nil {
 					return
 				}

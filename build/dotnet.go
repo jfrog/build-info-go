@@ -56,9 +56,9 @@ func (dm *DotnetModule) SetToolchainType(toolchainType dotnet.ToolchainType) {
 	dm.toolchainType = toolchainType
 }
 
-// Build exec all consume type dotnet commands, install, update, add, restore.
+// CalcDependencies exec all consume type dotnet commands, install, update, add, restore.
 // Collects the dotnet project's dependencies and saves them in the build-info module.
-func (dm *DotnetModule) Build() error {
+func (dm *DotnetModule) CalcDependencies() error {
 	err := dm.runCmd()
 	if err != nil {
 		return err
