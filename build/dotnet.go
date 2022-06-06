@@ -20,15 +20,13 @@ type DotnetModule struct {
 }
 
 // Pass an empty string for srcPath to find the solutions/proj files in the working directory.
-func newDotnetModule(srcPath string, containingBuild *Build) (*DotnetModule, error) {
+func newDotnetModule(srcPath string, containingBuild *Build) (module *DotnetModule, err error) {
 	if srcPath == "" {
-		wd, err := os.Getwd()
+		srcPath, err = os.Getwd()
 		if err != nil {
 			return nil, err
 		}
-		srcPath = wd
 	}
-
 	return &DotnetModule{solutionPath: srcPath, containingBuild: containingBuild, argAndFlags: []string{"restore"}}, nil
 }
 
@@ -56,7 +54,7 @@ func (dm *DotnetModule) SetToolchainType(toolchainType dotnet.ToolchainType) {
 	dm.toolchainType = toolchainType
 }
 
-// CalcDependencies exec all consume type dotnet commands, install, update, add, restore.
+// CalcDependencies exec all type of dotnet commands - install, update, add, restore.
 // Collects the dotnet project's dependencies and saves them in the build-info module.
 func (dm *DotnetModule) CalcDependencies() error {
 	err := dm.runCmd()
