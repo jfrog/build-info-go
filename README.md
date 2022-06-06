@@ -392,6 +392,18 @@ Note: checksums calculation is not yet supported for pip projects.
 bi pipenv [pipenv command] [command options]
 ```
 
+#### Dotnet
+
+```shell
+bi dotnet [Dotnet command] [command options]
+```
+
+#### Nuget
+
+```shell
+bi nuget [Nuget command] [command options]
+```
+
 Note: checksums calculation is not yet supported for pipenv projects.
 
 #### Conversion to CycloneDX
@@ -494,6 +506,24 @@ err = yarnModule.Build()
 // You can also add artifacts to that module.
 artifact1 := entities.Artifact{Name: "json", Type: "tgz", Checksum: &entities.Checksum{Sha1: "123", Md5: "456"}}
 err = yarnModule.AddArtifacts(artifact1, artifact2, ...)
+```
+
+#### Dotnet
+
+```go
+// You can pass an empty string as an argument, if the root of the Dotnet project is the working directory.
+dotnetModule, err := bld.AddDotnetModules(nugetProjectPath)
+// Calculate the dependencies used by this module, and store them in the module struct.
+err = dotnetModule.CalcDependencies()
+```
+
+#### Nuget
+
+```go
+// You can pass an empty string as an argument, if the root of the Nuget project is the working directory.
+nugetModule, err := bld.AddNugetModules(nugetProjectPath)
+// Calculate the dependencies used by this module, and store them in the module struct.
+err = nugetModule.CalcDependencies()
 ```
 
 ### Collecting Environment Variables

@@ -1,4 +1,4 @@
-package utils
+package compareutils
 
 import (
 	"reflect"
@@ -25,11 +25,11 @@ func IsEqualSlices(a, b []string) bool {
 
 // Compare two dimensional slices irrespective of elements order.
 func IsEqual2DSlices(a, b [][]string) bool {
-	return IsEqualSlices(to1DSlice(a), to1DSlice(b))
+	return IsEqualSlices(To1DSlice(a), To1DSlice(b))
 }
 
 // Transform two dimensional slice to one dimensional slice
-func to1DSlice(a [][]string) (result []string) {
+func To1DSlice(a [][]string) (result []string) {
 	for _, i := range a {
 		temp := ""
 		for _, j := range i {

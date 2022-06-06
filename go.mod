@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/CycloneDX/cyclonedx-go v0.5.1
 	github.com/buger/jsonparser v1.1.1
-	github.com/jfrog/gofrog v1.1.1
+	github.com/jfrog/gofrog v1.1.2
 	github.com/minio/sha256-simd v1.0.1-0.20210617151322-99e45fae3395
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.1

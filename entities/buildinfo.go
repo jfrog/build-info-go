@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"github.com/jfrog/build-info-go/utils/compareutils"
 	"regexp"
 	"strings"
 	"time"
@@ -8,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
-	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/stringutils"
 )
 
@@ -477,7 +477,7 @@ func (d *Dependency) IsEqual(other Dependency) (bool, error) {
 	if !match || err != nil {
 		return false, err
 	}
-	return d.Type == other.Type && utils.IsEqualSlices(d.Scopes, other.Scopes) && utils.IsEqual2DSlices(d.RequestedBy, other.RequestedBy), nil
+	return d.Type == other.Type && compareutils.IsEqualSlices(d.Scopes, other.Scopes) && compareutils.IsEqual2DSlices(d.RequestedBy, other.RequestedBy), nil
 }
 
 func IsEqualDependencySlices(actual, other []Dependency) (bool, error) {
