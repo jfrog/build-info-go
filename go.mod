@@ -30,5 +30,6 @@ exclude (
 )
 
 // replace github.com/jfrog/gofrog => github.com/jfrog/gofrog v1.0.7-0.20211128152632-e218c460d703
-replace github.com/jfrog/gofrog => ../gofrog
-//replace github.com/jfrog/gofrog => github.com/gailazar300/gofrog v1.0.7-0.20220606092440-7016666a6043
+//replace github.com/jfrog/gofrog => ../gofrog
+
+replace github.com/jfrog/gofrog => github.com/gailazar300/gofrog v1.1.2-0.20220606142349-7bccd3739c1b
