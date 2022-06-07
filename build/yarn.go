@@ -83,6 +83,9 @@ func (ym *YarnModule) Build() error {
 
 func (ym *YarnModule) getDependenciesMap() (map[string]*entities.Dependency, error) {
 	dependenciesMap, root, err := buildutils.GetYarnDependencies(ym.executablePath, ym.srcPath, ym.packageInfo, ym.containingBuild.logger)
+	if err != nil {
+		return nil, err
+	}
 	buildInfoDependencies := make(map[string]*entities.Dependency)
 	err = ym.appendDependencyRecursively(root, []string{}, dependenciesMap, buildInfoDependencies)
 	return buildInfoDependencies, err
