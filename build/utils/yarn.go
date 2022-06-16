@@ -104,7 +104,7 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 	if err != nil {
 		log.Warn("An error was thrown while collecting dependencies info: " + err.Error() + "\nCommand output:\n" + responseStr)
 
-		// A returned error doesn't necessarily mean that the operation totally failed. If, in addition, the response is empty, then it probably does.
+		// A returned error doesn't necessarily mean that the operation totally failed. If, in addition, the response is empty, then it probably failed.
 		if responseStr == "" {
 			return
 		}
@@ -149,6 +149,7 @@ func runYarnInfo(executablePath, srcPath string) (outResult, errResult string, e
 	outResult = strings.TrimSpace(outBuffer.String())
 	errResult = errBuffer.String()
 	if err != nil {
+		// urfave/cli (aka codegangsta) exits when an ExitError is returned, so if it's an ExitError we'll convert it to a regular error.
 		if _, ok := err.(*exec.ExitError); ok {
 			err = errors.New(err.Error())
 		}
