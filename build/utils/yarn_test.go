@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -19,4 +22,26 @@ func TestGetYarnDependencyKeyFromLocator(t *testing.T) {
 	for _, testCase := range testCases {
 		assert.Equal(t, testCase.expectedDepKey, GetYarnDependencyKeyFromLocator(testCase.yarnDepLocator))
 	}
+}
+
+func TestGetYarnDependencies(t *testing.T) {
+	// Copy the project directory to a temporary directory
+	tempDirPath, err := utils.CreateTempDir()
+	assert.NoError(t, err, "Couldn't create temp dir")
+	defer func() {
+		assert.NoError(t, utils.RemoveTempDir(tempDirPath), "Couldn't remove temp dir")
+	}()
+	testDataSource := filepath.Join("..", "testdata", "yarn")
+	testDataTarget := filepath.Join(tempDirPath, "yarn")
+	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
+
+	executablePath, err := GetYarnExecutable()
+	assert.NoError(t, err)
+	projectSrcPath := filepath.Join(testDataTarget, "project")
+	dependenciesMap, root, err := GetYarnDependencies(executablePath, projectSrcPath, &PackageInfo{Name: "build-info-go-tests", Version: "v1.0.0"}, &utils.NullLog{})
+	assert.NoError(t, err)
+	assert.NotNil(t, root)
+	assert.True(t, strings.HasPrefix(root.Value, "build-info-go-tests@"))
+	assert.Equal(t, "v1.0.0", root.Details.Version)
+	assert.Len(t, dependenciesMap, 3)
 }
