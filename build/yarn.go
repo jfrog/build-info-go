@@ -1,9 +1,7 @@
 package build
 
 import (
-	"bufio"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	buildutils "github.com/jfrog/build-info-go/build/utils"
@@ -30,7 +28,7 @@ type YarnModule struct {
 
 // Pass an empty string for srcPath to find the Yarn project in the working directory.
 func newYarnModule(srcPath string, containingBuild *Build) (*YarnModule, error) {
-	executablePath, err := getYarnExecutable()
+	executablePath, err := buildutils.GetYarnExecutable()
 	if err != nil {
 		return nil, err
 	}
@@ -84,56 +82,18 @@ func (ym *YarnModule) Build() error {
 }
 
 func (ym *YarnModule) getDependenciesMap() (map[string]*entities.Dependency, error) {
-	// Run 'yarn info'
-	responseStr, errStr, err := runInfo(ym.executablePath, ym.srcPath)
-	// Some warnings and messages of Yarn are printed to stderr. They don't necessarily cause the command to fail, but we'd want to show them to the user.
-	if len(errStr) > 0 {
-		ym.containingBuild.logger.Warn("Some errors occurred while collecting dependencies info:\n" + errStr)
-	}
+	dependenciesMap, root, err := buildutils.GetYarnDependencies(ym.executablePath, ym.srcPath, ym.packageInfo, ym.containingBuild.logger)
 	if err != nil {
-		ym.containingBuild.logger.Warn("An error was thrown while collecting dependencies info:", err.Error())
-		// A returned error doesn't necessarily mean that the operation totally failed. If, in addition, the response is empty, then it probably does.
-		if responseStr == "" {
-			return nil, err
-		}
+		return nil, err
 	}
-
-	dependenciesMap := make(map[string]*YarnDependency)
-	scanner := bufio.NewScanner(strings.NewReader(responseStr))
-	packageName := ym.packageInfo.FullName()
-	var root *YarnDependency
-
-	for scanner.Scan() {
-		var currDependency YarnDependency
-		currDepBytes := scanner.Bytes()
-		err = json.Unmarshal(currDepBytes, &currDependency)
-		if err != nil {
-			return nil, err
-		}
-		dependenciesMap[currDependency.Value] = &currDependency
-
-		// Check whether this dependency's name starts with the package name (which means this is the root)
-		if strings.HasPrefix(currDependency.Value, packageName+"@") {
-			root = &currDependency
-		}
-	}
-
 	buildInfoDependencies := make(map[string]*entities.Dependency)
 	err = ym.appendDependencyRecursively(root, []string{}, dependenciesMap, buildInfoDependencies)
 	return buildInfoDependencies, err
 }
 
-func (ym *YarnModule) appendDependencyRecursively(yarnDependency *YarnDependency, pathToRoot []string, yarnDependenciesMap map[string]*YarnDependency,
+func (ym *YarnModule) appendDependencyRecursively(yarnDependency *buildutils.YarnDependency, pathToRoot []string, yarnDependenciesMap map[string]*buildutils.YarnDependency,
 	buildInfoDependencies map[string]*entities.Dependency) error {
-	name := yarnDependency.Name()
-	var ver string
-	if len(pathToRoot) == 0 {
-		// The version of the local project returned from 'yarn info' is '0.0.0-use.local', but we need the version mentioned in package.json
-		ver = ym.packageInfo.Version
-	} else {
-		ver = yarnDependency.Details.Version
-	}
-	id := name + ":" + ver
+	id := yarnDependency.Name() + ":" + yarnDependency.Details.Version
 
 	// To avoid infinite loops in case of circular dependencies, the dependency won't be added if it's already in pathToRoot
 	if stringsSliceContains(pathToRoot, id) {
@@ -141,7 +101,7 @@ func (ym *YarnModule) appendDependencyRecursively(yarnDependency *YarnDependency
 	}
 
 	for _, dependencyPtr := range yarnDependency.Details.Dependencies {
-		innerDepKey := getYarnDependencyKeyFromLocator(dependencyPtr.Locator)
+		innerDepKey := buildutils.GetYarnDependencyKeyFromLocator(dependencyPtr.Locator)
 		innerYarnDep, exist := yarnDependenciesMap[innerDepKey]
 		if !exist {
 			return fmt.Errorf("an error occurred while creating dependencies tree: dependency %s was not found", dependencyPtr.Locator)
@@ -196,36 +156,6 @@ func (ym *YarnModule) AddArtifacts(artifacts ...entities.Artifact) error {
 	return ym.containingBuild.SavePartialBuildInfo(partial)
 }
 
-type YarnDependency struct {
-	// The value is usually in this structure: @scope/package-name@npm:1.0.0
-	Value   string         `json:"value,omitempty"`
-	Details YarnDepDetails `json:"children,omitempty"`
-}
-
-func (yd *YarnDependency) Name() string {
-	// Find the first index of '@', starting from position 1. In scoped dependencies (like '@jfrog/package-name@npm:1.2.3') we want to keep the first '@' as part of the name.
-	atSignIndex := strings.Index(yd.Value[1:], "@") + 1
-	return yd.Value[:atSignIndex]
-}
-
-type YarnDepDetails struct {
-	Version      string                  `json:"Version,omitempty"`
-	Dependencies []YarnDependencyPointer `json:"Dependencies,omitempty"`
-}
-
-type YarnDependencyPointer struct {
-	Descriptor string `json:"descriptor,omitempty"`
-	Locator    string `json:"locator,omitempty"`
-}
-
-func getYarnExecutable() (string, error) {
-	yarnExecPath, err := exec.LookPath("yarn")
-	if err != nil {
-		return "", err
-	}
-	return yarnExecPath, nil
-}
-
 func validateYarnVersion(executablePath, srcPath string) error {
 	yarnVersionStr, err := getVersion(executablePath, srcPath)
 	if err != nil {
@@ -249,38 +179,6 @@ func getVersion(executablePath, srcPath string) (string, error) {
 		err = errors.New(err.Error())
 	}
 	return strings.TrimSpace(outBuffer.String()), err
-}
-
-// Yarn dependency locator usually looks like this: package-name@npm:1.2.3, which is used as the key in the dependencies map.
-// But sometimes it points to a virtual package, so it looks different: package-name@virtual:[ID of virtual package]#npm:1.2.3.
-// In this case we need to omit the part of the virtual package ID, to get the key as it is found in the dependencies map.
-func getYarnDependencyKeyFromLocator(yarnDepLocator string) string {
-	virtualIndex := strings.Index(yarnDepLocator, "@virtual:")
-	if virtualIndex == -1 {
-		return yarnDepLocator
-	}
-
-	hashSignIndex := strings.LastIndex(yarnDepLocator, "#")
-	return yarnDepLocator[:virtualIndex+1] + yarnDepLocator[hashSignIndex+1:]
-}
-
-func runInfo(executablePath, srcPath string) (outResult, errResult string, err error) {
-	command := exec.Command(executablePath, "info", "--all", "--recursive", "--json")
-	command.Dir = srcPath
-	outBuffer := bytes.NewBuffer([]byte{})
-	command.Stdout = outBuffer
-	errBuffer := bytes.NewBuffer([]byte{})
-	command.Stderr = errBuffer
-	err = command.Run()
-	errResult = errBuffer.String()
-	if err != nil {
-		if _, ok := err.(*exec.ExitError); ok {
-			err = errors.New(err.Error())
-		}
-		return
-	}
-	outResult = strings.TrimSpace(outBuffer.String())
-	return
 }
 
 func runYarnCommand(executablePath, srcPath string, args ...string) error {
