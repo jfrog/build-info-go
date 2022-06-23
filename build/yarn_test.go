@@ -2,6 +2,7 @@ package build
 
 import (
 	"errors"
+	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -24,42 +25,26 @@ func TestYarnDependencyName(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		dependency := &YarnDependency{Value: testCase.dependencyValue}
+		dependency := &buildutils.YarnDependency{Value: testCase.dependencyValue}
 		assert.Equal(t, testCase.expectedName, dependency.Name())
 	}
 }
 
-func TestGetYarnDependencyKeyFromLocator(t *testing.T) {
-	testCases := []struct {
-		yarnDepLocator string
-		expectedDepKey string
-	}{
-		{"camelcase@npm:6.2.0", "camelcase@npm:6.2.0"},
-		{"@babel/highlight@npm:7.14.0", "@babel/highlight@npm:7.14.0"},
-		{"fsevents@patch:fsevents@npm%3A2.3.2#builtin<compat/fsevents>::version=2.3.2&hash=11e9ea", "fsevents@patch:fsevents@npm%3A2.3.2#builtin<compat/fsevents>::version=2.3.2&hash=11e9ea"},
-		{"follow-redirects@virtual:c192f6b3b32cd5d11a443145a3883a70c04cbd7c813b53085dbaf50263735f1162f10fdbddd53c24e162ec3bc#npm:1.14.1", "follow-redirects@npm:1.14.1"},
-	}
-
-	for _, testCase := range testCases {
-		assert.Equal(t, testCase.expectedDepKey, getYarnDependencyKeyFromLocator(testCase.yarnDepLocator))
-	}
-}
-
 func TestAppendDependencyRecursively(t *testing.T) {
-	dependenciesMap := map[string]*YarnDependency{
+	dependenciesMap := map[string]*buildutils.YarnDependency{
 		// For test 1:
-		"pack1@npm:1.0.0": {Value: "pack1@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0"}},
-		"pack2@npm:1.0.0": {Value: "pack2@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0"}},
-		"pack3@npm:1.0.0": {Value: "pack3@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{{Locator: "pack1@virtual:c192f6b3b32cd5d11a443144e162ec3bc#npm:1.0.0"}, {Locator: "pack2@npm:1.0.0"}}}},
+		"pack1@npm:1.0.0": {Value: "pack1@npm:1.0.0", Details: buildutils.YarnDepDetails{Version: "1.0.0"}},
+		"pack2@npm:1.0.0": {Value: "pack2@npm:1.0.0", Details: buildutils.YarnDepDetails{Version: "1.0.0"}},
+		"pack3@npm:1.0.0": {Value: "pack3@npm:1.0.0", Details: buildutils.YarnDepDetails{Version: "1.0.0", Dependencies: []buildutils.YarnDependencyPointer{{Locator: "pack1@virtual:c192f6b3b32cd5d11a443144e162ec3bc#npm:1.0.0"}, {Locator: "pack2@npm:1.0.0"}}}},
 		// For test 2:
-		"pack4@npm:1.0.0": {Value: "pack4@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{{Locator: "pack5@npm:1.0.0"}}}},
-		"pack5@npm:1.0.0": {Value: "pack5@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{{Locator: "pack6@npm:1.0.0"}}}},
-		"pack6@npm:1.0.0": {Value: "pack6@npm:1.0.0", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{{Locator: "pack4@npm:1.0.0"}}}},
+		"pack4@npm:1.0.0": {Value: "pack4@npm:1.0.0", Details: buildutils.YarnDepDetails{Version: "1.0.0", Dependencies: []buildutils.YarnDependencyPointer{{Locator: "pack5@npm:1.0.0"}}}},
+		"pack5@npm:1.0.0": {Value: "pack5@npm:1.0.0", Details: buildutils.YarnDepDetails{Version: "1.0.0", Dependencies: []buildutils.YarnDependencyPointer{{Locator: "pack6@npm:1.0.0"}}}},
+		"pack6@npm:1.0.0": {Value: "pack6@npm:1.0.0", Details: buildutils.YarnDepDetails{Version: "1.0.0", Dependencies: []buildutils.YarnDependencyPointer{{Locator: "pack4@npm:1.0.0"}}}},
 	}
-	yarmModule := &YarnModule{}
+	yarnModule := &YarnModule{}
 
 	testCases := []struct {
-		dependency           *YarnDependency
+		dependency           *buildutils.YarnDependency
 		expectedDependencies map[string]*entities.Dependency
 	}{
 		{
@@ -84,7 +69,7 @@ func TestAppendDependencyRecursively(t *testing.T) {
 		biDependencies := make(map[string]*entities.Dependency)
 		go func() {
 			defer producerConsumer.Done()
-			err := yarmModule.appendDependencyRecursively(testCase.dependency, []string{"rootpack:1.0.0"}, dependenciesMap, biDependencies)
+			err := yarnModule.appendDependencyRecursively(testCase.dependency, []string{"rootpack:1.0.0"}, dependenciesMap, biDependencies)
 			assert.NoError(t, err)
 		}()
 		producerConsumer.Run()
