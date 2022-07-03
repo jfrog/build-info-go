@@ -1,5 +1,9 @@
 # Release Notes
-## 1.3.0 (Jun 7, 2022)
+## 1.4.0 (July 3, 2022)
+- Changed RunCmdWithOutputParser to run in silent mode
+- Changes for Yarn Audit
+
+## 1.3.0 (June 7, 2022)
 - Add Dotnet support
 - Bug: Duplicate artifacts are counted by their paths instead of their names
 
