@@ -31,9 +31,6 @@ func getPoetryDependencies(srcPath string) (graph map[string][]string, directDep
 		return nil, nil, err
 	}
 	projectName, directDependencies, err := getPackageNameFromPyproject(srcPath)
-	if err != nil {
-		return nil, nil, err
-	}
 	// Extract packages names from poetry.lock
 	dependencies, dependenciesVersions, err := extractPackagesFromPoetryLock(filePath)
 	if err != nil {
@@ -81,7 +78,7 @@ func getPoetryLockFilePath(srcPath string) (string, error) {
 	return getFilePath(srcPath, "poetry.lock")
 }
 
-// Get the project-name by parsing the pyproject.toml file
+// Get the project-name by parsing the pyproject.toml file 890ac60 (Add Poetry support)
 func extractProjectFromPyproject(pyprojectFilePath string) (project PoetryPackage, err error) {
 	content, err := os.ReadFile(pyprojectFilePath)
 	if err != nil {
