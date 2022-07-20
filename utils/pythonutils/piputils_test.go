@@ -1,11 +1,12 @@
 package pythonutils
 
 import (
-	testdatautils "github.com/jfrog/build-info-go/build/testdata"
-	"github.com/stretchr/testify/assert"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	testdatautils "github.com/jfrog/build-info-go/build/testdata"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetProjectNameFromFileContent(t *testing.T) {
@@ -48,7 +49,7 @@ func TestDetermineModuleName(t *testing.T) {
 			defer cleanup()
 
 			// Determine module name
-			packageName, err := GetPackageNameFromSetuppy(tmpProjectPath)
+			packageName, err := getPackageNameFromSetuppy(tmpProjectPath)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedPackageName, packageName)
 		})
