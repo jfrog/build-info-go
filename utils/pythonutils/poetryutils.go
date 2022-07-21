@@ -29,6 +29,9 @@ func getPoetryDependencies(srcPath string) (graph map[string][]string, directDep
 		return nil, nil, err
 	}
 	projectName, directDependencies, err := getPackageNameFromPyproject(srcPath)
+	if err != nil {
+		return nil, nil, err
+	}
 	// Extract packages names from poetry.lock
 	dependencies, dependenciesVersions, err := extractPackagesFromPoetryLock(filePath)
 	if err != nil {
