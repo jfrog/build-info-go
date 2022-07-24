@@ -264,7 +264,7 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	}
 }
 
-func TestNpmProdFlags(t *testing.T) {
+func TestNpmProdFlag(t *testing.T) {
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	assert.NoError(t, err)
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
