@@ -264,7 +264,7 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	}
 }
 
-func TestNpmDevProdFlags(t *testing.T) {
+func TestNpmProdFlag(t *testing.T) {
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	assert.NoError(t, err)
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
@@ -273,13 +273,12 @@ func TestNpmDevProdFlags(t *testing.T) {
 		scope     string
 		totalDeps int
 	}{
-		{"", 201},
-		{"--prod", 55},
-		{"--dev", 150},
+		{"", 2},
+		{"--prod", 1},
 	}
 	for _, entry := range testDependencyScopes {
 
-		projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project1", false, npmVersion)
+		projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project3", false, npmVersion)
 		defer cleanup()
 		cacachePath := filepath.Join(projectPath, "tmpcache")
 		npmArgs := []string{"--cache=" + cacachePath, entry.scope}
