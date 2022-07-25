@@ -21,7 +21,7 @@ type PoetryLock struct {
 	Package []*PoetryPackage
 }
 
-// Executes the poetry-dependency-map script and returns a dependency map of all the installed poetry packages in the current environment to and another list of the top level dependencies
+// Executes the poetry-dependency-map script and returns a dependency map of all the installed poetry packages in the current environment and another list of the top level dependencies
 func getPoetryDependencies(srcPath string) (graph map[string][]string, directDependencies []string, err error) {
 	filePath, err := getPoetryLockFilePath(srcPath)
 	if err != nil || filePath == "" {
@@ -79,7 +79,7 @@ func getPoetryLockFilePath(srcPath string) (string, error) {
 	return getFilePath(srcPath, "poetry.lock")
 }
 
-// Get the project-name by parse the pyproject.tomal file
+// Get the project-name by parse the pyproject.toml file
 func extractProjectFromPyproject(pyprojectFilePath string) (project PoetryPackage, err error) {
 	content, err := os.ReadFile(pyprojectFilePath)
 	if err != nil {
@@ -121,11 +121,9 @@ func extractPackagesFromPoetryLock(lockFilePath string) (dependencies map[string
 	return
 }
 
-// Returns the key array of a given map
+// Returns the key array of a given map.
+// (TODO - Should be replaced by maps.keys() when we move to go 1.18)
 func mapToKeysArray(aMap map[string]interface{}) []string {
-	// if aMap == nil {
-	// 	return []string{}
-	// }
 	keys := make([]string, len(aMap))
 	i := 0
 	for k := range aMap {
