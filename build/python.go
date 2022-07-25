@@ -2,13 +2,14 @@ package build
 
 import (
 	"fmt"
+	"os"
+	"regexp"
+	"strings"
+
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 	gofrogcmd "github.com/jfrog/gofrog/io"
-	"os"
-	"regexp"
-	"strings"
 )
 
 type PythonModule struct {
@@ -38,12 +39,12 @@ func (pm *PythonModule) RunInstallAndCollectDependencies(commandArgs []string) e
 	}
 	dependenciesGraph, topLevelPackagesList, err := pythonutils.GetPythonDependencies(pm.tool, pm.srcPath, pm.localDependenciesPath)
 	if err != nil {
-		return fmt.Errorf("failed while attempting to get %s dependencies graph: %s", string(pm.tool), err.Error())
+		return fmt.Errorf("failed while attempting to get %s dependencies graph: %s", pm.tool, err.Error())
 	}
 	// Get package-name.
-	packageName, pkgNameErr := pythonutils.GetPackageNameFromSetuppy(pm.srcPath)
+	packageName, pkgNameErr := pythonutils.GetPackageName(pm.tool, pm.srcPath)
 	if pkgNameErr != nil {
-		pm.containingBuild.logger.Debug("Couldn't retrieve the package name from Setup.py. Reason: ", pkgNameErr.Error())
+		pm.containingBuild.logger.Debug("Couldn't retrieve the package name. Reason: ", pkgNameErr.Error())
 	}
 	// If module-name was set by the command, don't change it.
 	if pm.name == "" {
