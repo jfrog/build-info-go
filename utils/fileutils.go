@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/jfrog/build-info-go/entities"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jfrog/build-info-go/entities"
 )
 
 const (
@@ -517,15 +518,6 @@ func CreateDirIfNotExist(path string) error {
 	}
 	_, err = CreateFilePath(path, "")
 	return err
-}
-
-func IsStringInSlice(string string, strings []string) bool {
-	for _, v := range strings {
-		if v == string {
-			return true
-		}
-	}
-	return false
 }
 
 func IsPathSymlink(path string) bool {

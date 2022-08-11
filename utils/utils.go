@@ -11,3 +11,12 @@ func GetRegExp(regex string) (*regexp.Regexp, error) {
 	}
 	return regExp, nil
 }
+
+func IsStringInSlice(str string, strings []string) bool {
+	for _, v := range strings {
+		if v == str {
+			return true
+		}
+	}
+	return false
+}
