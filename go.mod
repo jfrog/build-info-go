@@ -1,6 +1,6 @@
 module github.com/jfrog/build-info-go
 
-go 1.17
+go 1.18
 
 require (
 	github.com/CycloneDX/cyclonedx-go v0.5.1
@@ -22,11 +22,6 @@ require (
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
-)
-
-exclude (
-	golang.org/x/text v0.3.3
-	golang.org/x/text v0.3.5
 )
 
 // replace github.com/jfrog/gofrog => github.com/jfrog/gofrog v1.0.7-0.20211128152632-e218c460d703
