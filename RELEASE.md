@@ -1,4 +1,12 @@
 # Release Notes
+## 1.4.0 (July 3, 2022)
+- Changed RunCmdWithOutputParser to run in silent mode
+- Changes for Yarn Audit
+
+## 1.3.0 (June 7, 2022)
+- Add Dotnet support
+- Bug: Duplicate artifacts are counted by their paths instead of their names
+
 ## 1.2.6 (May 8, 2022)
 - Added pip & pipenv usage to the README
 - Bug fix - Missing npm dependencies cause an error

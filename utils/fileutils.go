@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jfrog/build-info-go/entities"
 )
 
 const (
@@ -174,6 +176,50 @@ func ListFiles(path string, includeDirs bool) ([]string, error) {
 				return nil, err
 			}
 			if isDir {
+				fileList = append(fileList, filePath)
+			}
+		}
+	}
+	return fileList, nil
+}
+
+// Return all files in the specified path who satisfy the filter func. Not recursive.
+func ListFilesByFilterFunc(path string, filterFunc func(filePath string) (bool, error)) ([]string, error) {
+	sep := GetFileSeparator()
+	if !strings.HasSuffix(path, sep) {
+		path += sep
+	}
+	var fileList []string
+	files, _ := ioutil.ReadDir(path)
+	path = strings.TrimPrefix(path, "."+sep)
+
+	for _, f := range files {
+		filePath := path + f.Name()
+		satisfy, err := filterFunc(filePath)
+		if err != nil {
+			return nil, err
+		}
+		if !satisfy {
+			continue
+		}
+		exists, err := IsFileExists(filePath, false)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			fileList = append(fileList, filePath)
+			continue
+		}
+
+		// Checks if the filepath is a symlink.
+		if IsPathSymlink(filePath) {
+			// Gets the file info of the symlink.
+			file, err := GetFileInfo(filePath, false)
+			if err != nil {
+				return nil, err
+			}
+			// Checks if the symlink is a file.
+			if !file.IsDir() {
 				fileList = append(fileList, filePath)
 			}
 		}
@@ -474,15 +520,6 @@ func CreateDirIfNotExist(path string) error {
 	return err
 }
 
-func IsStringInSlice(string string, strings []string) bool {
-	for _, v := range strings {
-		if v == string {
-			return true
-		}
-	}
-	return false
-}
-
 func IsPathSymlink(path string) bool {
 	f, _ := os.Lstat(path)
 	return f != nil && IsFileSymlink(f)
@@ -540,4 +577,60 @@ func ReadNLines(path string, total int) (lines []string, err error) {
 		}
 	}
 	return lines, nil
+}
+
+type FileDetails struct {
+	Checksum entities.Checksum
+	Size     int64
+}
+
+func GetFileDetails(filePath string, includeChecksums bool) (details *FileDetails, err error) {
+	details = new(FileDetails)
+	if includeChecksums {
+		details.Checksum, err = calcChecksumDetails(filePath)
+		if err != nil {
+			return details, err
+		}
+	} else {
+		details.Checksum = entities.Checksum{}
+	}
+
+	file, err := os.Open(filePath)
+	defer func() {
+		e := file.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+	if err != nil {
+		return nil, err
+	}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	details.Size = fileInfo.Size()
+	return details, nil
+}
+
+func calcChecksumDetails(filePath string) (checksum entities.Checksum, err error) {
+	file, err := os.Open(filePath)
+	defer func() {
+		e := file.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+	if err != nil {
+		return entities.Checksum{}, err
+	}
+	return calcChecksumDetailsFromReader(file)
+}
+
+func calcChecksumDetailsFromReader(reader io.Reader) (entities.Checksum, error) {
+	checksumInfo, err := CalcChecksums(reader)
+	if err != nil {
+		return entities.Checksum{}, err
+	}
+	return entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}, nil
 }

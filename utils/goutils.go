@@ -163,9 +163,9 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 	var executionError error
 	var errorOut string
 	if performPasswordMask {
-		output, errorOut, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
+		output, errorOut, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, false, protocolRegExp)
 	} else {
-		output, errorOut, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
+		output, errorOut, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, false)
 	}
 	if len(output) != 0 {
 		log.Debug(output)

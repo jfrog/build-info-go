@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jfrog/build-info-go/utils/pythonutils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jfrog/build-info-go/utils/pythonutils"
 
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
@@ -101,6 +102,16 @@ func (b *Build) AddPythonModule(srcPath string, tool pythonutils.PythonTool) (*P
 // AddYarnModule adds a Yarn module to this Build. Pass srcPath as an empty string if the root of the Yarn project is the working directory.
 func (b *Build) AddYarnModule(srcPath string) (*YarnModule, error) {
 	return newYarnModule(srcPath, b)
+}
+
+// AddNugetModules adds a Nuget module to this Build. Pass srcPath as an empty string if the root of the Nuget project is the working directory.
+func (b *Build) AddNugetModules(srcPath string) (*DotnetModule, error) {
+	return newDotnetModule(srcPath, b)
+}
+
+// AddDotnetModules adds a Dotnet module to this Build. Pass srcPath as an empty string if the root of the Dotnet project is the working directory.
+func (b *Build) AddDotnetModules(srcPath string) (*DotnetModule, error) {
+	return newDotnetModule(srcPath, b)
 }
 
 func (b *Build) CollectEnv() error {
@@ -442,7 +453,7 @@ func addArtifactToPartialModule(artifact entities.Artifact, moduleId string, par
 	if partialModules[moduleId].artifacts == nil {
 		partialModules[moduleId].artifacts = make(map[string]entities.Artifact)
 	}
-	key := fmt.Sprintf("%s-%s-%s", artifact.Name, artifact.Sha1, artifact.Md5)
+	key := fmt.Sprintf("%s-%s-%s", artifact.Path, artifact.Sha1, artifact.Md5)
 	partialModules[moduleId].artifacts[key] = artifact
 }
 
