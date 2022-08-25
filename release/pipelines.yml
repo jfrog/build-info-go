@@ -15,7 +15,7 @@ pipelines:
         image:
           custom:
             name: releases-docker.jfrog.io/jfrog-ecosystem-integration-env
-            tag: 1.5.0
+            tag: latest
       environmentVariables:
         readOnly:
           NEXT_VERSION: 0.0.0
