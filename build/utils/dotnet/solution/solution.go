@@ -290,7 +290,7 @@ func parseProjectLine(projectLine, path string) (projectName, projFilePath strin
 func parseSlnFile(slnFile string) ([]string, error) {
 	var err error
 	if projectRegExp == nil {
-		projectRegExp, err = utils.GetRegExp(`Project\("(.*\.csproj)`)
+		projectRegExp, err = utils.GetRegExp(`Project\("(.*\..*proj)`)
 		if err != nil {
 			return nil, err
 		}
