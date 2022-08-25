@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	buildinfo "github.com/jfrog/build-info-go/entities"
-	gofrog "github.com/jfrog/gofrog/io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,7 +12,9 @@ import (
 
 	"github.com/jfrog/build-info-go/build/utils/dotnet/dependencies"
 	"github.com/jfrog/build-info-go/build/utils/dotnet/solution/project"
+	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	gofrog "github.com/jfrog/gofrog/io"
 )
 
 type Solution interface {
@@ -207,12 +207,12 @@ func (solution *solution) loadSingleProject(project project.Project, log utils.L
 	// First we wil find the project's dependencies source.
 	// It can be located directly in the project's root directory or in a directory with the project name under the solution root
 	// or under obj directory (in case of assets.json file)
-	projectRootPath := project.RootPath()
-	projectPathPattern := filepath.Join(projectRootPath, dependencies.AssetDirName) + string(filepath.Separator)
-	projectNamePattern := string(filepath.Separator) + project.Name() + string(filepath.Separator)
+	projectRootPath := strings.ToLower(project.RootPath())
+	projectPathPattern := strings.ToLower(filepath.Join(projectRootPath, dependencies.AssetDirName) + string(filepath.Separator))
+	projectNamePattern := strings.ToLower(string(filepath.Separator) + project.Name() + string(filepath.Separator))
 	var dependenciesSource string
 	for _, source := range solution.dependenciesSources {
-		if projectRootPath == filepath.Dir(source) || strings.Contains(source, projectPathPattern) || strings.Contains(source, projectNamePattern) {
+		if projectRootPath == strings.ToLower(filepath.Dir(source)) || strings.Contains(strings.ToLower(source), projectPathPattern) || strings.Contains(strings.ToLower(source), projectNamePattern) {
 			dependenciesSource = source
 			break
 		}
@@ -271,7 +271,7 @@ func parseProjectLine(projectLine, path string) (projectName, projFilePath strin
 	}
 
 	projectInfo := strings.Split(parsedLine[1], ",")
-	if len(projectInfo) <= 2 {
+	if len(projectInfo) < 2 {
 		return "", "", errors.New("Unexpected project information format: " + parsedLine[1])
 	}
 	projectName = removeQuotes(projectInfo[0])
@@ -290,7 +290,7 @@ func parseProjectLine(projectLine, path string) (projectName, projFilePath strin
 func parseSlnFile(slnFile string) ([]string, error) {
 	var err error
 	if projectRegExp == nil {
-		projectRegExp, err = utils.GetRegExp(`Project\("(.*)\nEndProject`)
+		projectRegExp, err = utils.GetRegExp(`Project\("(.*\..*proj)`)
 		if err != nil {
 			return nil, err
 		}
