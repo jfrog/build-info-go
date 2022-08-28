@@ -1,4 +1,14 @@
 # Release Notes
+## 1.5.0 (Aug 28, 2022)
+- Update dependencies
+- Update go to 1.18
+- Update jfrog-ecosystem-integration-env to latest
+- Fix multi lines NuGet project definition
+
+## 1.4.1 (July 3, 2022)
+- Move IsStringInSlice out from fileutils
+- The latest npm tests have been updated to work with npm versions 8.11.0 and above
+
 ## 1.4.0 (July 3, 2022)
 - Changed RunCmdWithOutputParser to run in silent mode
 - Changes for Yarn Audit
