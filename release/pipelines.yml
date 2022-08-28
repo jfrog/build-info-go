@@ -4,7 +4,7 @@ resources:
     configuration:
       path: jfrog/build-info-go
       branches:
-        include: main
+        include: dev
       gitProvider: il_automation
 
 pipelines:
