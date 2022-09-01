@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -412,7 +413,7 @@ func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) e
 
 	for _, v := range files {
 		// Skip if excluded
-		if IsStringInSlice(filepath.Base(v), excludeNames) {
+		if slices.Contains(excludeNames, filepath.Base(v)) {
 			continue
 		}
 

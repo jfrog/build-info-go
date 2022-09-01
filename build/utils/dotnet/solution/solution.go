@@ -114,10 +114,9 @@ func populateRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap 
 			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= buildinfo.RequestedByMaxLength {
 				continue
 			}
-			for _, parentRequestedBy := range parentDependency.RequestedBy {
-				childRequestedBy := append([]string{parentDependency.Id}, parentRequestedBy...)
-				childDep.RequestedBy = append(childDep.RequestedBy, childRequestedBy)
-			}
+			// Update RequestedBy field from parent's RequestedBy.
+			childDep.UpdateRequestedBy(parentDependency.Id, parentDependency.RequestedBy)
+
 			// Run recursive call on child dependencies
 			populateRequestedBy(*childDep, dependenciesMap, childrenMap)
 		}

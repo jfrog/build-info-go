@@ -2,6 +2,7 @@ package entities
 
 import (
 	"github.com/jfrog/build-info-go/utils/compareutils"
+	"golang.org/x/exp/slices"
 	"regexp"
 	"strings"
 	"time"
@@ -528,10 +529,8 @@ func (d *Dependency) UpdateRequestedBy(parentId string, parentRequestedBy [][]st
 
 func (d *Dependency) NodeHasLoop() bool {
 	for _, requestedBy := range d.RequestedBy {
-		for _, depId := range requestedBy {
-			if depId == d.Id {
-				return true
-			}
+		if slices.Contains(requestedBy, d.Id) {
+			return true
 		}
 	}
 	return false
