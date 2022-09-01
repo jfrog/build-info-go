@@ -413,7 +413,6 @@ func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) e
 
 	for _, v := range files {
 		// Skip if excluded
-
 		if slices.Contains(excludeNames, filepath.Base(v)) {
 			continue
 		}
