@@ -8,6 +8,7 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/version"
+	"golang.org/x/exp/slices"
 	"os"
 	"os/exec"
 	"strings"
@@ -96,7 +97,7 @@ func (ym *YarnModule) appendDependencyRecursively(yarnDependency *buildutils.Yar
 	id := yarnDependency.Name() + ":" + yarnDependency.Details.Version
 
 	// To avoid infinite loops in case of circular dependencies, the dependency won't be added if it's already in pathToRoot
-	if stringsSliceContains(pathToRoot, id) {
+	if slices.Contains(pathToRoot, id) {
 		return nil
 	}
 
@@ -191,13 +192,4 @@ func runYarnCommand(executablePath, srcPath string, args ...string) error {
 		err = errors.New(err.Error())
 	}
 	return err
-}
-
-func stringsSliceContains(slice []string, str string) bool {
-	for _, element := range slice {
-		if element == str {
-			return true
-		}
-	}
-	return false
 }

@@ -11,6 +11,7 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.11.2
 	github.com/xeipuuv/gojsonschema v1.2.0
+	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91
 )
 
 require (
