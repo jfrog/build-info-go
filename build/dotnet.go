@@ -46,12 +46,28 @@ func (dm *DotnetModule) SetSolutionPath(solutionPath string) {
 	dm.solutionPath = solutionPath
 }
 
-func (dm *DotnetModule) SetArgsAndFlags(argAndFlags []string) {
-	dm.argAndFlags = argAndFlags
-}
-
 func (dm *DotnetModule) SetToolchainType(toolchainType dotnet.ToolchainType) {
 	dm.toolchainType = toolchainType
+}
+
+func (dm *DotnetModule) GetArgAndFlags() []string {
+	return dm.argAndFlags
+}
+
+func (dm *DotnetModule) GetName() string {
+	return dm.name
+}
+
+func (dm *DotnetModule) GetSubcommand() string {
+	return dm.subCommand
+}
+
+func (dm *DotnetModule) GetSolutionPath() string {
+	return dm.solutionPath
+}
+
+func (dm *DotnetModule) GetToolchainType() dotnet.ToolchainType {
+	return dm.toolchainType
 }
 
 // CalcDependencies exec all type of dotnet commands - install, update, add, restore.
