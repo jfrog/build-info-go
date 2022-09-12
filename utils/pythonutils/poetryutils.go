@@ -1,10 +1,20 @@
 package pythonutils
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
+	gofrogcmd "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/jfrog-client-go/utils/errorutils"
+	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"golang.org/x/exp/maps"
 )
 
@@ -118,4 +128,101 @@ func extractPackagesFromPoetryLock(lockFilePath string) (dependencies map[string
 		dependencies[dependencyName] = maps.Keys(dependency.Dependencies)
 	}
 	return
+}
+
+func extractPoetryDependenciesFiles(srcPath string, cmdArgs []string, log utils.Log) (dependenciesFiles map[string]entities.Dependency, err error) {
+	// Run poetry install and extract the site-packages location
+	sitePackagesPath, err := getSitePackagesPath(cmdArgs, srcPath)
+	if err != nil {
+		return
+	}
+	// Extract packages names from poetry.lock
+	filePath, err := getPoetryLockFilePath(srcPath)
+	if err != nil || filePath == "" {
+		// Error was returned or poetry.lock does not exist in directory.
+		return nil, err
+	}
+	dependencies, dependenciesVersions, err := extractPackagesFromPoetryLock(filePath)
+	if err != nil {
+		return nil, err
+	}
+	dependenciesFiles = map[string]entities.Dependency{}
+	for _, directDependencies := range dependencies {
+		for _, dependency := range directDependencies {
+			directUrlPath := fmt.Sprintf("%s%s-%s.dist-info%sdirect_url.json", sitePackagesPath, dependency, dependenciesVersions[dependency], string(os.PathSeparator))
+			directUrlFile, err := fileutils.ReadFile(directUrlPath)
+			if errorutils.CheckError(err) != nil {
+				log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
+				continue
+			}
+			directUrl := packagedDirectUrl{}
+			err = json.Unmarshal(directUrlFile, &directUrl)
+			if errorutils.CheckError(err) != nil {
+				log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
+				continue
+			}
+			lastSeparatorIndex := strings.LastIndex(directUrl.Url, string(os.PathSeparator))
+			var fileName string
+			if lastSeparatorIndex == -1 {
+				fileName = directUrl.Url
+			} else {
+				fileName = directUrl.Url[lastSeparatorIndex+1:]
+			}
+			dependenciesFiles[strings.ToLower(dependency)] = entities.Dependency{Id: fileName}
+			log.Debug(fmt.Sprintf("Found package: %s installed with: %s", dependency, fileName))
+		}
+
+	}
+	return
+}
+
+func getSitePackagesPath(commandArgs []string, srcPath string) (sitePackagesPath string, err error) {
+	// First run poetry install with verbose logging
+	commandArgs = append(commandArgs, "-vv")
+	installCmd := utils.NewCommand("poetry", "install", commandArgs)
+	installCmd.Dir = srcPath
+	// Extract the virtuL env path
+	virtualEnvRegexp, err := regexp.Compile(`^Using\svirtualenv:\s(.*)$`)
+	if err != nil {
+		return "", err
+	}
+	virtualEnvNameParser := gofrogcmd.CmdOutputPattern{
+		RegExp: virtualEnvRegexp,
+		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
+
+			// Check for out of bound results.
+			if len(pattern.MatchedResults)-1 < 0 {
+				return "", nil
+			}
+			// If found, return the virtual env path
+			return pattern.MatchedResults[1], nil
+		},
+	}
+	virtualEnvPath, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &virtualEnvNameParser)
+	if err != nil {
+		return "", fmt.Errorf("failed running poetry command with error: '%s - %s'", err.Error(), errorOut)
+	}
+	if virtualEnvPath != "" {
+		// Take the first line matches the virtualEnvRegexp
+		sitePackagesPath = strings.Split(virtualEnvPath, "\n")[0]
+		// Extract from poetry env(i.e PROJECT-9SrbZw5z-py3.9) the env python version
+		if len(sitePackagesPath) < 2 {
+			return "", fmt.Errorf("failed extracting python site package form the following virtual env %q", sitePackagesPath)
+		}
+		pythonVersion := sitePackagesPath[len(sitePackagesPath)-2:]
+		// add /lib/python3.10/site-packages
+		sitePackagesPath = filepath.Join(sitePackagesPath, "lib", "python"+pythonVersion, "site-packages")
+	} else {
+		// If no virtuL env is use, return the local python installation site-packages path
+		siteCmd := utils.NewCommand("python", "site", []string{"-m", "--user-site"})
+		sitePackagesPath, err = gofrogcmd.RunCmdOutput(siteCmd)
+		if err != nil {
+			return "", fmt.Errorf("failed running python -m site --user-site with error: '%s'", err.Error())
+		}
+	}
+	return
+}
+
+type packagedDirectUrl struct {
+	Url string
 }
