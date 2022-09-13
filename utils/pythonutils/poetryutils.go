@@ -37,13 +37,16 @@ func getPoetryDependencies(srcPath string) (graph map[string][]string, directDep
 	filePath, err := getPoetryLockFilePath(srcPath)
 	if err != nil || filePath == "" {
 		// Error was returned or poetry.lock does not exist in directory.
-		return nil, nil, err
+		return map[string][]string{}, []string{}, err
 	}
 	projectName, directDependencies, err := getPackageNameFromPyproject(srcPath)
+	if err != nil {
+		return map[string][]string{}, []string{}, err
+	}
 	// Extract packages names from poetry.lock
 	dependencies, dependenciesVersions, err := extractPackagesFromPoetryLock(filePath)
 	if err != nil {
-		return nil, nil, err
+		return map[string][]string{}, []string{}, err
 	}
 	graph = make(map[string][]string)
 	// Add the root node - the project itself.
