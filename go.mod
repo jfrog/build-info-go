@@ -3,6 +3,7 @@ module github.com/jfrog/build-info-go
 go 1.18
 
 require (
+	github.com/BurntSushi/toml v1.1.0
 	github.com/CycloneDX/cyclonedx-go v0.6.0
 	github.com/buger/jsonparser v1.1.1
 	github.com/jfrog/gofrog v1.2.1

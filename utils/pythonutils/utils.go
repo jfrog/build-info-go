@@ -2,13 +2,17 @@ package pythonutils
 
 import (
 	"errors"
-	buildinfo "github.com/jfrog/build-info-go/entities"
+	"path/filepath"
 	"strings"
+
+	buildinfo "github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
 )
 
 const (
 	Pip    = "pip"
 	Pipenv = "pipenv"
+	Poetry = "poetry"
 )
 
 type PythonTool string
@@ -40,17 +44,11 @@ func parseDependenciesToGraph(packages []pythonDependencyPackage) (map[string][]
 
 // Structs for parsing the pip-dependency-map result.
 type pythonDependencyPackage struct {
-	Package      packageType  `json:"package,omitempty"`
-	Dependencies []dependency `json:"dependencies,omitempty"`
+	Package      packageType   `json:"package,omitempty"`
+	Dependencies []packageType `json:"dependencies,omitempty"`
 }
 
 type packageType struct {
-	Key              string `json:"key,omitempty"`
-	PackageName      string `json:"package_name,omitempty"`
-	InstalledVersion string `json:"installed_version,omitempty"`
-}
-
-type dependency struct {
 	Key              string `json:"key,omitempty"`
 	PackageName      string `json:"package_name,omitempty"`
 	InstalledVersion string `json:"installed_version,omitempty"`
@@ -62,8 +60,22 @@ func GetPythonDependencies(tool PythonTool, srcPath, localDependenciesPath strin
 		return getPipDependencies(srcPath, localDependenciesPath)
 	case Pipenv:
 		return getPipenvDependencies(srcPath)
+	case Poetry:
+		return getPoetryDependencies(srcPath)
 	default:
 		return nil, nil, errors.New(string(tool) + " commands are not supported.")
+	}
+}
+
+func GetPackageName(tool PythonTool, srcPath string) (packageName string, err error) {
+	switch tool {
+	case Pip, Pipenv:
+		return getPackageNameFromSetuppy(srcPath)
+	case Poetry:
+		packageName, _, err = getPackageNameFromPyproject(srcPath)
+		return
+	default:
+		return "", errors.New(string(tool) + " commands are not supported.")
 	}
 }
 
@@ -114,4 +126,14 @@ func updateDepsIdsAndRequestedBy(parentDependency buildinfo.Dependency, dependen
 			updateDepsIdsAndRequestedBy(childDep, dependenciesMap, dependenciesGraph)
 		}
 	}
+}
+
+func getFilePath(srcPath, fileName string) (string, error) {
+	filePath := filepath.Join(srcPath, fileName)
+	// Check if fileName exists.
+	validPath, err := utils.IsFileExists(filePath, false)
+	if err != nil || !validPath {
+		return "", err
+	}
+	return filePath, nil
 }
