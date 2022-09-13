@@ -90,7 +90,7 @@ func getPoetryLockFilePath(srcPath string) (string, error) {
 	return getFilePath(srcPath, "poetry.lock")
 }
 
-// Get the project-name by parsing the pyproject.toml file 890ac60 (Add Poetry support)
+// Get the project-name by parsing the pyproject.toml file.
 func extractProjectFromPyproject(pyprojectFilePath string) (project PoetryPackage, err error) {
 	content, err := os.ReadFile(pyprojectFilePath)
 	if err != nil {
