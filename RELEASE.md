@@ -3,6 +3,13 @@
 | Release notes moved to https://github.com/jfrog/build-info-go/releases |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------|
 
+## 1.5.2 (September 13, 2022)
+- Breaking change: Removed the redundant `SetArgsAndFlags` setter from `DotnetModule`.
+- Add `DotnetModule` getters.
+
+## 1.5.1 (September 5, 2022)
+- Fix Nuget requestedBy calculation.
+
 ## 1.5.0 (Aug 28, 2022)
 - Update dependencies
 - Update go to 1.18
