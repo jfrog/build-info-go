@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,8 +14,6 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	gofrogcmd "github.com/jfrog/gofrog/io"
-	"github.com/jfrog/jfrog-client-go/utils/errorutils"
-	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"golang.org/x/exp/maps"
 )
 
@@ -149,14 +148,14 @@ func extractPoetryDependenciesFiles(srcPath string, cmdArgs []string, log utils.
 	dependenciesFiles = map[string]entities.Dependency{}
 	for dependency, version := range dependenciesVersions {
 		directUrlPath := fmt.Sprintf("%s%s-%s.dist-info%sdirect_url.json", sitePackagesPath, dependency, version, string(os.PathSeparator))
-		directUrlFile, err := fileutils.ReadFile(directUrlPath)
-		if errorutils.CheckError(err) != nil {
+		directUrlFile, err := ioutil.ReadFile(directUrlPath)
+		if err != nil {
 			log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
 			continue
 		}
 		directUrl := packagedDirectUrl{}
 		err = json.Unmarshal(directUrlFile, &directUrl)
-		if errorutils.CheckError(err) != nil {
+		if err != nil {
 			log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
 			continue
 		}
