@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"golang.org/x/exp/maps"
 )
 
 type PyprojectToml struct {
@@ -21,7 +22,8 @@ type PoetryLock struct {
 	Package []*PoetryPackage
 }
 
-// Executes the poetry-dependency-map script and returns a dependency map of all the installed poetry packages in the current environment and another list of the top level dependencies
+// Extract all poetry dependencies from the pyproject.toml and poetry.lock files.
+// Returns a dependency map of all the installed poetry packages in the current environment and another list of the top level dependencies.
 func getPoetryDependencies(srcPath string) (graph map[string][]string, directDependencies []string, err error) {
 	filePath, err := getPoetryLockFilePath(srcPath)
 	if err != nil || filePath == "" {
@@ -57,14 +59,14 @@ func getPackageNameFromPyproject(srcPath string) (string, []string, error) {
 	filePath, err := getPyprojectFilePath(srcPath)
 	if err != nil || filePath == "" {
 		// Error was returned or pyproject.toml does not exist in directory.
-		return "", nil, err
+		return "", []string{}, err
 	}
 	// Extract package name from pyproject.toml.
 	project, err := extractProjectFromPyproject(filePath)
 	if err != nil {
-		return "", nil, err
+		return "", []string{}, err
 	}
-	return project.Name, append(mapToKeysArray(project.Dependencies), mapToKeysArray(project.DevDependencies)...), nil
+	return project.Name, append(maps.Keys(project.Dependencies), maps.Keys(project.DevDependencies)...), nil
 }
 
 // Look for 'pyproject.toml' file in current work dir.
@@ -79,7 +81,7 @@ func getPoetryLockFilePath(srcPath string) (string, error) {
 	return getFilePath(srcPath, "poetry.lock")
 }
 
-// Get the project-name by parse the pyproject.toml file
+// Get the project-name by parsing the pyproject.toml file
 func extractProjectFromPyproject(pyprojectFilePath string) (project PoetryPackage, err error) {
 	content, err := os.ReadFile(pyprojectFilePath)
 	if err != nil {
@@ -99,7 +101,7 @@ func extractProjectFromPyproject(pyprojectFilePath string) (project PoetryPackag
 	return PoetryPackage{}, errors.New("Couldn't find project name and version in " + pyprojectFilePath)
 }
 
-// Get the project-name by parse the poetry.lock file
+// Get the project-name by parsing the poetry.lock file
 func extractPackagesFromPoetryLock(lockFilePath string) (dependencies map[string][]string, dependenciesVersions map[string]string, err error) {
 	content, err := os.ReadFile(lockFilePath)
 	if err != nil {
@@ -116,19 +118,7 @@ func extractPackagesFromPoetryLock(lockFilePath string) (dependencies map[string
 	for _, dependency := range poetryLockFile.Package {
 		dependenciesVersions[dependency.Name] = dependency.Version
 		dependencyName := dependency.Name + ":" + dependency.Version
-		dependencies[dependencyName] = mapToKeysArray(dependency.Dependencies)
+		dependencies[dependencyName] = maps.Keys(dependency.Dependencies)
 	}
 	return
-}
-
-// Returns the key array of a given map.
-// (TODO - Should be replaced by maps.keys() when we move to go 1.18)
-func mapToKeysArray(aMap map[string]interface{}) []string {
-	keys := make([]string, len(aMap))
-	i := 0
-	for k := range aMap {
-		keys[i] = k
-		i++
-	}
-	return keys
 }

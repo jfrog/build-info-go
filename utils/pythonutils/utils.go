@@ -132,12 +132,8 @@ func getFilePath(srcPath, fileName string) (string, error) {
 	filePath := filepath.Join(srcPath, fileName)
 	// Check if fileName exists.
 	validPath, err := utils.IsFileExists(filePath, false)
-	if err != nil {
+	if err != nil || !validPath {
 		return "", err
 	}
-	if !validPath {
-		return "", nil
-	}
-
 	return filePath, nil
 }
