@@ -142,35 +142,33 @@ func extractPoetryDependenciesFiles(srcPath string, cmdArgs []string, log utils.
 		// Error was returned or poetry.lock does not exist in directory.
 		return nil, err
 	}
-	dependencies, dependenciesVersions, err := extractPackagesFromPoetryLock(filePath)
+	_, dependenciesVersions, err := extractPackagesFromPoetryLock(filePath)
 	if err != nil {
 		return nil, err
 	}
 	dependenciesFiles = map[string]entities.Dependency{}
-	for _, directDependencies := range dependencies {
-		for _, dependency := range directDependencies {
-			directUrlPath := fmt.Sprintf("%s%s-%s.dist-info%sdirect_url.json", sitePackagesPath, dependency, dependenciesVersions[dependency], string(os.PathSeparator))
-			directUrlFile, err := fileutils.ReadFile(directUrlPath)
-			if errorutils.CheckError(err) != nil {
-				log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
-				continue
-			}
-			directUrl := packagedDirectUrl{}
-			err = json.Unmarshal(directUrlFile, &directUrl)
-			if errorutils.CheckError(err) != nil {
-				log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
-				continue
-			}
-			lastSeparatorIndex := strings.LastIndex(directUrl.Url, string(os.PathSeparator))
-			var fileName string
-			if lastSeparatorIndex == -1 {
-				fileName = directUrl.Url
-			} else {
-				fileName = directUrl.Url[lastSeparatorIndex+1:]
-			}
-			dependenciesFiles[strings.ToLower(dependency)] = entities.Dependency{Id: fileName}
-			log.Debug(fmt.Sprintf("Found package: %s installed with: %s", dependency, fileName))
+	for dependency, version := range dependenciesVersions {
+		directUrlPath := fmt.Sprintf("%s%s-%s.dist-info%sdirect_url.json", sitePackagesPath, dependency, version, string(os.PathSeparator))
+		directUrlFile, err := fileutils.ReadFile(directUrlPath)
+		if errorutils.CheckError(err) != nil {
+			log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
+			continue
 		}
+		directUrl := packagedDirectUrl{}
+		err = json.Unmarshal(directUrlFile, &directUrl)
+		if errorutils.CheckError(err) != nil {
+			log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
+			continue
+		}
+		lastSeparatorIndex := strings.LastIndex(directUrl.Url, string(os.PathSeparator))
+		var fileName string
+		if lastSeparatorIndex == -1 {
+			fileName = directUrl.Url
+		} else {
+			fileName = directUrl.Url[lastSeparatorIndex+1:]
+		}
+		dependenciesFiles[strings.ToLower(dependency)] = entities.Dependency{Id: fileName}
+		log.Debug(fmt.Sprintf("Found package: %s installed with: %s", dependency, fileName))
 
 	}
 	return
@@ -206,12 +204,13 @@ func getSitePackagesPath(commandArgs []string, srcPath string) (sitePackagesPath
 		// Take the first line matches the virtualEnvRegexp
 		sitePackagesPath = strings.Split(virtualEnvPath, "\n")[0]
 		// Extract from poetry env(i.e PROJECT-9SrbZw5z-py3.9) the env python version
-		if len(sitePackagesPath) < 2 {
+		pythonVersionIndex := strings.LastIndex(sitePackagesPath, "-py")
+		if pythonVersionIndex == -1 {
 			return "", fmt.Errorf("failed extracting python site package form the following virtual env %q", sitePackagesPath)
 		}
-		pythonVersion := sitePackagesPath[len(sitePackagesPath)-2:]
+		pythonVersion := sitePackagesPath[pythonVersionIndex+3:]
 		// add /lib/python3.10/site-packages
-		sitePackagesPath = filepath.Join(sitePackagesPath, "lib", "python"+pythonVersion, "site-packages")
+		sitePackagesPath = filepath.Join(sitePackagesPath, "lib", "python"+pythonVersion, "site-packages") + string(os.PathSeparator)
 	} else {
 		// If no virtuL env is use, return the local python installation site-packages path
 		siteCmd := utils.NewCommand("python", "site", []string{"-m", "--user-site"})

@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	Pip    = "pip"
-	Pipenv = "pipenv"
-	Poetry = "poetry"
+	Pip    PythonTool = "pip"
+	Pipenv PythonTool = "pipenv"
+	Poetry PythonTool = "poetry"
 )
 
 type PythonTool string
