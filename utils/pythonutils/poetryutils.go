@@ -51,13 +51,13 @@ func getPoetryDependencies(srcPath string) (graph map[string][]string, directDep
 	graph = make(map[string][]string)
 	// Add the root node - the project itself.
 	for _, directDependency := range directDependencies {
-		directDependencyName := directDependency + ":" + dependenciesVersions[directDependency]
+		directDependencyName := directDependency + ":" + dependenciesVersions[strings.ToLower(directDependency)]
 		graph[projectName] = append(graph[projectName], directDependencyName)
 	}
 	// Add versions to all dependencies
 	for dependency, transitiveDependencies := range dependencies {
 		for _, transitiveDependency := range transitiveDependencies {
-			transitiveDependencyName := transitiveDependency + ":" + dependenciesVersions[transitiveDependency]
+			transitiveDependencyName := transitiveDependency + ":" + dependenciesVersions[strings.ToLower(transitiveDependency)]
 			graph[dependency] = append(graph[dependency], transitiveDependencyName)
 		}
 	}
@@ -125,7 +125,7 @@ func extractPackagesFromPoetryLock(lockFilePath string) (dependencies map[string
 	dependenciesVersions = make(map[string]string)
 	dependencies = make(map[string][]string)
 	for _, dependency := range poetryLockFile.Package {
-		dependenciesVersions[dependency.Name] = dependency.Version
+		dependenciesVersions[strings.ToLower(dependency.Name)] = dependency.Version
 		dependencyName := dependency.Name + ":" + dependency.Version
 		dependencies[dependencyName] = maps.Keys(dependency.Dependencies)
 	}
