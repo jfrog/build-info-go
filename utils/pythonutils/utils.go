@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/jfrog/build-info-go/entities"
-	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	gofrogcmd "github.com/jfrog/gofrog/io"
 )
@@ -101,7 +100,7 @@ func GetPackageName(tool PythonTool, srcPath string) (packageName string, err er
 // topLevelPackagesList - The direct dependencies
 // packageName          - The resolved package name of the Python project, may be empty if we couldn't resolve it
 // moduleName           - The input module name from the user, or the packageName
-func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string, topLevelPackagesList []string, packageName, moduleName string) {
+func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]entities.Dependency, dependenciesGraph map[string][]string, topLevelPackagesList []string, packageName, moduleName string) {
 	if packageName == "" {
 		// Projects without setup.py
 		dependenciesGraph[moduleName] = topLevelPackagesList
@@ -109,15 +108,15 @@ func UpdateDepsIdsAndRequestedBy(dependenciesMap map[string]buildinfo.Dependency
 		// Projects with setup.py
 		dependenciesGraph[moduleName] = dependenciesGraph[packageName]
 	}
-	rootModule := buildinfo.Dependency{Id: moduleName, RequestedBy: [][]string{{}}}
+	rootModule := entities.Dependency{Id: moduleName, RequestedBy: [][]string{{}}}
 	updateDepsIdsAndRequestedBy(rootModule, dependenciesMap, dependenciesGraph)
 }
 
-func updateDepsIdsAndRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap map[string]buildinfo.Dependency, dependenciesGraph map[string][]string) {
+func updateDepsIdsAndRequestedBy(parentDependency entities.Dependency, dependenciesMap map[string]entities.Dependency, dependenciesGraph map[string][]string) {
 	for _, childId := range dependenciesGraph[parentDependency.Id] {
 		childName := childId[0:strings.Index(childId, ":")]
 		if childDep, ok := dependenciesMap[childName]; ok {
-			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= buildinfo.RequestedByMaxLength {
+			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= entities.RequestedByMaxLength {
 				continue
 			}
 			// Update RequestedBy field from parent's RequestedBy.
