@@ -3,6 +3,9 @@
 | Release notes moved to https://github.com/jfrog/build-info-go/releases |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------|
 
+## 1.6.0 (September 18, 2022)
+- Add support for the Poetry package manager
+
 ## 1.5.2 (September 13, 2022)
 - Breaking change: Removed the redundant `SetArgsAndFlags` setter from `DotnetModule`.
 - Add `DotnetModule` getters.
