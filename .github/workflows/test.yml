@@ -19,10 +19,10 @@ jobs:
         with:
           go-version: 1.18.x
 
-      - name: Setup Python3
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
+      #- name: Setup Python3
+      #  uses: actions/setup-python@v4
+      #  with:
+      #    python-version: "3.x"
 
       - name: Setup Pipenv
         run: pip3 install pipenv
