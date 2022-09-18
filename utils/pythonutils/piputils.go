@@ -3,7 +3,6 @@ package pythonutils
 import (
 	"encoding/json"
 	"errors"
-	"github.com/jfrog/build-info-go/utils"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -11,6 +10,8 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/jfrog/build-info-go/utils"
 )
 
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
@@ -75,7 +76,7 @@ func writeScriptIfNeeded(targetDirPath, scriptName string) error {
 	return nil
 }
 
-func GetPackageNameFromSetuppy(srcPath string) (string, error) {
+func getPackageNameFromSetuppy(srcPath string) (string, error) {
 	filePath, err := getSetupPyFilePath(srcPath)
 	if err != nil || filePath == "" {
 		// Error was returned or setup.py does not exist in directory.
@@ -94,17 +95,7 @@ func GetPackageNameFromSetuppy(srcPath string) (string, error) {
 // Look for 'setup.py' file in current work dir.
 // If found, return its absolute path.
 func getSetupPyFilePath(srcPath string) (string, error) {
-	filePath := filepath.Join(srcPath, "setup.py")
-	// Check if setup.py exists.
-	validPath, err := utils.IsFileExists(filePath, false)
-	if err != nil {
-		return "", err
-	}
-	if !validPath {
-		return "", nil
-	}
-
-	return filePath, nil
+	return getFilePath(srcPath, "setup.py")
 }
 
 // Get the project-name by running 'egg_info' command on setup.py and extracting it from 'PKG-INFO' file.
