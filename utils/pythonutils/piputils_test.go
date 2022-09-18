@@ -50,8 +50,9 @@ func TestDetermineModuleName(t *testing.T) {
 
 			// Determine module name
 			packageName, err := getPackageNameFromSetuppy(tmpProjectPath)
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedPackageName, packageName)
+			if assert.NoError(t, err) {
+				assert.Equal(t, test.expectedPackageName, packageName)
+			}
 		})
 	}
 }

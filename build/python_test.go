@@ -56,13 +56,14 @@ func testGenerateBuildInfoForPython(t *testing.T, pythonTool pythonutils.PythonT
 	pythonModule.SetName(moduleName)
 	assert.NoError(t, pythonModule.RunInstallAndCollectDependencies(cmdArgs))
 	buildInfo, err := pythonBuild.ToBuildInfo()
-	assert.NoError(t, err)
-	// Verify results.
-	expectedBuildInfoJson := filepath.Join(projectPath, expectedResultsJson)
-	expectedBuildInfo := testdatautils.GetBuildInfo(t, expectedBuildInfoJson)
-	match, err := entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules)
-	assert.NoError(t, err)
-	if !match {
-		testdatautils.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
+	if assert.NoError(t, err) {
+		// Verify results.
+		expectedBuildInfoJson := filepath.Join(projectPath, expectedResultsJson)
+		expectedBuildInfo := testdatautils.GetBuildInfo(t, expectedBuildInfoJson)
+		match, err := entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules)
+		assert.NoError(t, err)
+		if !match {
+			testdatautils.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
+		}
 	}
 }
