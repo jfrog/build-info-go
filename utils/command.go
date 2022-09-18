@@ -30,7 +30,7 @@ func (config *Command) RunWithOutput() (data []byte, err error) {
 	err = cmd.Run()
 	if err != nil {
 		return nil, fmt.Errorf("failed running command: '%s %s' with error: %s - %s",
-			cmd.Path,
+			cmd.Dir,
 			strings.Join(cmd.Args, " "),
 			err.Error(),
 			stderr.String(),
