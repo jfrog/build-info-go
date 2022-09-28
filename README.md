@@ -392,6 +392,16 @@ Note: checksums calculation is not yet supported for pip projects.
 bi pipenv [pipenv command] [command options]
 ```
 
+Note: checksums calculation is not yet supported for pipenv projects.
+
+#### poetry
+
+```shell
+bi poetry [poetry command] [command options]
+```
+
+Note: checksums calculation is not yet supported for poetry projects.
+
 #### Dotnet
 
 ```shell
@@ -403,8 +413,6 @@ bi dotnet [Dotnet command] [command options]
 ```shell
 bi nuget [Nuget command] [command options]
 ```
-
-Note: checksums calculation is not yet supported for pipenv projects.
 
 #### Conversion to CycloneDX
 
