@@ -26,6 +26,12 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	pipdeptreeCmd.Dir = srcPath
 	output, err := pipdeptreeCmd.RunWithOutput()
 	if err != nil {
+		// Try adding version string to error log
+		pipdeptreeCmd.CmdArgs = []string{"-m", "pip", "--version"}
+		versionOutput, _ := pipdeptreeCmd.RunWithOutput()
+		if versionOutput != nil {
+			err = errors.New(err.Error() + ". Pip version: " + string(versionOutput))
+		}
 		return nil, nil, err
 	}
 	// Parse into array.
