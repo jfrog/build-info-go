@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 	"github.com/pkg/errors"
 	clitool "github.com/urfave/cli/v2"
-	"os"
-	"os/exec"
-	"strings"
 )
 
 const (
@@ -304,6 +305,40 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return printBuild(bld, context.String(formatFlag))
 				} else {
 					return exec.Command("pipenv", filteredArgs[1:]...).Run()
+				}
+			},
+		},
+		{
+			Name:      "poetry",
+			Usage:     "Generate build-info for a poetry project",
+			UsageText: "bi pipenv",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("poetry-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
+				pythonModule, err := bld.AddPythonModule("", pythonutils.Poetry)
+				if err != nil {
+					return
+				}
+				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
+				if filteredArgs[0] == "install" {
+					err = pythonModule.RunInstallAndCollectDependencies(filteredArgs[1:])
+					if err != nil {
+						return
+					}
+					return printBuild(bld, context.String(formatFlag))
+				} else {
+					return exec.Command("poetry", filteredArgs[1:]...).Run()
 				}
 			},
 		},
