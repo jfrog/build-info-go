@@ -132,6 +132,8 @@ func extractPackagesFromPoetryLock(lockFilePath string) (dependencies map[string
 	return
 }
 
+// Get the project dependencies files (.whl or .tar.gz) by searching the Python package site.
+// extractPoetryDependenciesFiles returns a dictionary where the key is the dependency name and the value is a dependency file struct.
 func extractPoetryDependenciesFiles(srcPath string, cmdArgs []string, log utils.Log) (dependenciesFiles map[string]entities.Dependency, err error) {
 	// Run poetry install and extract the site-packages location
 	sitePackagesPath, err := getSitePackagesPath(cmdArgs, srcPath)
@@ -153,13 +155,13 @@ func extractPoetryDependenciesFiles(srcPath string, cmdArgs []string, log utils.
 		directUrlPath := fmt.Sprintf("%s%s-%s.dist-info%sdirect_url.json", sitePackagesPath, dependency, version, string(os.PathSeparator))
 		directUrlFile, err := ioutil.ReadFile(directUrlPath)
 		if err != nil {
-			log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
+			log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, error: %s \ncontinuing...", dependency, err))
 			continue
 		}
 		directUrl := packagedDirectUrl{}
 		err = json.Unmarshal(directUrlFile, &directUrl)
 		if err != nil {
-			log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", dependency))
+			log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, error: %s \ncontinuing...", dependency, err))
 			continue
 		}
 		lastSeparatorIndex := strings.LastIndex(directUrl.Url, string(os.PathSeparator))
