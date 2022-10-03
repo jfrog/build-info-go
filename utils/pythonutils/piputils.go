@@ -27,10 +27,10 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	output, err := pipdeptreeCmd.RunWithOutput()
 	if err != nil {
 		// Try adding version string to error log
-		pipdeptreeCmd.CmdArgs = []string{"-m", "pip", "--version"}
-		versionOutput, _ := pipdeptreeCmd.RunWithOutput()
-		if versionOutput != nil {
-			err = errors.New(err.Error() + ". Pip version: " + string(versionOutput))
+		pipdeptreeCmd.CmdArgs = []string{"--version"}
+		verString, verErr := pipdeptreeCmd.RunWithOutput()
+		if verErr != nil && verString != nil {
+			err = errors.New(string(verString) + "\n" + err.Error())
 		}
 		return nil, nil, err
 	}
