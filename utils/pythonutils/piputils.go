@@ -20,7 +20,7 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	if err != nil {
 		return nil, nil, err
 	}
-	pythonExecutable, windowsPyArg := getPythonExecutable()
+	pythonExecutable, windowsPyArg := GetPython3Executable()
 	// Run pipdeptree script
 	pipdeptreeCmd := utils.NewCommand(pythonExecutable, windowsPyArg, []string{pipDependencyMapScriptPath, "--json"})
 	pipdeptreeCmd.Dir = srcPath
@@ -132,7 +132,7 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 
 	// Run python 'egg_info --egg-base <eggBase>' command.
 	var args []string
-	pythonExecutable, windowsPyArg := getPythonExecutable()
+	pythonExecutable, windowsPyArg := GetPython3Executable()
 	if windowsPyArg != "" {
 		args = append(args, windowsPyArg)
 	}
@@ -148,7 +148,7 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 	return extractPackageNameFromEggBase(eggBase)
 }
 
-func getPythonExecutable() (string, string) {
+func GetPython3Executable() (string, string) {
 	windowsPyArg := ""
 	pythonExecutable, pathErr := exec.LookPath("python3")
 	if pathErr != nil || pythonExecutable == "" {
