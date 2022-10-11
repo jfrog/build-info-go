@@ -3,6 +3,7 @@ package pythonutils
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -150,12 +151,19 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 
 func GetPython3Executable() (string, string) {
 	windowsPyArg := ""
-	pythonExecutable, pathErr := exec.LookPath("python3")
-	if pathErr != nil || pythonExecutable == "" {
+	path := os.Getenv("PATH")
+	fmt.Println("path: " + path)
+	python, _ := exec.LookPath("python")
+	pip, _ := exec.LookPath("pip")
+	fmt.Println("python: " + python)
+	fmt.Println("pip: " + pip)
+
+	pythonExecutable, _ := exec.LookPath("python3")
+	if pythonExecutable == "" {
 		if runtime.GOOS == "windows" {
 			// If the OS is Windows try using Py Launcher: 'py -3'
-			pythonExecutable, pathErr = exec.LookPath("py")
-			if pathErr != nil && pythonExecutable != "" {
+			pythonExecutable, _ = exec.LookPath("py")
+			if pythonExecutable != "" {
 				windowsPyArg = "-3"
 			}
 		}
