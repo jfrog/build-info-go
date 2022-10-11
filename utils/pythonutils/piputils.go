@@ -21,7 +21,7 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 		return nil, nil, err
 	}
 	// Run pipdeptree script
-	cmd := utils.NewCommand("python", " ", []string{pipDependencyMapScriptPath, "--json"})
+	cmd := utils.NewCommand("python", "", []string{pipDependencyMapScriptPath, "--json"})
 	cmd.Dir = srcPath
 	output, err := cmd.RunWithOutput()
 	if err != nil {
