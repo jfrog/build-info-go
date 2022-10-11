@@ -3,7 +3,6 @@ package pythonutils
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -21,15 +20,14 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	if err != nil {
 		return nil, nil, err
 	}
-	pythonExecutable, windowsPyArg := GetPython3Executable()
 	// Run pipdeptree script
-	pipdeptreeCmd := utils.NewCommand(pythonExecutable, windowsPyArg, []string{pipDependencyMapScriptPath, "--json"})
-	pipdeptreeCmd.Dir = srcPath
-	output, err := pipdeptreeCmd.RunWithOutput()
+	cmd := utils.NewCommand("python", " ", []string{pipDependencyMapScriptPath, "--json"})
+	cmd.Dir = srcPath
+	output, err := cmd.RunWithOutput()
 	if err != nil {
 		// Try adding version string to error log
-		pipdeptreeCmd.CmdArgs = []string{"--version"}
-		verString, verErr := pipdeptreeCmd.RunWithOutput()
+		cmd.CmdArgs = []string{"--version"}
+		verString, verErr := cmd.RunWithOutput()
 		if verErr != nil && verString != nil {
 			err = errors.New(string(verString) + "\n" + err.Error())
 		}
@@ -151,15 +149,6 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 
 func GetPython3Executable() (string, string) {
 	windowsPyArg := ""
-	path := os.Getenv("PATH")
-	fmt.Println("path: " + path)
-	python, _ := exec.LookPath("python")
-	python3, _ := exec.LookPath("python3")
-	pip, _ := exec.LookPath("pip")
-	fmt.Println("python: " + python)
-	fmt.Println("python3: " + python3)
-	fmt.Println("pip: " + pip)
-
 	pythonExecutable, _ := exec.LookPath("python3")
 	if pythonExecutable == "" {
 		if runtime.GOOS == "windows" {
