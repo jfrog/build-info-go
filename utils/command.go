@@ -36,7 +36,6 @@ func (config *Command) RunWithOutput() (data []byte, err error) {
 			stderr.String(),
 		)
 	}
-	fmt.Println("running " + " " + strings.Join(cmd.Args, " ") + " in: " + cmd.Dir + " got:\n " + stdout.String())
 	return stdout.Bytes(), nil
 }
 
