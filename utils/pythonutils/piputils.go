@@ -3,6 +3,7 @@ package pythonutils
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -150,22 +151,31 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 
 func GetPython3Executable() (string, string) {
 	windowsPyArg := ""
-	pythonExecutable := ""
-	if runtime.GOOS == "windows" {
-		// If the OS is Windows try using Py Launcher: 'py -3'
-		pythonExecutable, _ = exec.LookPath("py")
-		if pythonExecutable != "" {
-			windowsPyArg = "-3"
-		}
-	} else {
-		// If the OS is Mac/Linux we try getting python3 executable directly
-		pythonExecutable, _ = exec.LookPath("python3")
-	}
-	// Try using 'python' if 'python3'/'py' couldn't be found
+	path := os.Getenv("PATH")
+	fmt.Println("path: " + path)
+	python, _ := exec.LookPath("python")
+	python3, _ := exec.LookPath("python3")
+	pip, _ := exec.LookPath("pip")
+	fmt.Println("python: " + python)
+	fmt.Println("python3: " + python3)
+	fmt.Println("pip: " + pip)
+
+	pythonExecutable, _ := exec.LookPath("python3")
 	if pythonExecutable == "" {
-		pythonExecutable = "python"
+		if runtime.GOOS == "windows" {
+			// If the OS is Windows try using Py Launcher: 'py -3'
+			pythonExecutable, _ = exec.LookPath("py")
+			if pythonExecutable != "" {
+				windowsPyArg = "-3"
+			}
+		}
+		// Try using 'python' if 'python3'/'py' couldn't be found
+		if pythonExecutable == "" {
+			pythonExecutable = "python"
+		}
 	}
 	return pythonExecutable, windowsPyArg
+
 }
 
 // Parse the output of 'python egg_info' command, in order to find the path of generated file 'PKG-INFO'.
