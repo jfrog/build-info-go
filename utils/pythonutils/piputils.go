@@ -16,27 +16,14 @@ import (
 
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
 func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]string, []string, error) {
-	// Try installing latest pipdeptree
-	output, err := installAndExecPipdeptree(srcPath)
-	// If failed installing or running pipdeptree, run local pipdeptree script
-	if err != nil || len(output) == 0 {
-		localPipdeptreeScript := ""
-		localPipdeptreeScript, err = getDepTreeScriptPath(dependenciesDirName)
-		if err != nil {
-			return nil, nil, err
-		}
-		localPipdeptree := utils.NewCommand("python", "", []string{localPipdeptreeScript, "--json"})
-		localPipdeptree.Dir = srcPath
-		output, err = localPipdeptree.RunWithOutput()
-	}
+	localPipdeptreeScript, err := getDepTreeScriptPath(dependenciesDirName)
 	if err != nil {
-		// Try adding version string to error log
-		pythonVersion := utils.NewCommand("python", "", []string{"--version"})
-		pythonVersion.Dir = srcPath
-		verString, verErr := pythonVersion.RunWithOutput()
-		if verErr != nil && verString != nil {
-			err = errors.New(string(verString) + "\n" + err.Error())
-		}
+		return nil, nil, err
+	}
+	localPipdeptree := utils.NewCommand("python", "", []string{localPipdeptreeScript, "--json"})
+	localPipdeptree.Dir = srcPath
+	output, err := localPipdeptree.RunWithOutput()
+	if err != nil {
 		return nil, nil, err
 	}
 	// Parse into array.
@@ -46,20 +33,6 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	}
 
 	return parseDependenciesToGraph(packages)
-}
-
-// Return path to the dependency-tree script, If it doesn't exist, it creates the file.
-func installAndExecPipdeptree(srcPath string) (output []byte, err error) {
-	pipdeptreeInstall := utils.NewCommand("pip", "install", []string{"pipdeptree"})
-	pipdeptreeInstall.Dir = srcPath
-	_, err = pipdeptreeInstall.RunWithOutput()
-	if err != nil {
-		return
-	}
-	pipdeptreeExec := utils.NewCommand("pipdeptree", "", []string{"--json"})
-	pipdeptreeExec.Dir = srcPath
-	output, err = pipdeptreeExec.RunWithOutput()
-	return
 }
 
 // Return path to the dependency-tree script, If it doesn't exist, it creates the file.
