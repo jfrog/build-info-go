@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/BurntSushi/toml v1.1.0
-	github.com/CycloneDX/cyclonedx-go v0.6.0
+	github.com/CycloneDX/cyclonedx-go v0.7.0
 	github.com/buger/jsonparser v1.1.1
 	github.com/jfrog/gofrog v1.2.1
 	github.com/minio/sha256-simd v1.0.1-0.20210617151322-99e45fae3395
