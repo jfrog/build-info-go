@@ -12,7 +12,14 @@
           "maven.compiler.target": "1.8",
           "project.build.sourceEncoding": "UTF-8"
         },
-        "id": "org.jfrog.test:multi2:3.7-SNAPSHOT"
+        "id": "org.jfrog.test:multi2:3.7-SNAPSHOT",
+        "artifacts": [
+          {
+            "name": "multi2-3.7-SNAPSHOT.pom",
+            "type": "pom",
+            "path": "org/jfrog/test/multi2/3.7-SNAPSHOT"
+          }
+        ]
       },
       {
         "type": "maven",
@@ -22,6 +29,13 @@
           "project.build.sourceEncoding": "UTF-8"
         },
         "id": "org.jfrog.test:multi1:3.7-SNAPSHOT",
+        "artifacts": [
+          {
+            "name": "multi1-3.7-SNAPSHOT.pom",
+            "type": "pom",
+            "path": "org/jfrog/test/multi1/3.7-SNAPSHOT"
+          }
+        ],
         "dependencies": [
           {
             "id": "org.apache.commons:commons-email:1.1",
@@ -220,6 +234,13 @@
           "project.build.sourceEncoding": "UTF-8"
         },
         "id": "org.jfrog.test:multi3:3.7-SNAPSHOT",
+        "artifacts": [
+          {
+            "name": "multi3-3.7-SNAPSHOT.pom",
+            "type": "pom",
+            "path": "org/jfrog/test/multi3/3.7-SNAPSHOT"
+          }
+        ],
         "dependencies": [
           {
             "id": "org.springframework:spring-beans:2.5.6",
