@@ -2,6 +2,7 @@ package entities
 
 import (
 	"github.com/jfrog/build-info-go/utils/compareutils"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"regexp"
 	"strings"
@@ -202,11 +203,8 @@ func (targetBuildInfo *BuildInfo) ToCycloneDxBom() (*cdx.BOM, error) {
 	// Convert the map of dependencies to CycloneDX dependency objects
 	var dependencies []cdx.Dependency
 	for compRef, deps := range depMap {
-		var cdxDepsSlice []cdx.Dependency
-		for depRef := range deps {
-			cdxDepsSlice = append(cdxDepsSlice, cdx.Dependency{Ref: depRef})
-		}
-		dependencies = append(dependencies, cdx.Dependency{Ref: compRef, Dependencies: &cdxDepsSlice})
+		depsSlice := maps.Keys(deps)
+		dependencies = append(dependencies, cdx.Dependency{Ref: compRef, Dependencies: &depsSlice})
 	}
 
 	bom := cdx.NewBOM()
