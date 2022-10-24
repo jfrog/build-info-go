@@ -311,7 +311,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 		{
 			Name:      "poetry",
 			Usage:     "Generate build-info for a poetry project",
-			UsageText: "bi pipenv",
+			UsageText: "bi poetry",
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
 				service := build.NewBuildInfoService()
