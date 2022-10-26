@@ -3,7 +3,6 @@ package pythonutils
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -68,7 +67,7 @@ func writeScriptIfNeeded(targetDirPath, scriptName string) error {
 		if err != nil {
 			return err
 		}
-		err = ioutil.WriteFile(scriptPath, pipDepTreeContent, os.ModePerm)
+		err = os.WriteFile(scriptPath, pipDepTreeContent, os.ModePerm)
 		if err != nil {
 			return err
 		}

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -381,7 +381,7 @@ type PackageInfo struct {
 }
 
 func ReadPackageInfoFromPackageJson(packageJsonDirectory string, npmVersion *version.Version) (*PackageInfo, error) {
-	packageJson, err := ioutil.ReadFile(filepath.Join(packageJsonDirectory, "package.json"))
+	packageJson, err := os.ReadFile(filepath.Join(packageJsonDirectory, "package.json"))
 	if err != nil {
 		return nil, err
 	}

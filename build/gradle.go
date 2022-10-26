@@ -2,7 +2,6 @@ package build
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -155,7 +154,7 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 		}
 	}
 
-	return initScriptPath, ioutil.WriteFile(initScriptPath, []byte(initScriptContent), 0644)
+	return initScriptPath, os.WriteFile(initScriptPath, []byte(initScriptContent), 0644)
 }
 
 func getGradleExecPath(useWrapper bool) (string, error) {

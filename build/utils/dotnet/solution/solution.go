@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -295,7 +294,7 @@ func parseSlnFile(slnFile string) ([]string, error) {
 		}
 	}
 
-	content, err := ioutil.ReadFile(slnFile)
+	content, err := os.ReadFile(slnFile)
 	if err != nil {
 		return nil, err
 	}
@@ -311,8 +310,8 @@ func removeQuotes(value string) string {
 // For each project:
 // 1. Check if the project is located under the solutions' directory (which was scanned before)
 // 2. If it doesn't -find all potential dependencies sources for the relevant projects:
-//		* 'project.assets.json' files are located in 'obj' directory in project's root.
-//		* 'packages.config' files are located in the project root/ in solutions root in a directory named after project's name.
+//   - 'project.assets.json' files are located in 'obj' directory in project's root.
+//   - 'packages.config' files are located in the project root/ in solutions root in a directory named after project's name.
 func (solution *solution) getDependenciesSourcesInProjectsDir(slnProjects []project.Project) error {
 	// Walk and search for dependencies sources files in project's directories.
 	for _, project := range slnProjects {

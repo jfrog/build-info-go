@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/jfrog/build-info-go/utils"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -36,7 +35,7 @@ func main() {
 		return
 	}
 	// Read the script content from the .py file
-	pyFile, err := ioutil.ReadFile(path.Join(wd, pythonPackageRelativePath, pythonPackageName, "pipdeptree", pipDepTreePythonScript))
+	pyFile, err := os.ReadFile(path.Join(wd, pythonPackageRelativePath, pythonPackageName, "pipdeptree", pipDepTreePythonScript))
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +48,7 @@ func main() {
 	// Write the script content a a byte-slice
 	resourceString += "var pipDepTreeContent = []byte(`\n" + pyFileString + "`)"
 	// Create .go file with the script content
-	err = ioutil.WriteFile(pipDepTreeContentPath, []byte(resourceString), os.ModePerm)
+	err = os.WriteFile(pipDepTreeContentPath, []byte(resourceString), os.ModePerm)
 	if err != nil {
 		panic(err)
 	}

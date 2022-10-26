@@ -2,7 +2,7 @@ package testdata
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -28,7 +28,7 @@ func CreateTestProject(t *testing.T, projectPath string) (tmpProjectPath string,
 }
 
 func GetBuildInfo(t *testing.T, filePath string) entities.BuildInfo {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	assert.NoError(t, err)
 	var buildinfo entities.BuildInfo
 	assert.NoError(t, json.Unmarshal(data, &buildinfo))

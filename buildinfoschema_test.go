@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -40,7 +39,7 @@ func TestYarnSchema(t *testing.T) {
 // install        - Install the project, if needed
 func validateBuildInfoSchema(t *testing.T, commandName, pathInTestData string, install func()) {
 	// Load build-info schema
-	schema, err := ioutil.ReadFile("buildinfo-schema.json")
+	schema, err := os.ReadFile("buildinfo-schema.json")
 	assert.NoError(t, err)
 	schemaLoader := gojsonschema.NewBytesLoader(schema)
 
@@ -104,7 +103,7 @@ func generateBuildInfo(t *testing.T, commandName string) []byte {
 	main()
 
 	// Read output
-	content, err := ioutil.ReadFile(commandOutput.Name())
+	content, err := os.ReadFile(commandOutput.Name())
 	assert.NoError(t, err)
 	assert.NotEmpty(t, content)
 	return content
