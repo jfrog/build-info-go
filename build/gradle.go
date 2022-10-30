@@ -160,11 +160,11 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 func getGradleExecPath(useWrapper bool) (string, error) {
 	if useWrapper {
 		if runtime.GOOS == "windows" {
-			return "./gradlew.bat", nil
+			return "." + string(os.PathSeparator) + "gradlew.bat", nil
 		}
 		return "./gradlew", nil
 	}
-	gradleExec, err := exec.LookPath("gradle")
+	gradleExec, err := exec.LookPath("." + string(os.PathSeparator) + "gradle")
 	if err != nil {
 		return "", err
 	}
