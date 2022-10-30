@@ -164,7 +164,7 @@ func getGradleExecPath(useWrapper bool) (string, error) {
 		}
 		return "./gradlew", nil
 	}
-	gradleExec, err := exec.LookPath("." + string(os.PathSeparator) + "gradle")
+	gradleExec, err := exec.LookPath("gradle")
 	if err != nil {
 		return "", err
 	}
