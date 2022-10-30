@@ -159,10 +159,12 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 
 func getGradleExecPath(useWrapper bool) (string, error) {
 	if useWrapper {
+		execName := "gradlew"
 		if runtime.GOOS == "windows" {
-			return "." + string(os.PathSeparator) + "gradlew.bat", nil
+			execName = execName + ".bat"
 		}
-		return "./gradlew", nil
+		// The Go1.19 update added the restriction that executables in the current directory are not resolved when the only executable name is provided.
+		return "." + string(os.PathSeparator) + execName, nil
 	}
 	gradleExec, err := exec.LookPath("gradle")
 	if err != nil {
