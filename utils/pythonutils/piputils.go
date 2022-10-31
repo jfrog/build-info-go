@@ -16,15 +16,13 @@ import (
 
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
 func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]string, []string, error) {
-	pipDependencyMapScriptPath, err := getDepTreeScriptPath(dependenciesDirName)
+	localPipdeptreeScript, err := getDepTreeScriptPath(dependenciesDirName)
 	if err != nil {
 		return nil, nil, err
 	}
-	pythonExecutable, windowsPyArg := getPythonExecutable()
-	// Run pipdeptree script
-	pipdeptreeCmd := utils.NewCommand(pythonExecutable, windowsPyArg, []string{pipDependencyMapScriptPath, "--json"})
-	pipdeptreeCmd.Dir = srcPath
-	output, err := pipdeptreeCmd.RunWithOutput()
+	localPipdeptree := utils.NewCommand("python", "", []string{localPipdeptreeScript, "--json"})
+	localPipdeptree.Dir = srcPath
+	output, err := localPipdeptree.RunWithOutput()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -126,7 +124,7 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 
 	// Run python 'egg_info --egg-base <eggBase>' command.
 	var args []string
-	pythonExecutable, windowsPyArg := getPythonExecutable()
+	pythonExecutable, windowsPyArg := GetPython3Executable()
 	if windowsPyArg != "" {
 		args = append(args, windowsPyArg)
 	}
@@ -142,14 +140,14 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 	return extractPackageNameFromEggBase(eggBase)
 }
 
-func getPythonExecutable() (string, string) {
+func GetPython3Executable() (string, string) {
 	windowsPyArg := ""
-	pythonExecutable, pathErr := exec.LookPath("python3")
-	if pathErr != nil || pythonExecutable == "" {
+	pythonExecutable, _ := exec.LookPath("python3")
+	if pythonExecutable == "" {
 		if runtime.GOOS == "windows" {
 			// If the OS is Windows try using Py Launcher: 'py -3'
-			pythonExecutable, pathErr = exec.LookPath("py")
-			if pathErr != nil && pythonExecutable != "" {
+			pythonExecutable, _ = exec.LookPath("py")
+			if pythonExecutable != "" {
 				windowsPyArg = "-3"
 			}
 		}
