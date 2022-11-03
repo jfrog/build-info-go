@@ -17,11 +17,11 @@ jobs:
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
-            pip: "3.8"
+            python: "3.8"
           - node: "16"
-            pip: "3.9"
+            python: "3.9"
           - node: "16.9"
-            pip: "3.x"
+            python: "3.x"
 
     steps:
       - uses: actions/checkout@v3
@@ -34,7 +34,7 @@ jobs:
       - name: Setup Python3
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.pip }}
+          python-version: ${{ matrix.python }}
 
       - name: Setup Pipenv
         run: pip3 install pipenv
