@@ -16,9 +16,12 @@ jobs:
         os: [ ubuntu-latest, windows-latest, macOS-latest ]
         node: [ 14, 16.9, 16 ]
         include:
-          - pip: "3.8"
-          - pip: "3.9"
-          - pip: "3.x"
+          - node: "14"
+            pip: "3.8"
+          - node: "16"
+            pip: "3.9"
+          - node: "16.9"
+            pip: "3.x"
 
     steps:
       - uses: actions/checkout@v3
