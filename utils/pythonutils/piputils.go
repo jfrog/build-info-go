@@ -16,23 +16,52 @@ import (
 
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
 func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]string, []string, error) {
-	localPipdeptreeScript, err := getDepTreeScriptPath(dependenciesDirName)
-	if err != nil {
-		return nil, nil, err
+	// Run and install if needed latest pipdeptree
+	output, pdtErr := runLatestPipdeptree(srcPath)
+	if pdtErr != nil {
+		// If failed installing or running latest pipdeptree, try running bundled local pipdeptree script
+		localPipdeptreeScript, err := getDepTreeScriptPath(dependenciesDirName)
+		if err != nil {
+			return nil, nil, err
+		}
+		localPipdeptree := utils.NewCommand("python", "", []string{localPipdeptreeScript, "--json"})
+		localPipdeptree.Dir = srcPath
+		output, err = localPipdeptree.RunWithOutput()
+		if err != nil {
+			return nil, nil, err
+		}
 	}
-	localPipdeptree := utils.NewCommand("python", "", []string{localPipdeptreeScript, "--json"})
-	localPipdeptree.Dir = srcPath
-	output, err := localPipdeptree.RunWithOutput()
-	if err != nil {
-		return nil, nil, err
-	}
+
 	// Parse into array.
 	packages := make([]pythonDependencyPackage, 0)
-	if err = json.Unmarshal(output, &packages); err != nil {
+	if err := json.Unmarshal(output, &packages); err != nil {
 		return nil, nil, err
 	}
 
 	return parseDependenciesToGraph(packages)
+}
+
+func runLatestPipdeptree(srcPath string) (output []byte, err error) {
+	pdtPath, _ := exec.LookPath("pipdeptree")
+	if pdtPath == "" {
+		// install latest pipdeptree
+		err = exec.Command("pip", "install", "pipdeptree").Run()
+		if err != nil {
+			return
+		}
+		defer func() {
+			// uninstall pipdeptree
+			e := exec.Command("pip", "uninstall", "pipdeptree", "-y").Run()
+			if err == nil {
+				err = e
+			}
+		}()
+	}
+	pipdeptreeCmd := utils.NewCommand("pipdeptree", "", []string{"--json"})
+	pipdeptreeCmd.Dir = srcPath
+	output, err = pipdeptreeCmd.RunWithOutput()
+
+	return
 }
 
 // Return path to the dependency-tree script, If it doesn't exist, it creates the file.
