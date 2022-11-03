@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macOS-latest ]
-        node: [ 14, 16.9, 16 ]
+        node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
             pip: "3.8"
