@@ -1,7 +1,11 @@
 name: Tests
 
 on: [ push, pull_request ]
-
+# Ensures that only the latest commit is running for each PR at a time.
+# Ignores this rule for push events.
+concurrency:
+  group: ${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 jobs:
   unit-test:
     name: ${{ matrix.os }}, node ${{ matrix.node }} , pip ${{ matrix.pip }}
@@ -10,8 +14,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macOS-latest ]
-        node: [ 14, 16.9, 16 ]
-        pip: [ 3.8, 3.9, 3.10, 3.x ]
+        include:
+          - node: "14"
+            pip: "3.8"
+          - node: "16"
+            pip: "3.9"
+          - node: "16.9"
+            pip: "3.x"
     steps:
       - uses: actions/checkout@v3
 
