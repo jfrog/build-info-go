@@ -23,6 +23,6 @@ func getPipenvDependencies(srcPath string) (dependenciesGraph map[string][]strin
 	if err != nil {
 		return
 	}
-	dependenciesGraph, topLevelDependencies, err = parseDependenciesToGraph(packages)
+	dependenciesGraph, topLevelDependencies, err = parseDependenciesToGraph(packages, false)
 	return
 }

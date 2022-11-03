@@ -17,7 +17,7 @@ import (
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
 func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]string, []string, error) {
 	// Run and install if needed latest pipdeptree
-	output, pdtErr := runLatestPipdeptree(srcPath)
+	output, ignorePdtModule, pdtErr := runLatestPipdeptree(srcPath)
 	if pdtErr != nil {
 		// If failed installing or running latest pipdeptree, try running bundled local pipdeptree script
 		localPipdeptreeScript, err := getDepTreeScriptPath(dependenciesDirName)
@@ -38,10 +38,10 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 		return nil, nil, err
 	}
 
-	return parseDependenciesToGraph(packages)
+	return parseDependenciesToGraph(packages, ignorePdtModule)
 }
 
-func runLatestPipdeptree(srcPath string) (output []byte, err error) {
+func runLatestPipdeptree(srcPath string) (output []byte, ignorePdtModule bool, err error) {
 	pdtPath, _ := exec.LookPath("pipdeptree")
 	if pdtPath == "" {
 		// install latest pipdeptree
@@ -49,6 +49,7 @@ func runLatestPipdeptree(srcPath string) (output []byte, err error) {
 		if err != nil {
 			return
 		}
+		ignorePdtModule = true
 		defer func() {
 			// uninstall pipdeptree
 			e := exec.Command("pip", "uninstall", "pipdeptree", "-y").Run()
@@ -60,7 +61,6 @@ func runLatestPipdeptree(srcPath string) (output []byte, err error) {
 	pipdeptreeCmd := utils.NewCommand("pipdeptree", "", []string{"--json"})
 	pipdeptreeCmd.Dir = srcPath
 	output, err = pipdeptreeCmd.RunWithOutput()
-
 	return
 }
 

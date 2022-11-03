@@ -22,11 +22,15 @@ type PythonTool string
 
 // Parse pythonDependencyPackage list to dependencies map. (mapping dependency to his child deps)
 // Also returns a list of project's root dependencies
-func parseDependenciesToGraph(packages []pythonDependencyPackage) (map[string][]string, []string, error) {
+func parseDependenciesToGraph(packages []pythonDependencyPackage, ignorePdtModule bool) (map[string][]string, []string, error) {
 	// Create packages map.
 	packagesMap := map[string][]string{}
 	allSubPackages := map[string]bool{}
 	for _, pkg := range packages {
+		if ignorePdtModule && pkg.Package.Key == "pipdeptree" {
+			// If pipdeptree wasn't previously existed on the project ignore it
+			continue
+		}
 		var subPackages []string
 		for _, subPkg := range pkg.Dependencies {
 			subPkgFullName := subPkg.Key + ":" + subPkg.InstalledVersion
