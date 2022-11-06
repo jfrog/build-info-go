@@ -9,11 +9,11 @@ concurrency:
 jobs:
   unit-test:
     name: ${{ matrix.os }}, node ${{ matrix.node }} , python ${{ matrix.python }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest, macOS-latest ]
+        os: [ ubuntu, windows, macOS ]
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
