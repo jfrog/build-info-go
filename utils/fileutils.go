@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"golang.org/x/exp/slices"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -160,7 +159,7 @@ func ListFiles(path string, includeDirs bool) ([]string, error) {
 		path += sep
 	}
 	fileList := []string{}
-	files, _ := ioutil.ReadDir(path)
+	files, _ := os.ReadDir(path)
 	path = strings.TrimPrefix(path, "."+sep)
 
 	for _, f := range files {
@@ -191,7 +190,7 @@ func ListFilesByFilterFunc(path string, filterFunc func(filePath string) (bool, 
 		path += sep
 	}
 	var fileList []string
-	files, _ := ioutil.ReadDir(path)
+	files, _ := os.ReadDir(path)
 	path = strings.TrimPrefix(path, "."+sep)
 
 	for _, f := range files {
@@ -274,7 +273,7 @@ func GetFileContentAndInfo(filePath string) (fileContent []byte, fileInfo os.Fil
 	if err != nil {
 		return
 	}
-	fileContent, err = ioutil.ReadFile(filePath)
+	fileContent, err = os.ReadFile(filePath)
 	return
 }
 
@@ -282,7 +281,7 @@ func GetFileContentAndInfo(filePath string) (fileContent []byte, fileInfo os.Fil
 func CreateTempDir() (string, error) {
 	tempDirBase := os.TempDir()
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	return ioutil.TempDir(tempDirBase, tempDirPrefix+timestamp+"-")
+	return os.MkdirTemp(tempDirBase, tempDirPrefix+timestamp+"-")
 }
 
 func RemoveTempDir(dirPath string) error {
@@ -334,7 +333,7 @@ func removeDirContents(dirPath string) (err error) {
 func CleanOldDirs() error {
 	// Get all files at temp dir
 	tempDirBase := os.TempDir()
-	files, err := ioutil.ReadDir(tempDirBase)
+	files, err := os.ReadDir(tempDirBase)
 	if err != nil {
 		return err
 	}
@@ -546,7 +545,7 @@ func Unmarshal(filePath string, loadTarget interface{}) (err error) {
 		}
 	}()
 	var byteValue []byte
-	byteValue, err = ioutil.ReadAll(jsonFile)
+	byteValue, err = io.ReadAll(jsonFile)
 	if err != nil {
 		return
 	}

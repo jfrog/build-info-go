@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -38,7 +37,7 @@ func CreateTempBuildFile(buildName, buildNumber, projectKey, buildsDirPath strin
 		return nil, err
 	}
 	logger.Debug("Creating temp build file at: " + dirPath)
-	tempFile, err := ioutil.TempFile(dirPath, "temp")
+	tempFile, err := os.CreateTemp(dirPath, "temp")
 	if err != nil {
 		return nil, err
 	}

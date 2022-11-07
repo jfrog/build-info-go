@@ -3,7 +3,6 @@ package build
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -73,5 +72,5 @@ func saveBuildGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath s
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(detailsFilePath, content.Bytes(), 0600)
+	return os.WriteFile(detailsFilePath, content.Bytes(), 0600)
 }

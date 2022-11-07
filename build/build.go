@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -188,7 +187,7 @@ func (b *Build) getGeneratedBuildsInfo() ([]*entities.BuildInfo, error) {
 		if dir {
 			continue
 		}
-		content, err := ioutil.ReadFile(buildFile)
+		content, err := os.ReadFile(buildFile)
 		if err != nil {
 			return nil, err
 		}
@@ -252,7 +251,7 @@ func (b *Build) SavePartialBuildInfo(partial *entities.Partial) (err error) {
 		return
 	}
 	b.logger.Debug("Creating temp build file at:", dirPath)
-	tempFile, err := ioutil.TempFile(dirPath, "temp")
+	tempFile, err := os.CreateTemp(dirPath, "temp")
 	if err != nil {
 		return
 	}
@@ -322,7 +321,7 @@ func (b *Build) readPartialBuildInfoFiles() (entities.Partials, error) {
 		if dir || strings.HasSuffix(buildFile, BuildInfoDetails) {
 			continue
 		}
-		content, err := ioutil.ReadFile(buildFile)
+		content, err := os.ReadFile(buildFile)
 		if err != nil {
 			return nil, err
 		}
@@ -357,7 +356,7 @@ func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
 		return nil, errors.New("Failed to construct the build-info to be published. " +
 			"This may be because there were no previous commands, which collected build-info for " + buildString)
 	}
-	content, err := ioutil.ReadFile(generalDetailsFilePath)
+	content, err := os.ReadFile(generalDetailsFilePath)
 	if err != nil {
 		return nil, err
 	}

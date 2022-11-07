@@ -6,7 +6,7 @@ import (
 	"fmt"
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -49,7 +49,7 @@ func (extractor *assetsExtractor) ChildrenMap() (map[string][]string, error) {
 // Create new assets json extractor.
 func (extractor *assetsExtractor) new(dependenciesSource string, log utils.Log) (Extractor, error) {
 	newExtractor := &assetsExtractor{}
-	content, err := ioutil.ReadFile(dependenciesSource)
+	content, err := os.ReadFile(dependenciesSource)
 	if err != nil {
 		return nil, err
 	}
