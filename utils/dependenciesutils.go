@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -52,7 +51,7 @@ func CreateExtractorPropsFile(extractorConfPath, buildInfoPath, buildName, build
 	if err := os.MkdirAll(extractorConfPath, 0777); err != nil {
 		return "", err
 	}
-	propertiesFile, err := ioutil.TempFile(extractorConfPath, configPropertiesPathTempPrefix)
+	propertiesFile, err := os.CreateTemp(extractorConfPath, configPropertiesPathTempPrefix)
 	if err != nil {
 		return "", err
 	}

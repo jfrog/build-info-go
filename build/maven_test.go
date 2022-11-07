@@ -3,7 +3,7 @@ package build
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -66,7 +66,7 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 }
 
 func getExpectedMavenBuildInfo(t *testing.T, filePath string) entities.BuildInfo {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	assert.NoError(t, err)
 	var buildinfo entities.BuildInfo
 	assert.NoError(t, json.Unmarshal(data, &buildinfo))

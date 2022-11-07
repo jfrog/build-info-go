@@ -8,7 +8,6 @@ import (
 
 	"github.com/jfrog/gofrog/version"
 
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +15,7 @@ import (
 	gofrogcmd "github.com/jfrog/gofrog/io"
 )
 
-//#nosec G101 -- False positive - no hardcoded credentials.
+// #nosec G101 -- False positive - no hardcoded credentials.
 const credentialsInUrlRegexp = `(http|https|git)://.+@`
 
 // Minimum go version, which its output does not require masking passwords in URLs.
@@ -143,7 +142,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 	}
 	if err == nil {
 		defer func() {
-			e := ioutil.WriteFile(filepath.Join(projectDir, "go.sum"), sumFileContent, sumFileStat.Mode())
+			e := os.WriteFile(filepath.Join(projectDir, "go.sum"), sumFileContent, sumFileStat.Mode())
 			if err == nil {
 				err = e
 			}
@@ -178,7 +177,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 
 	// Restore the go.mod and go.sum files, to make sure they stay the same as before
 	// running the "go mod graph" command.
-	err = ioutil.WriteFile(filepath.Join(projectDir, "go.mod"), modFileContent, modFileStat.Mode())
+	err = os.WriteFile(filepath.Join(projectDir, "go.mod"), modFileContent, modFileStat.Mode())
 	if err != nil {
 		return "", err
 	}

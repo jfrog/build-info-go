@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -65,7 +64,7 @@ func TestGetDeployPath(t *testing.T) {
 }
 
 func TestParseDependencies(t *testing.T) {
-	dependenciesJsonList, err := ioutil.ReadFile(filepath.Join("..", "testdata", "npm", "dependenciesList.json"))
+	dependenciesJsonList, err := os.ReadFile(filepath.Join("..", "testdata", "npm", "dependenciesList.json"))
 	if err != nil {
 		t.Error(err)
 	}

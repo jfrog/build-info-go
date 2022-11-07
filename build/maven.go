@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -226,7 +225,7 @@ func createClassworldsConfig(dependenciesPath string) error {
 	if utils.IsPathExists(classworldsPath) {
 		return nil
 	}
-	return ioutil.WriteFile(classworldsPath, []byte(ClassworldsConf), 0644)
+	return os.WriteFile(classworldsPath, []byte(ClassworldsConf), 0644)
 }
 
 func (config *mvnRunConfig) GetCmd() *exec.Cmd {
