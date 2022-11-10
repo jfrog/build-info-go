@@ -14,7 +14,7 @@ const (
 	pythonPackageName         = "pythonutils"
 	pythonPackageRelativePath = "utils"
 	// The pip-dep-tree script version. The version should be manually incremented following changes to the pipdeptree.py source file.
-	pipDepTreeVersion = "5"
+	pipDepTreeVersion = "6"
 )
 
 // This main function should be executed manually following changes in pipdeptree.py. Running the function generates new 'pipDepTreeContentFileName' from 'pipDepTreePythonScript.

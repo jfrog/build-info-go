@@ -1,28 +1,40 @@
 name: Tests
 
 on: [ push, pull_request ]
-
+# Ensures that only the latest commit is running for each PR at a time.
+# Ignores this rule for push events.
+concurrency:
+  group: ${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 jobs:
   unit-test:
-    name: ${{ matrix.os }}, node ${{ matrix.node }}
-    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }}, node ${{ matrix.node }} , python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest, macOS-latest ]
-        node: [ 14, 16.9, 16 ]
+        os: [ ubuntu, windows, macOS ]
+        node: [ 14, 16, 16.9 ]
+        include:
+          - node: "14"
+            python: "3.8"
+          - node: "16"
+            python: "3.9"
+          - node: "16.9"
+            python: "3.x"
+
     steps:
       - uses: actions/checkout@v3
 
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.19.x
+          go-version: 1.18.x
 
       - name: Setup Python3
         uses: actions/setup-python@v4
         with:
-          python-version: "3.x"
+          python-version: ${{ matrix.python }}
 
       - name: Setup Pipenv
         run: pip3 install pipenv
