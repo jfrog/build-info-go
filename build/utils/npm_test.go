@@ -202,7 +202,7 @@ func TestConflictsDependenciesList(t *testing.T) {
 	}
 }
 
-// This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
+// This case happens when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
 // Seems like the compatibility upgrades may result in dependencies losing their integrity.
 // We try to get the integrity from the cache index.
 func TestDependencyWithNoIntegrity(t *testing.T) {
