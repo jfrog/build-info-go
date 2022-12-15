@@ -54,7 +54,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 					continue
 				}
 				// Here, we don't know where is the tarball (or if it is actually exists in the filesystem) so we can't calculate the dependency checksum.
-				// This case happends when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
+				// This case happens when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
 				// Seems like the compatibility upgrades may result in dependencies losing their integrity.
 				// We use the integrity to get's the dependencies tarball
 				otherMissingDeps = append(otherMissingDeps, dep.Id)
