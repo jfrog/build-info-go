@@ -81,7 +81,7 @@ func (solution *solution) BuildInfo(moduleName string, log utils.Log) (*buildinf
 
 		// Populate module dependencies
 		for _, dep := range dependencies {
-			// If dependency has no RequestedBy field, it means that the depedency not accessible in the current project.
+			// If dependency has no RequestedBy field, it means that the dependency not accessible in the current project.
 			// In that case, the dependency is assumed to be under a project which is referenced by this project.
 			// We therefore don't include the dependency in the build-info.
 			if len(dep.RequestedBy) > 0 {
