@@ -207,7 +207,7 @@ func automaticallyModifyMod() (bool, error) {
 
 func compareSpecificVersionToCurVersion(result *bool, comparedVersion string) (bool, error) {
 	if result == nil {
-		goVersion, err := getParsedGoVersion()
+		goVersion, err := GetParsedGoVersion()
 		if err != nil {
 			return false, err
 		}
@@ -218,7 +218,7 @@ func compareSpecificVersionToCurVersion(result *bool, comparedVersion string) (b
 	return *result, nil
 }
 
-func getParsedGoVersion() (*version.Version, error) {
+func GetParsedGoVersion() (*version.Version, error) {
 	output, err := getGoVersion()
 	if err != nil {
 		return nil, err
