@@ -25,14 +25,15 @@ const (
 	Build ModuleType = "build"
 
 	// Package managers types
-	Generic ModuleType = "generic"
-	Maven   ModuleType = "maven"
-	Gradle  ModuleType = "gradle"
-	Docker  ModuleType = "docker"
-	Npm     ModuleType = "npm"
-	Nuget   ModuleType = "nuget"
-	Go      ModuleType = "go"
-	Python  ModuleType = "python"
+	Generic   ModuleType = "generic"
+	Maven     ModuleType = "maven"
+	Gradle    ModuleType = "gradle"
+	Docker    ModuleType = "docker"
+	Npm       ModuleType = "npm"
+	Nuget     ModuleType = "nuget"
+	Go        ModuleType = "go"
+	Python    ModuleType = "python"
+	Terraform ModuleType = "terraform"
 )
 
 type BuildInfo struct {
