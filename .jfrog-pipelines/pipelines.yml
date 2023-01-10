@@ -29,7 +29,7 @@ pipelines:
               trigger: false
           integrations:
             - name: git_asafgabai
-            - name: ecosys_asafg
+            - name: ecosys_asafg_jf
         execution:
           onExecute:
             - cd $res_buildinfoGoGit_resourcePath
@@ -52,7 +52,7 @@ pipelines:
             # Download JFrog CLI
             - curl -fL https://install-cli.jfrog.io | sh
             - jf c rm --quiet
-            - jf c add internal --url=$int_ecosys_asafg_url --user=$int_ecosys_asafg_user --password=$int_ecosys_asafg_apikey
+            - jf c add internal --url=$int_ecosys_asafg_jf_url --token=$int_ecosys_asafg_jf_token
             - jf goc --repo-resolve go-remote
 
             # Audit
