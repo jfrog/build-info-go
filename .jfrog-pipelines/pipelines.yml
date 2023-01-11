@@ -52,7 +52,7 @@ pipelines:
             # Download JFrog CLI
             - curl -fL https://install-cli.jfrog.io | sh
             - jf c rm --quiet
-            - jf c add internal --url=$int_ecosys_asafg_jf_url --token=$int_ecosys_asafg_jf_token
+            - jf c add internal --url=$int_ecosys_asafg_jf_url --access-token=$int_ecosys_asafg_jf_token
             - jf goc --repo-resolve go-remote
 
             # Audit
