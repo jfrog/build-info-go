@@ -30,7 +30,7 @@ buildAndUpload () {
 
   destPath="$pkgPath/$version/$pkg/$exeName"
   echo "Uploading $exeName to $destPath ..."
-  jf rt u "./$exeName" "$destPath"
+#  jf rt u "./$exeName" "$destPath"
 }
 
 #function copyToLatestDir()
