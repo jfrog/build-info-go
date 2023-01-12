@@ -69,6 +69,7 @@ pipelines:
 
             # Commit and publish build-info
             - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER --dry-run > build-info.json
+            - git add build-info.json
             - git commit -m "Update build-info file"
             - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER
 
