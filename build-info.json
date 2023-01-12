@@ -1,19 +1,64 @@
 {
-  "name": "build-info-go",
-  "number": "1",
+  "name": "ecosystem-build-info-go-release",
+  "number": "10",
   "agent": {
-    "name": "jfrog-cli-go",
-    "version": "2.25.2"
+    "name": "jfrog-pipelines:1.27.0"
   },
   "buildAgent": {
     "name": "GENERIC",
-    "version": "2.25.2"
+    "version": "2.32.0"
   },
   "modules": [
     {
       "type": "go",
       "id": "github.com/jfrog/build-info-go",
       "dependencies": [
+        {
+          "id": "github.com/pmezard/go-difflib:v1.0.0",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/CycloneDX/cyclonedx-go:v0.7.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/gofrog:v1.2.4",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.0",
+              "github.com/CycloneDX/cyclonedx-go:v0.7.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.0",
+              "github.com/jfrog/gofrog:v1.2.4",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.0",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "f200e2a5211b527ef2d2ff301718ccc4ad5c705b",
+          "md5": "fb72df530a7f3fca56ccc192c9f30a58",
+          "sha256": "de04cecc1a4b8d53e4357051026794bcbc54f2e6a260cfac508ce69d5d6457a0"
+        },
+        {
+          "id": "github.com/minio/sha256-simd:v1.0.1-0.20210617151322-99e45fae3395",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "f091f68b7467e6dfb5ce28ae894b295525e59d47",
+          "md5": "572ef4681740cfdacbbe601587609622",
+          "sha256": "bb36b77f985b4ef963517202dbce3a9c72ffc7b90d70143ab4cd176981aa4c72"
+        },
         {
           "id": "github.com/urfave/cli/v2:v2.11.2",
           "type": "zip",
@@ -27,6 +72,71 @@
           "sha256": "f78989b0ba98a71226ce2e35bdd1220dcfde508ee6b5eb41c32c387d5eedcacd"
         },
         {
+          "id": "github.com/jfrog/gofrog:v1.2.4",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "c870eec37e8235dc5f45330f755223712b09177c",
+          "md5": "593d89a61aa8009eddd77108b622e1c9",
+          "sha256": "dcb60013780f0aa01b916f58232464e6408109bb97cc62d25963ad16637c9664"
+        },
+        {
+          "id": "github.com/klauspost/cpuid/v2:v2.0.6",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/minio/sha256-simd:v1.0.1-0.20210617151322-99e45fae3395",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "1ed6884c9ee6ecf98727186591ec597771bd9abe",
+          "md5": "e5a4769c581330d21ea90f433cec2ad0",
+          "sha256": "514cbd03b0ded074640a9034af2cbc87490167a6d622a8c4bf478e153d8366e2"
+        },
+        {
+          "id": "github.com/xeipuuv/gojsonschema:v1.2.0",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "e1529901eb2cf8c9ff2b1fbf504cb08d05d3d578",
+          "md5": "ebbf84ea1a07065b100c33e2736e6d03",
+          "sha256": "55c8ce068257aa0d263aad7470113dafcd50f955ee754fc853c2fdcd31ad096f"
+        },
+        {
+          "id": "github.com/russross/blackfriday/v2:v2.1.0",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/cpuguy83/go-md2man/v2:v2.0.2",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/cpuguy83/go-md2man/v2:v2.0.2",
+              "github.com/urfave/cli/v2:v2.11.2",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/urfave/cli/v2:v2.11.2",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "b733cda2c795193ad2a65e13dcd7529b93bf04e9",
+          "md5": "eea4411c54002a5fb7d0db351270eefe",
+          "sha256": "7852750d58a053ce38b01f2c203208817564f552ebf371b2b630081d7004c6ae"
+        },
+        {
           "id": "github.com/!cyclone!d!x/cyclonedx-go:v0.7.0",
           "type": "zip",
           "requestedBy": [
@@ -37,6 +147,120 @@
           "sha1": "803a7073bb2ac4fd2cf6bb4c24124f45888524fe",
           "md5": "2d0bdb76723fa5c12c91443f0edcffc9",
           "sha256": "cb20d6b2943ef65c177a4895bf95355d805b99499d778eb88d5626f5d15fae2c"
+        },
+        {
+          "id": "github.com/cpuguy83/go-md2man/v2:v2.0.2",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/urfave/cli/v2:v2.11.2",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "cab8c09415bb3aa49892aac866a2732980d44c95",
+          "md5": "86a066c9aaad807da54f481b8286f8ce",
+          "sha256": "70a7e609809cf2a92c5535104db5eb82d75c54bfcfed2d224e87dd2fd9729f62"
+        },
+        {
+          "id": "github.com/pkg/errors:v0.9.1",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/gofrog:v1.2.4",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "6ac37cf1eab63f464a8ec2d20bc7224271528d7d",
+          "md5": "5d8002959a144c1bea1f86228fe09755",
+          "sha256": "d4c36b8bcd0616290a3913215e0f53b931bd6e00670596f2960df1b44af2bd07"
+        },
+        {
+          "id": "github.com/xeipuuv/gojsonreference:v0.0.0-20180127040603-bd5ef7bd5415",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/xeipuuv/gojsonschema:v1.2.0",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "133e9c4987a455db1a748f79522b79e95bd395ff",
+          "md5": "1355152ef669012354342f3f0a133987",
+          "sha256": "7ec98f4df894413f4dc58c8df330ca8b24ff425b05a8e1074c3028c99f7e45e7"
+        },
+        {
+          "id": "github.com/xrash/smetrics:v0.0.0-20201216005158-039620a65673",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/urfave/cli/v2:v2.11.2",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "79a771d85bf5b4df5b583c8435343b323f52995e",
+          "md5": "b5a17afb05c11c10713e33e390729bd7",
+          "sha256": "bbebb9a00f44ff3e27bec16111effdcf2706d727821a4833ec8da19aad96e26d"
+        },
+        {
+          "id": "github.com/xeipuuv/gojsonpointer:v0.0.0-20180127040702-4e3ac2762d5f",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/xeipuuv/gojsonschema:v1.2.0",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "c00ffab826fdd7e3aa1284ed3a0918cbdf2ec095",
+          "md5": "812aaf45e505b2953d31a75ce668e46e",
+          "sha256": "5b1a4bcc8e003f214c92b3fa52959d9eb0e3af1c0c529efa55815db951146e48"
+        },
+        {
+          "id": "github.com/davecgh/go-spew:v1.1.1",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/CycloneDX/cyclonedx-go:v0.7.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/gofrog:v1.2.4",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.0",
+              "github.com/CycloneDX/cyclonedx-go:v0.7.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.0",
+              "github.com/jfrog/gofrog:v1.2.4",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.0",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "0f9760bda0c6ccacac5e57f62d0f5ad9c7dab03f",
+          "md5": "feef6644bd69286382139b28be3f0b91",
+          "sha256": "6b44a843951f371b7010c754ecc3cabefe815d5ced1c5b9409fb2d697e8a890d"
         },
         {
           "id": "gopkg.in/yaml.v3:v3.0.1",
@@ -77,104 +301,32 @@
           "sha256": "aab8fbc4e6300ea08e6afe1caea18a21c90c79f489f52c53e2f20431f1a9a015"
         },
         {
-          "id": "github.com/xeipuuv/gojsonreference:v0.0.0-20180127040603-bd5ef7bd5415",
+          "id": "github.com/!burnt!sushi/toml:v1.1.0",
           "type": "zip",
           "requestedBy": [
             [
               "github.com/jfrog/build-info-go"
             ],
             [
-              "github.com/xeipuuv/gojsonschema:v1.2.0",
+              "github.com/urfave/cli/v2:v2.11.2",
               "github.com/jfrog/build-info-go"
             ]
           ],
-          "sha1": "133e9c4987a455db1a748f79522b79e95bd395ff",
-          "md5": "1355152ef669012354342f3f0a133987",
-          "sha256": "7ec98f4df894413f4dc58c8df330ca8b24ff425b05a8e1074c3028c99f7e45e7"
+          "sha1": "7651abb935d690d81ccffe2a2c47d6fed3e4c2a9",
+          "md5": "d9d7c516d4ccdd32c48ff9f36bd1ac55",
+          "sha256": "0a6b8a552883276d4b96f44b6fa877f4d61255bfd228a1ba5bdd1e64618dc007"
         },
         {
-          "id": "github.com/pkg/errors:v0.9.1",
+          "id": "github.com/buger/jsonparser:v1.1.1",
           "type": "zip",
           "requestedBy": [
-            [
-              "github.com/jfrog/gofrog:v1.2.4",
-              "github.com/jfrog/build-info-go"
-            ],
             [
               "github.com/jfrog/build-info-go"
             ]
           ],
-          "sha1": "6ac37cf1eab63f464a8ec2d20bc7224271528d7d",
-          "md5": "5d8002959a144c1bea1f86228fe09755",
-          "sha256": "d4c36b8bcd0616290a3913215e0f53b931bd6e00670596f2960df1b44af2bd07"
-        },
-        {
-          "id": "github.com/davecgh/go-spew:v1.1.1",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/CycloneDX/cyclonedx-go:v0.7.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/gofrog:v1.2.4",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.0",
-              "github.com/CycloneDX/cyclonedx-go:v0.7.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.0",
-              "github.com/jfrog/gofrog:v1.2.4",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.0",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "0f9760bda0c6ccacac5e57f62d0f5ad9c7dab03f",
-          "md5": "feef6644bd69286382139b28be3f0b91",
-          "sha256": "6b44a843951f371b7010c754ecc3cabefe815d5ced1c5b9409fb2d697e8a890d"
-        },
-        {
-          "id": "github.com/pmezard/go-difflib:v1.0.0",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/CycloneDX/cyclonedx-go:v0.7.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/gofrog:v1.2.4",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.0",
-              "github.com/CycloneDX/cyclonedx-go:v0.7.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.0",
-              "github.com/jfrog/gofrog:v1.2.4",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.0",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "f200e2a5211b527ef2d2ff301718ccc4ad5c705b",
-          "md5": "fb72df530a7f3fca56ccc192c9f30a58",
-          "sha256": "de04cecc1a4b8d53e4357051026794bcbc54f2e6a260cfac508ce69d5d6457a0"
+          "sha1": "e0c54d96564262a70bc7ed33fb3ee2b15596f68f",
+          "md5": "7ab77d10951f73b96b9c19a6cca51bb1",
+          "sha256": "be17ef1b44c22eac645eeac80f0e26cdfc70d77262e631358e00c2aa817eab8c"
         },
         {
           "id": "github.com/stretchr/testify:v1.8.0",
@@ -197,95 +349,6 @@
           "sha256": "d880adf449449120b459a2220f539c69648fd797ded5b745cf3add60ec84081e"
         },
         {
-          "id": "github.com/cpuguy83/go-md2man/v2:v2.0.2",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/urfave/cli/v2:v2.11.2",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "cab8c09415bb3aa49892aac866a2732980d44c95",
-          "md5": "86a066c9aaad807da54f481b8286f8ce",
-          "sha256": "70a7e609809cf2a92c5535104db5eb82d75c54bfcfed2d224e87dd2fd9729f62"
-        },
-        {
-          "id": "github.com/xrash/smetrics:v0.0.0-20201216005158-039620a65673",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/urfave/cli/v2:v2.11.2",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "79a771d85bf5b4df5b583c8435343b323f52995e",
-          "md5": "b5a17afb05c11c10713e33e390729bd7",
-          "sha256": "bbebb9a00f44ff3e27bec16111effdcf2706d727821a4833ec8da19aad96e26d"
-        },
-        {
-          "id": "github.com/!burnt!sushi/toml:v1.1.0",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/urfave/cli/v2:v2.11.2",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "7651abb935d690d81ccffe2a2c47d6fed3e4c2a9",
-          "md5": "d9d7c516d4ccdd32c48ff9f36bd1ac55",
-          "sha256": "0a6b8a552883276d4b96f44b6fa877f4d61255bfd228a1ba5bdd1e64618dc007"
-        },
-        {
-          "id": "github.com/xeipuuv/gojsonpointer:v0.0.0-20180127040702-4e3ac2762d5f",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/xeipuuv/gojsonschema:v1.2.0",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "c00ffab826fdd7e3aa1284ed3a0918cbdf2ec095",
-          "md5": "812aaf45e505b2953d31a75ce668e46e",
-          "sha256": "5b1a4bcc8e003f214c92b3fa52959d9eb0e3af1c0c529efa55815db951146e48"
-        },
-        {
-          "id": "github.com/russross/blackfriday/v2:v2.1.0",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/cpuguy83/go-md2man/v2:v2.0.2",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/cpuguy83/go-md2man/v2:v2.0.2",
-              "github.com/urfave/cli/v2:v2.11.2",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/urfave/cli/v2:v2.11.2",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "b733cda2c795193ad2a65e13dcd7529b93bf04e9",
-          "md5": "eea4411c54002a5fb7d0db351270eefe",
-          "sha256": "7852750d58a053ce38b01f2c203208817564f552ebf371b2b630081d7004c6ae"
-        },
-        {
           "id": "golang.org/x/exp:v0.0.0-20220827204233-334a2380cb91",
           "type": "zip",
           "requestedBy": [
@@ -296,74 +359,283 @@
           "sha1": "2d2b6005d25ca740ede5c9c92e717bfb2d64ecb8",
           "md5": "6e990d92129befe08bd84a048ccde444",
           "sha256": "d22b8623bef1ead959b1c6449512dfdbf9624e1ec6c4bc443e91eee170d4d7af"
-        },
-        {
-          "id": "github.com/buger/jsonparser:v1.1.1",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "e0c54d96564262a70bc7ed33fb3ee2b15596f68f",
-          "md5": "7ab77d10951f73b96b9c19a6cca51bb1",
-          "sha256": "be17ef1b44c22eac645eeac80f0e26cdfc70d77262e631358e00c2aa817eab8c"
-        },
-        {
-          "id": "github.com/klauspost/cpuid/v2:v2.0.6",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/minio/sha256-simd:v1.0.1-0.20210617151322-99e45fae3395",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "1ed6884c9ee6ecf98727186591ec597771bd9abe",
-          "md5": "e5a4769c581330d21ea90f433cec2ad0",
-          "sha256": "514cbd03b0ded074640a9034af2cbc87490167a6d622a8c4bf478e153d8366e2"
-        },
-        {
-          "id": "github.com/xeipuuv/gojsonschema:v1.2.0",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "e1529901eb2cf8c9ff2b1fbf504cb08d05d3d578",
-          "md5": "ebbf84ea1a07065b100c33e2736e6d03",
-          "sha256": "55c8ce068257aa0d263aad7470113dafcd50f955ee754fc853c2fdcd31ad096f"
-        },
-        {
-          "id": "github.com/jfrog/gofrog:v1.2.4",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "c870eec37e8235dc5f45330f755223712b09177c",
-          "md5": "593d89a61aa8009eddd77108b622e1c9",
-          "sha256": "dcb60013780f0aa01b916f58232464e6408109bb97cc62d25963ad16637c9664"
-        },
-        {
-          "id": "github.com/minio/sha256-simd:v1.0.1-0.20210617151322-99e45fae3395",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "f091f68b7467e6dfb5ce28ae894b295525e59d47",
-          "md5": "572ef4681740cfdacbbe601587609622",
-          "sha256": "bb36b77f985b4ef963517202dbce3a9c72ffc7b90d70143ab4cd176981aa4c72"
         }
       ]
     }
   ],
-  "started": "2023-01-09T14:28:59.943+0200",
-  "artifactoryPrincipal": "asafg"
+  "started": "2023-01-12T11:35:19.301+0000",
+  "properties": {
+    "buildInfo.env.BASH_FUNC__get_curl%%": "() {  local payload",
+    "buildInfo.env.BASH_FUNC__notify_airbrake%%": "() {  local curl_auth",
+    "buildInfo.env.BASH_FUNC__notify_email%%": "() {  if [ -z \"$opt_status\" ]; then\n case \"$current_script_section\" in \n onStart | onExecute)\n opt_status",
+    "buildInfo.env.BASH_FUNC__notify_jira%%": "() {  local i_username",
+    "buildInfo.env.BASH_FUNC__notify_newrelic%%": "() {  local curl_auth",
+    "buildInfo.env.BASH_FUNC__notify_pagerduty%%": "() {  local routingKey",
+    "buildInfo.env.BASH_FUNC__post_curl%%": "() {  local payload",
+    "buildInfo.env.BASH_FUNC__put_curl%%": "() {  local payload",
+    "buildInfo.env.BASH_FUNC__validate_buildinfo%%": "() {  if [[ $# -ne 3 ]]; then\n echo \"Usage: _validate_buildinfo BUILD_NAME BUILD_NUMBER PROJECT_KEY\" 1\u003e\u00262;\n exit 99;\n fi;\n local build_name",
+    "buildInfo.env.BASH_FUNC_add_affinity_group_files%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_add_cache_files%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_add_pipeline_files%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_add_pipeline_variables%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_add_run_files%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_add_run_variables%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_before_exit%%": "() {  return_code",
+    "buildInfo.env.BASH_FUNC_bump_semver%%": "() {  local version_to_bump",
+    "buildInfo.env.BASH_FUNC_check_default_trigger_payload%%": "() {  local trigger_file_path",
+    "buildInfo.env.BASH_FUNC_check_xray_available%%": "() {  if [ -z \"$(which jfrog)\" ]; then\n echo \"JFrog CLI not found\";\n return 1;\n fi;\n local cli_version",
+    "buildInfo.env.BASH_FUNC_cleanup_jfrog_cli%%": "() {  if [[ $# -lt 2 ]]; then\n echo \"Usage: cleanup_jfrog_cli [--server-name NAME]\" 1\u003e\u00262;\n return 1;\n fi;\n if [ -z \"$(which jfrog)\" ]; then\n echo \"JFrog CLI not found\";\n return 1;\n fi;\n local serverName",
+    "buildInfo.env.BASH_FUNC_compare_git%%": "() {  if [[ $# -le 0 ]]; then\n echo \"Usage: compare_git [--path | --resource]\" 1\u003e\u00262;\n exit 99;\n fi;\n local opt_path",
+    "buildInfo.env.BASH_FUNC_configure_jfrog_cli%%": "() {  if [[ $# -lt 6 ]]; then\n echo \"Usage: configure_jfrog_cli [--artifactory-url URL] [--xray-url URL] [--user USER] [--apikey APIKEY] [--access-token ACCESSTOKEN] [--server-name NAME]\" 1\u003e\u00262;\n return 1;\n fi;\n if [ -z \"$(which jfrog)\" ]; then\n echo \"JFrog CLI not found\";\n return 1;\n fi;\n local artifactoryUrl",
+    "buildInfo.env.BASH_FUNC_decrypt_file%%": "() {  local source_file",
+    "buildInfo.env.BASH_FUNC_decrypt_string%%": "() {  local source_string",
+    "buildInfo.env.BASH_FUNC_encrypt_file%%": "() {  local source_file",
+    "buildInfo.env.BASH_FUNC_encrypt_string%%": "() {  local source_string",
+    "buildInfo.env.BASH_FUNC_end_step%%": "() {  if [[ $# -le 0 ]]; then\n echo \"Usage: end_step [success | failure | skipped]\" 1\u003e\u00262;\n exit 99;\n fi;\n local status",
+    "buildInfo.env.BASH_FUNC_execute_command%%": "() {  local retry_cmd",
+    "buildInfo.env.BASH_FUNC_export_pipeline_variables%%": "() {  if [ -f $pipeline_workspace_dir/pipeline.env ]; then\n source $pipeline_workspace_dir/pipeline.env;\n fi\n}",
+    "buildInfo.env.BASH_FUNC_export_run_variables%%": "() {  if [ -f $steplet_run_state_dir/run.env ]; then\n source $steplet_run_state_dir/run.env;\n fi\n}",
+    "buildInfo.env.BASH_FUNC_find_resource_variable%%": "() {  if [[ $# -le 1 ]]; then\n echo \"Usage: find_resource_variable RESOURCE FIELDNAME\" 1\u003e\u00262;\n exit 99;\n fi;\n local resourceName",
+    "buildInfo.env.BASH_FUNC_find_step_configuration_value%%": "() {  if [[ $# -le 0 ]]; then\n echo \"Usage: find_step_configuration_value CONFIGURATION\" 1\u003e\u00262;\n exit 99;\n fi;\n local configurationName",
+    "buildInfo.env.BASH_FUNC_get_affinity_group_step_names%%": "() {  if [[ $# -le 0 ]]; then\n echo \"Usage: get_affinity_group_step_names [--type] [--syntax-version] [--namespace]\" 1\u003e\u00262;\n exit 99;\n fi;\n local affinity_group_step_type",
+    "buildInfo.env.BASH_FUNC_get_integration_name%%": "() {  if [[ $# -le 0 ]]; then\n echo \"Usage: get_integration_name [--type]\" 1\u003e\u00262;\n exit 99;\n fi;\n local integration_type",
+    "buildInfo.env.BASH_FUNC_get_resource_name%%": "() {  if [[ $# -le 0 ]]; then\n echo \"Usage: get_resource_name [--type] [--operation] [--syntax-version] [--namespace]\" 1\u003e\u00262;\n exit 99;\n fi;\n local resource_names",
+    "buildInfo.env.BASH_FUNC_get_resource_names%%": "() {  if [[ $# -le 0 ]]; then\n echo \"Usage: get_resource_names [--type] [--operation] [--syntax-version] [--namespace]\" 1\u003e\u00262;\n exit 99;\n fi;\n local resource_name",
+    "buildInfo.env.BASH_FUNC_get_run_state_location%%": "() {  local artifact_url_output_file",
+    "buildInfo.env.BASH_FUNC_get_step_var%%": "() {  local STEP_NAME",
+    "buildInfo.env.BASH_FUNC_get_trigger_payload%%": "() {  local trigger_file_path",
+    "buildInfo.env.BASH_FUNC_get_uuid%%": "() {  local uuid",
+    "buildInfo.env.BASH_FUNC_handle_sigterm%%": "() {  execute_command 'echo \"Received a termination signal. Exiting script.\" \u0026\u0026 exit 1'\n}",
+    "buildInfo.env.BASH_FUNC_invoke_task%%": "() {  pipe_debug_logger \"invoking task\";\n local pipeCmd",
+    "buildInfo.env.BASH_FUNC_on_error%%": "() {  exit $?\n}",
+    "buildInfo.env.BASH_FUNC_pipe_debug_logger%%": "() {  if [ \"${JFROG_PIPELINES_DEBUG}\" ",
+    "buildInfo.env.BASH_FUNC_pipe_error_logger%%": "() {  printf \"${RED}[Error]${NC} %s \\n\" \"$@\" 1\u003e\u00262\n}",
+    "buildInfo.env.BASH_FUNC_pipe_info_logger%%": "() {  printf \"${BLU}[Info]${NC}  %s \\n\" \"$@\" 1\u003e\u00262\n}",
+    "buildInfo.env.BASH_FUNC_pipe_success_logger%%": "() {  printf \"${GRE}%s${NC} \\n\" \"$@\" 1\u003e\u00262\n}",
+    "buildInfo.env.BASH_FUNC_pipe_warn_logger%%": "() {  local message",
+    "buildInfo.env.BASH_FUNC_read_json%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_replace_envs%%": "() {  local temp_dest",
+    "buildInfo.env.BASH_FUNC_replicate_resource%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_restore_affinity_group_files%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_restore_cache_files%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_restore_pipefail%%": "() {  if [ ! -z \"$pipefail\" ]; then\n set $pipefail pipefail;\n fi\n}",
+    "buildInfo.env.BASH_FUNC_restore_pipeline_files%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_restore_run_files%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_retry_command%%": "() {  for i in $(seq 1 3);\n do\n { \n \"$@\";\n ret",
+    "buildInfo.env.BASH_FUNC_save_artifact_info%%": "() {  if [[ $# -lt 2 ]]; then\n echo \"Usage: save_artifact_info TYPE FILE [--build-name --build-number --release-bundle-name --release-bundle-version --project-key]\" 1\u003e\u00262;\n exit 99;\n fi;\n local artifact_type",
+    "buildInfo.env.BASH_FUNC_save_tests%%": "() {  local source_file",
+    "buildInfo.env.BASH_FUNC_save_xray_results_url%%": "() {  local xrayUrl",
+    "buildInfo.env.BASH_FUNC_send_notification%%": "() {  if [[ $# -le 0 ]]; then\n echo \"Usage: send_notification INTEGRATION [OPTIONS]\" 1\u003e\u00262;\n exit 99;\n fi;\n local i_name",
+    "buildInfo.env.BASH_FUNC_set_payload%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_set_pipefail%%": "() {  if echo \"$SHELLOPTS\" | grep -q \":pipefail\"; then\n pipefail",
+    "buildInfo.env.BASH_FUNC_set_run_name%%": "() {  local name",
+    "buildInfo.env.BASH_FUNC_set_step_var%%": "() {  local KEY",
+    "buildInfo.env.BASH_FUNC_set_trigger_payload%%": "() {  if [[ $# -le 1 ]]; then\n echo \"Usage: set_trigger_payload [stepVariables|pipelineVariables] KEY",
+    "buildInfo.env.BASH_FUNC_start_group%%": "() {  if [ -z \"$1\" ]; then\n echo \"Error: missing group name as first argument.\" 1\u003e\u00262;\n fi;\n local group_name",
+    "buildInfo.env.BASH_FUNC_stop_group%%": "() {  if [ \"${#open_group_list[@]}\" -lt 1 ]; then\n return;\n fi;\n local sanitizedUUID",
+    "buildInfo.env.BASH_FUNC_update_commit_status%%": "() {  if [[ $# -le 0 ]]; then\n echo \"Usage: update_commit_status RESOURCE [--status STATUS --message \\\"MESSAGE\\\" --context CONTEXT]\" 1\u003e\u00262;\n exit 99;\n fi;\n local resourceName",
+    "buildInfo.env.BASH_FUNC_update_run_description%%": "() {  local description",
+    "buildInfo.env.BASH_FUNC_url_encode%%": "() {  local LC_ALL",
+    "buildInfo.env.BASH_FUNC_use_jfrog_cli%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_validate_artifact%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BASH_FUNC_write_output%%": "() {  if [ \"$1\" ",
+    "buildInfo.env.BLU": "\\033[1;34m",
+    "buildInfo.env.CI": "true",
+    "buildInfo.env.CYN": "\\033[1;36m",
+    "buildInfo.env.GRE": "\\033[1;32m",
+    "buildInfo.env.HOME": "/home/frogger",
+    "buildInfo.env.HOSTNAME": "55f6454bd6d6",
+    "buildInfo.env.IS_K8S_BUILD_PLANE": "false",
+    "buildInfo.env.JAVA_HOME": "/home/frogger/.sdkman/candidates/java/current",
+    "buildInfo.env.JFROG_ARCHITECTURE": "x86_64",
+    "buildInfo.env.JFROG_CLI_BUILD_NAME": "ecosystem-build-info-go-release",
+    "buildInfo.env.JFROG_CLI_BUILD_NUMBER": "10",
+    "buildInfo.env.JFROG_CLI_BUILD_PROJECT": "",
+    "buildInfo.env.JFROG_CLI_BUILD_URL": "https://ecosysjfrog.jfrog.io/ui/pipelines/myPipelines/default/release_build_info_go/10/Release?branch",
+    "buildInfo.env.JFROG_CLI_USER_AGENT": "jfrog-pipelines:1.27.0",
+    "buildInfo.env.JFROG_DEFAULT_TASK_REPO": "pipelines-tasks-virtual",
+    "buildInfo.env.JFROG_OPERATING_SYSTEM": "Ubuntu_18.04",
+    "buildInfo.env.JFROG_OPERATING_SYSTEM_FAMILY": "Linux",
+    "buildInfo.env.JFROG_PIPELINES_API_URL": "https://ecosysjfrog-pipelines-api.jfrog.io/v1",
+    "buildInfo.env.JFROG_PIPELINES_DEBUG": "false",
+    "buildInfo.env.JFROG_PIPELINES_STEP_CONTAINER_MEM_LIMIT_BYTES": "15459483648",
+    "buildInfo.env.JFROG_PIPELINE_VARIABLES_FILE": "/var/opt/jfrog/pipelines/data/release_build_info_go/workspace/pipeline.env",
+    "buildInfo.env.JFROG_PIPELINE_WORKSPACE_DIR": "/var/opt/jfrog/pipelines/data/release_build_info_go/workspace",
+    "buildInfo.env.JFROG_PIPE_CLI_PATH": "/var/opt/jfrog/pipelines/pipe/pipe",
+    "buildInfo.env.JFROG_POST_HOOKS_DIR": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace/post_hooks",
+    "buildInfo.env.JFROG_PROJECT_ID": "1",
+    "buildInfo.env.JFROG_PROJECT_NAME": "default",
+    "buildInfo.env.JFROG_RUN_ID": "5847",
+    "buildInfo.env.JFROG_RUN_NUMBER": "10",
+    "buildInfo.env.JFROG_RUN_VARIABLES_FILE": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace/run_state/run.env",
+    "buildInfo.env.JFROG_SCRIPT_EXTENSION": "sh",
+    "buildInfo.env.JFROG_SHARED_WORKSPACE_DIR": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/Release/workspace",
+    "buildInfo.env.JFROG_STEPLET_NUMBER": "1",
+    "buildInfo.env.JFROG_STEPLET_RUN_STATE_DIR": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace/run_state",
+    "buildInfo.env.JFROG_STEPLET_WORKSPACE_DIR": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace",
+    "buildInfo.env.JFROG_STEP_JSON_PATH": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/steplet.json",
+    "buildInfo.env.JFROG_STEP_TMP_DIR": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace/tmp",
+    "buildInfo.env.JFROG_STEP_WORKSPACE_DIR": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace",
+    "buildInfo.env.JFROG_TASK_WORKSPACE_DIR": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace/tasks",
+    "buildInfo.env.M2_HOME": "/home/frogger/.sdkman/candidates/maven/current",
+    "buildInfo.env.NC": "\\033[0m",
+    "buildInfo.env.NEXT_VERSION": "1.8.5-test",
+    "buildInfo.env.OLDPWD": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878",
+    "buildInfo.env.PATH": "/var/opt/jfrog/pipelines/pipe:/var/opt/jfrog/pipelines/jfrog:/home/frogger/.sdkman/candidates/java/current/bin:/home/frogger/.sdkman/candidates/maven/current/bin:/home/frogger/.sdkman/candidates/gradle/current/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "buildInfo.env.PWD": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/dependencyState/resources/buildinfoGoGit",
+    "buildInfo.env.RED": "\\033[1;31m",
+    "buildInfo.env.SHLVL": "1",
+    "buildInfo.env.YEL": "\\033[1;33m",
+    "buildInfo.env._": "/usr/local/bin/jf",
+    "buildInfo.env.architecture": "x86_64",
+    "buildInfo.env.current_cmd": "jf rt bag \u0026\u0026 jf rt bce",
+    "buildInfo.env.current_cmd_uuid": "ac4ac697-c4f6-4843-a946-0d9eeb7e7972",
+    "buildInfo.env.current_script_section": "onExecute",
+    "buildInfo.env.custom_certs_dir": "/var/opt/jfrog/pipelines/var/etc/security/keys/trusted",
+    "buildInfo.env.custom_certs_enabled": "false",
+    "buildInfo.env.int_ecosys_asafg_jf_displayName": "JFrog Platform Access Token",
+    "buildInfo.env.int_ecosys_asafg_jf_id": "1072",
+    "buildInfo.env.int_ecosys_asafg_jf_masterName": "jfrogPlatformToken",
+    "buildInfo.env.int_ecosys_asafg_jf_name": "ecosys_asafg_jf",
+    "buildInfo.env.int_ecosys_asafg_jf_url": "https://ecosysjfrog.jfrog.io",
+    "buildInfo.env.int_git_asafgabai_displayName": "GitHub",
+    "buildInfo.env.int_git_asafgabai_id": "1036",
+    "buildInfo.env.int_git_asafgabai_masterName": "github",
+    "buildInfo.env.int_git_asafgabai_name": "git_asafgabai",
+    "buildInfo.env.int_git_asafgabai_url": "https://api.github.com",
+    "buildInfo.env.jfrog_cli_path": "/var/opt/jfrog/pipelines/jfrog/jfrog",
+    "buildInfo.env.no_verify_ssl": "false",
+    "buildInfo.env.open_group_info_482aeb35_0fe7_4467_92a3_1784e5b44d11_name": "Executing step",
+    "buildInfo.env.open_group_info_482aeb35_0fe7_4467_92a3_1784e5b44d11_parent_uuid": "root",
+    "buildInfo.env.open_group_info_482aeb35_0fe7_4467_92a3_1784e5b44d11_shown": "true",
+    "buildInfo.env.open_group_info_482aeb35_0fe7_4467_92a3_1784e5b44d11_status": "0",
+    "buildInfo.env.open_group_info_482aeb35_0fe7_4467_92a3_1784e5b44d11_uuid": "482aeb35-0fe7-4467-92a3-1784e5b44d11",
+    "buildInfo.env.operating_system": "Ubuntu_18.04",
+    "buildInfo.env.pipeline_name": "release_build_info_go",
+    "buildInfo.env.pipeline_workspace_dir": "/var/opt/jfrog/pipelines/data/release_build_info_go/workspace",
+    "buildInfo.env.pipelines_api_url": "https://ecosysjfrog-pipelines-api.jfrog.io/v1",
+    "buildInfo.env.project_id": "1",
+    "buildInfo.env.project_name": "default",
+    "buildInfo.env.reqexec_bin_path": "/var/opt/jfrog/pipelines/reqExec/dist/main/main",
+    "buildInfo.env.reqexec_dir": "/var/opt/jfrog/pipelines/reqExec",
+    "buildInfo.env.res_buildinfoGoGit_autoSyncResourceIfOutdated": "false",
+    "buildInfo.env.res_buildinfoGoGit_baseCommitRef": "",
+    "buildInfo.env.res_buildinfoGoGit_beforeCommitSha": "a87bc059f69ed9b323812c32ed8682f1c47219d3",
+    "buildInfo.env.res_buildinfoGoGit_branchName": "dev",
+    "buildInfo.env.res_buildinfoGoGit_branches": "{\"include\":\"dev\"}",
+    "buildInfo.env.res_buildinfoGoGit_commitMessage": "Added build-info JSON.",
+    "buildInfo.env.res_buildinfoGoGit_commitSha": "995647dc437d154f281e1d1e8e3942bb2c57a8ca",
+    "buildInfo.env.res_buildinfoGoGit_commitUrl": "https://github.com/asafgabai/build-info-go/commit/995647dc437d154f281e1d1e8e3942bb2c57a8ca",
+    "buildInfo.env.res_buildinfoGoGit_committerLogin": "asafgabai",
+    "buildInfo.env.res_buildinfoGoGit_compareUrl": "https://github.com/asafgabai/build-info-go/compare/a87bc059f69ed9b323812c32ed8682f1c47219d3...995647dc437d154f281e1d1e8e3942bb2c57a8ca",
+    "buildInfo.env.res_buildinfoGoGit_gitProvider_displayName": "GitHub",
+    "buildInfo.env.res_buildinfoGoGit_gitProvider_id": "1036",
+    "buildInfo.env.res_buildinfoGoGit_gitProvider_masterName": "github",
+    "buildInfo.env.res_buildinfoGoGit_gitProvider_name": "git_asafgabai",
+    "buildInfo.env.res_buildinfoGoGit_gitProvider_url": "https://api.github.com",
+    "buildInfo.env.res_buildinfoGoGit_gitRepoFullName": "asafgabai/build-info-go",
+    "buildInfo.env.res_buildinfoGoGit_gitRepoRepositoryHttpsUrl": "https://github.com/asafgabai/build-info-go.git",
+    "buildInfo.env.res_buildinfoGoGit_gitRepoRepositorySshUrl": "git@github.com:asafgabai/build-info-go.git",
+    "buildInfo.env.res_buildinfoGoGit_gitRepoRepositoryUrl": "https://api.github.com/repos/asafgabai/build-info-go",
+    "buildInfo.env.res_buildinfoGoGit_gitRepoSourceDefaultBranch": "main",
+    "buildInfo.env.res_buildinfoGoGit_gitTagMessage": "",
+    "buildInfo.env.res_buildinfoGoGit_gitTagName": "",
+    "buildInfo.env.res_buildinfoGoGit_headCommitRef": "",
+    "buildInfo.env.res_buildinfoGoGit_integrationAlias": "gitProvider",
+    "buildInfo.env.res_buildinfoGoGit_integrationName": "git_asafgabai",
+    "buildInfo.env.res_buildinfoGoGit_isBranchCreate": "false",
+    "buildInfo.env.res_buildinfoGoGit_isBranchDelete": "false",
+    "buildInfo.env.res_buildinfoGoGit_isFilePatternMatch": "true",
+    "buildInfo.env.res_buildinfoGoGit_isFork": "false",
+    "buildInfo.env.res_buildinfoGoGit_isGitTag": "false",
+    "buildInfo.env.res_buildinfoGoGit_isPrerelease": "false",
+    "buildInfo.env.res_buildinfoGoGit_isPrivateRepository": "false",
+    "buildInfo.env.res_buildinfoGoGit_isPullRequest": "false",
+    "buildInfo.env.res_buildinfoGoGit_isPullRequestClose": "false",
+    "buildInfo.env.res_buildinfoGoGit_isRelease": "false",
+    "buildInfo.env.res_buildinfoGoGit_isTrigger": "false",
+    "buildInfo.env.res_buildinfoGoGit_masterName": "github",
+    "buildInfo.env.res_buildinfoGoGit_operation": "IN",
+    "buildInfo.env.res_buildinfoGoGit_path": "asafgabai/build-info-go",
+    "buildInfo.env.res_buildinfoGoGit_pullRequestBaseBranch": "",
+    "buildInfo.env.res_buildinfoGoGit_pullRequestNumber": "",
+    "buildInfo.env.res_buildinfoGoGit_releaseBody": "",
+    "buildInfo.env.res_buildinfoGoGit_releaseName": "",
+    "buildInfo.env.res_buildinfoGoGit_releasedAt": "",
+    "buildInfo.env.res_buildinfoGoGit_repositoryProvider": "github",
+    "buildInfo.env.res_buildinfoGoGit_resourceId": "235",
+    "buildInfo.env.res_buildinfoGoGit_resourcePath": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/dependencyState/resources/buildinfoGoGit",
+    "buildInfo.env.res_buildinfoGoGit_resourceVersionId": "9206",
+    "buildInfo.env.res_buildinfoGoGit_shaData": "{\"providerDomain\":\"github.com\",\"branchName\":\"dev\",\"isPullRequest\":false,\"isPullRequestClose\":false,\"isFork\":false,\"pullRequestNumber\":null,\"pullRequestBaseBranch\":null,\"commitSha\":\"995647dc437d154f281e1d1e8e3942bb2c57a8ca\",\"beforeCommitSha\":\"a87bc059f69ed9b323812c32ed8682f1c47219d3\",\"commitUrl\":\"https://github.com/asafgabai/build-info-go/commit/995647dc437d154f281e1d1e8e3942bb2c57a8ca\",\"commitMessage\":\"Added build-info JSON.\",\"baseCommitRef\":\"\",\"headCommitRef\":\"\",\"headPROrgName\":\"\",\"compareUrl\":\"https://github.com/asafgabai/build-info-go/compare/a87bc059f69ed9b323812c32ed8682f1c47219d3...995647dc437d154f281e1d1e8e3942bb2c57a8ca\",\"skipDecryption\":false,\"isGitTag\":false,\"gitTagName\":null,\"gitTagMessage\":null,\"isRelease\":false,\"releaseName\":null,\"releaseBody\":null,\"releasedAt\":null,\"isPrerelease\":false,\"pullRequestRepoFullName\":null,\"changeId\":null,\"changeSha\":null,\"eventType\":null,\"patchSetNumber\":null,\"changeSubject\":null,\"providerSshPort\":null,\"changeOwner\":{},\"providerUrl\":null,\"isBranchCreate\":false,\"isBranchDelete\":false,\"committer\":{\"email\":\"asafg@jfrog.com\",\"login\":\"asafgabai\",\"displayName\":\"Asaf Gabai\"},\"lastAuthor\":{\"email\":\"asafg@jfrog.com\",\"login\":\"asafgabai\",\"displayName\":\"Asaf Gabai\"},\"triggeredBy\":{\"email\":\"77976014+asafgabai@users.noreply.github.com\",\"login\":\"asafgabai\",\"displayName\":\"asafgabai\"}}",
+    "buildInfo.env.run_created_at": "2023-01-12T11:31:39.062Z",
+    "buildInfo.env.run_dir": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847",
+    "buildInfo.env.run_id": "5847",
+    "buildInfo.env.run_number": "10",
+    "buildInfo.env.running_in_container": "true",
+    "buildInfo.env.script_extension": "sh",
+    "buildInfo.env.shared_workspace": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/Release/workspace",
+    "buildInfo.env.skip_before_exit_methods": "false",
+    "buildInfo.env.step_affinity_group": "Release",
+    "buildInfo.env.step_build_plane_version": "1.27.0",
+    "buildInfo.env.step_configuration_environmentVariables": "[{\"key\":\"NEXT_VERSION\",\"value\":\"1.8.5-test\",\"isReadOnly\":true,\"level\":\"pipeline\",\"type\":\"pipeline\"}]",
+    "buildInfo.env.step_configuration_environmentVariables_0_isReadOnly": "true",
+    "buildInfo.env.step_configuration_environmentVariables_0_level": "pipeline",
+    "buildInfo.env.step_configuration_environmentVariables_0_type": "pipeline",
+    "buildInfo.env.step_configuration_environmentVariables_0_value": "1.8.5-test",
+    "buildInfo.env.step_configuration_environmentVariables_len": "1",
+    "buildInfo.env.step_configuration_inputResources": "[{\"name\":\"buildinfoGoGit\",\"trigger\":false}]",
+    "buildInfo.env.step_configuration_inputResources_0_name": "buildinfoGoGit",
+    "buildInfo.env.step_configuration_inputResources_0_trigger": "false",
+    "buildInfo.env.step_configuration_inputResources_len": "1",
+    "buildInfo.env.step_configuration_instanceSize": "c4.2xlarge",
+    "buildInfo.env.step_configuration_integrations": "[{\"name\":\"git_asafgabai\"},{\"name\":\"ecosys_asafg_jf\"}]",
+    "buildInfo.env.step_configuration_integrations_0_name": "git_asafgabai",
+    "buildInfo.env.step_configuration_integrations_1_name": "ecosys_asafg_jf",
+    "buildInfo.env.step_configuration_integrations_len": "2",
+    "buildInfo.env.step_configuration_isOnDemand": "true",
+    "buildInfo.env.step_configuration_nodeId": "2332",
+    "buildInfo.env.step_configuration_nodeName": "node-a01f257c",
+    "buildInfo.env.step_configuration_nodePool": "default-dynamic-nodepool",
+    "buildInfo.env.step_configuration_runtime": "{\"type\":\"image\",\"image\":{\"imageName\":\"releases-docker.jfrog.io/jfrog-ecosystem-integration-env\",\"imageTag\":\"latest\",\"containerOptions\":\"\",\"autoPull\":true}}",
+    "buildInfo.env.step_configuration_timeoutSeconds": "3600",
+    "buildInfo.env.step_dependency_state_dir": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/dependencyState",
+    "buildInfo.env.step_docker_container_name": "step-5878-5878",
+    "buildInfo.env.step_id": "5878",
+    "buildInfo.env.step_image_name": "releases-docker.jfrog.io/jfrog-ecosystem-integration-env",
+    "buildInfo.env.step_image_tag": "latest",
+    "buildInfo.env.step_json_path": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/steplet.json",
+    "buildInfo.env.step_name": "Release",
+    "buildInfo.env.step_namespace": "jfrog",
+    "buildInfo.env.step_node_id": "2332",
+    "buildInfo.env.step_node_name": "node-a01f257c",
+    "buildInfo.env.step_node_pool_name": "default-dynamic-nodepool",
+    "buildInfo.env.step_output_dir": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/output",
+    "buildInfo.env.step_platform": "Ubuntu_18.04",
+    "buildInfo.env.step_runtime": "image",
+    "buildInfo.env.step_timeout_seconds": "3600",
+    "buildInfo.env.step_tmp_dir": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace/tmp",
+    "buildInfo.env.step_triggered_by_identity_name": "asafg",
+    "buildInfo.env.step_triggered_by_resource_name": "",
+    "buildInfo.env.step_triggered_by_step_name": "",
+    "buildInfo.env.step_type": "Bash",
+    "buildInfo.env.step_url": "https://ecosysjfrog.jfrog.io/ui/pipelines/myPipelines/default/release_build_info_go/10/Release?branch",
+    "buildInfo.env.step_workspace_dir": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace",
+    "buildInfo.env.step_workspace_tmp_dir": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace/tmp",
+    "buildInfo.env.steplet_id": "5878",
+    "buildInfo.env.steplet_number": "1",
+    "buildInfo.env.steplet_run_state_dir": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace/run_state",
+    "buildInfo.env.steplet_script_path": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/stepletScript.sh",
+    "buildInfo.env.steplet_workspace_dir": "/var/opt/jfrog/pipelines/data/release_build_info_go/runs/5847/steps/Release/5878/workspace",
+    "buildInfo.env.troubleshoot_msg": "For more information, see https://www.jfrog.com/confluence/display/JFROG/Troubleshooting#Troubleshooting-PipelinesErrorMessages"
+  },
+  "artifactoryPrincipal": "asafg",
+  "url": "https://ecosysjfrog.jfrog.io/ui/pipelines/myPipelines/default/release_build_info_go/10/Release?branch=",
+  "vcs": [
+    {
+      "url": "https://github.com/asafgabai/build-info-go.git",
+      "revision": "995647dc437d154f281e1d1e8e3942bb2c57a8ca",
+      "branch": "main",
+      "message": "Added build-info JSON."
+    }
+  ]
 }
