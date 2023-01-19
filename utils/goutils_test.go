@@ -41,71 +41,47 @@ rsc.io/sampler:v1.3.0
 
 func TestGetProjectRoot(t *testing.T) {
 	wd, err := os.Getwd()
-	if err != nil {
-		t.Error(err)
-	}
-	defer os.Chdir(wd)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, os.Chdir(wd))
+	}()
 
 	// CD into a directory with a go.mod file.
 	projectRoot := filepath.Join("testdata", "project")
-	err = os.Chdir(projectRoot)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, os.Chdir(projectRoot))
 
 	// Make projectRoot an absolute path.
 	projectRoot, err = os.Getwd()
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
 	// Get the project root.
 	root, err := GetProjectRoot()
-	if err != nil {
-		t.Error(err)
-	}
-	if root != projectRoot {
-		t.Error("Expecting", projectRoot, "got:", root)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, projectRoot, root)
 
 	// CD back to the original directory.
-	if err := os.Chdir(wd); err != nil {
-		t.Error(err)
+	if !assert.NoError(t, os.Chdir(wd)) {
+		return
 	}
 
-	// CD into a sub directory in the same project, and expect to get the same project root.
-	os.Chdir(wd)
+	// CD into a subdirectory in the same project, and expect to get the same project root.
 	projectSubDirectory := filepath.Join("testdata", "project", "dir")
-	err = os.Chdir(projectSubDirectory)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, os.Chdir(projectSubDirectory))
 	root, err = GetProjectRoot()
-	if err != nil {
-		t.Error(err)
-	}
-	if root != projectRoot {
-		t.Error("Expecting", projectRoot, "got:", root)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, projectRoot, root)
 
 	// CD back to the original directory.
-	if err := os.Chdir(wd); err != nil {
-		t.Error(err)
+	if !assert.NoError(t, os.Chdir(wd)) {
+		return
 	}
 
 	// Now CD into a directory outside the project, and expect to get a different project root.
 	noProjectRoot := filepath.Join("testdata", "noproject")
-	err = os.Chdir(noProjectRoot)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, os.Chdir(noProjectRoot))
 	root, err = GetProjectRoot()
-	if err != nil {
-		t.Error(err)
-	}
-	if root == projectRoot {
-		t.Error("Expecting a different value than", root)
-	}
+	assert.NoError(t, err)
+	assert.NotEqual(t, projectRoot, root)
 }
 
 func TestGetDependenciesList(t *testing.T) {
@@ -120,34 +96,32 @@ func TestGetDependenciesListWithIgnoreErrors(t *testing.T) {
 
 func testGetDependenciesList(t *testing.T, testDir string) {
 	log := NewDefaultLogger(ERROR)
-	gomodPath := filepath.Join("testdata", "mods", testDir)
-	err := os.Rename(filepath.Join(gomodPath, "go.mod.txt"), filepath.Join(gomodPath, "go.mod"))
+	goModPath := filepath.Join("testdata", "mods", testDir)
+	err := os.Rename(filepath.Join(goModPath, "go.mod.txt"), filepath.Join(goModPath, "go.mod"))
 	assert.NoError(t, err)
 	defer func() {
-		err := os.Rename(filepath.Join(gomodPath, "go.mod"), filepath.Join(gomodPath, "go.mod.txt"))
+		err := os.Rename(filepath.Join(goModPath, "go.mod"), filepath.Join(goModPath, "go.mod.txt"))
 		assert.NoError(t, err)
 	}()
-	err = os.Rename(filepath.Join(gomodPath, "go.sum.txt"), filepath.Join(gomodPath, "go.sum"))
+	err = os.Rename(filepath.Join(goModPath, "go.sum.txt"), filepath.Join(goModPath, "go.sum"))
 	assert.NoError(t, err)
 	defer func() {
-		err = os.Rename(filepath.Join(gomodPath, "go.sum"), filepath.Join(gomodPath, "go.sum.txt"))
+		err = os.Rename(filepath.Join(goModPath, "go.sum"), filepath.Join(goModPath, "go.sum.txt"))
 		assert.NoError(t, err)
 	}()
-	originSumFileContent, _, err := getGoSum(gomodPath, log)
-	err = os.Rename(filepath.Join(gomodPath, "test.go.txt"), filepath.Join(gomodPath, "test.go"))
+	originSumFileContent, _, err := getGoSum(goModPath, log)
+	err = os.Rename(filepath.Join(goModPath, "test.go.txt"), filepath.Join(goModPath, "test.go"))
 	assert.NoError(t, err)
 	defer func() {
-		err := os.Rename(filepath.Join(gomodPath, "test.go"), filepath.Join(gomodPath, "test.go.txt"))
+		err := os.Rename(filepath.Join(goModPath, "test.go"), filepath.Join(goModPath, "test.go.txt"))
 		assert.NoError(t, err)
 	}()
-	actual, err := GetDependenciesList(filepath.Join(gomodPath), log)
-	if err != nil {
-		t.Error(err)
-	}
+	actual, err := GetDependenciesList(filepath.Join(goModPath), log)
+	assert.NoError(t, err)
 
 	// Since Go 1.16 'go list' command won't automatically update go.mod and go.sum.
-	// Check that we rollback changes properly.
-	newSumFileContent, _, err := getGoSum(gomodPath, log)
+	// Check that we roll back changes properly.
+	newSumFileContent, _, err := getGoSum(goModPath, log)
 	if !reflect.DeepEqual(originSumFileContent, newSumFileContent) {
 		t.Errorf("go.sum has been modified and didn't rollback properly")
 	}
