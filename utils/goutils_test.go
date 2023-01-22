@@ -122,9 +122,7 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 	// Since Go 1.16 'go list' command won't automatically update go.mod and go.sum.
 	// Check that we roll back changes properly.
 	newSumFileContent, _, err := getGoSum(goModPath, log)
-	if !reflect.DeepEqual(originSumFileContent, newSumFileContent) {
-		t.Errorf("go.sum has been modified and didn't rollback properly")
-	}
+	assert.Equal(t, newSumFileContent, originSumFileContent, "go.sum has been modified and didn't rollback properly")
 
 	expected := map[string]bool{
 		"golang.org/x/text:v0.3.3": true,
@@ -132,9 +130,7 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 		"rsc.io/sampler:v1.3.0":    true,
 		testDir + ":":              true,
 	}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("Expecting: \n%v \nGot: \n%v", expected, actual)
-	}
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseGoPathWindows(t *testing.T) {
