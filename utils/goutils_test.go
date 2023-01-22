@@ -58,9 +58,7 @@ func TestGetProjectRoot(t *testing.T) {
 	assert.Equal(t, projectRoot, root)
 
 	// CD back to the original directory.
-	if !assert.NoError(t, os.Chdir(wd)) {
-		return
-	}
+	assert.NoError(t, os.Chdir(wd))
 
 	// CD into a subdirectory in the same project, and expect to get the same project root.
 	projectSubDirectory := filepath.Join("testdata", "project", "dir")
