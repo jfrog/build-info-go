@@ -20,7 +20,7 @@ const (
 	PropertiesTempfolderName        = "properties"
 	mavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
 	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
-	MavenExtractorDependencyVersion = "2.38.1"
+	MavenExtractorDependencyVersion = "2.39.0"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
