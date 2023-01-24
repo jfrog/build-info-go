@@ -118,6 +118,7 @@ func extractPackagesFromPoetryLock(lockFilePath string) (dependencies map[string
 	var poetryLockFile PoetryLock
 
 	_, err = toml.Decode(string(content), &poetryLockFile)
+	fmt.Print(string(content))
 	if err != nil {
 		return
 	}
