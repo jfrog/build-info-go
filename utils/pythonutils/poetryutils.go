@@ -125,6 +125,7 @@ func extractPackagesFromPoetryLock(lockFilePath string) (dependencies map[string
 	dependenciesVersions = make(map[string]string)
 	dependencies = make(map[string][]string)
 	for _, dependency := range poetryLockFile.Package {
+		fmt.Print("depppp: " + dependency.Name)
 		dependenciesVersions[strings.ToLower(dependency.Name)] = dependency.Version
 		dependencyName := dependency.Name + ":" + dependency.Version
 		dependencies[dependencyName] = maps.Keys(dependency.Dependencies)
