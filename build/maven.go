@@ -188,7 +188,6 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 			}
 		}
 		mm.containingBuild.logger.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
-
 		cmd := exec.Command(maven, "--version")
 		var stdout bytes.Buffer
 		cmd.Stdout = &stdout
@@ -222,9 +221,9 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 func (mm *MavenModule) getSuitableM2String() string {
 	maven := "mvn"
 	if mm.extractorDetails.useWrapper {
-		maven = "./mvnw"
+		maven, _ = filepath.Abs("./mvnw")
 		if runtime.GOOS == "windows" {
-			maven = "mvnw.cmd"
+			maven, _ = filepath.Abs("mvnw.cmd")
 		}
 	}
 	return maven
