@@ -42,7 +42,9 @@ rsc.io/sampler:v1.3.0
 func TestGetProjectRoot(t *testing.T) {
 	wd, err := os.Getwd()
 	assert.NoError(t, err)
-	defer assert.NoError(t, os.Chdir(wd))
+	defer func() {
+		assert.NoError(t, os.Chdir(wd))
+	}()
 
 	// CD into a directory with a go.mod file.
 	projectRoot := filepath.Join("testdata", "project")
