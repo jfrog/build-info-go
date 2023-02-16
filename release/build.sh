@@ -73,6 +73,7 @@ buildAndUpload 'linux-arm' 'linux' 'arm' ''
 buildAndUpload 'linux-ppc64' 'linux' 'ppc64' ''
 buildAndUpload 'linux-ppc64le' 'linux' 'ppc64le' ''
 buildAndUpload 'mac-386' 'darwin' 'amd64' ''
+buildAndUpload 'mac-arm64' 'darwin' 'arm64' ''
 buildAndUpload 'windows-amd64' 'windows' 'amd64' '.exe'
 
 # Copy the uploaded version to override latest dir
