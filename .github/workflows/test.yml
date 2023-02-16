@@ -44,6 +44,12 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           check-latest: true
+          
+      - name: Setup Maven v3.8.6 for Windows
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: 3.8.6
+        if: matrix.os = 'windows-latest'
 
       - name: Go Cache
         uses: actions/cache@v3
