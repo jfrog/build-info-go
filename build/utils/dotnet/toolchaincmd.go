@@ -4,6 +4,7 @@ import (
 	"github.com/jfrog/build-info-go/utils"
 	"io"
 	"os/exec"
+	"strings"
 )
 
 type ToolchainType int
@@ -30,6 +31,13 @@ var toolchainsMap = map[ToolchainType]toolchainInfo{
 		flagPrefix:    "--",
 		addSourceArgs: []string{"nuget", "add", "source"},
 	},
+}
+
+func ConvertNameToToolType(name string) ToolchainType {
+	if strings.ToLower(name) == "nuget" {
+		return Nuget
+	}
+	return DotnetCore
 }
 
 func (toolchainType ToolchainType) String() string {
