@@ -18,7 +18,7 @@ const (
 	MavenExtractorFileName          = "build-info-extractor-maven3-%s-uber.jar"
 	classworldsConfFileName         = "classworlds.conf"
 	PropertiesTempfolderName        = "properties"
-	mavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
+	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
 	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
 	MavenExtractorDependencyVersion = "2.39.3"
 
@@ -45,11 +45,11 @@ type MavenModule struct {
 type extractorDetails struct {
 	// Extractor local path.
 	localPath string
-	// Download the extracor from remote server.
+	// Download the extractor from remote server.
 	downloadExtractorFunc func(downloadTo, downloadFrom string) error
 	// mvn goals to build the project.
 	goals []string
-	// Additionals JVM option to build the project.
+	// Additional JVM option to build the project.
 	mavenOpts []string
 	// Map of configurations for the extractor.
 	props map[string]string
@@ -213,7 +213,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 
 func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
 	filename := fmt.Sprintf(MavenExtractorFileName, MavenExtractorDependencyVersion)
-	filePath := fmt.Sprintf(mavenExtractorRemotePath, MavenExtractorDependencyVersion)
+	filePath := fmt.Sprintf(MavenExtractorRemotePath, MavenExtractorDependencyVersion)
 	if err := utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc, logger); err != nil {
 		return err
 	}

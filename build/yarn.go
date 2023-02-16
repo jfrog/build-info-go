@@ -62,7 +62,7 @@ func newYarnModule(srcPath string, containingBuild *Build) (*YarnModule, error) 
 
 // Build builds the project, collects its dependencies and saves them in the build-info module.
 func (ym *YarnModule) Build() error {
-	err := runYarnCommand(ym.executablePath, ym.srcPath, ym.yarnArgs...)
+	err := RunYarnCommand(ym.executablePath, ym.srcPath, ym.yarnArgs...)
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func getVersion(executablePath, srcPath string) (string, error) {
 	return strings.TrimSpace(outBuffer.String()), err
 }
 
-func runYarnCommand(executablePath, srcPath string, args ...string) error {
+func RunYarnCommand(executablePath, srcPath string, args ...string) error {
 	command := exec.Command(executablePath, args...)
 	command.Dir = srcPath
 	command.Stdout = os.Stderr
