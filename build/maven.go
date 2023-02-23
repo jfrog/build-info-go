@@ -177,11 +177,9 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 		// Since Maven installation can be located in different locations,
 		// Depending on the installation type and the OS (for example: For Mac with brew install: /usr/local/Cellar/maven/{version}/libexec or Ubuntu with debian: /usr/share/maven),
 		// We need to grab the location using the mvn --version command
-
 		// First we will try lo look for 'mvn' in PATH.
-		maven := mm.getSuitableM2String()
+		maven := mm.getExecutableName()
 		if !mm.extractorDetails.useWrapper {
-
 			mvnPath, err := exec.LookPath("mvn")
 			if err != nil || mvnPath == "" {
 				return "", errors.New(err.Error() + "Hint: The mvn command may not be included in the PATH. Either add it to the path, or set the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
@@ -218,10 +216,10 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 	return
 }
 
-func (mm *MavenModule) getSuitableM2String() string {
+func (mm *MavenModule) getExecutableName() string {
 	maven := "mvn"
 	if mm.extractorDetails.useWrapper {
-		maven, _ = filepath.Abs("./mvnw")
+		maven = "./mvnw"
 		if runtime.GOOS == "windows" {
 			maven, _ = filepath.Abs("mvnw.cmd")
 		}
