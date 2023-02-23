@@ -182,7 +182,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 		if !mm.extractorDetails.useWrapper {
 			mvnPath, err := exec.LookPath("mvn")
 			if err != nil || mvnPath == "" {
-				return "", errors.New(err.Error() + "Hint: The mvn command may not be included in the PATH. Either add it to the path, or set the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
+				return "", errors.New(err.Error() + ". Hint: The mvn command may not be included in the PATH. Either add it to the path, or set the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
 			}
 		}
 		mm.containingBuild.logger.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
