@@ -320,7 +320,7 @@ const (
 )
 
 func (nc NpmCmd) String() string {
-	return [...]string{"ls", "config", "install", "ci", "pack", "-version"}[nc]
+	return [...]string{"ls", "config", "install", "ci", "pack", "-v"}[nc]
 }
 
 func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
@@ -351,27 +351,35 @@ func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, 
 	return
 }
 
+func GetNodeVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
+	return getVersionAndExecPath("node", log)
+}
+
 func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
+	return getVersionAndExecPath("npm", log)
+}
+
+func getVersionAndExecPath(cmdName string, log utils.Log) (*version.Version, string, error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
-	npmExecPath, err := exec.LookPath("npm")
+	execPath, err := exec.LookPath(cmdName)
 	if err != nil {
 		return nil, "", err
 	}
 
-	if npmExecPath == "" {
+	if execPath == "" {
 		return nil, "", errors.New("could not find the 'npm' executable in the system PATH")
 	}
 
-	log.Debug("Using npm executable:", npmExecPath)
+	log.Debug("Using", cmdName, "executable:", execPath)
 
-	versionData, _, err := RunNpmCmd(npmExecPath, "", Version, nil, log)
+	versionData, _, err := RunNpmCmd(execPath, "", Version, nil, log)
 	if err != nil {
 		return nil, "", err
 	}
-	log.Debug("Using npm version:", string(versionData))
-	return version.NewVersion(string(versionData)), npmExecPath, nil
+	log.Debug("Using", cmdName, "version:", string(versionData))
+	return version.NewVersion(string(versionData)), execPath, nil
 }
 
 type PackageInfo struct {
