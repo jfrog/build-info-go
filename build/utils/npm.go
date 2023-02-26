@@ -369,7 +369,7 @@ func getVersionAndExecPath(cmdName string, log utils.Log) (*version.Version, str
 	}
 
 	if execPath == "" {
-		return nil, "", errors.New("could not find the 'npm' executable in the system PATH")
+		return nil, "", fmt.Errorf("could not find the '%s' executable in the system PATH", cmdName)
 	}
 
 	log.Debug("Using", cmdName, "executable:", execPath)
