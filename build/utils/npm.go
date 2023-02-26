@@ -352,7 +352,12 @@ func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, 
 }
 
 func GetNodeVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
-	return getVersionAndExecPath("node", log)
+	nodeVersion, nodeExecPath, err := getVersionAndExecPath("node", log)
+	if err != nil {
+		return nil, "", err
+	}
+	nodeVersion.SetVersion(strings.TrimPrefix(nodeVersion.GetVersion(), "v"))
+	return nodeVersion, nodeExecPath, nil
 }
 
 func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
@@ -369,7 +374,7 @@ func getVersionAndExecPath(cmdName string, log utils.Log) (*version.Version, str
 	}
 
 	if execPath == "" {
-		return nil, "", errors.New("could not find the 'npm' executable in the system PATH")
+		return nil, "", fmt.Errorf("could not find the '%s' executable in the system PATH", cmdName)
 	}
 
 	log.Debug("Using", cmdName, "executable:", execPath)
