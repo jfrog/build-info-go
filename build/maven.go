@@ -187,6 +187,9 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 			}
 		}
 		output, stdout, err := mm.getMavenVersionOutPut(maven)
+		if err != nil {
+			return "", errors.New("Could not find the location of the maven home directory, by running 'mvn --version' command. The command output is:\n" + stdout.String() + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
+		}
 		// Finding the relevant "Maven home" line in command response.
 		mavenHome, err = mm.ExtractMavenPath(output)
 		if mavenHome == "" || err != nil {
