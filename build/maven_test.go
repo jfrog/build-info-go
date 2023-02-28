@@ -72,3 +72,40 @@ func getExpectedMavenBuildInfo(t *testing.T, filePath string) entities.BuildInfo
 	assert.NoError(t, json.Unmarshal(data, &buildinfo))
 	return buildinfo
 }
+
+func TestExtractMavenPath(t *testing.T) {
+	service := NewBuildInfoService()
+	mavenBuild, err := service.GetOrCreateBuild("build-info-maven-test", "1")
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, mavenBuild.Clean())
+	}()
+	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
+	assert.NoError(t, err)
+	// Create maven project
+	projectPath := filepath.Join(testdataDir, "maven", "project")
+	tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, projectPath)
+	defer cleanup()
+	// Add maven project as module in build-info.
+	mavenModule, err := mavenBuild.AddMavenModule(tmpProjectPath)
+	assert.NoError(t, err)
+
+	s1 := "Maven home: /test/is/good"
+	s2 := "Home: /test/is/not/good"
+	s3 := "Mvn Home:= /test/is/not/good"
+	var output []string
+	output = append(output, s1, s2, s3)
+	mavenHome, err := mavenModule.ExtractMavenPath(output)
+	assert.NoError(t, err)
+	assert.Equal(t, "/test/is/good", mavenHome)
+	output = nil
+	output = append(output, s2, s1, s3)
+	mavenHome, err = mavenModule.ExtractMavenPath(output)
+	assert.NoError(t, err)
+	assert.Equal(t, "/test/is/good", mavenHome)
+	output = nil
+	output = append(output, s2, s3)
+	mavenHome, err = mavenModule.ExtractMavenPath(output)
+	assert.Equal(t, "", mavenHome)
+	assert.NoError(t, err)
+}

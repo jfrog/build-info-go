@@ -186,34 +186,15 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 				return "", errors.New(err.Error() + "\nHint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories.")
 			}
 		}
-		mm.containingBuild.logger.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
-		cmd := exec.Command(maven, "--version")
-		var stdout bytes.Buffer
-		cmd.Stdout = &stdout
-		err = cmd.Run()
-		if err != nil {
-			return "", err
-		}
-		output := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+		output, stdout, err := mm.getMavenVersionOutPut(maven)
 		// Finding the relevant "Maven home" line in command response.
-		for _, line := range output {
-			if strings.HasPrefix(line, "Maven home:") {
-				mavenHome = strings.Split(line, " ")[2]
-				if utils.IsWindows() {
-					mavenHome = strings.TrimSuffix(mavenHome, "\r")
-				}
-				mavenHome, err = filepath.Abs(mavenHome)
-				if err != nil {
-					return "", err
-				}
-				break
-			}
-		}
-		if mavenHome == "" {
+		mavenHome, err = mm.ExtractMavenPath(output)
+		if mavenHome == "" || err != nil {
 			return "", errors.New("Could not find the location of the maven home directory, by running 'mvn --version' command. The command output is:\n" + stdout.String() + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
 		}
 	}
 	mm.containingBuild.logger.Debug("Maven home location: ", mavenHome)
+
 	return
 }
 
@@ -226,6 +207,35 @@ func (mm *MavenModule) getExecutableName() (maven string, err error) {
 		}
 	}
 	return maven, err
+}
+
+func (mm *MavenModule) getMavenVersionOutPut(maven string) (output []string, stdout bytes.Buffer, err error) {
+	mm.containingBuild.logger.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
+	cmd := exec.Command(maven, "--version")
+	cmd.Stdout = &stdout
+	err = cmd.Run()
+	if err != nil {
+		return nil, stdout, err
+	}
+	output = strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	return output, stdout, nil
+}
+
+func (mm *MavenModule) ExtractMavenPath(output []string) (mavenHome string, err error) {
+	for _, line := range output {
+		if strings.HasPrefix(line, "Maven home:") {
+			mavenHome = strings.Split(line, " ")[2]
+			if utils.IsWindows() {
+				mavenHome = strings.TrimSuffix(mavenHome, "\r")
+			}
+			mavenHome, err = filepath.Abs(mavenHome)
+			if err != nil {
+				return "", err
+			}
+			break
+		}
+	}
+	return mavenHome, nil
 }
 
 func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
