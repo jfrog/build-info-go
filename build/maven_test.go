@@ -97,15 +97,27 @@ func TestExtractMavenPath(t *testing.T) {
 	output = append(output, s1, s2, s3)
 	mavenHome, err := mavenModule.ExtractMavenPath(output)
 	assert.NoError(t, err)
-	assert.Equal(t, "/test/is/good", mavenHome)
+	if utils.IsWindows() {
+		assert.Equal(t, "/test/is/good/r", mavenHome)
+	} else {
+		assert.Equal(t, "/test/is/good", mavenHome)
+	}
 	output = nil
 	output = append(output, s2, s1, s3)
 	mavenHome, err = mavenModule.ExtractMavenPath(output)
 	assert.NoError(t, err)
-	assert.Equal(t, "/test/is/good", mavenHome)
+	if utils.IsWindows() {
+		assert.Equal(t, "/test/is/good/r", mavenHome)
+	} else {
+		assert.Equal(t, "/test/is/good", mavenHome)
+	}
 	output = nil
 	output = append(output, s2, s3)
 	mavenHome, err = mavenModule.ExtractMavenPath(output)
-	assert.Equal(t, "", mavenHome)
+	if utils.IsWindows() {
+		assert.Equal(t, "/r", mavenHome)
+	} else {
+		assert.Equal(t, "", mavenHome)
+	}
 	assert.NoError(t, err)
 }
