@@ -70,8 +70,8 @@ pipelines:
             - jf rt bp
 
             # Distribute release bundle
-            - jf ds rbc "build-info-go" $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
-            - jf ds rbd "build-info-go" $NEXT_VERSION --site="releases.jfrog.io" --sync
+            - jf ds rbc ecosystem-build-info-go $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
+            - jf ds rbd ecosystem-build-info-go $NEXT_VERSION --site="releases.jfrog.io" --sync
 
             # Push to main
             - git clean -fd
