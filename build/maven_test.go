@@ -40,6 +40,7 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	defer func() {
 		assert.NoError(t, mavenBuild.Clean())
 	}()
+
 	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
 	assert.NoError(t, err)
 	// Create maven project
@@ -90,34 +91,26 @@ func TestExtractMavenPath(t *testing.T) {
 	mavenModule, err := mavenBuild.AddMavenModule(tmpProjectPath)
 	assert.NoError(t, err)
 
-	s1 := "Maven home: /test/is/good"
-	s2 := "Home: /test/is/not/good"
-	s3 := "Mvn Home:= /test/is/not/good"
-	var output []string
-	output = append(output, s1, s2, s3)
-	mavenHome, err := mavenModule.ExtractMavenPath(output)
-	assert.NoError(t, err)
-	if utils.IsWindows() {
-		assert.Equal(t, "/test/is/good/r", mavenHome)
-	} else {
-		assert.Equal(t, "/test/is/good", mavenHome)
+	allTests := []struct {
+		s1 string
+		s2 string
+		s3 string
+	}{
+		{"Maven home: /test/is/good", "Home: /test/is/not/good", "Mvn Home:= /test/is/not/good"},
+		{"Home: /test/is/not/good", "Maven home: /test/is/good", "Mvn Home:= /test/is/not/good"},
+		{"Mvn Home:= /test/is/not/good", "Home: /test/is/not/good", "Maven home: /test/is/good"},
 	}
-	output = nil
-	output = append(output, s2, s1, s3)
-	mavenHome, err = mavenModule.ExtractMavenPath(output)
-	assert.NoError(t, err)
-	if utils.IsWindows() {
-		assert.Equal(t, "/test/is/good/r", mavenHome)
-	} else {
-		assert.Equal(t, "/test/is/good", mavenHome)
-	}
-	output = nil
-	output = append(output, s2, s3)
-	mavenHome, err = mavenModule.ExtractMavenPath(output)
-	if utils.IsWindows() {
-		assert.Equal(t, "/r", mavenHome)
-	} else {
-		assert.Equal(t, "", mavenHome)
+
+	for _, test := range allTests {
+		var output []string
+		output = append(output, test.s1, test.s2, test.s3)
+		mavenHome, err := mavenModule.extractMavenPath(output)
+		assert.NoError(t, err)
+		if utils.IsWindows() {
+			assert.Equal(t, "/test/is/good/r", mavenHome)
+		} else {
+			assert.Equal(t, "/test/is/good", mavenHome)
+		}
 	}
 	assert.NoError(t, err)
 }
