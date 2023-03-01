@@ -120,3 +120,26 @@ func TestExtractMavenPath(t *testing.T) {
 	}
 	assert.NoError(t, err)
 }
+
+func TestGetExecutableName(t *testing.T) {
+	service := NewBuildInfoService()
+	mavenBuild, err := service.GetOrCreateBuild("build-info-maven-test", "1")
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, mavenBuild.Clean())
+	}()
+	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
+	assert.NoError(t, err)
+	// Create maven project
+	projectPath := filepath.Join(testdataDir, "maven", "project")
+	tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, projectPath)
+	defer cleanup()
+	// Add maven project as module in build-info.
+	mavenModule, err := mavenBuild.AddMavenModule(tmpProjectPath)
+	assert.NoError(t, err)
+
+	mvnHome, err := mavenModule.getExecutableName()
+	assert.NoError(t, err)
+	assert.Equal(t, "mvn", mvnHome)
+
+}
