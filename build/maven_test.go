@@ -1,6 +1,7 @@
 package build
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -92,9 +93,9 @@ func TestExtractMavenPath(t *testing.T) {
 	assert.NoError(t, err)
 
 	allTests := []struct {
-		s1 string
-		s2 string
-		s3 string
+		mavenVersionResultFirstLine  string
+		mavenVersionResultSecondLine string
+		mavenVersionResultThirdLine  string
 	}{
 		{"Maven home: /test/is/good", "Home: /test/is/not/good", "Mvn Home:= /test/is/not/good"},
 		{"Home: /test/is/not/good", "Maven home: /test/is/good", "Mvn Home:= /test/is/not/good"},
@@ -102,12 +103,17 @@ func TestExtractMavenPath(t *testing.T) {
 	}
 
 	for _, test := range allTests {
-		var output []string
-		output = append(output, test.s1, test.s2, test.s3)
-		mavenHome, err := mavenModule.extractMavenPath(output)
+		var mavenVersionFullResult []string
+		mavenVersionFullResult = append(mavenVersionFullResult, test.mavenVersionResultFirstLine, test.mavenVersionResultSecondLine, test.mavenVersionResultThirdLine)
+		data1 := bytes.Buffer{}
+		for _, i := range mavenVersionFullResult {
+			data1.WriteString(i)
+			data1.WriteString("\n")
+		}
+		mavenHome, err := mavenModule.extractMavenPath(data1)
 		assert.NoError(t, err)
 		if utils.IsWindows() {
-			assert.Equal(t, "/test/is/good/r", mavenHome)
+			assert.Equal(t, "\test\\is\\good", mavenHome)
 		} else {
 			assert.Equal(t, "/test/is/good", mavenHome)
 		}
