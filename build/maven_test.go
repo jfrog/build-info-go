@@ -79,9 +79,8 @@ func TestExtractMavenPath(t *testing.T) {
 	service := NewBuildInfoService()
 	mavenBuild, err := service.GetOrCreateBuild("build-info-maven-test", "1")
 	assert.NoError(t, err)
-	defer func() {
-		assert.NoError(t, mavenBuild.Clean())
-	}()
+	defer assert.NoError(t, mavenBuild.Clean())
+
 	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
 	assert.NoError(t, err)
 	// Create maven project
@@ -118,16 +117,14 @@ func TestExtractMavenPath(t *testing.T) {
 			assert.Equal(t, "/test/is/good", mavenHome)
 		}
 	}
-	assert.NoError(t, err)
 }
 
 func TestGetExecutableName(t *testing.T) {
 	service := NewBuildInfoService()
 	mavenBuild, err := service.GetOrCreateBuild("build-info-maven-test", "1")
 	assert.NoError(t, err)
-	defer func() {
-		assert.NoError(t, mavenBuild.Clean())
-	}()
+	defer assert.NoError(t, mavenBuild.Clean())
+
 	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
 	assert.NoError(t, err)
 	// Create maven project
