@@ -112,7 +112,7 @@ func TestExtractMavenPath(t *testing.T) {
 		mavenHome, err := mavenModule.extractMavenPath(data1)
 		assert.NoError(t, err)
 		if utils.IsWindows() {
-			assert.Equal(t, "\test\\is\\good", mavenHome)
+			assert.Equal(t, "\\test\\is\\good", mavenHome)
 		} else {
 			assert.Equal(t, "/test/is/good", mavenHome)
 		}
