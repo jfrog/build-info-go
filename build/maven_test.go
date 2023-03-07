@@ -120,23 +120,13 @@ func TestExtractMavenPath(t *testing.T) {
 }
 
 func TestGetExecutableName(t *testing.T) {
-	service := NewBuildInfoService()
-	mavenBuild, err := service.GetOrCreateBuild("build-info-maven-test", "1")
-	assert.NoError(t, err)
-	defer assert.NoError(t, mavenBuild.Clean())
-
-	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
-	assert.NoError(t, err)
-	// Create maven project
-	projectPath := filepath.Join(testdataDir, "maven", "project")
-	tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, projectPath)
-	defer cleanup()
 	// Add maven project as module in build-info.
-	mavenModule, err := mavenBuild.AddMavenModule(tmpProjectPath)
-	assert.NoError(t, err)
-
+	mavenModule := MavenModule{extractorDetails: &extractorDetails{useWrapper: true}}
 	mvnHome, err := mavenModule.getExecutableName()
 	assert.NoError(t, err)
-	assert.Equal(t, "mvn", mvnHome)
-
+	if !utils.IsWindows() {
+		assert.Equal(t, "./mvnw", mvnHome)
+	} else {
+		assert.Equal(t, "mvnw.cmd", mvnHome)
+	}
 }
