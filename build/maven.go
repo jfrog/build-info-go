@@ -162,7 +162,12 @@ func (mm *MavenModule) CalcDependencies() error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(mvnRunConfig.buildInfoProperties)
+	defer func() {
+		e := os.Remove(mvnRunConfig.buildInfoProperties)
+		if err == nil {
+			err = e
+		}
+	}()
 	mm.containingBuild.logger.Info("Running Mvn...")
 	return mvnRunConfig.runCmd()
 }
@@ -217,7 +222,7 @@ func (mm *MavenModule) getExecutableName() (maven string, err error) {
 			maven, err = filepath.Abs("mvnw.cmd")
 		}
 	}
-	return maven, err
+	return
 }
 
 func (mm *MavenModule) execMavenVersion(maven string) (stdout bytes.Buffer, err error) {
@@ -225,10 +230,6 @@ func (mm *MavenModule) execMavenVersion(maven string) (stdout bytes.Buffer, err 
 	cmd := exec.Command(maven, "--version")
 	cmd.Stdout = &stdout
 	err = cmd.Run()
-	if err != nil {
-		return stdout, err
-	}
-
 	return stdout, nil
 }
 
