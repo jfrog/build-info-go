@@ -186,7 +186,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 				if err != nil {
 					return "", errors.New(err.Error() + "\nHint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories.")
 				} else {
-					return "", errors.New("Hint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories.")
+					return "", errors.New("hint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories")
 				}
 			}
 		}
