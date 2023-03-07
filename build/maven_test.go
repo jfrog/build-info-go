@@ -127,6 +127,8 @@ func TestGetExecutableName(t *testing.T) {
 	if !utils.IsWindows() {
 		assert.Equal(t, "./mvnw", mvnHome)
 	} else {
-		assert.Equal(t, "mvnw.cmd", mvnHome)
+		result, err := filepath.Abs("mvnw.cmd")
+		assert.NoError(t, err)
+		assert.Equal(t, result, mvnHome)
 	}
 }
