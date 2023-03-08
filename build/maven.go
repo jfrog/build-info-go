@@ -241,6 +241,9 @@ func (mm *MavenModule) execMavenVersion(maven string) (stdout bytes.Buffer, err 
 	cmd := exec.Command(maven, "--version")
 	cmd.Stdout = &stdout
 	err = cmd.Run()
+	if err != nil {
+		return stdout, err
+	}
 	return stdout, nil
 }
 
