@@ -193,7 +193,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 			}
 		}
 		versionOutput, err := mm.execMavenVersion(maven)
-		err = mm.determineError("", versionOutput.String(), err)
+		err = mm.determineError("mvn", versionOutput.String(), err)
 		if err != nil {
 			return "", err
 		}
