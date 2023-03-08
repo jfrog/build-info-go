@@ -187,31 +187,42 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 		}
 		if !mm.extractorDetails.useWrapper {
 			mvnPath, err := exec.LookPath("mvn")
-			if err != nil || mvnPath == "" {
-				if err != nil {
-					return "", errors.New(err.Error() + "\nHint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories.")
-				} else {
-					return "", errors.New("hint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories")
-				}
+			err = mm.determineError(mvnPath, "", err)
+			if err != nil {
+				return "", err
 			}
 		}
 		versionOutput, err := mm.execMavenVersion(maven)
+		err = mm.determineError("", versionOutput.String(), err)
 		if err != nil {
-			return "", errors.New(err.Error() + "Could not find the location of the maven home directory, by running 'mvn --version' command. The command versionOutput is:\n" + versionOutput.String() + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
+			return "", err
 		}
 		// Finding the relevant "Maven home" line in command response.
 		mavenHome, err = mm.extractMavenPath(versionOutput)
-		if mavenHome == "" || err != nil {
-			if err != nil {
-				return "", errors.New(err.Error() + "Could not find the location of the maven home directory, by running 'mvn --version' command. The command versionOutput is:\n" + versionOutput.String() + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
-			} else {
-				return "", errors.New("Could not find the location of the maven home directory, by running 'mvn --version' command. The command versionOutput is:\n" + versionOutput.String() + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
-			}
+		err = mm.determineError(mavenHome, versionOutput.String(), err)
+		if err != nil {
+			return "", err
 		}
 	}
 	mm.containingBuild.logger.Debug("Maven home location: ", mavenHome)
 
 	return
+}
+
+func (mm *MavenModule) determineError(mvnPath string, versionOutput string, err error) error {
+	if err != nil {
+		if versionOutput == "" {
+			return errors.New(err.Error() + "\nHint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories.")
+		}
+		return errors.New(err.Error() + "Could not find the location of the maven home directory, by running 'mvn --version' command. The command versionOutput is:\n" + versionOutput + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
+	}
+	if mvnPath == "" {
+		if versionOutput == "" {
+			return errors.New("hint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories")
+		}
+		return errors.New("Could not find the location of the maven home directory, by running 'mvn --version' command. The command versionOutput is:\n" + versionOutput + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
+	}
+	return nil
 }
 
 func (mm *MavenModule) getExecutableName() (maven string, err error) {
