@@ -193,7 +193,6 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 			}
 		}
 		versionOutput, err := mm.execMavenVersion(maven)
-		err = mm.determineError("mvn", versionOutput.String(), err)
 		if err != nil {
 			return "", err
 		}
@@ -241,9 +240,11 @@ func (mm *MavenModule) execMavenVersion(maven string) (stdout bytes.Buffer, err 
 	cmd := exec.Command(maven, "--version")
 	cmd.Stdout = &stdout
 	err = cmd.Run()
+	err = mm.determineError("mvn", stdout.String(), err)
 	if err != nil {
 		return stdout, err
 	}
+
 	return stdout, nil
 }
 
@@ -253,11 +254,12 @@ func (mm *MavenModule) extractMavenPath(mavenVersionOutput bytes.Buffer) (mavenH
 		if !strings.HasPrefix(line, "Maven home:") {
 			continue
 		}
-		mavenHome := strings.Split(line, " ")[2]
+		mavenHome = strings.Split(line, " ")[2]
 		mavenHome = strings.TrimSpace(mavenHome)
-		return filepath.Abs(mavenHome)
+		mavenHome, err = filepath.Abs(mavenHome)
+		err = mm.determineError(mavenHome, mavenVersionOutput.String(), err)
 	}
-	return "", nil
+	return
 }
 
 func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
