@@ -186,10 +186,9 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 			return maven, err
 		}
 		if !mm.extractorDetails.useWrapper {
-			mvnPath, err := exec.LookPath("mvn")
-			err = mm.determineError(mvnPath, "", err)
+			mvnPath, err := mm.lookPath()
 			if err != nil {
-				return "", err
+				return mvnPath, err
 			}
 		}
 		versionOutput, err := mm.execMavenVersion(maven)
@@ -198,7 +197,6 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 		}
 		// Finding the relevant "Maven home" line in command response.
 		mavenHome, err = mm.extractMavenPath(versionOutput)
-		err = mm.determineError(mavenHome, versionOutput.String(), err)
 		if err != nil {
 			return "", err
 		}
@@ -208,6 +206,14 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 	return
 }
 
+func (mm *MavenModule) lookPath() (mvnPath string, err error) {
+	mvnPath, err = exec.LookPath("mvn")
+	err = mm.determineError(mvnPath, "", err)
+	return
+}
+
+// For every different we show to users a message that helps him to solve the error
+// and this function is to determine which is the suitable message to show depend on the error we got
 func (mm *MavenModule) determineError(mvnPath string, versionOutput string, err error) error {
 	if err != nil {
 		if versionOutput == "" {
