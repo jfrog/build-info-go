@@ -146,7 +146,7 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 }
 
 // Generates Maven build-info.
-func (mm *MavenModule) CalcDependencies() error {
+func (mm *MavenModule) CalcDependencies() (err error) {
 	if mm.srcPath == "" {
 		var err error
 		if mm.srcPath, err = os.Getwd(); err != nil {
@@ -154,7 +154,7 @@ func (mm *MavenModule) CalcDependencies() error {
 		}
 	}
 
-	err := downloadMavenExtractor(mm.extractorDetails.localPath, mm.extractorDetails.downloadExtractorFunc, mm.containingBuild.logger)
+	err = downloadMavenExtractor(mm.extractorDetails.localPath, mm.extractorDetails.downloadExtractorFunc, mm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
@@ -178,8 +178,8 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 	if mavenHome == "" {
 		// The 'mavenHome' is not defined.
 		// Since Maven installation can be located in different locations,
-		// Depending on the installation type and the OS (for example: For Mac with brew install: /usr/local/Cellar/maven/{version}/libexec or Ubuntu with debian: /usr/share/maven),
-		// We need to grab the location using the mvn --version command
+		// depending on the installation type and the OS (for example: For Mac with brew install: /usr/local/Cellar/maven/{version}/libexec or Ubuntu with debian: /usr/share/maven),
+		// we need to grab the location using the mvn --version command.
 		// First we will try lo look for 'mvn' in PATH.
 		maven, err := mm.getExecutableName()
 		if err != nil {
