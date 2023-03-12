@@ -163,11 +163,15 @@ func (mm *MavenModule) CalcDependencies() (err error) {
 		return err
 	}
 	defer func() {
-		e := os.Remove(mvnRunConfig.buildInfoProperties)
+		fileExist, e := utils.IsFileExists(mvnRunConfig.buildInfoProperties, false)
+		if fileExist && e == nil {
+			e = os.Remove(mvnRunConfig.buildInfoProperties)
+		}
 		if err == nil {
 			err = e
 		}
 	}()
+
 	mm.containingBuild.logger.Info("Running Mvn...")
 	return mvnRunConfig.runCmd()
 }
