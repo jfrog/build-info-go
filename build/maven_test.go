@@ -57,6 +57,7 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	if assert.NoError(t, err) {
 		buildInfo, err := mavenBuild.ToBuildInfo()
 		assert.NoError(t, err)
+
 		// Check build-info results.
 		expectedModules := getExpectedMavenBuildInfo(t, filepath.Join(testdataDir, "maven", "expected_maven_buildinfo.json")).Modules
 		match, err := entities.IsEqualModuleSlices(buildInfo.Modules, expectedModules)
