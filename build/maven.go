@@ -214,7 +214,7 @@ func (mm *MavenModule) lookPath() (mvnPath string, err error) {
 }
 
 // This function shows the suitable error message to user.
-func (mm *MavenModule) determineError(mvnPath string, versionOutput string, err error) error {
+func (mm *MavenModule) determineError(mvnPath, versionOutput string, err error) error {
 	if err != nil {
 		if versionOutput == "" {
 			return errors.New(err.Error() + "\nHint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories.")
