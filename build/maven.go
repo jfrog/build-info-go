@@ -213,7 +213,7 @@ func (mm *MavenModule) lookPath() (mvnPath string, err error) {
 	return
 }
 
-// This function shows the suitable error message to user.
+// This function generates an error with a clear message, based on the arguments it gets.
 func (mm *MavenModule) determineError(mvnPath, versionOutput string, err error) error {
 	if err != nil {
 		if versionOutput == "" {
