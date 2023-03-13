@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/jfrog/build-info-go/utils"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/jfrog/build-info-go/utils"
 )
 
 const (
@@ -148,19 +147,17 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 // Generates Maven build-info.
 func (mm *MavenModule) CalcDependencies() (err error) {
 	if mm.srcPath == "" {
-		var err error
 		if mm.srcPath, err = os.Getwd(); err != nil {
 			return err
 		}
 	}
 
-	err = downloadMavenExtractor(mm.extractorDetails.localPath, mm.extractorDetails.downloadExtractorFunc, mm.containingBuild.logger)
-	if err != nil {
-		return err
+	if err = downloadMavenExtractor(mm.extractorDetails.localPath, mm.extractorDetails.downloadExtractorFunc, mm.containingBuild.logger); err != nil {
+		return
 	}
 	mvnRunConfig, err := mm.createMvnRunConfig()
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
 		fileExist, e := utils.IsFileExists(mvnRunConfig.buildInfoProperties, false)
@@ -216,8 +213,7 @@ func (mm *MavenModule) lookPath() (mvnPath string, err error) {
 	return
 }
 
-// For every different we show to users a message that helps him to solve the error
-// and this function is to determine which is the suitable message to show depend on the error we got
+// This function shows the suitable error message to user.
 func (mm *MavenModule) determineError(mvnPath string, versionOutput string, err error) error {
 	if err != nil {
 		if versionOutput == "" {
@@ -237,9 +233,10 @@ func (mm *MavenModule) determineError(mvnPath string, versionOutput string, err 
 func (mm *MavenModule) getExecutableName() (maven string, err error) {
 	maven = "mvn"
 	if mm.extractorDetails.useWrapper {
-		maven = "./mvnw"
 		if utils.IsWindows() {
 			maven, err = filepath.Abs("mvnw.cmd")
+		} else {
+			maven = "./mvnw"
 		}
 	}
 	return
