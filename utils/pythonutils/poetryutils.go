@@ -96,7 +96,6 @@ func extractProjectFromPyproject(pyprojectFilePath string) (project PoetryPackag
 		return
 	}
 	var pyprojectFile PyprojectToml
-	fmt.Print(string(content))
 	_, err = toml.Decode(string(content), &pyprojectFile)
 	if err != nil {
 		return
@@ -118,14 +117,12 @@ func extractPackagesFromPoetryLock(lockFilePath string) (dependencies map[string
 	var poetryLockFile PoetryLock
 
 	_, err = toml.Decode(string(content), &poetryLockFile)
-	fmt.Print(string(content))
 	if err != nil {
 		return
 	}
 	dependenciesVersions = make(map[string]string)
 	dependencies = make(map[string][]string)
 	for _, dependency := range poetryLockFile.Package {
-		fmt.Print("depppp: " + dependency.Name)
 		dependenciesVersions[strings.ToLower(dependency.Name)] = dependency.Version
 		dependencyName := dependency.Name + ":" + dependency.Version
 		dependencies[dependencyName] = maps.Keys(dependency.Dependencies)
