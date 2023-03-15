@@ -91,7 +91,7 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	dependenciesMap := make(map[string]*dependencyInfo)
 
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
-	npmArgs = append(npmArgs, "--json", "--all", "--long")
+	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if err != nil {
