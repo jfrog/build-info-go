@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
@@ -20,7 +19,7 @@ const (
 	PropertiesTempfolderName        = "properties"
 	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
 	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
-	MavenExtractorDependencyVersion = "2.39.5"
+	MavenExtractorDependencyVersion = "2.39.7"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -55,6 +54,8 @@ type extractorDetails struct {
 	props map[string]string
 	// Local path to the configuration file.
 	propsDir string
+	// Use the maven wrapper to build the project.
+	useWrapper bool
 }
 
 // Add a new Maven module to a given build.
@@ -81,11 +82,12 @@ func newMavenModule(containingBuild *Build, srcPath string) (*MavenModule, error
 	}, err
 }
 
-func (mm *MavenModule) SetExtractorDetails(localdExtractorPath, extractorPropsdir string, goals []string, downloadExtractorFunc func(downloadTo, downloadFrom string) error, configProps map[string]string) *MavenModule {
-	mm.extractorDetails.localPath = localdExtractorPath
+func (mm *MavenModule) SetExtractorDetails(localExtractorPath, extractorPropsdir string, goals []string, downloadExtractorFunc func(downloadTo, downloadFrom string) error, configProps map[string]string, useWrapper bool) *MavenModule {
+	mm.extractorDetails.localPath = localExtractorPath
 	mm.extractorDetails.propsDir = extractorPropsdir
 	mm.extractorDetails.downloadExtractorFunc = downloadExtractorFunc
 	mm.extractorDetails.goals = goals
+	mm.extractorDetails.useWrapper = useWrapper
 	if configProps != nil {
 		mm.extractorDetails.props = configProps
 	}
@@ -144,24 +146,30 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 }
 
 // Generates Maven build-info.
-func (mm *MavenModule) CalcDependencies() error {
+func (mm *MavenModule) CalcDependencies() (err error) {
 	if mm.srcPath == "" {
-		var err error
 		if mm.srcPath, err = os.Getwd(); err != nil {
 			return err
 		}
 	}
 
-	err := downloadMavenExtractor(mm.extractorDetails.localPath, mm.extractorDetails.downloadExtractorFunc, mm.containingBuild.logger)
-	if err != nil {
-		return err
+	if err = downloadMavenExtractor(mm.extractorDetails.localPath, mm.extractorDetails.downloadExtractorFunc, mm.containingBuild.logger); err != nil {
+		return
 	}
 	mvnRunConfig, err := mm.createMvnRunConfig()
 	if err != nil {
-		return err
+		return
 	}
+	defer func() {
+		fileExist, e := utils.IsFileExists(mvnRunConfig.buildInfoProperties, false)
+		if fileExist && e == nil {
+			e = os.Remove(mvnRunConfig.buildInfoProperties)
+		}
+		if err == nil {
+			err = e
+		}
+	}()
 
-	defer os.Remove(mvnRunConfig.buildInfoProperties)
 	mm.containingBuild.logger.Info("Running Mvn...")
 	return mvnRunConfig.runCmd()
 }
@@ -172,42 +180,93 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 	if mavenHome == "" {
 		// The 'mavenHome' is not defined.
 		// Since Maven installation can be located in different locations,
-		// Depending on the installation type and the OS (for example: For Mac with brew install: /usr/local/Cellar/maven/{version}/libexec or Ubuntu with debian: /usr/share/maven),
-		// We need to grab the location using the mvn --version command
-
+		// depending on the installation type and the OS (for example: For Mac with brew install: /usr/local/Cellar/maven/{version}/libexec or Ubuntu with debian: /usr/share/maven),
+		// we need to grab the location using the mvn --version command.
 		// First we will try lo look for 'mvn' in PATH.
-		mvnPath, err := exec.LookPath("mvn")
-		if err != nil || mvnPath == "" {
-			return "", errors.New(err.Error() + "Hint: The mvn command may not be included in the PATH. Either add it to the path, or set the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
+		maven, err := mm.getExecutableName()
+		if err != nil {
+			return maven, err
 		}
-		mm.containingBuild.logger.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
-		cmd := exec.Command("mvn", "--version")
-		var stdout bytes.Buffer
-		cmd.Stdout = &stdout
-		err = cmd.Run()
+		if !mm.extractorDetails.useWrapper {
+			mvnPath, err := mm.lookPath()
+			if err != nil {
+				return mvnPath, err
+			}
+		}
+		versionOutput, err := mm.execMavenVersion(maven)
 		if err != nil {
 			return "", err
 		}
-		output := strings.Split(strings.TrimSpace(stdout.String()), "\n")
 		// Finding the relevant "Maven home" line in command response.
-		for _, line := range output {
-			if strings.HasPrefix(line, "Maven home:") {
-				mavenHome = strings.Split(line, " ")[2]
-				if runtime.GOOS == "windows" {
-					mavenHome = strings.TrimSuffix(mavenHome, "\r")
-				}
-				mavenHome, err = filepath.Abs(mavenHome)
-				if err != nil {
-					return "", err
-				}
-				break
-			}
-		}
-		if mavenHome == "" {
-			return "", errors.New("Could not find the location of the maven home directory, by running 'mvn --version' command. The command output is:\n" + stdout.String() + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
+		mavenHome, err = mm.extractMavenPath(versionOutput)
+		if err != nil {
+			return "", err
 		}
 	}
 	mm.containingBuild.logger.Debug("Maven home location: ", mavenHome)
+
+	return
+}
+
+func (mm *MavenModule) lookPath() (mvnPath string, err error) {
+	mvnPath, err = exec.LookPath("mvn")
+	err = mm.determineError(mvnPath, "", err)
+	return
+}
+
+// This function generates an error with a clear message, based on the arguments it gets.
+func (mm *MavenModule) determineError(mvnPath, versionOutput string, err error) error {
+	if err != nil {
+		if versionOutput == "" {
+			return errors.New(err.Error() + "\nHint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories.")
+		}
+		return errors.New(err.Error() + "Could not find the location of the maven home directory, by running 'mvn --version' command. The command versionOutput is:\n" + versionOutput + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
+	}
+	if mvnPath == "" {
+		if versionOutput == "" {
+			return errors.New("hint: The mvn command may not be included in the PATH. Either add it to the path or set the M2_HOME environment variable value to the maven installation directory, which is the directory that includes the bin and lib directories")
+		}
+		return errors.New("Could not find the location of the maven home directory, by running 'mvn --version' command. The command versionOutput is:\n" + versionOutput + "\nYou also have the option of setting the M2_HOME environment variable value to the maven installation directory, which is the directory which includes the bin and lib directories.")
+	}
+	return nil
+}
+
+func (mm *MavenModule) getExecutableName() (maven string, err error) {
+	maven = "mvn"
+	if mm.extractorDetails.useWrapper {
+		if utils.IsWindows() {
+			maven, err = filepath.Abs("mvnw.cmd")
+		} else {
+			maven = "./mvnw"
+		}
+	}
+	return
+}
+
+func (mm *MavenModule) execMavenVersion(maven string) (stdout bytes.Buffer, err error) {
+	mm.containingBuild.logger.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
+	cmd := exec.Command(maven, "--version")
+	cmd.Stdout = &stdout
+	err = cmd.Run()
+	err = mm.determineError("mvn", stdout.String(), err)
+	if err != nil {
+		return stdout, err
+	}
+
+	return stdout, nil
+}
+
+func (mm *MavenModule) extractMavenPath(mavenVersionOutput bytes.Buffer) (mavenHome string, err error) {
+	mavenVersionResultInArray := strings.Split(strings.TrimSpace(mavenVersionOutput.String()), "\n")
+	for _, line := range mavenVersionResultInArray {
+		if !strings.HasPrefix(line, "Maven home:") {
+			continue
+		}
+		mavenHome = strings.Split(line, " ")[2]
+		mavenHome = strings.TrimSpace(mavenHome)
+		mavenHome, err = filepath.Abs(mavenHome)
+		err = mm.determineError(mavenHome, mavenVersionOutput.String(), err)
+	}
 	return
 }
 
