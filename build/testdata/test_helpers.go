@@ -71,5 +71,5 @@ func PrintBuildInfoMismatch(t *testing.T, expected, actual []entities.Module) {
 	assert.NoError(t, err)
 	actualStr, err := json.MarshalIndent(actual, "", "  ")
 	assert.NoError(t, err)
-	t.Errorf("build-info don't match. want: \n %v\n got:\n%s\n", string(excpectedStr), string(actualStr))
+	t.Errorf("build-info don't match. want: \n%v\ngot:\n%s\n", string(excpectedStr), string(actualStr))
 }

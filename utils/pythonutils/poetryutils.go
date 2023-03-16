@@ -96,7 +96,6 @@ func extractProjectFromPyproject(pyprojectFilePath string) (project PoetryPackag
 		return
 	}
 	var pyprojectFile PyprojectToml
-
 	_, err = toml.Decode(string(content), &pyprojectFile)
 	if err != nil {
 		return
