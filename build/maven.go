@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/jfrog/build-info-go/utils"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/jfrog/build-info-go/utils"
 )
 
 const (
@@ -18,7 +19,7 @@ const (
 	PropertiesTempfolderName        = "properties"
 	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
 	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
-	MavenExtractorDependencyVersion = "2.39.5"
+	MavenExtractorDependencyVersion = "2.39.7"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
