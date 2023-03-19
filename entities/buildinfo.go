@@ -379,9 +379,9 @@ func IsEqualModuleSlices(actual, other []Module) (bool, error) {
 }
 
 func isEqualModuleSlices(actual, other []Module) (bool, error) {
-	//	if len(actual) != len(other) {
-	//		return false, nil
-	//	}
+	if len(actual) != len(other) {
+		return false, nil
+	}
 	visitedIndexes := make(map[int]bool)
 	for _, aEl := range actual {
 		found := false
