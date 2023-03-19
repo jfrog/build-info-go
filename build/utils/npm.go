@@ -97,14 +97,13 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	}
 	npmArgs = append(npmArgs, "--json", "--all", "--long")
 	if npmVersion.AtLeast("7.0.0") {
-		npmArgs = append(npmArgs, "--package-lock-only")
+		npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 	}
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
 	if err != nil && npmVersion.AtLeast("7.0.0") {
-		var arg []string
-		arg = append(arg, "--package-lock-only")
+		npmArgs = append(npmArgs, "--package-lock-only")
 		// Installing package-lock to use it to create a dependencies map.
-		_, errData, err = RunNpmCmd(executablePath, srcPath, Install, arg, log)
+		_, errData, err = RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
 		if err != nil {
 			return nil, errors.New(err.Error() + "Couldn't install package-lock, Hint: Restore node_modules or package-lock folder.")
 		}
