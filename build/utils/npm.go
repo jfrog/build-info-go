@@ -95,11 +95,7 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	if err != nil {
 		return nil, err
 	}
-	if npmVersion.AtLeast("8.19.4") {
-		npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
-	} else {
-		npmArgs = append(npmArgs, "--json", "--all", "--long")
-	}
+	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
 	if err != nil && npmVersion.AtLeast("8.19.4") {
 		npmArgs = append(npmArgs, "--package-lock-only")
