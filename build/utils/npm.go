@@ -95,9 +95,18 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	if err != nil {
 		return nil, err
 	}
-	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
+	found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
+	if isDirExistsErr != nil {
+		return nil, isDirExistsErr
+	}
+	//if we don't have node_modules, the function will use the package-lock dependencies
+	if !found {
+		npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
+	} else {
+		npmArgs = append(npmArgs, "--json", "--all", "--long")
+	}
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
-	if err != nil && npmVersion.AtLeast("8.19.4") {
+	if err != nil && npmVersion.AtLeast("5.8.0") {
 		npmArgs = append(npmArgs, "--package-lock-only")
 		// Installing package-lock to use it to create a dependencies map.
 		_, errData, err = RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
@@ -107,17 +116,11 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 		if len(errData) > 0 {
 			log.Warn("Some errors occurred while collecting installing package-lock:\n" + string(errData))
 		}
+		npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 		data, errData, err = RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
 	}
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if err != nil {
-		found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
-		if isDirExistsErr != nil {
-			return nil, isDirExistsErr
-		}
-		if !found {
-			return nil, errors.New("node_modules isn't found in '" + srcPath + "'. Hint: Restore node_modules folder by running npm install or npm ci.")
-		}
 		log.Warn("npm list command failed with error:", err.Error())
 	}
 	if len(errData) > 0 {
