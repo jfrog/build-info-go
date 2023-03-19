@@ -91,13 +91,13 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	dependenciesMap := make(map[string]*dependencyInfo)
 
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
-	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 	npmVersion, err := GetNpmVersion(executablePath, log)
 	if err != nil {
 		return nil, err
 	}
+	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
-	if err != nil && npmVersion.AtLeast("0.0.7") {
+	if err != nil && npmVersion.AtLeast("7.0.0") {
 		var arg []string
 		arg = append(arg, "--package-lock-only")
 		// Installing package-lock to use it to create a dependencies map.
