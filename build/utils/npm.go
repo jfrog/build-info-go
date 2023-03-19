@@ -99,9 +99,10 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 		// Installing package-lock to use it to create a dependencies map.
 		_, errData, err = RunNpmCmd(executablePath, srcPath, Install, arg, log)
 		if err != nil {
-			if errData != nil {
-				return nil, errors.New(err.Error() + "Couldn't install package-lock, Hint: Restore node_modules or package-lock folder.")
-			}
+			return nil, errors.New(err.Error() + "Couldn't install package-lock, Hint: Restore node_modules or package-lock folder.")
+		}
+		if len(errData) > 0 {
+			log.Warn("Some errors occurred while collecting installing package-lock:\n" + string(errData))
 		}
 		data, errData, err = RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
 	}
