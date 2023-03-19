@@ -93,6 +93,16 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
 	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	if err != nil {
+		var arg []string
+		arg = append(arg, "--package-lock-only")
+		// Installing package-lock to use it to create a dependencies map.
+		data, errData, err = RunNpmCmd(executablePath, srcPath, Install, arg, log)
+		if err != nil {
+			return nil, errors.New(err.Error() + "Couldn't install package-lock, Hint: Restore node_modules or package-lock folder.")
+		}
+		data, errData, err = RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	}
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if err != nil {
 		found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
