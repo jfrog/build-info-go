@@ -106,7 +106,7 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 		npmArgs = append(npmArgs, "--json", "--all", "--long")
 	}
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
-	if err != nil && npmVersion.AtLeast("5.8.0") {
+	if err != nil && npmVersion.AtLeast("8.19.4") {
 		npmArgs = append(npmArgs, "--package-lock-only")
 		// Installing package-lock to use it to create a dependencies map.
 		_, errData, err = RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
@@ -121,7 +121,7 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	}
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if err != nil {
-		log.Warn("npm list command failed with error:", err.Error())
+		return nil, errors.New("npm list command failed with error:" + err.Error())
 	}
 	if len(errData) > 0 {
 		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
