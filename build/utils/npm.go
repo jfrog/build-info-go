@@ -92,9 +92,12 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
 	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
-	vrsn, err := GetNpmVersion(executablePath, log)
+	npmVersion, err := GetNpmVersion(executablePath, log)
+	if err != nil {
+		return nil, err
+	}
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
-	if err != nil && vrsn.AtLeast("0.0.7") {
+	if err != nil && npmVersion.AtLeast("0.0.7") {
 		var arg []string
 		arg = append(arg, "--package-lock-only")
 		// Installing package-lock to use it to create a dependencies map.
@@ -120,10 +123,6 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	}
 	if len(errData) > 0 {
 		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
-	}
-	npmVersion, err := GetNpmVersion(executablePath, log)
-	if err != nil {
-		return nil, err
 	}
 	parseFunc := parseNpmLsDependencyFunc(npmVersion)
 
