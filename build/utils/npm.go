@@ -123,7 +123,8 @@ func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, l
 	npmArgs = append(npmArgs, "--json", "--all", "--long")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
 	if err != nil {
-		log.Warn("npm list command failed with error:", err.Error())
+		// It is not mandatory for the function to return this error.
+		log.Error("npm list command failed with error:", err.Error())
 	}
 	if len(errData) > 0 {
 		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
@@ -145,7 +146,7 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string
 	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
 	if err != nil {
-		log.Warn("npm list command failed with error:", err.Error())
+		log.Error("npm list command failed with error:", err.Error())
 	}
 	if len(errData) > 0 {
 		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
