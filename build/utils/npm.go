@@ -155,10 +155,9 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string
 }
 
 func installPackageLock(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
-	if npmVersion.AtLeast("8.0.0") {
-
+	if npmVersion.AtLeast("6.0.0") {
 		npmArgs = append(npmArgs, "--package-lock-only")
-		// Installing package-lock to use it to create a dependencies map.
+		// Installing package-lock to generate the dependencies map.
 		_, errData, err := RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
 		if err != nil || len(errData) > 0 {
 			log.Error("Some errors occurred while installing package-lock")
@@ -166,7 +165,7 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 		}
 		return nil
 	}
-	return errors.New("couldn't install package-lock because npm version is less than 8.0.0")
+	return errors.New("couldn't install package-lock because npm version is less than 6.0.0")
 }
 
 func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
