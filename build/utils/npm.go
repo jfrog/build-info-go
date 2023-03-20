@@ -105,8 +105,10 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 		data = runNpmLsWithNodeModules(executablePath, srcPath, npmArgs, log)
 	} else {
 		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmArgs, log, npmVersion)
+		if err != nil {
+			return nil, err
+		}
 	}
-
 	parseFunc := parseNpmLsDependencyFunc(npmVersion)
 	// Parse the dependencies json object.
 	return dependenciesMap, jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
