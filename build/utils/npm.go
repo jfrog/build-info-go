@@ -132,7 +132,7 @@ func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, l
 }
 
 func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) ([]byte, error) {
-	found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "package-lock.json"), false)
+	found, isDirExistsErr := utils.IsFileExists(filepath.Join(srcPath, "package-lock.json"), false)
 	if isDirExistsErr != nil {
 		return nil, isDirExistsErr
 	}
