@@ -99,35 +99,15 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	if isDirExistsErr != nil {
 		return nil, isDirExistsErr
 	}
+	var data []byte
 	//if we don't have node_modules, the function will use the package-lock dependencies
-	if !found {
-		npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
+	if found {
+		data = runNpmLsWithNodeModules(executablePath, srcPath, npmArgs, log)
 	} else {
-		npmArgs = append(npmArgs, "--json", "--all", "--long")
+		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmArgs, log, npmVersion)
 	}
-	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
-	if err != nil && npmVersion.AtLeast("8.19.4") {
-		npmArgs = append(npmArgs, "--package-lock-only")
-		// Installing package-lock to use it to create a dependencies map.
-		_, errData, err = RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
-		if err != nil {
-			return nil, errors.New(err.Error() + "Couldn't install package-lock, Hint: Restore node_modules or package-lock folder.")
-		}
-		if len(errData) > 0 {
-			log.Warn("Some errors occurred while collecting installing package-lock:\n" + string(errData))
-		}
-		npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
-		data, errData, err = RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
-	}
-	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
-	if err != nil {
-		return nil, errors.New("npm list command failed with error:" + err.Error())
-	}
-	if len(errData) > 0 {
-		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
-	}
-	parseFunc := parseNpmLsDependencyFunc(npmVersion)
 
+	parseFunc := parseNpmLsDependencyFunc(npmVersion)
 	// Parse the dependencies json object.
 	return dependenciesMap, jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
 		if string(key) == "dependencies" {
@@ -135,6 +115,55 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 		}
 		return err
 	})
+}
+
+func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log) (data []byte) {
+	npmArgs = append(npmArgs, "--json", "--all", "--long")
+	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	if err != nil {
+		log.Warn("npm list command failed with error:", err.Error())
+	}
+	if len(errData) > 0 {
+		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+	}
+	return
+}
+
+func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) ([]byte, error) {
+	found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "package-lock.json"), false)
+	if isDirExistsErr != nil {
+		return nil, isDirExistsErr
+	}
+	if !found {
+		err := installPackageLock(executablePath, srcPath, npmArgs, log, npmVersion)
+		if err != nil {
+			return nil, err
+		}
+	}
+	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
+	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	if err != nil {
+		log.Warn("npm list command failed with error:", err.Error())
+	}
+	if len(errData) > 0 {
+		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+	}
+	return data, nil
+}
+
+func installPackageLock(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
+	if npmVersion.AtLeast("8.0.0") {
+
+		npmArgs = append(npmArgs, "--package-lock-only")
+		// Installing package-lock to use it to create a dependencies map.
+		_, errData, err := RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
+		if err != nil || len(errData) > 0 {
+			log.Error("Some errors occurred while installing package-lock")
+			return err
+		}
+		return nil
+	}
+	return errors.New("couldn't install package-lock because npm version is less than 8.0.0")
 }
 
 func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
