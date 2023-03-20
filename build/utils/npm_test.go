@@ -244,7 +244,7 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	defer cleanup()
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 
-	// Install all of the project's dependencies.
+	// Install all the project's dependencies.
 	npmArgs := []string{"--cache=" + cacachePath}
 	_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
 	assert.NoError(t, err)
@@ -254,12 +254,12 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify results.
-	var excpected []entities.Dependency
-	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
-	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
+	var expected []entities.Dependency
+	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &expected))
+	match, err := entities.IsEqualDependencySlices(expected, dependencies)
 	assert.NoError(t, err)
 	if !match {
-		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: expected}}, []entities.Module{{Dependencies: dependencies}})
 	}
 }
 

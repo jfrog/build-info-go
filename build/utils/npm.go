@@ -89,7 +89,6 @@ type dependencyInfo struct {
 // The dependencies map looks like name:version -> entities.Dependency
 func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (map[string]*dependencyInfo, error) {
 	dependenciesMap := make(map[string]*dependencyInfo)
-
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
 	npmVersion, err := GetNpmVersion(executablePath, log)
 	if err != nil {
