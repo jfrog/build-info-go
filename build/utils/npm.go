@@ -86,7 +86,7 @@ type dependencyInfo struct {
 }
 
 // Run 'npm list ...' command and parse the returned result to create a dependencies map of.
-// The dependencies map looks like name:version -> entities.Dependency
+// The dependencies map looks like name:version -> entities.Dependency.
 func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (map[string]*dependencyInfo, error) {
 	dependenciesMap := make(map[string]*dependencyInfo)
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
@@ -94,13 +94,13 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	if err != nil {
 		return nil, err
 	}
-	found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
+	isNodeModulesExist, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
 	if isDirExistsErr != nil {
 		return nil, isDirExistsErr
 	}
 	var data []byte
 	//if we don't have node_modules, the function will use the package-lock dependencies
-	if found {
+	if isNodeModulesExist {
 		data = runNpmLsWithNodeModules(executablePath, srcPath, npmArgs, log)
 	} else {
 		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmArgs, log, npmVersion)
@@ -132,11 +132,11 @@ func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, l
 }
 
 func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) ([]byte, error) {
-	found, isDirExistsErr := utils.IsFileExists(filepath.Join(srcPath, "package-lock.json"), false)
+	isPackageLockExist, isDirExistsErr := utils.IsFileExists(filepath.Join(srcPath, "package-lock.json"), false)
 	if isDirExistsErr != nil {
 		return nil, isDirExistsErr
 	}
-	if !found {
+	if !isPackageLockExist {
 		err := installPackageLock(executablePath, srcPath, npmArgs, log, npmVersion)
 		if err != nil {
 			return nil, err
