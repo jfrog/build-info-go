@@ -154,10 +154,17 @@ func TestBundledDependenciesList(t *testing.T) {
 	_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
 	assert.NoError(t, err)
 
-	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
-
 	// Calculate dependencies.
 	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	// Asserting there is at least one dependency.
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+
+	// Remove node_modules directory, then calculate dependencies by package-lock.
+	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
+
+	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
 	assert.NoError(t, err)
 
 	// Asserting there is at least one dependency.
@@ -189,6 +196,15 @@ func TestConflictsDependenciesList(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+
+	// Remove node_modules directory, then calculate dependencies by package-lock.
+	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
+
+	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	// Asserting there is at least one dependency.
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
 // This case happens when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
@@ -214,6 +230,15 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+
+	// Remove node_modules directory, then calculate dependencies by package-lock.
+	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
+
+	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	// Asserting there is at least one dependency.
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
 // A project built differently for each operating system.
@@ -235,6 +260,15 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "bundle-dependencies", npmArgs, true, logger)
 	assert.NoError(t, err)
 
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+
+	// Remove node_modules directory, then calculate dependencies by package-lock.
+	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
+
+	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	// Asserting there is at least one dependency.
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
