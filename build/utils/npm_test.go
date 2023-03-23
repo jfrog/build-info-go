@@ -161,7 +161,7 @@ func TestBundledDependenciesList(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Asserting there is at least one dependency.
-	assert.Greaterf(t, len(dependencies), 1, "Error: dependencies are not found!")
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
 // This test runs with npm v6. It collects build-info for npm project that has conflicts in peer dependencies.
@@ -188,7 +188,7 @@ func TestConflictsDependenciesList(t *testing.T) {
 	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
 	assert.NoError(t, err)
 
-	assert.Greaterf(t, len(dependencies), 1, "Error: dependencies are not found!")
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
 // This case happens when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
@@ -213,7 +213,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "jfrogtest", npmArgs, true, logger)
 	assert.NoError(t, err)
 
-	assert.Greaterf(t, len(dependencies), 1, "Error: dependencies are not found!")
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
 // A project built differently for each operating system.
@@ -235,7 +235,7 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "bundle-dependencies", npmArgs, true, logger)
 	assert.NoError(t, err)
 
-	assert.Greaterf(t, len(dependencies), 1, "Error: dependencies are not found!")
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
 func TestNpmProdFlag(t *testing.T) {
