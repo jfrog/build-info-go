@@ -159,8 +159,7 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 		// Installing package-lock to generate the dependencies map.
 		_, errData, err := RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
 		if err != nil || len(errData) > 0 {
-			log.Error("Some errors occurred while installing package-lock")
-			return err
+			return errors.New("Some errors occurred while installing package-lock: " + err.Error())
 		}
 		return nil
 	}
