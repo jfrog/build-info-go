@@ -230,9 +230,6 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
-
-	// Remove node_modules directory, then calculate dependencies by package-lock.
-	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
 }
 
 // A project built differently for each operating system.
