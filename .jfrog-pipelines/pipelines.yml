@@ -48,6 +48,7 @@ pipelines:
             - git checkout main
             - git remote set-url origin https://$int_git_asafgabai_token@github.com/asafgabai/build-info-go.git
             - git merge origin/dev
+#            - git tag v${NEXT_VERSION}
 
             # Download JFrog CLI
             - curl -fL https://install-cli.jfrog.io | sh
@@ -77,8 +78,8 @@ pipelines:
             - git tag v${NEXT_VERSION}
 
             # Distribute release bundle
-            #            - jf ds rbc "build-info-go" $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
-            #            - jf ds rbd "build-info-go" $NEXT_VERSION --site="releases.jfrog.io" --sync
+#            - jf ds rbc ecosystem-build-info-go $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
+#            - jf ds rbd ecosystem-build-info-go $NEXT_VERSION --site="releases.jfrog.io" --sync
 
             # Push to main
             - git clean -fd

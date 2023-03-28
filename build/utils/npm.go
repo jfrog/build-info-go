@@ -47,7 +47,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 			continue
 		}
 		if calculateChecksums {
-			dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity, log)
+			dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity)
 			if err != nil {
 				if dep.Optional {
 					missingOptionalDeps = append(missingOptionalDeps, dep.Id)
@@ -220,7 +220,7 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 			}
 			return errors.New("failed to parse '" + string(value) + "' from npm ls output.")
 		}
-		appendDependency(dependencies, npmLsDependency, pathToRoot, log)
+		appendDependency(dependencies, npmLsDependency, pathToRoot)
 		transitive, _, _, err := jsonparser.Get(value, "dependencies")
 		if err != nil && err.Error() != "Key path not found" {
 			return err
@@ -256,7 +256,7 @@ func npmLsDependencyParser(data []byte) (*npmLsDependency, error) {
 	return npmLsDependency, json.Unmarshal(data, &npmLsDependency)
 }
 
-func appendDependency(dependencies map[string]*dependencyInfo, dep *npmLsDependency, pathToRoot []string, log utils.Log) {
+func appendDependency(dependencies map[string]*dependencyInfo, dep *npmLsDependency, pathToRoot []string) {
 	depId := dep.id()
 	scopes := dep.getScopes()
 	if dependencies[depId] == nil {
@@ -275,7 +275,7 @@ func appendDependency(dependencies map[string]*dependencyInfo, dep *npmLsDepende
 }
 
 // Lookup for a dependency's tarball in npm cache, and calculate checksum.
-func calculateChecksum(cacache *cacache, name, version, integrity string, log utils.Log) (md5 string, sha1 string, sha256 string, err error) {
+func calculateChecksum(cacache *cacache, name, version, integrity string) (md5 string, sha1 string, sha256 string, err error) {
 	if integrity == "" {
 		var info *cacacheInfo
 		info, err = cacache.GetInfo(name + "@" + version)
@@ -370,7 +370,6 @@ func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	log.Debug("Using npm version:", string(versionData))
 	return version.NewVersion(string(versionData)), npmExecPath, nil
 }
 
@@ -462,5 +461,5 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 }
 
 func printMissingDependenciesWarning(dependencyType string, dependencies []string, log utils.Log) {
-	log.Debug("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\n It is therefore okay to skip this dependency: " + strings.Join(dependencies, ","))
+	log.Debug("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\nIt is therefore okay to skip this dependency: " + strings.Join(dependencies, ","))
 }
