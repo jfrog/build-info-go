@@ -1,0 +1,90 @@
+resources:
+  - name: buildinfoGoGit
+    type: GitRepo
+    configuration:
+      path: jfrog/build-info-go
+      branches:
+        include: dev
+      gitProvider: il_automation
+
+pipelines:
+  - name: release_build_info_go
+    configuration:
+      runtime:
+        type: image
+        image:
+          custom:
+            name: releases-docker.jfrog.io/jfrog-ecosystem-integration-env
+            tag: latest
+      environmentVariables:
+        readOnly:
+          NEXT_VERSION: 0.0.0
+
+    steps:
+      - name: Release
+        type: Bash
+        configuration:
+          inputResources:
+            - name: buildinfoGoGit
+              trigger: false
+          integrations:
+            - name: il_automation
+            - name: entplus_deployer
+        execution:
+          onExecute:
+            - cd $res_buildinfoGoGit_resourcePath
+
+            # Set env
+            - export CI=true
+            - export JFROG_CLI_BUILD_NAME=ecosystem-build-info-go-release
+            - export JFROG_CLI_BUILD_NUMBER=$run_number
+            - export JFROG_CLI_BUILD_PROJECT=ecosys
+
+            # Make sure version provided
+            - echo "Checking variables"
+            - test -n "$NEXT_VERSION" -a "$NEXT_VERSION" != "0.0.0"
+
+            # Configure Git and merge from the dev
+            - git checkout main
+            - git remote set-url origin https://$int_il_automation_token@github.com/jfrog/build-info-go.git
+            - git merge origin/dev
+            - git tag v${NEXT_VERSION}
+
+            # Download JFrog CLI
+            - curl -fL https://install-cli.jfrog.io | sh
+            - jf c rm --quiet
+            - jf c add internal --url=$int_entplus_deployer_url --user=$int_entplus_deployer_user --password=$int_entplus_deployer_apikey
+            - jf goc --repo-resolve ecosys-go-remote
+
+            # Audit
+            - jf audit
+
+            # Build and upload
+            - >
+              env -i PATH=$PATH HOME=$HOME 
+              JFROG_CLI_BUILD_NAME=$JFROG_CLI_BUILD_NAME 
+              JFROG_CLI_BUILD_NUMBER=$JFROG_CLI_BUILD_NUMBER 
+              JFROG_CLI_BUILD_PROJECT=$JFROG_CLI_BUILD_PROJECT 
+              release/build.sh "$NEXT_VERSION"
+            - jf rt bag && jf rt bce
+
+            # Commit and publish build-info
+            - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER --dry-run > build-info.json
+            - git add build-info.json
+            - git commit -m "Update build-info.json file"
+            - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER
+
+            # Create a Git tag to the current commit
+            - git tag v${NEXT_VERSION}
+
+            # Distribute release bundle
+            - jf ds rbc ecosystem-build-info-go $NEXT_VERSION --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
+            - jf ds rbd ecosystem-build-info-go $NEXT_VERSION --site="releases.jfrog.io" --sync
+
+            # Push to main
+            - git clean -fd
+            - git push
+            - git push --tags
+
+          onComplete:
+            - jf c rm --quiet
