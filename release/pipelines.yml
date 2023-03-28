@@ -48,7 +48,6 @@ pipelines:
             - git checkout main
             - git remote set-url origin https://$int_il_automation_token@github.com/jfrog/build-info-go.git
             - git merge origin/dev
-            - git tag v${NEXT_VERSION}
 
             # Download JFrog CLI
             - curl -fL https://install-cli.jfrog.io | sh
