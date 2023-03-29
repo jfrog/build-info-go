@@ -94,13 +94,13 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	if err != nil {
 		return nil, err
 	}
-	isNodeModulesExist, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
-	if isDirExistsErr != nil {
-		return nil, isDirExistsErr
+	nodeModulesExist, err := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
+	if err != nil {
+		return nil, err
 	}
 	var data []byte
 	// If we don't have node_modules, the function will use the package-lock dependencies.
-	if isNodeModulesExist {
+	if nodeModulesExist {
 		data = runNpmLsWithNodeModules(executablePath, srcPath, npmArgs, log)
 	} else {
 		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmArgs, log, npmVersion)
@@ -122,8 +122,8 @@ func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, l
 	npmArgs = append(npmArgs, "--json", "--all", "--long")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
 	if err != nil {
-		// It is not mandatory for the function to return this error.
-		log.Error("npm list command failed with error:", err.Error())
+		// It is optional for the function to return this error.
+		log.Warn("npm list command failed with error:", err.Error())
 	}
 	if len(errData) > 0 {
 		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
@@ -145,7 +145,7 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string
 	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
 	if err != nil {
-		log.Error("npm list command failed with error:", err.Error())
+		log.Warn("npm list command failed with error:", err.Error())
 	}
 	if len(errData) > 0 {
 		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
@@ -163,7 +163,7 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 		}
 		return nil
 	}
-	return errors.New("couldn't install package-lock because npm version is less than 6.0.0")
+	return errors.New("it looks like you’re using version XXX of the npm client. Versions below 6.0.0 require running `npm install` before running this command")
 }
 
 func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {

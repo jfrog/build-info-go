@@ -150,25 +150,7 @@ func TestBundledDependenciesList(t *testing.T) {
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cacachePath}
 
-	// Install dependencies in the npm project.
-	_, _, err = RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs, "ci"), logger)
-	assert.NoError(t, err)
-
-	// Calculate dependencies.
-	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
-	assert.NoError(t, err)
-
-	// Asserting there is at least one dependency.
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
-
-	// Remove node_modules directory, then calculate dependencies by package-lock.
-	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
-
-	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
-	assert.NoError(t, err)
-
-	// Asserting there is at least one dependency.
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+	validateDependencies(t, projectPath, npmArgs)
 }
 
 // This test runs with npm v6. It collects build-info for npm project that has conflicts in peer dependencies.
@@ -187,24 +169,8 @@ func TestConflictsDependenciesList(t *testing.T) {
 	defer cleanup()
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cacachePath}
-	// Install dependencies in the npm project.
-	_, _, err = RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs, "ci"), logger)
-	assert.NoError(t, err)
 
-	// Calculate dependencies.
-	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
-	assert.NoError(t, err)
-
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
-
-	// Remove node_modules directory, then calculate dependencies by package-lock.
-	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
-
-	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
-	assert.NoError(t, err)
-
-	// Asserting there is at least one dependency.
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+	validateDependencies(t, projectPath, npmArgs)
 }
 
 // This case happens when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
@@ -324,4 +290,28 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	configCache, err = GetNpmConfigCache(projectPath, "npm", []string{}, innerLogger)
 	assert.NoError(t, err)
 	assert.Equal(t, filepath.Join(cachePath, "_cacache"), configCache)
+}
+
+// This function executes Ci, then validate generating dependencies in two possible scenarios:
+// 1. node_module exists in the project.
+// 2. node_module doesn't exist in the project and generating dependencies needs package-lock.
+func validateDependencies(t *testing.T, projectPath string, npmArgs []string) {
+	// Install dependencies in the npm project.
+	_, _, err := RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs,"ci"), logger)
+	assert.NoError(t, err)
+
+	// Calculate dependencies.
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+
+	// Remove node_modules directory, then calculate dependencies by package-lock.
+	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
+
+	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	// Asserting there is at least one dependency.
+	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
