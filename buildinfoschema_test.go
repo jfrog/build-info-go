@@ -23,7 +23,7 @@ func TestMavenSchema(t *testing.T) {
 
 func TestNpmSchema(t *testing.T) {
 	validateBuildInfoSchema(t, "npm", filepath.Join("npm", "project1", "npmv8"), func() {
-		_, _, err := buildutils.RunNpmCmd("npm", "", buildutils.Install, []string{}, &utils.NullLog{})
+		_, _, err := buildutils.RunNpmCmd("npm", "", []string{"install"}, &utils.NullLog{})
 		assert.NoError(t, err)
 	})
 }
