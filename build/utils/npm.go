@@ -94,13 +94,13 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	if err != nil {
 		return nil, err
 	}
-	isNodeModulesExist, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
-	if isDirExistsErr != nil {
-		return nil, isDirExistsErr
+	nodeModulesExist, err := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
+	if err != nil {
+		return nil, err
 	}
 	var data []byte
 	// If we don't have node_modules, the function will use the package-lock dependencies.
-	if isNodeModulesExist {
+	if nodeModulesExist {
 		data = runNpmLsWithNodeModules(executablePath, srcPath, npmArgs, log)
 	} else {
 		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmArgs, log, npmVersion)
@@ -158,8 +158,8 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 		npmArgs = append(npmArgs, "--package-lock-only")
 		// Installing package-lock to generate the dependencies map.
 		_, errData, err := RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
-		if err != nil || len(errData) > 0 {
-			return errors.New("Some errors occurred while installing package-lock: " + err.Error())
+		if err != nil {
+			return errors.New("Some errors occurred while installing package-lock: " + string(errData))
 		}
 		return nil
 	}
