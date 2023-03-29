@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	testdatautils "github.com/jfrog/build-info-go/build/testdata"
+	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -150,7 +151,22 @@ func TestBundledDependenciesList(t *testing.T) {
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cacachePath}
 
-	validateDependencies(t, projectPath, npmArgs)
+	// Install dependencies in the npm project.
+	_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
+	assert.NoError(t, err)
+
+	// Calculate dependencies.
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	// Check peer dependency is not found.
+	var excpected []entities.Dependency
+	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
+	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
+	assert.NoError(t, err)
+	if !match {
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+	}
 }
 
 // This test runs with npm v6. It collects build-info for npm project that has conflicts in peer dependencies.
@@ -169,8 +185,21 @@ func TestConflictsDependenciesList(t *testing.T) {
 	defer cleanup()
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cacachePath}
+	// Install dependencies in the npm project.
+	_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
+	assert.NoError(t, err)
 
-	validateDependencies(t, projectPath, npmArgs)
+	// Calculate dependencies.
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	assert.NoError(t, err)
+
+	var excpected []entities.Dependency
+	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
+	match, err := entities.IsEqualDependencySlices(dependencies, excpected)
+	assert.NoError(t, err)
+	if !match {
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+	}
 }
 
 // This case happens when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
@@ -195,7 +224,14 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "jfrogtest", npmArgs, true, logger)
 	assert.NoError(t, err)
 
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+	// Verify results.
+	var excpected []entities.Dependency
+	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
+	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
+	assert.NoError(t, err)
+	if !match {
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+	}
 }
 
 // A project built differently for each operating system.
@@ -208,7 +244,7 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	defer cleanup()
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 
-	// Install all the project's dependencies.
+	// Install all of the project's dependencies.
 	npmArgs := []string{"--cache=" + cacachePath}
 	_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
 	assert.NoError(t, err)
@@ -217,16 +253,14 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "bundle-dependencies", npmArgs, true, logger)
 	assert.NoError(t, err)
 
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
-
-	// Remove node_modules directory, then calculate dependencies by package-lock.
-	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
-
-	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	// Verify results.
+	var excpected []entities.Dependency
+	assert.NoError(t, utils.Unmarshal(filepath.Join(projectPath, "excpected_dependencies_list.json"), &excpected))
+	match, err := entities.IsEqualDependencySlices(excpected, dependencies)
 	assert.NoError(t, err)
-
-	// Asserting there is at least one dependency.
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+	if !match {
+		testdatautils.PrintBuildInfoMismatch(t, []entities.Module{{Dependencies: excpected}}, []entities.Module{{Dependencies: dependencies}})
+	}
 }
 
 func TestNpmProdFlag(t *testing.T) {
@@ -290,28 +324,4 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	configCache, err = GetNpmConfigCache(projectPath, "npm", []string{}, innerLogger)
 	assert.NoError(t, err)
 	assert.Equal(t, filepath.Join(cachePath, "_cacache"), configCache)
-}
-
-// This function executes Ci, then validate generating dependencies in two possible scenarios:
-// 1. node_module exists in the project.
-// 2. node_module doesn't exist in the project and generating dependencies needs package-lock.
-func validateDependencies(t *testing.T, projectPath string, npmArgs []string) {
-	// Install dependencies in the npm project.
-	_, _, err := RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
-	assert.NoError(t, err)
-
-	// Calculate dependencies.
-	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
-	assert.NoError(t, err)
-
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
-
-	// Remove node_modules directory, then calculate dependencies by package-lock.
-	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
-
-	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
-	assert.NoError(t, err)
-
-	// Asserting there is at least one dependency.
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
