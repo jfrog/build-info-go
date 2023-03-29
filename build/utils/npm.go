@@ -375,8 +375,6 @@ func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) 
 		return
 	}
 	log.Debug("npm " + tmpArgs[0] + " standard output is:\n" + string(stdResult))
-	// We want to erase the command name from npmArgs.
-	npmArgs = npmArgs[1:]
 	return
 }
 
