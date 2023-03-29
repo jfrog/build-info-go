@@ -53,6 +53,7 @@ func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 func (nm *NpmModule) CalcDependencies() error {
 	_, errData, err := buildutils.RunNpmCmd(nm.executablePath, nm.srcPath, nm.npmArgs, &utils.NullLog{})
 	if err != nil {
+		// NpmArgs[0] includes the npm command.
 		return errors.New("couldn't run npm " + nm.npmArgs[0] + ": " + string(errData))
 	}
 	// After executing the user-provided command, cleaning npmArgs is needed.
