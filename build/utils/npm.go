@@ -374,6 +374,7 @@ func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) 
 		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(tmpArgs, " ") + "'\nError output is:\n" + string(errResult) + "\nCommand error: is:\n" + string(err.Error()))
 		return
 	}
+	// The npm command is the first cell in tmpArgs array.
 	log.Debug("npm " + tmpArgs[0] + " standard output is:\n" + string(stdResult))
 	return
 }
