@@ -163,7 +163,7 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 		}
 		return nil
 	}
-	return errors.New("couldn't install package-lock because npm version is less than 6.0.0")
+	return errors.New("it looks like you’re using version XXX of the npm client. Versions below 6.0.0 require running `npm install` before running this command")
 }
 
 func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
