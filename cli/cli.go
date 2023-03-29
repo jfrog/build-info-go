@@ -140,11 +140,16 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				if err != nil {
 					return
 				}
+				formatValue, filteredArgs, err := extractStringFlag(context.Args().Slice(), formatFlag)
+				if err != nil {
+					return
+				}
+				npmModule.SetNpmArgs(filteredArgs)
 				err = npmModule.CalcDependencies()
 				if err != nil {
 					return
 				}
-				return printBuild(bld, context.String(formatFlag))
+				return printBuild(bld, formatValue)
 			},
 		},
 		{
