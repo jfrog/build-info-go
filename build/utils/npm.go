@@ -379,6 +379,7 @@ func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) 
 	return
 }
 
+// This function append the Npm command in the first cell in npmArgs strings array.
 func AppendNpmCommand(npmArgs []string, command string) []string {
 	termpArgs := []string{command}
 	termpArgs = append(termpArgs, npmArgs...)
