@@ -33,7 +33,7 @@ func TestGenerateBuildInfoForNpm(t *testing.T) {
 
 	// Install dependencies in the npm project.
 	npmArgs := []string{"--cache=" + filepath.Join(projectPath, "tmpcache")}
-	_, _, err = buildutils.RunNpmCmd("npm", projectPath, buildutils.Install, npmArgs, logger)
+	_, _, err = buildutils.RunNpmCmd("npm", projectPath, buildutils.AppendNpmCommand(npmArgs, "install"), logger)
 	assert.NoError(t, err)
 	npmModule, err := npmBuild.AddNpmModule(projectPath)
 	assert.NoError(t, err)
