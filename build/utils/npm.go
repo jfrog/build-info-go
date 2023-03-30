@@ -86,33 +86,29 @@ type dependencyInfo struct {
 }
 
 // Run 'npm list ...' command and parse the returned result to create a dependencies map of.
-// The dependencies map looks like name:version -> entities.Dependency
+// The dependencies map looks like name:version -> entities.Dependency.
 func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (map[string]*dependencyInfo, error) {
 	dependenciesMap := make(map[string]*dependencyInfo)
-
-	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
-	npmArgs = append(npmArgs, "--json", "--all", "--long")
-	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
-	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
-	if err != nil {
-		found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
-		if isDirExistsErr != nil {
-			return nil, isDirExistsErr
-		}
-		if !found {
-			return nil, errors.New("node_modules isn't found in '" + srcPath + "'. Hint: Restore node_modules folder by running npm install or npm ci.")
-		}
-		log.Warn("npm list command failed with error:", err.Error())
-	}
-	if len(errData) > 0 {
-		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
-	}
+	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs).
 	npmVersion, err := GetNpmVersion(executablePath, log)
 	if err != nil {
 		return nil, err
 	}
+	nodeModulesExist, err := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
+	if err != nil {
+		return nil, err
+	}
+	var data []byte
+	// If we don't have node_modules, the function will use the package-lock dependencies.
+	if nodeModulesExist {
+		data = runNpmLsWithNodeModules(executablePath, srcPath, npmArgs, log)
+	} else {
+		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmArgs, log, npmVersion)
+		if err != nil {
+			return nil, err
+		}
+	}
 	parseFunc := parseNpmLsDependencyFunc(npmVersion)
-
 	// Parse the dependencies json object.
 	return dependenciesMap, jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
 		if string(key) == "dependencies" {
@@ -120,6 +116,54 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 		}
 		return err
 	})
+}
+
+func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log) (data []byte) {
+	npmArgs = append(npmArgs, "--json", "--all", "--long")
+	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	if err != nil {
+		// It is optional for the function to return this error.
+		log.Warn("npm list command failed with error:", err.Error())
+	}
+	if len(errData) > 0 {
+		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+	}
+	return
+}
+
+func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) ([]byte, error) {
+	isPackageLockExist, isDirExistsErr := utils.IsFileExists(filepath.Join(srcPath, "package-lock.json"), false)
+	if isDirExistsErr != nil {
+		return nil, isDirExistsErr
+	}
+	if !isPackageLockExist {
+		err := installPackageLock(executablePath, srcPath, npmArgs, log, npmVersion)
+		if err != nil {
+			return nil, err
+		}
+	}
+	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
+	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	if err != nil {
+		log.Warn("npm list command failed with error:", err.Error())
+	}
+	if len(errData) > 0 {
+		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+	}
+	return data, nil
+}
+
+func installPackageLock(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
+	if npmVersion.AtLeast("6.0.0") {
+		npmArgs = append(npmArgs, "--package-lock-only")
+		// Installing package-lock to generate the dependencies map.
+		_, errData, err := RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
+		if err != nil {
+			return errors.New("Some errors occurred while installing package-lock: " + string(errData))
+		}
+		return nil
+	}
+	return errors.New("it looks like you’re using version " + npmVersion.GetVersion() + " of the npm client. Versions below 6.0.0 require running `npm install` before running this command")
 }
 
 func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
