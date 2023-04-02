@@ -50,7 +50,7 @@ func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 	return &NpmModule{name: name, srcPath: srcPath, containingBuild: containingBuild, executablePath: executablePath}, nil
 }
 
-func (nm *NpmModule) CalcDependencies() error {
+func (nm *NpmModule) Build() error {
 	_, errData, err := buildutils.RunNpmCmd(nm.executablePath, nm.srcPath, nm.npmArgs, &utils.NullLog{})
 	if err != nil {
 		// NpmArgs[0] includes the npm command.
@@ -58,6 +58,10 @@ func (nm *NpmModule) CalcDependencies() error {
 	}
 	// After executing the user-provided command, cleaning npmArgs is needed.
 	nm.npmArgs = []string{}
+	return nm.CalcDependencies()
+}
+
+func (nm *NpmModule) CalcDependencies() error {
 	if !nm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}

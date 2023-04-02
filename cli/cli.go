@@ -145,7 +145,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				npmModule.SetNpmArgs(filteredArgs)
-				err = npmModule.CalcDependencies()
+				err = npmModule.Build()
 				if err != nil {
 					return
 				}
