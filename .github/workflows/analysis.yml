@@ -15,11 +15,6 @@ jobs:
         with:
           install-go: false
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          skip-cache: true
-
   Go-Sec:
     runs-on: ubuntu-latest
     steps:
