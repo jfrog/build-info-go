@@ -47,7 +47,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 			continue
 		}
 		if calculateChecksums {
-			dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity, log)
+			dep.Md5, dep.Sha1, dep.Sha256, err = calculateChecksum(cacache, dep.Name, dep.Version, dep.Integrity)
 			if err != nil {
 				if dep.Optional {
 					missingOptionalDeps = append(missingOptionalDeps, dep.Id)
@@ -86,33 +86,29 @@ type dependencyInfo struct {
 }
 
 // Run 'npm list ...' command and parse the returned result to create a dependencies map of.
-// The dependencies map looks like name:version -> entities.Dependency
+// The dependencies map looks like name:version -> entities.Dependency.
 func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (map[string]*dependencyInfo, error) {
 	dependenciesMap := make(map[string]*dependencyInfo)
-
-	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs)
-	npmArgs = append(npmArgs, "--json", "--all", "--long")
-	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
-	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
-	if err != nil {
-		found, isDirExistsErr := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
-		if isDirExistsErr != nil {
-			return nil, isDirExistsErr
-		}
-		if !found {
-			return nil, errors.New("node_modules isn't found in '" + srcPath + "'. Hint: Restore node_modules folder by running npm install or npm ci.")
-		}
-		log.Warn("npm list command failed with error:", err.Error())
-	}
-	if len(errData) > 0 {
-		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
-	}
+	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs).
 	npmVersion, err := GetNpmVersion(executablePath, log)
 	if err != nil {
 		return nil, err
 	}
+	nodeModulesExist, err := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
+	if err != nil {
+		return nil, err
+	}
+	var data []byte
+	// If we don't have node_modules, the function will use the package-lock dependencies.
+	if nodeModulesExist {
+		data = runNpmLsWithNodeModules(executablePath, srcPath, npmArgs, log)
+	} else {
+		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmArgs, log, npmVersion)
+		if err != nil {
+			return nil, err
+		}
+	}
 	parseFunc := parseNpmLsDependencyFunc(npmVersion)
-
 	// Parse the dependencies json object.
 	return dependenciesMap, jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
 		if string(key) == "dependencies" {
@@ -120,6 +116,54 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 		}
 		return err
 	})
+}
+
+func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log) (data []byte) {
+	npmArgs = append(npmArgs, "--json", "--all", "--long")
+	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	if err != nil {
+		// It is optional for the function to return this error.
+		log.Warn("npm list command failed with error:", err.Error())
+	}
+	if len(errData) > 0 {
+		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+	}
+	return
+}
+
+func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) ([]byte, error) {
+	isPackageLockExist, isDirExistsErr := utils.IsFileExists(filepath.Join(srcPath, "package-lock.json"), false)
+	if isDirExistsErr != nil {
+		return nil, isDirExistsErr
+	}
+	if !isPackageLockExist {
+		err := installPackageLock(executablePath, srcPath, npmArgs, log, npmVersion)
+		if err != nil {
+			return nil, err
+		}
+	}
+	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
+	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	if err != nil {
+		log.Warn("npm list command failed with error:", err.Error())
+	}
+	if len(errData) > 0 {
+		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+	}
+	return data, nil
+}
+
+func installPackageLock(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
+	if npmVersion.AtLeast("6.0.0") {
+		npmArgs = append(npmArgs, "--package-lock-only")
+		// Installing package-lock to generate the dependencies map.
+		_, errData, err := RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
+		if err != nil {
+			return errors.New("Some errors occurred while installing package-lock: " + string(errData))
+		}
+		return nil
+	}
+	return errors.New("it looks like you’re using version " + npmVersion.GetVersion() + " of the npm client. Versions below 6.0.0 require running `npm install` before running this command")
 }
 
 func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
@@ -220,7 +264,7 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 			}
 			return errors.New("failed to parse '" + string(value) + "' from npm ls output.")
 		}
-		appendDependency(dependencies, npmLsDependency, pathToRoot, log)
+		appendDependency(dependencies, npmLsDependency, pathToRoot)
 		transitive, _, _, err := jsonparser.Get(value, "dependencies")
 		if err != nil && err.Error() != "Key path not found" {
 			return err
@@ -256,7 +300,7 @@ func npmLsDependencyParser(data []byte) (*npmLsDependency, error) {
 	return npmLsDependency, json.Unmarshal(data, &npmLsDependency)
 }
 
-func appendDependency(dependencies map[string]*dependencyInfo, dep *npmLsDependency, pathToRoot []string, log utils.Log) {
+func appendDependency(dependencies map[string]*dependencyInfo, dep *npmLsDependency, pathToRoot []string) {
 	depId := dep.id()
 	scopes := dep.getScopes()
 	if dependencies[depId] == nil {
@@ -275,7 +319,7 @@ func appendDependency(dependencies map[string]*dependencyInfo, dep *npmLsDepende
 }
 
 // Lookup for a dependency's tarball in npm cache, and calculate checksum.
-func calculateChecksum(cacache *cacache, name, version, integrity string, log utils.Log) (md5 string, sha1 string, sha256 string, err error) {
+func calculateChecksum(cacache *cacache, name, version, integrity string) (md5 string, sha1 string, sha256 string, err error) {
 	if integrity == "" {
 		var info *cacacheInfo
 		info, err = cacache.GetInfo(name + "@" + version)
@@ -370,7 +414,6 @@ func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	log.Debug("Using npm version:", string(versionData))
 	return version.NewVersion(string(versionData)), npmExecPath, nil
 }
 
@@ -462,5 +505,5 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 }
 
 func printMissingDependenciesWarning(dependencyType string, dependencies []string, log utils.Log) {
-	log.Debug("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\n It is therefore okay to skip this dependency: " + strings.Join(dependencies, ","))
+	log.Debug("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\nIt is therefore okay to skip this dependency: " + strings.Join(dependencies, ","))
 }
