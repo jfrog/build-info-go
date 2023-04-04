@@ -38,7 +38,7 @@ func (t DependenciesTree) MarshalJSON() ([]byte, error) {
 func (t *DependenciesTree) AddChildren(allDependencies map[string]*buildinfo.Dependency, children map[string][]string) {
 	for _, child := range children[t.Id] {
 		if _, ok := allDependencies[child]; !ok {
-			//No such child, skip...
+			// No such child, skip...
 			continue
 		}
 		childTree := &DependenciesTree{Id: child, Dependency: allDependencies[child]}
@@ -52,7 +52,7 @@ func CreateDependencyTree(rootDependencies []string, allDependencies map[string]
 	var rootTree Root
 	for _, root := range rootDependencies {
 		if _, ok := allDependencies[root]; !ok {
-			//No such root, skip...
+			// No such root, skip...
 			continue
 		}
 		subTree := &DependenciesTree{Id: root, Dependency: allDependencies[root]}

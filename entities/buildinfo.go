@@ -289,9 +289,9 @@ func mergeStringSlices(slice1, slice2 []string) []string {
 				exists = true
 				break
 			}
-			if !exists {
-				slice1 = append(slice1, item2)
-			}
+		}
+		if !exists {
+			slice1 = append(slice1, item2)
 		}
 	}
 	return slice1
@@ -306,9 +306,9 @@ func mergeRequestedBySlices(requestedBy1, requestedBy2 [][]string) [][]string {
 				exists = true
 				break
 			}
-			if !exists {
-				requestedBy1 = append(requestedBy1, item2)
-			}
+		}
+		if !exists {
+			requestedBy1 = append(requestedBy1, item2)
 		}
 	}
 	return requestedBy1
