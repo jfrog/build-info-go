@@ -3,6 +3,7 @@ package build
 import (
 	"errors"
 	"os"
+	"strings"
 
 	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
@@ -58,7 +59,7 @@ func (nm *NpmModule) Build() error {
 			return errors.New("couldn't run npm " + nm.npmArgs[0] + ": " + string(errData))
 		}
 		// After executing the user-provided command, cleaning npmArgs is needed.
-		nm.npmArgs = []string{}
+		nm.filterNpmArgsFlags()
 	}
 	return nm.CalcDependencies()
 }
@@ -90,4 +91,14 @@ func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {
 	}
 	partial := &entities.Partial{ModuleId: nm.name, ModuleType: entities.Npm, Artifacts: artifacts}
 	return nm.containingBuild.SavePartialBuildInfo(partial)
+}
+
+// This function discard the npm command in npmArgs, and keep over only the command flags.
+// It is necessary for the npm command to come before the npm command flags in npmArgs in order to work the function correctly.
+func (nm *NpmModule) filterNpmArgsFlags() {
+	for argIndex := 0; argIndex < len(nm.npmArgs); argIndex++ {
+		if strings.HasPrefix(nm.npmArgs[argIndex], "-") {
+			nm.npmArgs = nm.npmArgs[argIndex:]
+		}
+	}
 }
