@@ -104,7 +104,7 @@ func (gm *GradleModule) CalcDependencies() (err error) {
 }
 
 func (gm *GradleModule) createGradleRunConfig() (*gradleRunConfig, error) {
-	gradleExecPath, err := getGradleExecPath(gm.gradleExtractorDetails.useWrapper)
+	gradleExecPath, err := GetGradleExecPath(gm.gradleExtractorDetails.useWrapper)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 	return initScriptPath, os.WriteFile(initScriptPath, []byte(initScriptContent), 0644)
 }
 
-func getGradleExecPath(useWrapper bool) (string, error) {
+func GetGradleExecPath(useWrapper bool) (string, error) {
 	if useWrapper {
 		execName := "gradlew"
 		if runtime.GOOS == "windows" {

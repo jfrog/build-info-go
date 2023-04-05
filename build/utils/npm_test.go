@@ -242,7 +242,6 @@ func TestNpmProdFlag(t *testing.T) {
 		{"--prod", 1},
 	}
 	for _, entry := range testDependencyScopes {
-
 		projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project3", false, npmVersion)
 		defer cleanup()
 		cacachePath := filepath.Join(projectPath, "tmpcache")

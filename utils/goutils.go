@@ -49,7 +49,7 @@ func RunGo(goArg []string, repoUrl string) error {
 	if err != nil {
 		return err
 	}
-	errorOut := ""
+	var errorOut string
 	if performPasswordMask {
 		_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
 	} else {
@@ -293,7 +293,7 @@ func getGOPATH() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not find GOPATH env: %s", err.Error())
 	}
-	return strings.TrimSpace(parseGoPath(string(output))), nil
+	return strings.TrimSpace(parseGoPath(output)), nil
 }
 
 func parseGoPath(goPath string) string {
