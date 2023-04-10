@@ -158,8 +158,8 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 		npmArgs = append(npmArgs, "--package-lock-only")
 		// Installing package-lock to generate the dependencies map.
 		_, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "install"), log)
-		if err != nil || len(errData) > 0 {
-			return errors.New("Some errors occurred while installing package-lock: " + err.Error())
+		if err != nil {
+			return errors.New("Some errors occurred while installing package-lock: " + string(errData))
 		}
 		return nil
 	}
