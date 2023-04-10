@@ -365,7 +365,7 @@ bi gradle
 #### npm
 
 ```shell
-bi npm
+bi npm [npm command] [command options]
 ```
 
 Note: checksums calculation is not yet supported for npm projects.
