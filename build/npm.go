@@ -93,8 +93,8 @@ func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {
 	return nm.containingBuild.SavePartialBuildInfo(partial)
 }
 
-// This function discard the npm command in npmArgs, and keep over only the command flags.
-// It is necessary for the npm command to come before the npm command flags in npmArgs in order to work the function correctly.
+// This function discards the npm command in npmArgs and keeps only the command flags.
+// It is necessary for the npm command's name to come before the npm command's flags in npmArgs for the function to work correctly.
 func (nm *NpmModule) filterNpmArgsFlags() {
 	for argIndex := 0; argIndex < len(nm.npmArgs); argIndex++ {
 		if strings.HasPrefix(nm.npmArgs[argIndex], "-") {
