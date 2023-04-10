@@ -379,7 +379,8 @@ func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) 
 	return
 }
 
-// This function append the Npm command in the first cell in npmArgs strings array.
+// This function appends the Npm command as the first element in npmArgs strings array.
+// For example, if npmArgs equals {"--json", "--all"}, and we call appendNpmCommand(npmArgs, "ls"), we will get npmArgs = {"ls", "--json", "--all"}.
 func AppendNpmCommand(npmArgs []string, command string) []string {
 	termpArgs := []string{command}
 	termpArgs = append(termpArgs, npmArgs...)
