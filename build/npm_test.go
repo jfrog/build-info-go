@@ -52,3 +52,37 @@ func TestGenerateBuildInfoForNpm(t *testing.T) {
 		testdatautils.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
 	}
 }
+
+func TestFilterNpmArgsFlags(t *testing.T) {
+	service := NewBuildInfoService()
+	npmBuild, err := service.GetOrCreateBuild("build-info-go-test-npm", strconv.FormatInt(time.Now().Unix(), 10))
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, npmBuild.Clean())
+	}()
+	npmVersion, _, err := buildutils.GetNpmVersionAndExecPath(logger)
+	assert.NoError(t, err)
+
+	// Create npm project.
+	path, err := filepath.Abs(filepath.Join(".", "testdata"))
+	assert.NoError(t, err)
+	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project3", false, npmVersion)
+	defer cleanup()
+
+	// Install dependencies in the npm project.
+	npmArgs := []string{"ls", "--package-lock-only"}
+	_, _, err = buildutils.RunNpmCmd("npm", projectPath, buildutils.AppendNpmCommand(npmArgs, "install"), logger)
+	assert.NoError(t, err)
+	npmModule, err := npmBuild.AddNpmModule(projectPath)
+	assert.NoError(t, err)
+	npmModule.SetNpmArgs(npmArgs)
+	npmModule.filterNpmArgsFlags()
+	var expected []string
+	expected = append(expected, "--package-lock-only")
+	assert.Equal(t, expected, npmModule.npmArgs)
+	npmArgs = []string{"config", "cache", "--json", "--all"}
+	npmModule.SetNpmArgs(npmArgs)
+	npmModule.filterNpmArgsFlags()
+	expected = []string{"--json", "--all"}
+	assert.Equal(t, expected, npmModule.npmArgs)
+}
