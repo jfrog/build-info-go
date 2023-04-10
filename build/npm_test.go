@@ -69,7 +69,7 @@ func TestFilterNpmArgsFlags(t *testing.T) {
 	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project3", false, npmVersion)
 	defer cleanup()
 
-	// Install dependencies in the npm project.
+	// Set arguments in npmArgs.
 	npmArgs := []string{"ls", "--package-lock-only"}
 	_, _, err = buildutils.RunNpmCmd("npm", projectPath, buildutils.AppendNpmCommand(npmArgs, "install"), logger)
 	assert.NoError(t, err)
