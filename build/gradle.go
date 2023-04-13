@@ -38,7 +38,7 @@ type gradleExtractorDetails struct {
 	localPath string
 	// gradle tasks to build the project.
 	tasks []string
-	// Download the extracor from remote server.
+	// Download the extractor from remote server.
 	downloadExtractorFunc func(downloadTo, downloadFrom string) error
 	// Map of configurations for the extractor.
 	props map[string]string
@@ -59,7 +59,7 @@ func newGradleModule(containingBuild *Build, srcPath string) (*GradleModule, err
 		gradleExtractorDetails: &gradleExtractorDetails{
 			localPath: extractorLocalPath,
 			tasks:     []string{"artifactoryPublish"},
-			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempfolderName),
+			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempFolderName),
 			props:     map[string]string{},
 		},
 	}, err
