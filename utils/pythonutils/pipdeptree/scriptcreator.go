@@ -45,7 +45,7 @@ func main() {
 	resourceString := "package " + pythonPackageName + "\n\n"
 	// Add a const string with the script's version
 	resourceString += "const pipDepTreeVersion = \"" + pipDepTreeVersion + "\"\n\n"
-	// Write the script content a a byte-slice
+	// Write the script content a byte-slice
 	resourceString += "var pipDepTreeContent = []byte(`\n" + pyFileString + "`)"
 	// Create .go file with the script content
 	err = os.WriteFile(pipDepTreeContentPath, []byte(resourceString), os.ModePerm)
