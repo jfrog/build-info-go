@@ -70,8 +70,8 @@ func CreateExtractorPropsFile(extractorConfPath, buildInfoPath, buildName, build
 	return propertiesFile.Name(), writeProps(propertiesFile, configProperties, buildProperties)
 }
 
-func DownloadDependencies(downloadTo, filename, relativefilePath string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger Log) error {
-	downloadPath := path.Join(relativefilePath, filename)
+func DownloadDependencies(downloadTo, filename, relativeFilePath string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger Log) error {
+	downloadPath := path.Join(relativeFilePath, filename)
 	return downloadExtractorIfNeeded(downloadTo, filename, downloadPath, downloadExtractorFunc, logger)
 }
 

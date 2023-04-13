@@ -19,7 +19,7 @@ type ModuleType string
 const (
 	TimeFormat           = "2006-01-02T15:04:05.000-0700"
 	BuildInfoEnvPrefix   = "buildInfo.env."
-	RequestedByMaxLength = 10
+	RequestedByMaxLength = 15
 
 	// Build type
 	Build ModuleType = "build"
