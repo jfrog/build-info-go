@@ -29,8 +29,10 @@ func TestEmptySolution(t *testing.T) {
 		t.Error("An error occurred while creating the build info object", err.Error())
 	}
 	if !reflect.DeepEqual(buildInfo, expected) {
-		expectedString, _ := json.Marshal(expected)
-		buildInfoString, _ := json.Marshal(buildInfo)
+		expectedString, err := json.Marshal(expected)
+		assert.NoError(t, err)
+		buildInfoString, err := json.Marshal(buildInfo)
+		assert.NoError(t, err)
 		t.Errorf("Expecting: \n%s \nGot: \n%s", expectedString, buildInfoString)
 	}
 }

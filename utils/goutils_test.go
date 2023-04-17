@@ -107,7 +107,7 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 		err = os.Rename(filepath.Join(goModPath, "go.sum"), filepath.Join(goModPath, "go.sum.txt"))
 		assert.NoError(t, err)
 	}()
-	originSumFileContent, _, err := getGoSum(goModPath, log)
+	originSumFileContent, err := getGoSum(goModPath, log)
 	err = os.Rename(filepath.Join(goModPath, "test.go.txt"), filepath.Join(goModPath, "test.go"))
 	assert.NoError(t, err)
 	defer func() {
@@ -119,7 +119,7 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 
 	// Since Go 1.16 'go list' command won't automatically update go.mod and go.sum.
 	// Check that we roll back changes properly.
-	newSumFileContent, _, err := getGoSum(goModPath, log)
+	newSumFileContent, err := getGoSum(goModPath, log)
 	assert.Equal(t, newSumFileContent, originSumFileContent, "go.sum has been modified and didn't rollback properly")
 
 	expected := map[string]bool{
