@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -135,9 +134,9 @@ func TestGetProjectsFromSlns(t *testing.T) {
 
 // If running on Windows, replace \r\n with \n.
 func replaceCarriageSign(results []string) {
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		for i, result := range results {
-			results[i] = strings.Replace(result, "\r\n", "\n", -1)
+			results[i] = strings.ReplaceAll(result, "\r\n", "\n")
 		}
 	}
 }
