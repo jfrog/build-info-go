@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   unit-test:
-    name: ${{ matrix.os }}, node ${{ matrix.node }} , python ${{ matrix.python }}
+    name: ${{ matrix.os }}, node ${{ matrix.node }}, python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}-latest
     strategy:
       fail-fast: false
@@ -44,12 +44,6 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           check-latest: true
-          
-      - name: Setup Maven v3.8.6 for Windows
-        uses: stCarolas/setup-maven@v4.5
-        with:
-          maven-version: 3.8.6
-        if: runner.os == 'Windows'
 
       - name: Go Cache
         uses: actions/cache@v3

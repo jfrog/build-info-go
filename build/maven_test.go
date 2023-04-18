@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"testing"
-
 	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	"os"
+	"path/filepath"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -54,6 +53,10 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	mavenModule.SetMavenGoals("compile", "--no-transfer-progress")
 	// Calculate build-info.
 	err = mavenModule.CalcDependencies()
+	if err != nil {
+		// Maven Central sometimes cause that test to fail the maven compile command, so we try running it again to avoid flaky test
+		err = mavenModule.CalcDependencies()
+	}
 	if assert.NoError(t, err) {
 		buildInfo, err := mavenBuild.ToBuildInfo()
 		assert.NoError(t, err)

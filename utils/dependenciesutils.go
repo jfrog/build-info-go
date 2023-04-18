@@ -35,7 +35,7 @@ func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downlo
 		return downloadExtractorFunc(absFileName, downloadPath)
 	}
 	extractorUrl := "https://releases.jfrog.io/artifactory/oss-release-local/" + downloadPath
-	logger.Info("Downloading build-info-extractor from", extractorUrl, " to ", downloadTo)
+	logger.Info("Downloading build-info-extractor from", extractorUrl, "to", downloadTo)
 	return DownloadFile(absFileName, extractorUrl)
 }
 
