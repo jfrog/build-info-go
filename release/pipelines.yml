@@ -66,12 +66,14 @@ pipelines:
               JFROG_CLI_BUILD_PROJECT=$JFROG_CLI_BUILD_PROJECT 
               release/build.sh "$NEXT_VERSION"
             - jf rt bag && jf rt bce
+            - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER
 
-            # Commit and publish build-info
-            - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER --dry-run > build-info.json
+            # Update build-info.json
+            - curl -X GET "https://releases.jfrog.io/artifactory/bi-cli/v1/%5BRELEASE%5D/$operating_system-$architecture/bi" -L -o bi
+            - chmod u+x bi
+            - ./bi go > build-info.json
             - git add build-info.json
             - git commit -m "Update build-info.json file"
-            - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER
 
             # Create a Git tag to the current commit
             - git tag v${NEXT_VERSION}
