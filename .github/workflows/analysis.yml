@@ -15,8 +15,7 @@ jobs:
         with:
           args: |
             --timeout 5m
-            --enable errcheck,gosimple,govet,ineffassign,staticcheck,typecheck,unused,gocritic,asasalint,asciicheck,errchkjson,
-            errname,exportloopref,forcetypeassert,makezero,nilerr,unparam,unconvert,wastedassign,usestdlibvars 
+            -E errcheck,gosimple,govet,ineffassign,staticcheck,typecheck,unused,gocritic,asasalint,asciicheck,errchkjson,errname,exportloopref,forcetypeassert,makezero,nilerr,unparam,unconvert,wastedassign,usestdlibvars 
   
 
   Go-Sec:
