@@ -41,7 +41,7 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 		assert.NoError(t, mavenBuild.Clean())
 	}()
 
-	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
+	testdataDir, err := filepath.Abs("testdata")
 	assert.NoError(t, err)
 	// Create maven project
 	projectPath := filepath.Join(testdataDir, "maven", "project")
@@ -84,7 +84,7 @@ func TestExtractMavenPath(t *testing.T) {
 	assert.NoError(t, err)
 	defer assert.NoError(t, mavenBuild.Clean())
 
-	testdataDir, err := filepath.Abs(filepath.Join("testdata"))
+	testdataDir, err := filepath.Abs("testdata")
 	assert.NoError(t, err)
 	// Create maven project
 	projectPath := filepath.Join(testdataDir, "maven", "project")

@@ -163,22 +163,10 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	dependenciesMap := map[string]entities.Dependency{}
 
 	// Create regular expressions for log parsing.
-	collectingRegexp, err := regexp.Compile(`^Collecting\s(\w[\w-.]+)`)
-	if err != nil {
-		return nil, err
-	}
-	downloadingRegexp, err := regexp.Compile(`^\s*Downloading\s([^\s]*)\s\(`)
-	if err != nil {
-		return nil, err
-	}
-	usingCachedRegexp, err := regexp.Compile(`^\s*Using\scached\s([\S]+)\s\(`)
-	if err != nil {
-		return nil, err
-	}
-	alreadySatisfiedRegexp, err := regexp.Compile(`^Requirement\salready\ssatisfied:\s(\w[\w-.]+)`)
-	if err != nil {
-		return nil, err
-	}
+	collectingRegexp := regexp.MustCompile(`^Collecting\s(\w[\w-.]+)`)
+	downloadingRegexp := regexp.MustCompile(`^\s*Downloading\s([^\s]*)\s\(`)
+	usingCachedRegexp := regexp.MustCompile(`^\s*Using\scached\s([\S]+)\s\(`)
+	alreadySatisfiedRegexp := regexp.MustCompile(`^Requirement\salready\ssatisfied:\s(\w[\w-.]+)`)
 
 	var packageName string
 	expectingPackageFilePath := false
@@ -267,8 +255,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	}
 
 	// Execute command.
-	var errorOut string
-	_, errorOut, _, err = gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &cachedFileParser, &installedPackagesParser)
+	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &cachedFileParser, &installedPackagesParser)
 	if err != nil {
 		return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
 	}

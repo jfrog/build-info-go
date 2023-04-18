@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -29,8 +28,10 @@ func TestEmptySolution(t *testing.T) {
 		t.Error("An error occurred while creating the build info object", err.Error())
 	}
 	if !reflect.DeepEqual(buildInfo, expected) {
-		expectedString, _ := json.Marshal(expected)
-		buildInfoString, _ := json.Marshal(buildInfo)
+		expectedString, err := json.Marshal(expected)
+		assert.NoError(t, err)
+		buildInfoString, err := json.Marshal(buildInfo)
+		assert.NoError(t, err)
 		t.Errorf("Expecting: \n%s \nGot: \n%s", expectedString, buildInfoString)
 	}
 }
@@ -133,9 +134,9 @@ func TestGetProjectsFromSlns(t *testing.T) {
 
 // If running on Windows, replace \r\n with \n.
 func replaceCarriageSign(results []string) {
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		for i, result := range results {
-			results[i] = strings.Replace(result, "\r\n", "\n", -1)
+			results[i] = strings.ReplaceAll(result, "\r\n", "\n")
 		}
 	}
 }

@@ -59,11 +59,11 @@ func writeData(p []byte, w io.Writer, wg *sync.WaitGroup, errChan chan error) {
 }
 
 func UnixToWinPathSeparator(filePath string) string {
-	return strings.Replace(filePath, "/", "\\\\", -1)
+	return strings.ReplaceAll(filePath, "/", "\\\\")
 }
 
 func WinToUnixPathSeparator(filePath string) string {
-	return strings.Replace(filePath, "\\", "/", -1)
+	return strings.ReplaceAll(filePath, "\\", "/")
 }
 
 func IsWindows() bool {

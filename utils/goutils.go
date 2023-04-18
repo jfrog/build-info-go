@@ -305,11 +305,11 @@ func parseGoPath(goPath string) string {
 	return goPathSlice[0]
 }
 
-func getGoSum(rootProjectDir string, log Log) (sumFileContent []byte, sumFileStat os.FileInfo, err error) {
+func getGoSum(rootProjectDir string, log Log) (sumFileContent []byte, err error) {
 	sumFileExists, err := IsFileExists(filepath.Join(rootProjectDir, "go.sum"), true)
 	if err == nil && sumFileExists {
 		log.Debug("Sum file exists:", rootProjectDir)
-		sumFileContent, sumFileStat, err = GetFileContentAndInfo(filepath.Join(rootProjectDir, "go.sum"))
+		sumFileContent, _, err = GetFileContentAndInfo(filepath.Join(rootProjectDir, "go.sum"))
 	}
 	return
 }
