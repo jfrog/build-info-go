@@ -14,9 +14,10 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           args: |
-            -E=errcheck,gosimple,govet,ineffassign,staticcheck,typecheck,unused,gocritic,asasalint,asciicheck,errchkjson,
+            --timeout 5m
+            --enable errcheck,gosimple,govet,ineffassign,staticcheck,typecheck,unused,gocritic,asasalint,asciicheck,errchkjson,
             errname,exportloopref,forcetypeassert,makezero,nilerr,unparam,unconvert,wastedassign,usestdlibvars 
-            --timeout=5m
+  
 
   Go-Sec:
     runs-on: ubuntu-latest
