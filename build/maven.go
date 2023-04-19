@@ -16,10 +16,9 @@ const (
 	MavenHome                       = "M2_HOME"
 	MavenExtractorFileName          = "build-info-extractor-maven3-%s-uber.jar"
 	classworldsConfFileName         = "classworlds.conf"
-	PropertiesTempfolderName        = "properties"
+	PropertiesTempFolderName        = "properties"
 	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
-	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
-	MavenExtractorDependencyVersion = "2.39.8"
+	MavenExtractorDependencyVersion = "2.39.9"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -77,7 +76,7 @@ func newMavenModule(containingBuild *Build, srcPath string) (*MavenModule, error
 			goals:     []string{"compile"},
 			props:     extractorProps,
 			localPath: extractorLocalPath,
-			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempfolderName),
+			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempFolderName),
 		},
 	}, err
 }
