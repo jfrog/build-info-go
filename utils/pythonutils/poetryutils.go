@@ -171,25 +171,19 @@ func extractPoetryDependenciesFiles(srcPath string, cmdArgs []string, log utils.
 		}
 		dependenciesFiles[strings.ToLower(dependency)] = entities.Dependency{Id: fileName}
 		log.Debug(fmt.Sprintf("Found package: %s installed with: %s", dependency, fileName))
-
 	}
 	return
 }
-
 func getSitePackagesPath(commandArgs []string, srcPath string) (sitePackagesPath string, err error) {
 	// First run poetry install with verbose logging
 	commandArgs = append(commandArgs, "-vv")
 	installCmd := utils.NewCommand("poetry", "install", commandArgs)
 	installCmd.Dir = srcPath
 	// Extract the virtuL env path
-	virtualEnvRegexp, err := regexp.Compile(`^Using\svirtualenv:\s(.*)$`)
-	if err != nil {
-		return "", err
-	}
+	virtualEnvRegexp := regexp.MustCompile(`^Using\svirtualenv:\s(.*)$`)
 	virtualEnvNameParser := gofrogcmd.CmdOutputPattern{
 		RegExp: virtualEnvRegexp,
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-
 			// Check for out of bound results.
 			if len(pattern.MatchedResults)-1 < 0 {
 				return "", nil

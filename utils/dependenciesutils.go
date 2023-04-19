@@ -35,7 +35,7 @@ func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downlo
 		return downloadExtractorFunc(absFileName, downloadPath)
 	}
 	extractorUrl := "https://releases.jfrog.io/artifactory/oss-release-local/" + downloadPath
-	logger.Info("Downloading build-info-extractor from", extractorUrl, " to ", downloadTo)
+	logger.Info("Downloading build-info-extractor from", extractorUrl, "to", downloadTo)
 	return DownloadFile(absFileName, extractorUrl)
 }
 
@@ -70,8 +70,8 @@ func CreateExtractorPropsFile(extractorConfPath, buildInfoPath, buildName, build
 	return propertiesFile.Name(), writeProps(propertiesFile, configProperties, buildProperties)
 }
 
-func DownloadDependencies(downloadTo, filename, relativefilePath string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger Log) error {
-	downloadPath := path.Join(relativefilePath, filename)
+func DownloadDependencies(downloadTo, filename, relativeFilePath string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger Log) error {
+	downloadPath := path.Join(relativeFilePath, filename)
 	return downloadExtractorIfNeeded(downloadTo, filename, downloadPath, downloadExtractorFunc, logger)
 }
 

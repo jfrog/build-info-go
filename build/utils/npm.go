@@ -388,7 +388,7 @@ func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, 
 	errResult = errBuffer.Bytes()
 	stdResult = outBuffer.Bytes()
 	if err != nil {
-		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(cmdArgs, " ") + "'\nError output is:\n" + string(errResult) + "\nCommand error: is:\n" + string(err.Error()))
+		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(cmdArgs, " ") + "'\nError output is:\n" + string(errResult) + "\nCommand error: is:\n" + err.Error())
 		return
 	}
 	log.Debug("npm " + npmCmd.String() + " standard output is:\n" + string(stdResult))

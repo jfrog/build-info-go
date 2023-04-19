@@ -48,7 +48,7 @@ func TestGetProjectDependencies(t *testing.T) {
 			tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", test.poetryProject))
 			defer cleanup()
 
-			graph, directDependencies, err := getPoetryDependencies(filepath.Join(tmpProjectPath))
+			graph, directDependencies, err := getPoetryDependencies(tmpProjectPath)
 			assert.NoError(t, err)
 			sort.Strings(directDependencies)
 			if !reflect.DeepEqual(directDependencies, test.expectedDirectDependencies) {
