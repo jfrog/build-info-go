@@ -37,7 +37,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Setup Pipenv
-        run: pip3 install pipenv
+        run: python -m pip install pipenv
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
