@@ -202,7 +202,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 			return "", err
 		}
 	}
-	mm.containingBuild.logger.Debug("Maven home location: ", mavenHome)
+	mm.containingBuild.logger.Debug("Maven home location:", mavenHome)
 
 	return
 }
@@ -243,7 +243,7 @@ func (mm *MavenModule) getExecutableName() (maven string, err error) {
 }
 
 func (mm *MavenModule) execMavenVersion(maven string) (stdout bytes.Buffer, err error) {
-	mm.containingBuild.logger.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
+	mm.containingBuild.logger.Debug(MavenHome, "is not defined. Retrieving Maven home using 'mvn --version' command.")
 	cmd := exec.Command(maven, "--version")
 	cmd.Stdout = &stdout
 	err = cmd.Run()
