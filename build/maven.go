@@ -141,6 +141,7 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 		goals:               mm.extractorDetails.goals,
 		buildInfoProperties: extractorProps,
 		mavenOpts:           mm.extractorDetails.mavenOpts,
+		logger:              mm.containingBuild.logger,
 	}, nil
 }
 
@@ -313,12 +314,17 @@ type mvnRunConfig struct {
 	goals               []string
 	buildInfoProperties string
 	mavenOpts           []string
+	logger              utils.Log
 }
 
 func (config *mvnRunConfig) runCmd() error {
 	command := config.GetCmd()
-	command.Stderr = os.Stderr
-	command.Stdout = os.Stderr
+	outputBuffer := bytes.NewBuffer([]byte{})
+	command.Stdout = outputBuffer
+	command.Stderr = outputBuffer
 	command.Dir = config.workspace
-	return command.Run()
+	config.logger.Info("Running mvn command:", strings.Join(command.Args, " "))
+	err := command.Run()
+	config.logger.Info(outputBuffer.String())
+	return err
 }
