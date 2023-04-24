@@ -61,6 +61,9 @@ func (nm *NpmModule) Build() error {
 		// After executing the user-provided command, cleaning npmArgs is needed.
 		nm.filterNpmArgsFlags()
 	}
+	if !nm.containingBuild.buildNameAndNumberProvided() {
+		return nil
+	}
 	return nm.CalcDependencies()
 }
 
