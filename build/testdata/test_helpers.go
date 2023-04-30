@@ -22,6 +22,7 @@ func CreateTestProject(t *testing.T, projectPath string) (tmpProjectPath string,
 	assert.NoError(t, err)
 	assert.NoError(t, utils.CopyDir(projectPath, tmpProjectPath, true, nil))
 	cleanup = func() {
+		assert.NoError(t, os.Chdir(projectPath))
 		assert.NoError(t, utils.RemoveTempDir(tmpProjectPath))
 	}
 	return
