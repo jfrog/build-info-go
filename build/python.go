@@ -40,7 +40,7 @@ func (pm *PythonModule) RunInstallAndCollectDependencies(commandArgs []string) e
 	// Get package-name.
 	packageName, pkgNameErr := pythonutils.GetPackageName(pm.tool, pm.srcPath)
 	if pkgNameErr != nil {
-		pm.containingBuild.logger.Debug("Couldn't retrieve the package name. Reason: ", pkgNameErr.Error())
+		pm.containingBuild.logger.Debug("Couldn't retrieve the package name. Reason:", pkgNameErr.Error())
 	}
 	// If module-name was set by the command, don't change it.
 	if pm.name == "" {
