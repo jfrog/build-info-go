@@ -319,12 +319,9 @@ type mvnRunConfig struct {
 
 func (config *mvnRunConfig) runCmd() error {
 	command := config.GetCmd()
-	outputBuffer := bytes.NewBuffer([]byte{})
-	command.Stdout = outputBuffer
-	command.Stderr = outputBuffer
+	command.Stderr = os.Stderr
+	command.Stdout = os.Stderr
 	command.Dir = config.workspace
 	config.logger.Info("Running mvn command:", strings.Join(command.Args, " "))
-	err := command.Run()
-	config.logger.Info(outputBuffer.String())
-	return err
+	return command.Run()
 }
