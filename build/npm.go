@@ -99,6 +99,9 @@ func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {
 // This function discards the npm command in npmArgs and keeps only the command flags.
 // It is necessary for the npm command's name to come before the npm command's flags in npmArgs for the function to work correctly.
 func (nm *NpmModule) filterNpmArgsFlags() {
+	if len(nm.npmArgs) == 1 && !strings.HasPrefix(nm.npmArgs[0], "-") {
+		nm.npmArgs = []string{}
+	}
 	for argIndex := 0; argIndex < len(nm.npmArgs); argIndex++ {
 		if strings.HasPrefix(nm.npmArgs[argIndex], "-") {
 			nm.npmArgs = nm.npmArgs[argIndex:]
