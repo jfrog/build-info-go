@@ -13,11 +13,12 @@ import (
 const minSupportedNpmVersion = "5.4.0"
 
 type NpmModule struct {
-	containingBuild *Build
-	name            string
-	srcPath         string
-	executablePath  string
-	npmArgs         []string
+	containingBuild  *Build
+	name             string
+	srcPath          string
+	executablePath   string
+	npmArgs          []string
+	collectBuildInfo bool
 }
 
 // Pass an empty string for srcPath to find the npm project in the working directory.
@@ -61,7 +62,7 @@ func (nm *NpmModule) Build() error {
 		// After executing the user-provided command, cleaning npmArgs is needed.
 		nm.filterNpmArgsFlags()
 	}
-	if !nm.containingBuild.buildNameAndNumberProvided() {
+	if !nm.collectBuildInfo {
 		return nil
 	}
 	return nm.CalcDependencies()
@@ -86,6 +87,10 @@ func (nm *NpmModule) SetName(name string) {
 
 func (nm *NpmModule) SetNpmArgs(npmArgs []string) {
 	nm.npmArgs = npmArgs
+}
+
+func (nm *NpmModule) SetCollectBuildInfo(collectBuildInfo bool) {
+	nm.collectBuildInfo = collectBuildInfo
 }
 
 func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {
