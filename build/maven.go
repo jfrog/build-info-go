@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
@@ -29,6 +30,8 @@ const (
 	load ${m3plugin.lib}/*.jar
 	`
 )
+
+var mavenHomeRegex = regexp.MustCompile(`^Maven\shome:\s(.+)`)
 
 type MavenModule struct {
 	// The build which contains the maven module.
@@ -259,13 +262,15 @@ func (mm *MavenModule) execMavenVersion(maven string) (stdout bytes.Buffer, err 
 func (mm *MavenModule) extractMavenPath(mavenVersionOutput bytes.Buffer) (mavenHome string, err error) {
 	mavenVersionResultInArray := strings.Split(strings.TrimSpace(mavenVersionOutput.String()), "\n")
 	for _, line := range mavenVersionResultInArray {
-		if !strings.HasPrefix(line, "Maven home:") {
-			continue
+		line = strings.TrimSpace(line)
+		// Search for 'Maven home: /path/to/maven/home' line
+		regexMatch := mavenHomeRegex.FindStringSubmatch(line)
+		if regexMatch != nil {
+			foundPath := regexMatch[1]
+			mavenHome, err = filepath.Abs(foundPath)
+			err = mm.determineError(foundPath, mavenVersionOutput.String(), err)
+			break
 		}
-		mavenHome = strings.Split(line, " ")[2]
-		mavenHome = strings.TrimSpace(mavenHome)
-		mavenHome, err = filepath.Abs(mavenHome)
-		err = mm.determineError(mavenHome, mavenVersionOutput.String(), err)
 	}
 	return
 }
