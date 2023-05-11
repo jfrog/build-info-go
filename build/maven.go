@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,6 +38,8 @@ type MavenModule struct {
 	srcPath string
 	// The Maven extractor (dependency) which calculates the build-info.
 	extractorDetails *extractorDetails
+	// A pipe to write the maven extractor output to.
+	outputWriter io.Writer
 }
 
 // Maven extractor is the engine for calculating the project dependencies.
@@ -90,6 +93,11 @@ func (mm *MavenModule) SetExtractorDetails(localExtractorPath, extractorPropsdir
 	if configProps != nil {
 		mm.extractorDetails.props = configProps
 	}
+	return mm
+}
+
+func (mm *MavenModule) SetOutputWriter(outputWriter io.Writer) *MavenModule {
+	mm.outputWriter = outputWriter
 	return mm
 }
 
@@ -169,7 +177,7 @@ func (mm *MavenModule) CalcDependencies() (err error) {
 			err = e
 		}
 	}()
-
+	mvnRunConfig.SetOutputWriter(mm.outputWriter)
 	mm.containingBuild.logger.Info("Running Mvn...")
 	return mvnRunConfig.runCmd()
 }
@@ -182,7 +190,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 		// Since Maven installation can be located in different locations,
 		// depending on the installation type and the OS (for example: For Mac with brew install: /usr/local/Cellar/maven/{version}/libexec or Ubuntu with debian: /usr/share/maven),
 		// we need to grab the location using the mvn --version command.
-		// First we will try lo look for 'mvn' in PATH.
+		// First, we will try to look for 'mvn' in PATH.
 		maven, err := mm.getExecutableName()
 		if err != nil {
 			return maven, err
@@ -315,12 +323,22 @@ type mvnRunConfig struct {
 	buildInfoProperties string
 	mavenOpts           []string
 	logger              utils.Log
+	outputWriter        io.Writer
+}
+
+func (config *mvnRunConfig) SetOutputWriter(outputWriter io.Writer) *mvnRunConfig {
+	config.outputWriter = outputWriter
+	return config
 }
 
 func (config *mvnRunConfig) runCmd() error {
 	command := config.GetCmd()
 	command.Stderr = os.Stderr
-	command.Stdout = os.Stderr
+	if config.outputWriter == nil {
+		command.Stdout = os.Stderr
+	} else {
+		command.Stdout = config.outputWriter
+	}
 	command.Dir = config.workspace
 	config.logger.Info("Running mvn command:", strings.Join(command.Args, " "))
 	return command.Run()
