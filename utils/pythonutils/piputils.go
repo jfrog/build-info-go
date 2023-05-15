@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
@@ -143,7 +142,7 @@ func GetPython3Executable() (string, string) {
 	windowsPyArg := ""
 	pythonExecutable, _ := exec.LookPath("python3")
 	if pythonExecutable == "" {
-		if runtime.GOOS == "windows" {
+		if utils.IsWindows() {
 			// If the OS is Windows try using Py Launcher: 'py -3'
 			pythonExecutable, _ = exec.LookPath("py")
 			if pythonExecutable != "" {
@@ -156,7 +155,6 @@ func GetPython3Executable() (string, string) {
 		}
 	}
 	return pythonExecutable, windowsPyArg
-
 }
 
 // Parse the output of 'python egg_info' command, in order to find the path of generated file 'PKG-INFO'.
@@ -188,10 +186,7 @@ func extractPackageNameFromEggBase(eggBase string) ([]byte, error) {
 // If pattern of package name of version not found, return an error.
 func getProjectIdFromFileContent(content []byte) (string, error) {
 	// Create package-name regexp.
-	packageNameRegexp, err := regexp.Compile(`(?m)^Name:\s(\w[\w-.]+)`)
-	if err != nil {
-		return "", err
-	}
+	packageNameRegexp := regexp.MustCompile(`(?m)^Name:\s(\w[\w-.]+)`)
 
 	// Find first nameMatch of packageNameRegexp.
 	nameMatch := packageNameRegexp.FindStringSubmatch(string(content))
@@ -200,10 +195,7 @@ func getProjectIdFromFileContent(content []byte) (string, error) {
 	}
 
 	// Create package-version regexp.
-	packageVersionRegexp, err := regexp.Compile(`(?m)^Version:\s(\w[\w-.]+)`)
-	if err != nil {
-		return "", err
-	}
+	packageVersionRegexp := regexp.MustCompile(`(?m)^Version:\s(\w[\w-.]+)`)
 
 	// Find first match of packageNameRegexp.
 	versionMatch := packageVersionRegexp.FindStringSubmatch(string(content))

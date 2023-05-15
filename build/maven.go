@@ -16,10 +16,9 @@ const (
 	MavenHome                       = "M2_HOME"
 	MavenExtractorFileName          = "build-info-extractor-maven3-%s-uber.jar"
 	classworldsConfFileName         = "classworlds.conf"
-	PropertiesTempfolderName        = "properties"
+	PropertiesTempFolderName        = "properties"
 	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
-	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
-	MavenExtractorDependencyVersion = "2.39.8"
+	MavenExtractorDependencyVersion = "2.39.9"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -77,7 +76,7 @@ func newMavenModule(containingBuild *Build, srcPath string) (*MavenModule, error
 			goals:     []string{"compile"},
 			props:     extractorProps,
 			localPath: extractorLocalPath,
-			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempfolderName),
+			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempFolderName),
 		},
 	}, err
 }
@@ -142,6 +141,7 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 		goals:               mm.extractorDetails.goals,
 		buildInfoProperties: extractorProps,
 		mavenOpts:           mm.extractorDetails.mavenOpts,
+		logger:              mm.containingBuild.logger,
 	}, nil
 }
 
@@ -203,7 +203,7 @@ func (mm *MavenModule) loadMavenHome() (mavenHome string, err error) {
 			return "", err
 		}
 	}
-	mm.containingBuild.logger.Debug("Maven home location: ", mavenHome)
+	mm.containingBuild.logger.Debug("Maven home location:", mavenHome)
 
 	return
 }
@@ -244,7 +244,7 @@ func (mm *MavenModule) getExecutableName() (maven string, err error) {
 }
 
 func (mm *MavenModule) execMavenVersion(maven string) (stdout bytes.Buffer, err error) {
-	mm.containingBuild.logger.Debug(MavenHome, " is not defined. Retrieving Maven home using 'mvn --version' command.")
+	mm.containingBuild.logger.Debug(MavenHome, "is not defined. Retrieving Maven home using 'mvn --version' command.")
 	cmd := exec.Command(maven, "--version")
 	cmd.Stdout = &stdout
 	err = cmd.Run()
@@ -314,6 +314,7 @@ type mvnRunConfig struct {
 	goals               []string
 	buildInfoProperties string
 	mavenOpts           []string
+	logger              utils.Log
 }
 
 func (config *mvnRunConfig) runCmd() error {
@@ -321,5 +322,6 @@ func (config *mvnRunConfig) runCmd() error {
 	command.Stderr = os.Stderr
 	command.Stdout = os.Stderr
 	command.Dir = config.workspace
+	config.logger.Info("Running mvn command:", strings.Join(command.Args, " "))
 	return command.Run()
 }

@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
@@ -16,7 +15,7 @@ const (
 	GradleExtractorFileName          = "build-info-extractor-gradle-%s-uber.jar"
 	gradleInitScriptTemplate         = "gradle.init"
 	GradleExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
-	GradleExtractorDependencyVersion = "4.31.8"
+	GradleExtractorDependencyVersion = "4.31.9"
 )
 
 type GradleModule struct {
@@ -38,7 +37,7 @@ type gradleExtractorDetails struct {
 	localPath string
 	// gradle tasks to build the project.
 	tasks []string
-	// Download the extracor from remote server.
+	// Download the extractor from remote server.
 	downloadExtractorFunc func(downloadTo, downloadFrom string) error
 	// Map of configurations for the extractor.
 	props map[string]string
@@ -59,7 +58,7 @@ func newGradleModule(containingBuild *Build, srcPath string) (*GradleModule, err
 		gradleExtractorDetails: &gradleExtractorDetails{
 			localPath: extractorLocalPath,
 			tasks:     []string{"artifactoryPublish"},
-			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempfolderName),
+			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempFolderName),
 			props:     map[string]string{},
 		},
 	}, err
@@ -145,8 +144,8 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 	}
 
 	gradlePluginPath := filepath.Join(gradleDependenciesDir, gradlePluginFilename)
-	gradlePluginPath = strings.Replace(gradlePluginPath, "\\", "\\\\", -1)
-	initScriptContent := strings.Replace(GradleInitScript, "${pluginLibDir}", gradlePluginPath, -1)
+	gradlePluginPath = strings.ReplaceAll(gradlePluginPath, "\\", "\\\\")
+	initScriptContent := strings.ReplaceAll(GradleInitScript, "${pluginLibDir}", gradlePluginPath)
 	if !utils.IsPathExists(gradleDependenciesDir) {
 		err = os.MkdirAll(gradleDependenciesDir, 0777)
 		if err != nil {
@@ -160,8 +159,8 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 func GetGradleExecPath(useWrapper bool) (string, error) {
 	if useWrapper {
 		execName := "gradlew"
-		if runtime.GOOS == "windows" {
-			execName = execName + ".bat"
+		if utils.IsWindows() {
+			execName += ".bat"
 		}
 		// The Go1.19 update added the restriction that executables in the current directory are not resolved when the only executable name is provided.
 		return "." + string(os.PathSeparator) + execName, nil

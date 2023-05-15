@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -107,19 +106,19 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 		err = os.Rename(filepath.Join(goModPath, "go.sum"), filepath.Join(goModPath, "go.sum.txt"))
 		assert.NoError(t, err)
 	}()
-	originSumFileContent, _, err := getGoSum(goModPath, log)
+	originSumFileContent, err := getGoSum(goModPath, log)
 	err = os.Rename(filepath.Join(goModPath, "test.go.txt"), filepath.Join(goModPath, "test.go"))
 	assert.NoError(t, err)
 	defer func() {
 		err := os.Rename(filepath.Join(goModPath, "test.go"), filepath.Join(goModPath, "test.go.txt"))
 		assert.NoError(t, err)
 	}()
-	actual, err := GetDependenciesList(filepath.Join(goModPath), log)
+	actual, err := GetDependenciesList(goModPath, log)
 	assert.NoError(t, err)
 
 	// Since Go 1.16 'go list' command won't automatically update go.mod and go.sum.
 	// Check that we roll back changes properly.
-	newSumFileContent, _, err := getGoSum(goModPath, log)
+	newSumFileContent, err := getGoSum(goModPath, log)
 	assert.Equal(t, newSumFileContent, originSumFileContent, "go.sum has been modified and didn't rollback properly")
 
 	expected := map[string]bool{
@@ -133,7 +132,7 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 
 func TestParseGoPathWindows(t *testing.T) {
 	log := NewDefaultLogger(DEBUG)
-	if runtime.GOOS != "windows" {
+	if !IsWindows() {
 		log.Debug("Skipping the test since not running on Windows OS")
 		return
 	}
@@ -151,7 +150,7 @@ func TestParseGoPathWindows(t *testing.T) {
 }
 
 func TestParseGoPathUnix(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if IsWindows() {
 		return
 	}
 	tests := []struct {
