@@ -77,8 +77,7 @@ func TestFilterNpmArgsFlags(t *testing.T) {
 	assert.NoError(t, err)
 	npmModule.SetNpmArgs(npmArgs)
 	npmModule.filterNpmArgsFlags()
-	var expected []string
-	expected = append(expected, "--package-lock-only")
+	expected := []string{"--package-lock-only"}
 	assert.Equal(t, expected, npmModule.npmArgs)
 	npmArgs = []string{"config", "cache", "--json", "--all"}
 	npmModule.SetNpmArgs(npmArgs)
