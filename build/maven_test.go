@@ -79,19 +79,11 @@ func getExpectedMavenBuildInfo(t *testing.T, filePath string) entities.BuildInfo
 }
 
 func TestExtractMavenPath(t *testing.T) {
+	// Create mock mavenBuild
 	service := NewBuildInfoService()
-	mavenBuild, err := service.GetOrCreateBuild("build-info-maven-test", "1")
+	mavenBuild, err := service.GetOrCreateBuild("", "")
 	assert.NoError(t, err)
-	defer assert.NoError(t, mavenBuild.Clean())
-
-	testdataDir, err := filepath.Abs("testdata")
-	assert.NoError(t, err)
-	// Create maven project
-	projectPath := filepath.Join(testdataDir, "maven", "project")
-	tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, projectPath)
-	defer cleanup()
-	// Add maven project as module in build-info.
-	mavenModule, err := mavenBuild.AddMavenModule(tmpProjectPath)
+	mavenModule, err := mavenBuild.AddMavenModule("")
 	assert.NoError(t, err)
 
 	allTests := []struct {
@@ -99,9 +91,9 @@ func TestExtractMavenPath(t *testing.T) {
 		mavenVersionResultSecondLine string
 		mavenVersionResultThirdLine  string
 	}{
-		{"Maven home: /test/is/good", "Home: /test/is/not/good", "Mvn Home:= /test/is/not/good"},
-		{"Home: /test/is/not/good", "Maven home: /test/is/good", "Mvn Home:= /test/is/not/good"},
-		{"Mvn Home:= /test/is/not/good", "Home: /test/is/not/good", "Maven home: /test/is/good"},
+		{"Maven home: /Program Files/Maven/apache-maven-3.9.1", "Home: /test/is/not/good", "Mvn Home:= /test/is/not/good"},
+		{"Home: /test/is/not/good", "Maven home: /Program Files/Maven/apache-maven-3.9.1", "Mvn Home:= /test/is/not/good"},
+		{"Mvn Home:= /test/is/not/good", "Home: /test/is/not/good", "Maven home: /Program Files/Maven/apache-maven-3.9.1"},
 	}
 
 	for _, test := range allTests {
@@ -115,9 +107,9 @@ func TestExtractMavenPath(t *testing.T) {
 		mavenHome, err := mavenModule.extractMavenPath(data1)
 		assert.NoError(t, err)
 		if utils.IsWindows() {
-			assert.Equal(t, "D:\\test\\is\\good", mavenHome)
+			assert.Equal(t, "D:\\Program Files\\Maven\\apache-maven-3.9.1", mavenHome)
 		} else {
-			assert.Equal(t, "/test/is/good", mavenHome)
+			assert.Equal(t, "/Program Files/Maven/apache-maven-3.9.1", mavenHome)
 		}
 	}
 }
