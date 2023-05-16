@@ -99,9 +99,8 @@ func (mm *MavenModule) SetExtractorDetails(localExtractorPath, extractorPropsdir
 	return mm
 }
 
-func (mm *MavenModule) SetOutputWriter(outputWriter io.Writer) *MavenModule {
+func (mm *MavenModule) SetOutputWriter(outputWriter io.Writer) {
 	mm.outputWriter = outputWriter
-	return mm
 }
 
 func (mm *MavenModule) SetMavenGoals(goals ...string) {
