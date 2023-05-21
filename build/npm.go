@@ -3,6 +3,7 @@ package build
 import (
 	"errors"
 	"os"
+	"strings"
 
 	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
@@ -12,11 +13,12 @@ import (
 const minSupportedNpmVersion = "5.4.0"
 
 type NpmModule struct {
-	containingBuild *Build
-	name            string
-	srcPath         string
-	executablePath  string
-	npmArgs         []string
+	containingBuild  *Build
+	name             string
+	srcPath          string
+	executablePath   string
+	npmArgs          []string
+	collectBuildInfo bool
 }
 
 // Pass an empty string for srcPath to find the npm project in the working directory.
@@ -50,6 +52,22 @@ func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 	return &NpmModule{name: name, srcPath: srcPath, containingBuild: containingBuild, executablePath: executablePath}, nil
 }
 
+func (nm *NpmModule) Build() error {
+	if len(nm.npmArgs) > 0 {
+		_, errData, err := buildutils.RunNpmCmd(nm.executablePath, nm.srcPath, nm.npmArgs, &utils.NullLog{})
+		if err != nil {
+			// NpmArgs[0] includes the npm command.
+			return errors.New("couldn't run npm " + nm.npmArgs[0] + ": " + string(errData))
+		}
+		// After executing the user-provided command, cleaning npmArgs is needed.
+		nm.filterNpmArgsFlags()
+	}
+	if !nm.collectBuildInfo {
+		return nil
+	}
+	return nm.CalcDependencies()
+}
+
 func (nm *NpmModule) CalcDependencies() error {
 	if !nm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
@@ -71,10 +89,27 @@ func (nm *NpmModule) SetNpmArgs(npmArgs []string) {
 	nm.npmArgs = npmArgs
 }
 
+func (nm *NpmModule) SetCollectBuildInfo(collectBuildInfo bool) {
+	nm.collectBuildInfo = collectBuildInfo
+}
+
 func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {
 	if !nm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to add artifacts")
 	}
 	partial := &entities.Partial{ModuleId: nm.name, ModuleType: entities.Npm, Artifacts: artifacts}
 	return nm.containingBuild.SavePartialBuildInfo(partial)
+}
+
+// This function discards the npm command in npmArgs and keeps only the command flags.
+// It is necessary for the npm command's name to come before the npm command's flags in npmArgs for the function to work correctly.
+func (nm *NpmModule) filterNpmArgsFlags() {
+	if len(nm.npmArgs) == 1 && !strings.HasPrefix(nm.npmArgs[0], "-") {
+		nm.npmArgs = []string{}
+	}
+	for argIndex := 0; argIndex < len(nm.npmArgs); argIndex++ {
+		if strings.HasPrefix(nm.npmArgs[argIndex], "-") {
+			nm.npmArgs = nm.npmArgs[argIndex:]
+		}
+	}
 }

@@ -188,7 +188,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 
 	// Run npm CI to create this special case where the 'ansi-regex:5.0.0' is missing the integrity.
 	npmArgs := []string{"--cache=" + filepath.Join(projectPath, "tmpcache")}
-	_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
+	_, _, err = RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs, "ci"), logger)
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
@@ -210,7 +210,7 @@ func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
 
 	// Install all the project's dependencies.
 	npmArgs := []string{"--cache=" + cacachePath}
-	_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
+	_, _, err = RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs, "ci"), logger)
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
@@ -248,7 +248,7 @@ func TestNpmProdFlag(t *testing.T) {
 		npmArgs := []string{"--cache=" + cacachePath, entry.scope}
 
 		// Install dependencies in the npm project.
-		_, _, err = RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
+		_, _, err = RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs, "ci"), logger)
 		assert.NoError(t, err)
 
 		// Calculate dependencies with scope.
@@ -272,7 +272,7 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	npmArgs := []string{"--cache=" + cachePath}
 
 	// Install dependencies in the npm project.
-	_, _, err = RunNpmCmd("npm", projectPath, Install, npmArgs, innerLogger)
+	_, _, err = RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs, "install"), innerLogger)
 	assert.NoError(t, err)
 
 	configCache, err := GetNpmConfigCache(projectPath, "npm", npmArgs, innerLogger)
@@ -296,7 +296,7 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 // 2. node_module doesn't exist in the project and generating dependencies needs package-lock.
 func validateDependencies(t *testing.T, projectPath string, npmArgs []string) {
 	// Install dependencies in the npm project.
-	_, _, err := RunNpmCmd("npm", projectPath, Ci, npmArgs, logger)
+	_, _, err := RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs,"ci"), logger)
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
