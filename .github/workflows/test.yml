@@ -1,6 +1,9 @@
 name: Tests
-
-on: [ push, pull_request ]
+on:
+  push:
+    tags-ignore:
+      - '**'
+  pull_request:
 # Ensures that only the latest commit is running for each PR at a time.
 # Ignores this rule for push events.
 concurrency:
