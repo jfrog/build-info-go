@@ -27,7 +27,7 @@ func TestDownloadDependencies(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Make sure the Maven build-info extractor JAR and the classwords.conf file exist.
-	expectedJarPath := filepath.Join(tempDirPath, fmt.Sprintf(MavenExtractorFileName, MavenExtractorDependencyVersion))
+	expectedJarPath := filepath.Join(tempDirPath, fmt.Sprintf(MavenExtractorFileName, MavenExtractorDependencyVersion()))
 	assert.FileExists(t, expectedJarPath)
 	expectedClasswordsPath := filepath.Join(tempDirPath, "classworlds.conf")
 	assert.FileExists(t, expectedClasswordsPath)
