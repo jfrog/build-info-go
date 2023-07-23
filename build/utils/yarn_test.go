@@ -45,3 +45,13 @@ func TestGetYarnDependencies(t *testing.T) {
 	assert.Equal(t, "v1.0.0", root.Details.Version)
 	assert.Len(t, dependenciesMap, 3)
 }
+
+/*
+TESTS TO ADD:
+1) conversion from v1 unmarshall to v2 struct
+2) correct build of v1 root
+*/
+
+func TestBuildYarnV1DependencyMap(t *testing.T) {
+
+}
