@@ -208,6 +208,7 @@ func runYarnInfoOrList(executablePath string, srcPath string, v2AndAbove bool) (
 	err = command.Run()
 	outResult = strings.TrimSpace(outBuffer.String())
 	errResult = errBuffer.String()
+
 	if err != nil {
 		// urfave/cli (aka codegangsta) exits when an ExitError is returned, so if it's an ExitError we'll convert it to a regular error.
 		if _, ok := err.(*exec.ExitError); ok {
