@@ -15,7 +15,7 @@ const (
 	GradleExtractorFileName          = "build-info-extractor-gradle-%s-uber.jar"
 	gradleInitScriptTemplate         = "gradle.init"
 	GradleExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
-	GradleExtractorDependencyVersion = "4.31.9"
+	GradleExtractorDependencyVersion = "4.32.0"
 )
 
 type GradleModule struct {

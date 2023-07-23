@@ -56,7 +56,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 				// Here, we don't know where is the tarball (or if it is actually exists in the filesystem) so we can't calculate the dependency checksum.
 				// This case happens when the package-lock.json with property '"lockfileVersion": 1,' gets updated to version '"lockfileVersion": 2,' (from npm v6 to npm v7/v8).
 				// Seems like the compatibility upgrades may result in dependencies losing their integrity.
-				// We use the integrity to get's the dependencies tarball
+				// We use the integrity to get the dependencies tarball
 				otherMissingDeps = append(otherMissingDeps, dep.Id)
 				log.Debug("couldn't calculate checksum for " + dep.Id + ". Error: '" + err.Error() + "'.")
 				continue
@@ -120,7 +120,7 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 
 func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log) (data []byte) {
 	npmArgs = append(npmArgs, "--json", "--all", "--long")
-	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
 	if err != nil {
 		// It is optional for the function to return this error.
 		log.Warn("npm list command failed with error:", err.Error())
@@ -143,7 +143,7 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string
 		}
 	}
 	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
-	data, errData, err := RunNpmCmd(executablePath, srcPath, Ls, npmArgs, log)
+	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
 	if err != nil {
 		log.Warn("npm list command failed with error:", err.Error())
 	}
@@ -157,7 +157,7 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 	if npmVersion.AtLeast("6.0.0") {
 		npmArgs = append(npmArgs, "--package-lock-only")
 		// Installing package-lock to generate the dependencies map.
-		_, errData, err := RunNpmCmd(executablePath, srcPath, Install, npmArgs, log)
+		_, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "install"), log)
 		if err != nil {
 			return errors.New("Some errors occurred while installing package-lock: " + string(errData))
 		}
@@ -167,7 +167,7 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 }
 
 func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
-	versionData, _, err := RunNpmCmd(executablePath, "", Version, nil, log)
+	versionData, _, err := RunNpmCmd(executablePath, "", []string{"--version"}, log)
 	if err != nil {
 		return nil, err
 	}
@@ -352,33 +352,16 @@ func appendScopes(oldScopes []string, newScopes []string) []string {
 	return allScopes
 }
 
-type NpmCmd int
-
-const (
-	Ls NpmCmd = iota
-	Config
-	Install
-	Ci
-	Pack
-	Version
-)
-
-func (nc NpmCmd) String() string {
-	return [...]string{"ls", "config", "install", "ci", "pack", "-version"}[nc]
-}
-
-func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
-	log.Debug("Running npm " + npmCmd.String() + " command.")
-	cmdArgs := []string{npmCmd.String()}
+func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
+	log.Debug("Running npm " + npmArgs[0] + " command.")
 	tmpArgs := make([]string, 0)
 	for i := 0; i < len(npmArgs); i++ {
 		if strings.TrimSpace(npmArgs[i]) != "" {
 			tmpArgs = append(tmpArgs, npmArgs[i])
 		}
 	}
-	cmdArgs = append(cmdArgs, tmpArgs...)
 
-	command := exec.Command(executablePath, cmdArgs...)
+	command := exec.Command(executablePath, tmpArgs...)
 	command.Dir = srcPath
 	outBuffer := bytes.NewBuffer([]byte{})
 	command.Stdout = outBuffer
@@ -388,11 +371,20 @@ func RunNpmCmd(executablePath, srcPath string, npmCmd NpmCmd, npmArgs []string, 
 	errResult = errBuffer.Bytes()
 	stdResult = outBuffer.Bytes()
 	if err != nil {
-		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(cmdArgs, " ") + "'\nError output is:\n" + string(errResult) + "\nCommand error: is:\n" + err.Error())
+		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(tmpArgs, " ") + "'\nError output is:\n" + string(errResult) + "\nCommand error: is:\n" + err.Error())
 		return
 	}
-	log.Debug("npm " + npmCmd.String() + " standard output is:\n" + string(stdResult))
+	// The npm command is the first element in tmpArgs array.
+	log.Debug("npm " + tmpArgs[0] + " standard output is:\n" + string(stdResult))
 	return
+}
+
+// This function appends the Npm command as the first element in npmArgs strings array.
+// For example, if npmArgs equals {"--json", "--all"}, and we call appendNpmCommand(npmArgs, "ls"), we will get npmArgs = {"ls", "--json", "--all"}.
+func AppendNpmCommand(npmArgs []string, command string) []string {
+	termpArgs := []string{command}
+	termpArgs = append(termpArgs, npmArgs...)
+	return termpArgs
 }
 
 func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
@@ -410,7 +402,7 @@ func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 
 	log.Debug("Using npm executable:", npmExecPath)
 
-	versionData, _, err := RunNpmCmd(npmExecPath, "", Version, nil, log)
+	versionData, _, err := RunNpmCmd(npmExecPath, "", []string{"--version"}, log)
 	if err != nil {
 		return nil, "", err
 	}
@@ -485,7 +477,7 @@ func removeVersionPrefixes(packageInfo *PackageInfo) {
 // Default: Windows: %LocalAppData%\npm-cache, Posix: ~/.npm
 func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log utils.Log) (string, error) {
 	npmArgs = append([]string{"get", "cache"}, npmArgs...)
-	data, errData, err := RunNpmCmd(executablePath, srcPath, Config, append(npmArgs, "--json=false"), log)
+	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(append(npmArgs, "--json=false"), "config"), log)
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if len(errData) > 0 {
 		log.Warn("error while running the command :'" + executablePath + " " + strings.Join(npmArgs, " ") + ":\n" + string(errData))
