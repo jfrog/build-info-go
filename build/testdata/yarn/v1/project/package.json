@@ -1,0 +1,19 @@
+{
+  "name": "yarn-project",
+  "packageManager": "yarn@1.22.19",
+  "version": "v1.0.0",
+  "description": "test package for yarn v1",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "react": "18.2.0",
+    "xml": "1.0.1"
+  },
+  "devDependencies": {
+    "json": "9.0.6"
+  }
+}
