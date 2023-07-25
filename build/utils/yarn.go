@@ -94,7 +94,8 @@ func GetYarnExecutable() (string, error) {
 }
 
 // GetYarnDependencies returns a map of the dependencies of a Yarn project and the root package of the project.
-// The keys are the packages' values (Yarn's full identifiers of the packages), for example: '@scope/package-name@1.0.0'.
+// The keys are the packages' values (Yarn's full identifiers of the packages), for example: '@scope/package-name@1.0.0'
+// or @scope/package-name@npm:1.0.0 (depends on yarn version).
 // Pay attention that a package's value won't necessarily contain its version. Use the version in package's details instead.
 func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInfo, log utils.Log) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
 	executableVersion, err := getVersion(executablePath, srcPath)
