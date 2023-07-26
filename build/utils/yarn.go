@@ -4,14 +4,17 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/parallel"
 	"github.com/pkg/errors"
 	"os/exec"
 	"strings"
 	"sync"
+)
 
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/gofrog/parallel"
+const (
+	YarnV2Version = "2.0.0"
 )
 
 // Executes traverseDependenciesFunc on all dependencies in dependenciesMap. Each dependency that gets true in return, is added to dependenciesList.
@@ -91,12 +94,19 @@ func GetYarnExecutable() (string, error) {
 }
 
 // GetYarnDependencies returns a map of the dependencies of a Yarn project and the root package of the project.
-// The keys are the packages' values (Yarn's full identifiers of the packages), for example: '@scope/package-name@npm:1.0.0'.
+// The keys are the packages' values (Yarn's full identifiers of the packages), for example: '@scope/package-name@1.0.0'
+// (for yarn v < 2.0.0) or @scope/package-name@npm:1.0.0 (for yarn v >= 2.0.0).
 // Pay attention that a package's value won't necessarily contain its version. Use the version in package's details instead.
-// Note that in some versions of Yarn, the version of the root package is '0.0.0-use.local', instead of the version in the package.json file.
 func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInfo, log utils.Log) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
-	// Run 'yarn info'
-	responseStr, errStr, err := runYarnInfo(executablePath, srcPath)
+	executableVersion, err := getVersion(executablePath, srcPath)
+	if err != nil {
+		return
+	}
+
+	isV2AndAbove := strings.Compare(executableVersion, YarnV2Version) >= 0
+
+	// Run 'yarn info or list'
+	responseStr, errStr, err := runYarnInfoOrList(executablePath, srcPath, isV2AndAbove)
 	// Some warnings and messages of Yarn are printed to stderr. They don't necessarily cause the command to fail, but we'd want to show them to the user.
 	if len(errStr) > 0 {
 		log.Warn("An error occurred while collecting dependencies info:\n" + errStr)
@@ -111,6 +121,69 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 		err = nil
 	}
 
+	if isV2AndAbove {
+		dependenciesMap, root, err = buildYarnV2DependencyMap(packageInfo, responseStr)
+	} else {
+		dependenciesMap, root, err = buildYarnV1DependencyMap(packageInfo, responseStr)
+	}
+	return
+}
+
+// getVersion gets the current project's yarn version
+func getVersion(executablePath, srcPath string) (string, error) {
+	command := exec.Command(executablePath, "--version")
+	command.Dir = srcPath
+	outBuffer := bytes.NewBuffer([]byte{})
+	command.Stdout = outBuffer
+	errBuffer := bytes.NewBuffer([]byte{})
+	command.Stderr = errBuffer
+	err := command.Run()
+	if _, ok := err.(*exec.ExitError); ok {
+		err = errors.New(err.Error())
+	}
+	return strings.TrimSpace(outBuffer.String()), err
+}
+
+// buildYarnV1DependencyMap builds a map of dependencies for Yarn versions < 2.0.0
+// Pay attention that in Yarn < 2.0.0 the project itself with its direct dependencies is not presented when running the
+// command 'yarn list' therefore the root is built manually.
+func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
+	dependenciesMap = make(map[string]*YarnDependency)
+	var depTree Yarn1Data
+	err = json.Unmarshal([]byte(responseStr), &depTree)
+	if err != nil {
+		return
+	}
+
+	locatorsMap := make(map[string]string)
+	for _, curDependency := range depTree.Data.DepTree {
+		locatorsMap[curDependency.Name[:strings.Index(curDependency.Name[1:], "@")+1]] = curDependency.Name
+	}
+
+	for _, curDependency := range depTree.Data.DepTree {
+		var dependency YarnDependency
+		dependency.Value = curDependency.Name
+		version := curDependency.Name[strings.Index(curDependency.Name[1:], "@")+2:] // TODO make sure the +2 is ok, suppose to cover a package that starts with @
+		packageCleanName := curDependency.Name[:strings.Index(curDependency.Name[1:], "@")+1]
+		locatorsMap[packageCleanName] = curDependency.Name
+
+		dependency.Details = YarnDepDetails{version, nil}
+		for _, subDep := range curDependency.Dependencies {
+			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, ""})
+			subDependency := &(dependency.Details.Dependencies[len(dependency.Details.Dependencies)-1])
+			subDependency.Locator = locatorsMap[subDep.DependencyName[:strings.Index(subDep.DependencyName[1:], "@")+1]]
+		}
+		dependenciesMap[curDependency.Name] = &dependency
+	}
+
+	root = buildYarn1Root(packageInfo, &locatorsMap)
+	dependenciesMap[root.Value] = root
+	return
+}
+
+// buildYarnV2DependencyMap builds a map of dependencies for Yarn version >= 2.0.0
+// Note that in some versions of Yarn, the version of the root package is '0.0.0-use.local', instead of the version in the package.json file.
+func buildYarnV2DependencyMap(packageInfo *PackageInfo, responseStr string) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
 	dependenciesMap = make(map[string]*YarnDependency)
 	scanner := bufio.NewScanner(strings.NewReader(responseStr))
 
@@ -129,17 +202,21 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 			if currDependency.Details.Version == "0.0.0-use.local" {
 				currDependency.Details.Version = packageInfo.Version
 			}
-
 			root = &currDependency
 		}
-
 		dependenciesMap[currDependency.Value] = &currDependency
 	}
 	return
 }
 
-func runYarnInfo(executablePath, srcPath string) (outResult, errResult string, err error) {
-	command := exec.Command(executablePath, "info", "--all", "--recursive", "--json")
+// runYarnInfoOrList depends on the yarn version currently operating on the project, runs the command that gets the dependencies of the project
+func runYarnInfoOrList(executablePath string, srcPath string, v2AndAbove bool) (outResult, errResult string, err error) {
+	var command *exec.Cmd
+	if v2AndAbove {
+		command = exec.Command(executablePath, "info", "--all", "--recursive", "--json")
+	} else {
+		command = exec.Command(executablePath, "list", "--json", "--flat", "--no-progress")
+	}
 	command.Dir = srcPath
 	outBuffer := bytes.NewBuffer([]byte{})
 	command.Stdout = outBuffer
@@ -148,6 +225,7 @@ func runYarnInfo(executablePath, srcPath string) (outResult, errResult string, e
 	err = command.Run()
 	outResult = strings.TrimSpace(outBuffer.String())
 	errResult = errBuffer.String()
+
 	if err != nil {
 		// urfave/cli (aka codegangsta) exits when an ExitError is returned, so if it's an ExitError we'll convert it to a regular error.
 		if _, ok := err.(*exec.ExitError); ok {
@@ -172,6 +250,47 @@ func GetYarnDependencyKeyFromLocator(yarnDepLocator string) string {
 	return yarnDepLocator[:virtualIndex+1] + yarnDepLocator[hashSignIndex+1:]
 }
 
+// buildYarn1Root builds the root of the project's dependency tree (from direct dependencies in package.json)
+func buildYarn1Root(packageInfo *PackageInfo, locatorsMap *map[string]string) (root *YarnDependency) {
+	var rootDependency YarnDependency
+	rootDependency.Value = packageInfo.Name
+	version := packageInfo.Version
+	rootDependency.Details = YarnDepDetails{version, nil}
+	for directDepName := range packageInfo.Dependencies {
+		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*locatorsMap)[directDepName]})
+	}
+	for directDepName := range packageInfo.DevDependencies {
+		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*locatorsMap)[directDepName]})
+	}
+	for directDepName := range packageInfo.PeerDependencies {
+		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*locatorsMap)[directDepName]})
+	}
+	for directDepName := range packageInfo.OptionalDependencies {
+		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*locatorsMap)[directDepName]})
+	}
+	root = &rootDependency
+	return
+}
+
+type Yarn1Data struct {
+	Data Yarn1DependencyTree `json:"data,omitempty"`
+}
+
+type Yarn1DependencyTree struct {
+	DepTree []Yarn1DependencyDetails `json:"trees,omitempty"`
+}
+
+type Yarn1DependencyDetails struct {
+	Name         string                   `json:"name,omitempty"`
+	Dependencies []Yarn1DependencyPointer `json:"children,omitempty"`
+	Color        string                   `json:"color"`
+}
+
+type Yarn1DependencyPointer struct {
+	DependencyName string `json:"name,omitempty"`
+	Shadow         bool   `json:"shadow,omitempty"`
+}
+
 type YarnDependency struct {
 	// The value is usually in this structure: @scope/package-name@npm:1.0.0
 	Value   string         `json:"value,omitempty"`
@@ -180,8 +299,12 @@ type YarnDependency struct {
 
 func (yd *YarnDependency) Name() string {
 	// Find the first index of '@', starting from position 1. In scoped dependencies (like '@jfrog/package-name@npm:1.2.3') we want to keep the first '@' as part of the name.
-	atSignIndex := strings.Index(yd.Value[1:], "@") + 1
-	return yd.Value[:atSignIndex]
+	if strings.Contains(yd.Value[1:], "@") {
+		atSignIndex := strings.Index(yd.Value[1:], "@") + 1
+		return yd.Value[:atSignIndex]
+	} else {
+		return yd.Value
+	}
 }
 
 type YarnDepDetails struct {
