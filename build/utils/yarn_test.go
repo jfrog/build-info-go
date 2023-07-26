@@ -72,7 +72,8 @@ func CheckGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 	// (i.e. new dependencies added) make sure to fix the checks below
 	assert.Len(t, dependenciesMap, 6)
 	for key, val := range dependenciesMap {
-		if strings.HasPrefix(key, "react") {
+		switch {
+		case strings.HasPrefix(key, "react"):
 			assert.Equal(t, val.Details.Version, "18.2.0")
 			assert.True(t, val.Details.Dependencies != nil)
 			subDependencies := []string{"loose-envify"}
@@ -80,17 +81,17 @@ func CheckGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 				packageName := depPointer.Locator[:strings.Index(depPointer.Locator[1:], "@")+1]
 				assert.Contains(t, subDependencies, packageName)
 			}
-		} else if strings.HasPrefix(key, "xml") {
+		case strings.HasPrefix(key, "xml"):
 			assert.Equal(t, val.Details.Version, "1.0.1")
 			assert.True(t, val.Details.Dependencies == nil)
-		} else if strings.HasPrefix(key, "json") {
+		case strings.HasPrefix(key, "json"):
 			assert.Equal(t, val.Details.Version, "9.0.6")
 			assert.True(t, val.Details.Dependencies == nil)
-		} else if strings.HasPrefix(key, "loose-envify") {
+		case strings.HasPrefix(key, "loose-envify"):
 			assert.True(t, val.Details.Dependencies != nil)
-		} else if strings.HasPrefix(key, "js-tokens") {
+		case strings.HasPrefix(key, "js-tokens"):
 			assert.True(t, val.Details.Dependencies == nil)
-		} else {
+		default:
 			if key != root.Value {
 				assert.Error(t, errors.New("Package"+key+"should not be inside the dependencyMap"))
 			}

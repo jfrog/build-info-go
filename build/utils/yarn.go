@@ -118,7 +118,6 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 		if responseStr == "" {
 			return
 		}
-		err = nil
 	}
 
 	if isV2AndAbove {
