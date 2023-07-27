@@ -99,7 +99,7 @@ func GetYarnExecutable() (string, error) {
 // (for yarn v < 2.0.0) or @scope/package-name@npm:1.0.0 (for yarn v >= 2.0.0).
 // Pay attention that a package's value won't necessarily contain its version. Use the version in package's details instead.
 func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInfo, log utils.Log) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
-	executableVersionStr, err := getVersion(executablePath, srcPath)
+	executableVersionStr, err := GetVersion(executablePath, srcPath)
 	if err != nil {
 		return
 	}
@@ -130,7 +130,7 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 }
 
 // getVersion gets the current project's yarn version
-func getVersion(executablePath, srcPath string) (string, error) {
+func GetVersion(executablePath, srcPath string) (string, error) {
 	command := exec.Command(executablePath, "--version")
 	command.Dir = srcPath
 	outBuffer := bytes.NewBuffer([]byte{})
