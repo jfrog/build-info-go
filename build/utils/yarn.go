@@ -7,6 +7,7 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/parallel"
+	"github.com/jfrog/gofrog/version"
 	"github.com/pkg/errors"
 	"os/exec"
 	"strings"
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	YarnV2Version = "2.0.0"
+	yarnV2Version = "2.0.0"
 )
 
 // Executes traverseDependenciesFunc on all dependencies in dependenciesMap. Each dependency that gets true in return, is added to dependenciesList.
@@ -98,12 +99,12 @@ func GetYarnExecutable() (string, error) {
 // (for yarn v < 2.0.0) or @scope/package-name@npm:1.0.0 (for yarn v >= 2.0.0).
 // Pay attention that a package's value won't necessarily contain its version. Use the version in package's details instead.
 func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInfo, log utils.Log) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
-	executableVersion, err := getVersion(executablePath, srcPath)
+	executableVersionStr, err := getVersion(executablePath, srcPath)
 	if err != nil {
 		return
 	}
 
-	isV2AndAbove := strings.Compare(executableVersion, YarnV2Version) >= 0
+	isV2AndAbove := version.NewVersion(executableVersionStr).Compare(yarnV2Version) <= 0
 
 	// Run 'yarn info or list'
 	responseStr, errStr, err := runYarnInfoOrList(executablePath, srcPath, isV2AndAbove)
@@ -151,7 +152,12 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 	var depTree Yarn1Data
 	err = json.Unmarshal([]byte(responseStr), &depTree)
 	if err != nil {
+		err = errors.New("Couldn't parse 'yarn list' results in order to create the dependencyMap:\n" + err.Error())
 		return
+	}
+
+	if depTree.Data.DepTree == nil {
+		err = errors.New("depTree struct in buildYarnV1DependencyMap got a nil value in depTree.Data.DepTree field which is required")
 	}
 
 	locatorsMap := make(map[string]string)
