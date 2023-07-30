@@ -113,6 +113,12 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 	if err != nil {
 		log.Warn("An error was thrown while collecting dependencies info: " + err.Error() + "\nCommand output:\n" + responseStr)
 
+		// Spacial case: when 'yarn install' didn't run on the project we will get an error with non-empty responseStr, therefore the error is treated here
+		if strings.Contains(responseStr, "run \"yarn install\" to update the lockfile") {
+			err = errors.New("Error: Fetching dependencies failed since '" + packageInfo.Name + "' doesn't present in your lockfile\nPlease run 'yarn install' to update lockfile\n" + err.Error())
+			return
+		}
+
 		// A returned error doesn't necessarily mean that the operation totally failed. If, in addition, the response is empty, then it probably failed.
 		if responseStr == "" {
 			return
