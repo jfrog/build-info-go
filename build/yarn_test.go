@@ -132,16 +132,16 @@ func TestCollectDepsForYarnProjectWithTraverse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
 	validateModule(t, buildInfo.Modules[0], 4, 0, "build-info-go-tests:v1.0.0", entities.Npm, true)
-	dependencies := []string{
-		buildInfo.Modules[0].Dependencies[0].Id,
-		buildInfo.Modules[0].Dependencies[1].Id,
-		buildInfo.Modules[0].Dependencies[2].Id,
-		buildInfo.Modules[0].Dependencies[3].Id,
+	var dependencies []string
+	for _, dep := range buildInfo.Modules[0].Dependencies {
+		dependencies = append(dependencies, dep.Id)
 	}
-	assert.Contains(t, dependencies, "js-tokens:4.0.0")
-	assert.Contains(t, dependencies, "json:9.0.6")
-	assert.Contains(t, dependencies, "loose-envify:1.4.0")
-	assert.Contains(t, dependencies, "react:18.2.0")
+
+	expectedDependencies := []string{"js-tokens:4.0.0", "json:9.0.6", "loose-envify:1.4.0", "react:18.2.0"}
+
+	for _, expectedDep := range expectedDependencies {
+		assert.Contains(t, dependencies, expectedDep)
+	}
 }
 
 func TestCollectDepsForYarnProjectWithErrorInTraverse(t *testing.T) {

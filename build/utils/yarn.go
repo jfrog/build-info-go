@@ -14,9 +14,7 @@ import (
 	"sync"
 )
 
-const (
-	yarnV2Version = "2.0.0"
-)
+const yarnV2Version = "2.0.0"
 
 // Executes traverseDependenciesFunc on all dependencies in dependenciesMap. Each dependency that gets true in return, is added to dependenciesList.
 func TraverseDependencies(dependenciesMap map[string]*entities.Dependency, traverseDependenciesFunc func(dependency *entities.Dependency) (bool, error), threads int) (dependenciesList []entities.Dependency, err error) {
@@ -139,7 +137,7 @@ func GetVersion(executablePath, srcPath string) (string, error) {
 	command.Stderr = errBuffer
 	err := command.Run()
 	if _, ok := err.(*exec.ExitError); ok {
-		err = errors.New(err.Error())
+		err = errors.New("An error occurred while attempting to run the 'yarn --version' command. The executed yarn version could not be retrieved:\n" + err.Error())
 	}
 	return strings.TrimSpace(outBuffer.String()), err
 }
@@ -157,12 +155,16 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 	}
 
 	if depTree.Data.DepTree == nil {
-		err = errors.New("depTree struct in buildYarnV1DependencyMap got a nil value in depTree.Data.DepTree field which is required")
+		err = errors.New("Error: (buildYarnV1DependencyMap) depTree struct received a nil value in a required field: depTree.Data.DepTree")
 	}
 
 	locatorsMap := make(map[string]string)
+
+	//re := regexp.MustCompile("^(?:\\s*|[^a-zA-Z@]*)(?:[^@\\r\\n]*@([^@\\r\\n]+))?\n")
 	for _, curDependency := range depTree.Data.DepTree {
 		locatorsMap[curDependency.Name[:strings.Index(curDependency.Name[1:], "@")+1]] = curDependency.Name
+		//match := re.FindStringSubmatch(curDependency.Name)
+		//fmt.Println(match)
 	}
 
 	for _, curDependency := range depTree.Data.DepTree {

@@ -25,13 +25,11 @@ func TestGetYarnDependencyKeyFromLocator(t *testing.T) {
 	}
 }
 
-func TestGetYarnDependenciesV2(t *testing.T) {
-	// This test creates and tests a yarn project with yarn version of 3.1.1
+func TestGetYarnV2Dependencies(t *testing.T) {
 	CheckGetYarnDependencies(t, "v2", []string{"json@npm:9.0.6", "react@npm:18.2.0", "xml@npm:1.0.1"})
 }
 
-func TestBuildYarnDependenciesV1(t *testing.T) {
-	// This test creates and tests a yarn project with yarn version of 1.22.19
+func TestBuildYarnV1Dependencies(t *testing.T) {
 	CheckGetYarnDependencies(t, "v1", []string{"json@9.0.6", "react@18.2.0", "xml@1.0.1"})
 }
 
@@ -46,14 +44,16 @@ func CheckGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
 
-	// collecting and creating arguments for command
+	// Collecting and creating arguments for the command
 	executablePath, err := GetYarnExecutable()
 	assert.NoError(t, err)
 	projectSrcPath := filepath.Join(testDataTarget, "project")
-	pacInfo := PackageInfo{Name: "build-info-go-tests", Version: "v1.0.0", Dependencies: make(map[string]string), DevDependencies: make(map[string]string)}
-	pacInfo.Dependencies["react"] = "18.2.0"
-	pacInfo.Dependencies["xml"] = "1.0.1"
-	pacInfo.DevDependencies["json"] = "9.0.6"
+	pacInfo := PackageInfo{
+		Name:            "build-info-go-tests",
+		Version:         "v1.0.0",
+		Dependencies:    map[string]string{"react": "18.2.0", "xml": "1.0.1"},
+		DevDependencies: map[string]string{"json": "9.0.6"},
+	}
 	dependenciesMap, root, err := GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
 
 	// general checks
@@ -68,32 +68,35 @@ func CheckGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 	}
 
 	// checking dependencyMap
-	// NOTICE: the test uses fixed package versions. if for some reason dependencies in those packages (with those versions) changes
-	// (i.e. new dependencies added) make sure to fix the checks below
 	assert.Len(t, dependenciesMap, 6)
-	for key, val := range dependenciesMap {
-		switch {
-		case strings.HasPrefix(key, "react"):
-			assert.Equal(t, val.Details.Version, "18.2.0")
-			assert.True(t, val.Details.Dependencies != nil)
+	for dependencyName, depInfo := range dependenciesMap {
+		splitDepName := strings.Split(dependencyName, "@")
+		if len(splitDepName) != 2 {
+			assert.Error(t, errors.New("Got an empty dependency name or in incorrect format ( expected: package-name@version ) "))
+		}
+
+		switch splitDepName[0] {
+		case "react":
+			assert.Equal(t, "18.2.0", depInfo.Details.Version)
+			assert.NotNil(t, depInfo.Details.Dependencies)
 			subDependencies := []string{"loose-envify"}
-			for _, depPointer := range val.Details.Dependencies {
+			for _, depPointer := range depInfo.Details.Dependencies {
 				packageName := depPointer.Locator[:strings.Index(depPointer.Locator[1:], "@")+1]
 				assert.Contains(t, subDependencies, packageName)
 			}
-		case strings.HasPrefix(key, "xml"):
-			assert.Equal(t, val.Details.Version, "1.0.1")
-			assert.True(t, val.Details.Dependencies == nil)
-		case strings.HasPrefix(key, "json"):
-			assert.Equal(t, val.Details.Version, "9.0.6")
-			assert.True(t, val.Details.Dependencies == nil)
-		case strings.HasPrefix(key, "loose-envify"):
-			assert.True(t, val.Details.Dependencies != nil)
-		case strings.HasPrefix(key, "js-tokens"):
-			assert.True(t, val.Details.Dependencies == nil)
+		case "xml":
+			assert.Equal(t, "1.0.1", depInfo.Details.Version)
+			assert.Nil(t, depInfo.Details.Dependencies)
+		case "json":
+			assert.Equal(t, "9.0.6", depInfo.Details.Version)
+			assert.Nil(t, depInfo.Details.Dependencies)
+		case "loose-envify":
+			assert.NotNil(t, depInfo.Details.Dependencies)
+		case "js-tokens":
+			assert.Nil(t, depInfo.Details.Dependencies)
 		default:
-			if key != root.Value {
-				assert.Error(t, errors.New("Package"+key+"should not be inside the dependencyMap"))
+			if dependencyName != root.Value {
+				assert.Error(t, errors.New("Package "+dependencyName+" should not be inside the dependencyMap"))
 			}
 		}
 	}
