@@ -31,12 +31,12 @@ func TestGetYarnV2Dependencies(t *testing.T) {
 
 func TestBuildYarnV1Dependencies(t *testing.T) {
 	checkGetYarnDependencies(t, "v1", []string{"json@9.0.6", "react@18.2.0", "xml@1.0.1"})
-
 }
 
 func TestGetYarnDependenciesUninstalled(t *testing.T) {
 	checkGetYarnDependenciesUninstalled(t, "uninstalled-v2")
 	checkGetYarnDependenciesUninstalled(t, "uninstalled-v3")
+
 }
 
 func checkGetYarnDependenciesUninstalled(t *testing.T, versionDir string) {
