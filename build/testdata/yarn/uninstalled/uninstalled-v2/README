@@ -1,0 +1,2 @@
+This suitcase is intended for testing yarn project without running 'yarn install' on it
+DO NOT RUN 'yarn install' on this project!
