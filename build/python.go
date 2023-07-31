@@ -2,10 +2,9 @@ package build
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
+	"os"
 )
 
 type PythonModule struct {

@@ -10,6 +10,7 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	gofrogcmd "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/gofrog/version"
 )
 
 const (
@@ -162,11 +163,11 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 
 	dependenciesMap := map[string]entities.Dependency{}
 
-	// Create regular expressions for log parsing.
-	collectingRegexp := regexp.MustCompile(`^Collecting\s(\w[\w-.]+)`)
-	downloadingRegexp := regexp.MustCompile(`^\s*Downloading\s([^\s]*)\s\(`)
-	usingCachedRegexp := regexp.MustCompile(`^\s*Using\scached\s([\S]+)\s\(`)
-	alreadySatisfiedRegexp := regexp.MustCompile(`^Requirement\salready\ssatisfied:\s(\w[\w-.]+)`)
+	// Create regular expressions for collecting information from log parsing.
+	collectingRegexp := regexp.MustCompile(`^Collecting\s*(\w[\w-.]+)`)
+	downloadingRegexp := regexp.MustCompile(`^\s*Downloading\s*([^\s]*)\s\(`)
+	usingCachedRegexp := regexp.MustCompile(`\s*Using\scached\s([\S]+)\s\(`)
+	alreadySatisfiedRegexp := regexp.MustCompile(`^Requirement\salready\ssatisfied:\s*(\w[\w-.]+)`)
 
 	var packageName string
 	expectingPackageFilePath := false
@@ -254,10 +255,53 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 		},
 	}
 
+	if tool == Pipenv {
+		ver, err := getPipEnvVersion(log)
+		if err != nil {
+			return nil, err
+		}
+		if ver.Compare("2023.7.23") == 1 || ver.Compare("2023.7.23") == 0 {
+			_, stderr, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true)
+			if err != nil {
+				return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), stderr)
+			}
+			stderr = strings.ReplaceAll(stderr, "\n", "")
+			usingCached := usingCachedRegexp.FindAllStringSubmatch(stderr, -1)
+			for _, current := range usingCached {
+				filePath := current[1]
+				lastSlashIndex := strings.LastIndex(filePath, "/")
+				var fileName string
+				if lastSlashIndex == -1 {
+					fileName = filePath
+				} else {
+					fileName = filePath[lastSlashIndex+1:]
+				}
+				dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
+			}
+		}
+	}
+
 	// Execute command.
 	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &cachedFileParser, &installedPackagesParser)
 	if err != nil {
 		return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
 	}
 	return dependenciesMap, nil
+}
+
+// todo: think if you need to pass the log.
+func getPipEnvVersion(log utils.Log) (*version.Version, error) {
+	if log == nil {
+		log = &utils.NullLog{}
+	}
+	versionData, err := gofrogcmd.RunCmdOutput(utils.NewCommand(string(Pipenv), "--version", []string{}))
+	if err != nil {
+		return nil, err
+	}
+	_, versionData, found := strings.Cut(versionData, "version ")
+	if !found {
+		return nil, errors.New("couldn't find pipenv version")
+	}
+	versionData = strings.Replace(versionData, "\n", "", -1)
+	return version.NewVersion(versionData), nil
 }
