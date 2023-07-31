@@ -36,7 +36,6 @@ func TestBuildYarnV1Dependencies(t *testing.T) {
 func TestGetYarnDependenciesUninstalled(t *testing.T) {
 	checkGetYarnDependenciesUninstalled(t, "uninstalled-v2")
 	checkGetYarnDependenciesUninstalled(t, "uninstalled-v3")
-
 }
 
 func checkGetYarnDependenciesUninstalled(t *testing.T, versionDir string) {
