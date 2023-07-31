@@ -26,14 +26,37 @@ func TestGetYarnDependencyKeyFromLocator(t *testing.T) {
 }
 
 func TestGetYarnV2Dependencies(t *testing.T) {
-	CheckGetYarnDependencies(t, "v2", []string{"json@npm:9.0.6", "react@npm:18.2.0", "xml@npm:1.0.1"})
+	checkGetYarnDependencies(t, "v2", []string{"json@npm:9.0.6", "react@npm:18.2.0", "xml@npm:1.0.1"})
 }
 
 func TestBuildYarnV1Dependencies(t *testing.T) {
-	CheckGetYarnDependencies(t, "v1", []string{"json@9.0.6", "react@18.2.0", "xml@1.0.1"})
+	checkGetYarnDependencies(t, "v1", []string{"json@9.0.6", "react@18.2.0", "xml@1.0.1"})
 }
 
-func CheckGetYarnDependencies(t *testing.T, versionDir string, expectedLocators []string) {
+func TestGetYarnDependenciesUninstalled(t *testing.T) {
+	checkGetYarnDependenciesUninstalled(t, "uninstalled-v2")
+	checkGetYarnDependenciesUninstalled(t, "uninstalled-v3")
+}
+
+func checkGetYarnDependenciesUninstalled(t *testing.T, versionDir string) {
+	tempDirPath, err := utils.CreateTempDir()
+	assert.NoError(t, err, "Couldn't create temp dir")
+	defer func() {
+		assert.NoError(t, utils.RemoveTempDir(tempDirPath), "Couldn't remove temp dir")
+	}()
+	testDataSource := filepath.Join("..", "testdata", "yarn", versionDir)
+	testDataTarget := filepath.Join(tempDirPath, "yarn")
+	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
+
+	executablePath, err := GetYarnExecutable()
+	assert.NoError(t, err)
+	projectSrcPath := filepath.Join(testDataTarget, "project")
+	pacInfo := PackageInfo{Name: "build-info-go-tests"}
+	_, _, err = GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
+	assert.Error(t, err)
+}
+
+func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators []string) {
 	// Copy the project directory to a temporary directory
 	tempDirPath, err := utils.CreateTempDir()
 	assert.NoError(t, err, "Couldn't create temp dir")
