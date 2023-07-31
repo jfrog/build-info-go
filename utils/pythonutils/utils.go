@@ -276,10 +276,10 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 				fileName = filePath[lastSlashIndex+1:]
 			}
 			dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
-			_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &installedPackagesParser)
-			if err != nil {
-				return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
-			}
+		}
+		_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &installedPackagesParser)
+		if err != nil {
+			return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
 		}
 	} else {
 		// Execute command.
