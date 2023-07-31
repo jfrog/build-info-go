@@ -258,7 +258,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	if err != nil {
 		return nil, err
 	}
-	verifyPipEnvVersion := ver.Compare("2023.7.23") == 1 || ver.Compare("2023.7.23") == 0
+	verifyPipEnvVersion := ver.Compare("2023.7.23") == -1 || ver.Compare("2023.7.23") == 0
 	if tool == Pipenv && verifyPipEnvVersion {
 		_, stderr, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true)
 		if err != nil {
@@ -275,7 +275,11 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			} else {
 				fileName = filePath[lastSlashIndex+1:]
 			}
-			dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
+			tempPackageName, err := GetPackageName(tool, filePath)
+			if err != nil {
+				return nil, err
+			}
+			dependenciesMap[strings.ToLower(tempPackageName)] = entities.Dependency{Id: fileName}
 		}
 		_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &installedPackagesParser)
 		if err != nil {
@@ -300,6 +304,6 @@ func getPipEnvVersion() (*version.Version, error) {
 	if !found {
 		return nil, errors.New("couldn't find pipenv version")
 	}
-	versionData = strings.Replace(versionData, "\n", "", -1)
+	versionData = strings.ReplaceAll(versionData, "\n", "")
 	return version.NewVersion(versionData), nil
 }
