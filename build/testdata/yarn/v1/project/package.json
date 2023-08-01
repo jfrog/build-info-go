@@ -1,5 +1,5 @@
 {
-  "name": "yarn-project",
+  "name": "build-info-go-tests",
   "packageManager": "yarn@1.22.19",
   "version": "v1.0.0",
   "description": "test package for yarn v1",
