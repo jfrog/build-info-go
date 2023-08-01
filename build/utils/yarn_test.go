@@ -1,9 +1,12 @@
 package utils
 
 import (
+	"bytes"
 	"errors"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -34,26 +37,57 @@ func TestBuildYarnV1Dependencies(t *testing.T) {
 }
 
 func TestGetYarnDependenciesUninstalled(t *testing.T) {
-	checkGetYarnDependenciesUninstalled(t, "uninstalled-v2")
-	checkGetYarnDependenciesUninstalled(t, "uninstalled-v3")
+	checkGetYarnDependenciesUninstalled(t, "2.4.0")
+	checkGetYarnDependenciesUninstalled(t, "latest")
 }
 
-func checkGetYarnDependenciesUninstalled(t *testing.T, versionDir string) {
+func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 	tempDirPath, err := utils.CreateTempDir()
 	assert.NoError(t, err, "Couldn't create temp dir")
 	defer func() {
 		assert.NoError(t, utils.RemoveTempDir(tempDirPath), "Couldn't remove temp dir")
 	}()
-	testDataSource := filepath.Join("..", "testdata", "yarn", versionDir)
+	testDataSource := filepath.Join("..", "testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
+	//assert.NoError(t, os.Chdir(testDataTarget))
 
 	executablePath, err := GetYarnExecutable()
 	assert.NoError(t, err)
 	projectSrcPath := filepath.Join(testDataTarget, "project")
+	err = updateDirYarnVersion(executablePath, projectSrcPath, versionToSet)
+	assert.NoError(t, err, "command failed: could not set version '"+versionToSet+"' to the test suitcase")
+
+	// Deleting yarn.lock content to make imitate the reverse action of 'yarn install'
+	lockFilePath := filepath.Join(projectSrcPath, "yarn.lock")
+	yarnLockFile, err := os.OpenFile(lockFilePath, os.O_WRONLY|os.O_TRUNC, 0666)
+	assert.NoError(t, err, "could not open yarn.lock file or could not truncate the file's content")
+	defer yarnLockFile.Close()
+
 	pacInfo := PackageInfo{Name: "build-info-go-tests"}
 	_, _, err = GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
 	assert.Error(t, err)
+}
+
+func updateDirYarnVersion(executablePath string, srcPath string, versionToSet string) (err error) {
+	var command *exec.Cmd
+	command = exec.Command(executablePath, "set", "version", versionToSet)
+
+	command.Dir = srcPath
+	outBuffer := bytes.NewBuffer([]byte{})
+	command.Stdout = outBuffer
+	errBuffer := bytes.NewBuffer([]byte{})
+	command.Stderr = errBuffer
+	err = command.Run()
+
+	if err != nil {
+		// urfave/cli (aka codegangsta) exits when an ExitError is returned, so if it's an ExitError we'll convert it to a regular error.
+		if _, ok := err.(*exec.ExitError); ok {
+			err = errors.New(err.Error())
+		}
+		return
+	}
+	return
 }
 
 func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators []string) {
