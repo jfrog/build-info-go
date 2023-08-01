@@ -50,7 +50,6 @@ func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 	testDataSource := filepath.Join("..", "testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
-	//assert.NoError(t, os.Chdir(testDataTarget))
 
 	executablePath, err := GetYarnExecutable()
 	assert.NoError(t, err)
@@ -62,7 +61,12 @@ func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 	lockFilePath := filepath.Join(projectSrcPath, "yarn.lock")
 	yarnLockFile, err := os.OpenFile(lockFilePath, os.O_WRONLY|os.O_TRUNC, 0666)
 	assert.NoError(t, err, "could not open yarn.lock file or could not truncate the file's content")
-	defer yarnLockFile.Close()
+	defer func(yarnLockFile *os.File) {
+		err := yarnLockFile.Close()
+		if err != nil {
+
+		}
+	}(yarnLockFile)
 
 	pacInfo := PackageInfo{Name: "build-info-go-tests"}
 	_, _, err = GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
@@ -70,8 +74,7 @@ func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 }
 
 func updateDirYarnVersion(executablePath string, srcPath string, versionToSet string) (err error) {
-	var command *exec.Cmd
-	command = exec.Command(executablePath, "set", "version", versionToSet)
+	command := exec.Command(executablePath, "set", "version", versionToSet)
 
 	command.Dir = srcPath
 	outBuffer := bytes.NewBuffer([]byte{})
