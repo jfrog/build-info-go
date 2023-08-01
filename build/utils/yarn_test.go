@@ -61,11 +61,14 @@ func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 	lockFilePath := filepath.Join(projectSrcPath, "yarn.lock")
 	yarnLockFile, err := os.OpenFile(lockFilePath, os.O_WRONLY|os.O_TRUNC, 0666)
 	assert.NoError(t, err, "could not open yarn.lock file or could not truncate the file's content")
-	defer yarnLockFile.Close()
+	defer func() {
+		assert.NoError(t, yarnLockFile.Close())
+	}()
 
 	pacInfo := PackageInfo{Name: "build-info-go-tests"}
 	_, _, err = GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
 	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "fetching dependencies failed since '"+pacInfo.Name+"' doesn't present in your lockfile\nPlease run 'yarn install' to update lockfile\n"))
 }
 
 func updateDirYarnVersion(executablePath string, srcPath string, versionToSet string) (err error) {
