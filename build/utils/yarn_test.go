@@ -59,11 +59,13 @@ func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 
 	// Deleting yarn.lock content to make imitate the reverse action of 'yarn install'
 	lockFilePath := filepath.Join(projectSrcPath, "yarn.lock")
-	yarnLockFile, err := os.OpenFile(lockFilePath, os.O_WRONLY|os.O_TRUNC, 0666)
-	assert.NoError(t, err, "could not open yarn.lock file or could not truncate the file's content")
+	yarnLockFile, err := os.OpenFile(lockFilePath, os.O_WRONLY, 0666)
+	assert.NoError(t, err, "could not open yarn.lock file")
 	defer func() {
 		assert.NoError(t, yarnLockFile.Close())
 	}()
+	err = yarnLockFile.Truncate(0) // This line erases the file's content without deleting the file itself
+	assert.NoError(t, err, "could not erase yarn.lock file content")
 
 	pacInfo := PackageInfo{Name: "build-info-go-tests"}
 	_, _, err = GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
