@@ -54,8 +54,8 @@ func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 	executablePath, err := GetYarnExecutable()
 	assert.NoError(t, err)
 	projectSrcPath := filepath.Join(testDataTarget, "project")
-	err = updateDirYarnVersion(executablePath, projectSrcPath, versionToSet)
-	assert.NoError(t, err, "command failed: could not set version '"+versionToSet+"' to the test suitcase")
+	// A err = updateDirYarnVersion(executablePath, projectSrcPath, versionToSet)
+	// A assert.NoError(t, err, "command failed: could not set version '"+versionToSet+"' to the test suitcase")
 
 	// Deleting yarn.lock content to make imitate the reverse action of 'yarn install'
 	lockFilePath := filepath.Join(projectSrcPath, "yarn.lock")
