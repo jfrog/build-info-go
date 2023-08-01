@@ -169,25 +169,17 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 	for _, curDependency := range depTree.Data.DepTree {
 		packageCleanName, _ := splitNameAndVersion(curDependency.Name)
 		locatorsMap[packageCleanName] = curDependency.Name
-		// locatorsMap[curDependency.Name[:strings.Index(curDependency.Name[1:], "@")+1]] = curDependency.Name
 	}
 
 	for _, curDependency := range depTree.Data.DepTree {
 		var dependency YarnDependency
 		dependency.Value = curDependency.Name
 		_, packageVersion := splitNameAndVersion(curDependency.Name)
-		// packageVersion := curDependency.Name[strings.Index(curDependency.Name[1:], "@")+2:] // TODO make sure the +2 is ok, suppose to cover a package that starts with @
-		// packageCleanName := curDependency.Name[:strings.Index(curDependency.Name[1:], "@")+1]
-		// locatorsMap[packageCleanName] = curDependency.Name
 
 		dependency.Details = YarnDepDetails{packageVersion, nil}
 		for _, subDep := range curDependency.Dependencies {
 			subDepName, _ := splitNameAndVersion(subDep.DependencyName)
 			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, locatorsMap[subDepName]})
-
-			// dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, ""})
-			// subDependency := &(dependency.Details.Dependencies[len(dependency.Details.Dependencies)-1])
-			// subDependency.Locator = locatorsMap[subDep.DependencyName[:strings.Index(subDep.DependencyName[1:], "@")+1]]
 		}
 		dependenciesMap[curDependency.Name] = &dependency
 	}
