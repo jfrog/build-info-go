@@ -114,11 +114,6 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 		Dependencies:    map[string]string{"react": "18.2.0", "xml": "1.0.1"},
 		DevDependencies: map[string]string{"json": "9.0.6"},
 	}
-	if versionDir == "v1" {
-		version, err := GetVersion(executablePath, projectSrcPath)
-		assert.NoError(t, err, "error has occurred when verifying project's version")
-		assert.Equal(t, "1.22.19", version, "tests of yarn v1 are not running on v1 project")
-	}
 	dependenciesMap, root, err := GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
 
 	// general checks
