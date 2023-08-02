@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/parallel"
 	"github.com/jfrog/gofrog/version"
-	"github.com/pkg/errors"
+	"golang.org/x/exp/maps"
 	"os/exec"
 	"strings"
 	"sync"
@@ -161,31 +162,44 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 	}
 
 	if depTree.Data.DepTree == nil {
-
 		err = errors.New("an error occurred while parsing dependencies - the dependencies tree received a null value in a mandatory field")
+		return
+	}
+	// NEW CODE
+	packNameToFullName := make(map[string]string)
+
+	// Initializing dependencies map without child dependencies for each dependency + creating a map that maps: package-name -> package-name@version
+	for _, curDependency := range depTree.Data.DepTree {
+		packageCleanName, packageVersion, err2 := splitNameAndVersion(curDependency.Name)
+		if err2 != nil {
+			err = errors.Join(err, err2)
+			return
+		}
+
+		dependenciesMap[curDependency.Name] = &YarnDependency{
+			Value:   curDependency.Name,
+			Details: YarnDepDetails{Version: packageVersion},
+		}
+		packNameToFullName[packageCleanName] = curDependency.Name
 	}
 
-	locatorsMap := make(map[string]string)
-
+	// Adding child dependencies for each dependency
 	for _, curDependency := range depTree.Data.DepTree {
-		packageCleanName, _ := splitNameAndVersion(curDependency.Name)
-		locatorsMap[packageCleanName] = curDependency.Name
-	}
+		dependency := *(dependenciesMap[curDependency.Name])
 
-	for _, curDependency := range depTree.Data.DepTree {
-		var dependency YarnDependency
-		dependency.Value = curDependency.Name
-		_, packageVersion := splitNameAndVersion(curDependency.Name)
-
-		dependency.Details = YarnDepDetails{packageVersion, nil}
 		for _, subDep := range curDependency.Dependencies {
-			subDepName, _ := splitNameAndVersion(subDep.DependencyName)
-			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, locatorsMap[subDepName]})
+			subDepName, _, err2 := splitNameAndVersion(subDep.DependencyName)
+			if err2 != nil {
+				err = errors.Join(err, err2)
+				return
+			}
+			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, packNameToFullName[subDepName]})
 		}
 		dependenciesMap[curDependency.Name] = &dependency
 	}
 
-	root = buildYarn1Root(packageInfo, &locatorsMap)
+	rootProject := buildYarn1Root(packageInfo, &packNameToFullName)
+	root = &rootProject
 	dependenciesMap[root.Value] = root
 	return
 }
@@ -260,28 +274,30 @@ func GetYarnDependencyKeyFromLocator(yarnDepLocator string) string {
 }
 
 // buildYarn1Root builds the root of the project's dependency tree (from direct dependencies in package.json)
-func buildYarn1Root(packageInfo *PackageInfo, locatorsMap *map[string]string) (root *YarnDependency) {
-	var rootDependency YarnDependency
-	rootDependency.Value = packageInfo.Name
-	rootDependency.Details = YarnDepDetails{packageInfo.Version, nil}
-	for directDepName := range packageInfo.Dependencies {
-		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*locatorsMap)[directDepName]})
+func buildYarn1Root(packageInfo *PackageInfo, packNameToFullName *map[string]string) YarnDependency {
+	rootDependency := YarnDependency{
+		Value:   packageInfo.Name,
+		Details: YarnDepDetails{Version: packageInfo.Version},
 	}
-	for directDepName := range packageInfo.DevDependencies {
-		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*locatorsMap)[directDepName]})
+
+	rootDeps := maps.Keys(packageInfo.Dependencies)
+	rootDeps = append(rootDeps, maps.Keys(packageInfo.DevDependencies)...)
+	rootDeps = append(rootDeps, maps.Keys(packageInfo.PeerDependencies)...)
+	rootDeps = append(rootDeps, maps.Keys(packageInfo.OptionalDependencies)...)
+
+	for _, directDepName := range rootDeps {
+		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*packNameToFullName)[directDepName]})
 	}
-	for directDepName := range packageInfo.PeerDependencies {
-		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*locatorsMap)[directDepName]})
-	}
-	for directDepName := range packageInfo.OptionalDependencies {
-		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*locatorsMap)[directDepName]})
-	}
-	root = &rootDependency
-	return
+	return rootDependency
 }
 
-func splitNameAndVersion(packageFullName string) (packageCleanName string, packageVersion string) {
+// splitNameAndVersion splits package name for package version for th following format ONLY: package-name@version
+func splitNameAndVersion(packageFullName string) (packageCleanName string, packageVersion string, err2 error) {
 	indexOfLastAt := strings.LastIndex(packageFullName, "@")
+	if indexOfLastAt == -1 {
+		err2 = errors.New("received package name of incorrect format (expected: package-name@version)")
+		return
+	}
 	packageCleanName = packageFullName[:indexOfLastAt]
 	packageVersion = packageFullName[indexOfLastAt+1:]
 	return

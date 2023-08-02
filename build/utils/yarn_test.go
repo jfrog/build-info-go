@@ -56,17 +56,17 @@ func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 	projectSrcPath := filepath.Join(testDataTarget, "project")
 
 	err = updateDirYarnVersion(executablePath, projectSrcPath, versionToSet)
-	assert.NoError(t, err, "command failed: could not set version '"+versionToSet+"' to the test suitcase")
+	assert.NoError(t, err, "could not set version '"+versionToSet+"' to the test suitcase")
 
 	// Deleting yarn.lock content to make imitate the reverse action of 'yarn install'
 	lockFilePath := filepath.Join(projectSrcPath, "yarn.lock")
 	yarnLockFile, err := os.OpenFile(lockFilePath, os.O_WRONLY, 0666)
-	assert.NoError(t, err, "could not open yarn.lock file")
+	assert.NoError(t, err, "Could not open yarn.lock file")
 	defer func() {
 		assert.NoError(t, yarnLockFile.Close())
 	}()
 	err = yarnLockFile.Truncate(0) // This line erases the file's content without deleting the file itself
-	assert.NoError(t, err, "could not erase yarn.lock file content")
+	assert.NoError(t, err, "Could not erase yarn.lock file content")
 
 	pacInfo := PackageInfo{Name: "build-info-go-tests"}
 	_, _, err = GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
@@ -119,28 +119,29 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 	assert.NoError(t, err)
 	assert.NotNil(t, root)
 
-	// Checking root
-	assert.True(t, strings.HasPrefix(root.Value, "build-info-go-tests"))
-	assert.Equal(t, "v1.0.0", root.Details.Version)
-	for _, dependency := range root.Details.Dependencies {
-		assert.Contains(t, expectedLocators, dependency.Locator)
-	}
-
 	// Checking dependencyMap
 	assert.Len(t, dependenciesMap, 6)
 	for dependencyName, depInfo := range dependenciesMap {
-		splitDepName := strings.Split(dependencyName, "@")
-		if len(splitDepName) != 2 {
-			assert.Error(t, errors.New("got an empty dependency name or in incorrect format (expected: package-name@version) "))
+		var packageCleanName, packageVersion string
+		var err2 error
+		if dependencyName != root.Value {
+			packageCleanName, packageVersion, err2 = splitNameAndVersion(dependencyName)
+			assert.NoError(t, err2)
+			if packageCleanName == "" || packageVersion == "" {
+				assert.NoError(t, errors.New("got an empty dependency name/version or in incorrect format (expected: package-name@version) "))
+			}
+		} else {
+			packageCleanName = root.Value
 		}
 
-		switch splitDepName[0] {
+		switch packageCleanName {
 		case "react":
 			assert.Equal(t, "18.2.0", depInfo.Details.Version)
 			assert.NotNil(t, depInfo.Details.Dependencies)
 			subDependencies := []string{"loose-envify"}
 			for _, depPointer := range depInfo.Details.Dependencies {
-				packageName := depPointer.Locator[:strings.Index(depPointer.Locator[1:], "@")+1]
+				packageName, _, err3 := splitNameAndVersion(depPointer.Locator)
+				assert.NoError(t, errors.Join(err2, err3))
 				assert.Contains(t, subDependencies, packageName)
 			}
 		case "xml":
@@ -150,13 +151,34 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 			assert.Equal(t, "9.0.6", depInfo.Details.Version)
 			assert.Nil(t, depInfo.Details.Dependencies)
 		case "loose-envify":
-			assert.NotNil(t, depInfo.Details.Dependencies)
+			assert.NotNil(t, depInfo.Details.Dependencies) // TODO check according to amount of kids and not nil/no nil
+			assert.Equal(t, len(depInfo.Details.Dependencies), 1)
 		case "js-tokens":
 			assert.Nil(t, depInfo.Details.Dependencies)
-		default:
-			if dependencyName != root.Value {
-				assert.Error(t, errors.New("package "+dependencyName+" should not be inside the dependencies map"))
+		case root.Value:
+			assert.True(t, strings.HasPrefix(root.Value, "build-info-go-tests"))
+			assert.Equal(t, "v1.0.0", root.Details.Version)
+			for _, dependency := range root.Details.Dependencies {
+				assert.Contains(t, expectedLocators, dependency.Locator)
 			}
+		default: // TODO make another case of root value and default to throw error
+			assert.NoError(t, errors.New("package "+dependencyName+" should not be inside the dependencies map"))
 		}
+	}
+}
+
+func TestYarnDependency_Name(t *testing.T) {
+	testCases := []struct {
+		packageFullName     string
+		packageExpectedName string
+	}{
+		{"json@1.2.3", "json"},
+		{"@babel/highlight@7.14.0", "@babel/highlight"},
+		{"json@npm:1.2.3", "json"},
+		{"@babel/highlight@npm:7.14.0", "@babel/highlight"},
+	}
+	for _, testCase := range testCases {
+		yarnDep := YarnDependency{Value: testCase.packageFullName}
+		assert.Equal(t, testCase.packageExpectedName, yarnDep.Name())
 	}
 }
