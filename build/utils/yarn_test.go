@@ -151,7 +151,7 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 			assert.Equal(t, "9.0.6", depInfo.Details.Version)
 			assert.Nil(t, depInfo.Details.Dependencies)
 		case "loose-envify":
-			assert.NotNil(t, depInfo.Details.Dependencies) // TODO check according to amount of kids and not nil/no nil
+			assert.NotNil(t, depInfo.Details.Dependencies)
 			assert.Equal(t, len(depInfo.Details.Dependencies), 1)
 		case "js-tokens":
 			assert.Nil(t, depInfo.Details.Dependencies)
@@ -161,7 +161,7 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 			for _, dependency := range root.Details.Dependencies {
 				assert.Contains(t, expectedLocators, dependency.Locator)
 			}
-		default: // TODO make another case of root value and default to throw error
+		default:
 			assert.NoError(t, errors.New("package "+dependencyName+" should not be inside the dependencies map"))
 		}
 	}
