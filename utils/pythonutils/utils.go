@@ -160,7 +160,6 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	}
 	installCmd := utils.NewCommand(string(tool), "install", commandArgs)
 	installCmd.Dir = srcPath
-
 	dependenciesMap := map[string]entities.Dependency{}
 
 	// Create regular expressions for log parsing.
