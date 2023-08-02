@@ -261,9 +261,17 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 				log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
 				return pattern.Line, nil
 			}
+
+			// If this pattern matched before package-name was found, do not collect this path.
+			if !expectingPackageFilePath {
+				log.Debug(fmt.Sprintf("Could not resolve package name for download path: %s , continuing...", packageName))
+				return pattern.Line, nil
+			}
+
 			if strings.Contains(pattern.MatchedResults[0], "Using cached") {
 				usingCachedMode = true
 			}
+
 			if usingCachedMode {
 				cache = strings.Join([]string{cache, strings.Join(pattern.MatchedResults, "")}, "")
 				if strings.Contains(cache, "(") {
