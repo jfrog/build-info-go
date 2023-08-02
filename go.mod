@@ -3,17 +3,15 @@ module github.com/jfrog/build-info-go
 go 1.20
 
 require (
-	github.com/BurntSushi/toml v1.2.1
+	github.com/BurntSushi/toml v1.3.2
 	github.com/CycloneDX/cyclonedx-go v0.7.1
 	github.com/buger/jsonparser v1.1.1
 	github.com/jfrog/gofrog v1.3.0
-	github.com/minio/sha256-simd v1.0.1-0.20230222114820-6096f891a77b
-	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.8.2
-	github.com/urfave/cli/v2 v2.25.1
+	github.com/minio/sha256-simd v1.0.1
+	github.com/stretchr/testify v1.8.4
+	github.com/urfave/cli/v2 v2.25.7
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/exp v0.0.0-20230418202329-0354be287a23
-
+	golang.org/x/exp v0.0.0-20230801115018-d63ba01acd4b
 )
 
 require (
