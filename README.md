@@ -9,7 +9,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/jfrog/build-info-go)](https://goreportcard.com/report/github.com/jfrog/build-info-go)
 [![license](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat)](./LICENSE) [![Website](https://img.shields.io/badge/buildinfo.org-%F0%9F%8C%8E-blue)](https://buildinfo.org)
 
-</div>
+</div> 
 
 | Branch |                                                                                                                                                                             Status                                                                                                                                                                             |
 | :----: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
