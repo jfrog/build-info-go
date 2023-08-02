@@ -267,22 +267,22 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			if usingCachedMode {
 				cache = strings.Join([]string{cache, strings.Join(pattern.MatchedResults, "")}, "")
 				if strings.Contains(cache, "(") {
-					usingCachedMode = false
 					cache, _, _ = strings.Cut(cache, "(")
 					_, cache, _ = strings.Cut(cache, "Using cached")
 					cache = strings.ReplaceAll(cache, " ", "")
 					// Save dependency information.
-					filePath := cache
-					lastSlashIndex := strings.LastIndex(filePath, "/")
+
+					lastSlashIndex := strings.LastIndex(cache, "/")
 					var fileName string
 					if lastSlashIndex == -1 {
-						fileName = filePath
+						fileName = cache
 					} else {
-						fileName = filePath[lastSlashIndex+1:]
+						fileName = cache[lastSlashIndex+1:]
 					}
 					dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
 					cache = ""
 					expectingPackageFilePath = false
+					usingCachedMode = false
 
 					log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
 					return pattern.Line, nil
