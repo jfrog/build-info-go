@@ -167,8 +167,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	downloadingRegexp := regexp.MustCompile(`^\s*Downloading\s([^\s]*)\s\(`)
 	usingCachedRegexp := regexp.MustCompile(`^\s*Using\scached\s([\S]+)\s\(`)
 	alreadySatisfiedRegexp := regexp.MustCompile(`^Requirement\salready\ssatisfied:\s(\w[\w-.]+)`)
-	pipEnvUsingCached := regexp.MustCompile(`^\s*Using\s*cached\s*`)
-	pipEnvRegexp := regexp.MustCompile(`.*`)
+	getAllCharsRegexp := regexp.MustCompile(`.*`)
 
 	var packageName string
 	expectingPackageFilePath := false
@@ -259,34 +258,24 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	if err != nil {
 		return nil, err
 	}
+	// Check if pipenv version is higher than "2023.7.23",
+	// if yes execute a special log parsing.
 	verifyPipEnvVersion := pipEnvVersion.Compare("2023.7.23") == -1 || pipEnvVersion.Compare("2023.7.23") == 0
 	if tool == Pipenv && verifyPipEnvVersion {
-		// Add verbosity flag to pipenv commands to collect necessary data
-		var usingCachedMode bool = false
+		usingCachedMode := false
 		var cache string
 
-		// Extract already installed packages names.
-		pipEnvUsingCachedPattern := gofrogcmd.CmdOutputPattern{
-			RegExp: pipEnvUsingCached,
+		// Extract and arrange cache file name
+		pipEnvCachedParser := gofrogcmd.CmdOutputPattern{
+			RegExp: getAllCharsRegexp,
 			ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 				// Check for out of bound results.
 				if len(pattern.MatchedResults)-1 < 0 {
 					log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
 					return pattern.Line, nil
 				}
-				usingCachedMode = true
-				return pattern.Line, nil
-			},
-		}
-
-		// Extract already installed packages names.
-		pipEnvUsingCached := gofrogcmd.CmdOutputPattern{
-			RegExp: pipEnvRegexp,
-			ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-				// Check for out of bound results.
-				if len(pattern.MatchedResults)-1 < 0 {
-					log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
-					return pattern.Line, nil
+				if strings.Contains(pattern.MatchedResults[0], "Using cached") {
+					usingCachedMode = true
 				}
 				if usingCachedMode {
 					cache = strings.Join([]string{cache, strings.Join(pattern.MatchedResults, "")}, "")
@@ -315,7 +304,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 				return pattern.Line, nil
 			},
 		}
-		_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &pipEnvUsingCachedPattern, &pipEnvUsingCached, &installedPackagesParser)
+		_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &pipEnvCachedParser, &installedPackagesParser)
 		if err != nil {
 			return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
 		}
