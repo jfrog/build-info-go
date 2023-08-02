@@ -116,24 +116,22 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 		DevDependencies: map[string]string{"json": "9.0.6"},
 	}
 	dependenciesMap, root, err := GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
-
-	// general checks
 	assert.NoError(t, err)
 	assert.NotNil(t, root)
 
-	// checking root
+	// Checking root
 	assert.True(t, strings.HasPrefix(root.Value, "build-info-go-tests"))
 	assert.Equal(t, "v1.0.0", root.Details.Version)
 	for _, dependency := range root.Details.Dependencies {
 		assert.Contains(t, expectedLocators, dependency.Locator)
 	}
 
-	// checking dependencyMap
+	// Checking dependencyMap
 	assert.Len(t, dependenciesMap, 6)
 	for dependencyName, depInfo := range dependenciesMap {
 		splitDepName := strings.Split(dependencyName, "@")
 		if len(splitDepName) != 2 {
-			assert.Error(t, errors.New("Got an empty dependency name or in incorrect format ( expected: package-name@version ) "))
+			assert.Error(t, errors.New("got an empty dependency name or in incorrect format (expected: package-name@version) "))
 		}
 
 		switch splitDepName[0] {
@@ -157,7 +155,7 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 			assert.Nil(t, depInfo.Details.Dependencies)
 		default:
 			if dependencyName != root.Value {
-				assert.Error(t, errors.New("Package "+dependencyName+" should not be inside the dependencyMap"))
+				assert.Error(t, errors.New("package "+dependencyName+" should not be inside the dependencies map"))
 			}
 		}
 	}

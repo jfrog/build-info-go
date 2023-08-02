@@ -113,7 +113,7 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 	if err != nil {
 		log.Warn("An error was thrown while collecting dependencies info: " + err.Error() + "\nCommand output:\n" + responseStr)
 
-		// Spacial case: when 'yarn install' wasn't executed on the project we will get an error with non-empty responseStr. for yarn v2 and v3 ONLY.
+		// Spacial case: when 'yarn install' wasn't executed on the project we will get an error with non-empty responseStr (for yarn v2 and v3 ONLY)
 		if strings.Contains(responseStr, "present in your lockfile") {
 			err = errors.New("fetching dependencies failed since '" + packageInfo.Name + "' doesn't present in your lockfile\nPlease run 'yarn install' to update lockfile\n" + err.Error())
 			return
@@ -133,7 +133,7 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 	return
 }
 
-// getVersion gets the current project's yarn version
+// GetVersion getVersion gets the current project's yarn version
 func GetVersion(executablePath, srcPath string) (string, error) {
 	command := exec.Command(executablePath, "--version")
 	command.Dir = srcPath
@@ -156,12 +156,13 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 	var depTree Yarn1Data
 	err = json.Unmarshal([]byte(responseStr), &depTree)
 	if err != nil {
-		err = errors.New("Couldn't parse 'yarn list' results in order to create the dependencyMap:\n" + err.Error())
+		err = errors.New("couldn't parse 'yarn list' results in order to create the dependencyMap:\n" + err.Error())
 		return
 	}
 
 	if depTree.Data.DepTree == nil {
-		err = errors.New("Error: (buildYarnV1DependencyMap) depTree struct received a nil value in a required field: depTree.Data.DepTree")
+
+		err = errors.New("an error occurred while parsing dependencies - the dependencies tree received a null value in a mandatory field")
 	}
 
 	locatorsMap := make(map[string]string)
