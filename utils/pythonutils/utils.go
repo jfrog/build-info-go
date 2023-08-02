@@ -256,23 +256,23 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 		// This regular expression allows matching any input, while the execFunc verifies whether the line contains the phrase "Using cached."
 		//  If it does, we proceed to concatenate subsequent lines until we encounter a "(" symbol, indicating the end of the cache file path.
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-			// Check for out of bound results.
-			if len(pattern.MatchedResults)-1 < 0 {
-				log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
-				return pattern.Line, nil
-			}
-
-			// If this pattern matched before package-name was found, do not collect this path.
-			if !expectingPackageFilePath {
-				log.Debug(fmt.Sprintf("Could not resolve package name for download path: %s , continuing...", packageName))
-				return pattern.Line, nil
-			}
-
 			if strings.Contains(pattern.MatchedResults[0], "Using cached") {
 				usingCachedMode = true
 			}
 
 			if usingCachedMode {
+				// Check for out of bound results.
+				if len(pattern.MatchedResults)-1 < 0 {
+					log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
+					return pattern.Line, nil
+				}
+
+				// If this pattern matched before package-name was found, do not collect this path.
+				if !expectingPackageFilePath {
+					log.Debug(fmt.Sprintf("Could not resolve package name for download path: %s , continuing...", packageName))
+					return pattern.Line, nil
+				}
+
 				cache = strings.Join([]string{cache, strings.Join(pattern.MatchedResults, "")}, "")
 				if strings.Contains(cache, "(") {
 					cache, _, _ = strings.Cut(cache, "(")
@@ -287,7 +287,9 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 					} else {
 						fileName = cache[lastSlashIndex+1:]
 					}
+
 					dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
+					// Clean cache path, and expectingPackageFilePath and usingCachedMode flags
 					cache = ""
 					expectingPackageFilePath = false
 					usingCachedMode = false
