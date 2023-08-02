@@ -3,7 +3,6 @@ package pythonutils
 import (
 	"errors"
 	"fmt"
-	"github.com/jfrog/gofrog/version"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -165,7 +164,6 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	// Create regular expressions for log parsing.
 	collectingRegexp := regexp.MustCompile(`^Collecting\s(\w[\w-.]+)`)
 	downloadingRegexp := regexp.MustCompile(`^\s*Downloading\s([^\s]*)\s\(`)
-	usingCachedRegexp := regexp.MustCompile(`^\s*Using\scached\s([\S]+)\s\(`)
 	alreadySatisfiedRegexp := regexp.MustCompile(`^Requirement\salready\ssatisfied:\s(\w[\w-.]+)`)
 	getAllCharsRegexp := regexp.MustCompile(`.*`)
 
@@ -233,11 +231,6 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 		},
 	}
 
-	cachedFileParser := gofrogcmd.CmdOutputPattern{
-		RegExp:   usingCachedRegexp,
-		ExecFunc: downloadedFileParser.ExecFunc,
-	}
-
 	// Extract already installed packages names.
 	installedPackagesParser := gofrogcmd.CmdOutputPattern{
 		RegExp: alreadySatisfiedRegexp,
@@ -254,81 +247,54 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			return pattern.Line, nil
 		},
 	}
-	pipEnvVersion, err := getPipEnvVersion()
-	if err != nil {
-		return nil, err
-	}
-	// Check if pipenv version is higher than "2023.7.23",
-	// if yes execute a special log parsing.
-	verifyPipEnvVersion := pipEnvVersion.Compare("2023.7.23") == -1 || pipEnvVersion.Compare("2023.7.23") == 0
-	if tool == Pipenv && verifyPipEnvVersion {
-		usingCachedMode := false
-		var cache string
+	usingCachedMode := false
+	var cache string
 
-		// Extract and arrange cache file name
-		pipEnvCachedParser := gofrogcmd.CmdOutputPattern{
-			RegExp: getAllCharsRegexp,
-			ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-				// Check for out of bound results.
-				if len(pattern.MatchedResults)-1 < 0 {
-					log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
+	// Extract and arrange cache file name.
+	pipEnvCachedParser := gofrogcmd.CmdOutputPattern{
+		RegExp: getAllCharsRegexp,
+		// This regular expression allows matching any input, while the execFunc verifies whether the line contains the phrase "Using cached."
+		//  If it does, we proceed to concatenate subsequent lines until we encounter a "(" symbol, indicating the end of the cache file path.
+		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
+			// Check for out of bound results.
+			if len(pattern.MatchedResults)-1 < 0 {
+				log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
+				return pattern.Line, nil
+			}
+			if strings.Contains(pattern.MatchedResults[0], "Using cached") {
+				usingCachedMode = true
+			}
+			if usingCachedMode {
+				cache = strings.Join([]string{cache, strings.Join(pattern.MatchedResults, "")}, "")
+				if strings.Contains(cache, "(") {
+					usingCachedMode = false
+					cache, _, _ = strings.Cut(cache, "(")
+					_, cache, _ = strings.Cut(cache, "Using cached")
+					cache = strings.ReplaceAll(cache, " ", "")
+					// Save dependency information.
+					filePath := cache
+					lastSlashIndex := strings.LastIndex(filePath, "/")
+					var fileName string
+					if lastSlashIndex == -1 {
+						fileName = filePath
+					} else {
+						fileName = filePath[lastSlashIndex+1:]
+					}
+					dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
+					cache = ""
+					expectingPackageFilePath = false
+
+					log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
 					return pattern.Line, nil
 				}
-				if strings.Contains(pattern.MatchedResults[0], "Using cached") {
-					usingCachedMode = true
-				}
-				if usingCachedMode {
-					cache = strings.Join([]string{cache, strings.Join(pattern.MatchedResults, "")}, "")
-					if strings.Contains(cache, "(") {
-						usingCachedMode = false
-						cache, _, _ = strings.Cut(cache, "(")
-						_, cache, _ = strings.Cut(cache, "Using cached")
-						cache = strings.ReplaceAll(cache, " ", "")
-						// Save dependency information.
-						filePath := cache
-						lastSlashIndex := strings.LastIndex(filePath, "/")
-						var fileName string
-						if lastSlashIndex == -1 {
-							fileName = filePath
-						} else {
-							fileName = filePath[lastSlashIndex+1:]
-						}
-						dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
-						cache = ""
-						expectingPackageFilePath = false
-
-						log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
-						return pattern.Line, nil
-					}
-				}
-				return pattern.Line, nil
-			},
-		}
-		_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &pipEnvCachedParser, &installedPackagesParser)
-		if err != nil {
-			return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
-		}
-
-	} else {
-		// Execute command.
-		_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &cachedFileParser, &installedPackagesParser)
-		if err != nil {
-			return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
-		}
+			}
+			return pattern.Line, nil
+		},
+	}
+	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &pipEnvCachedParser, &installedPackagesParser)
+	if err != nil {
+		return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
 	}
 
 	return dependenciesMap, nil
-}
-
-func getPipEnvVersion() (*version.Version, error) {
-	versionData, err := gofrogcmd.RunCmdOutput(utils.NewCommand(string(Pipenv), "--version", []string{}))
-	if err != nil {
-		return nil, err
-	}
-	_, versionData, found := strings.Cut(versionData, "version ")
-	if !found {
-		return nil, errors.New("couldn't find pipenv version")
-	}
-	versionData = strings.ReplaceAll(versionData, "\n", "")
-	return version.NewVersion(versionData), nil
 }
