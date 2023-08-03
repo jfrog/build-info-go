@@ -162,18 +162,17 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 	}
 
 	if depTree.Data.DepTree == nil {
-		err = errors.New("an error occurred while parsing dependencies - the dependencies tree received a null value in a mandatory field")
+		err = errors.New("received an empty tree field while parsing 'yarn list' results")
 		return
 	}
-	// NEW CODE
+
 	packNameToFullName := make(map[string]string)
 
 	// Initializing dependencies map without child dependencies for each dependency + creating a map that maps: package-name -> package-name@version
 	for _, curDependency := range depTree.Data.DepTree {
-		packageCleanName, packageVersion, err2 := splitNameAndVersion(curDependency.Name)
-		if err2 != nil {
-			err = errors.Join(err, err2)
-			return
+		packageCleanName, packageVersion, err := splitNameAndVersion(curDependency.Name)
+		if err != nil {
+			return nil, nil, err
 		}
 
 		dependenciesMap[curDependency.Name] = &YarnDependency{
@@ -188,10 +187,9 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 		dependency := *(dependenciesMap[curDependency.Name])
 
 		for _, subDep := range curDependency.Dependencies {
-			subDepName, _, err2 := splitNameAndVersion(subDep.DependencyName)
-			if err2 != nil {
-				err = errors.Join(err, err2)
-				return
+			subDepName, _, err := splitNameAndVersion(subDep.DependencyName)
+			if err != nil {
+				return nil, nil, err
 			}
 			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, packNameToFullName[subDepName]})
 		}
@@ -286,16 +284,16 @@ func buildYarn1Root(packageInfo *PackageInfo, packNameToFullName *map[string]str
 	rootDeps = append(rootDeps, maps.Keys(packageInfo.OptionalDependencies)...)
 
 	for _, directDepName := range rootDeps {
-		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{"", (*packNameToFullName)[directDepName]})
+		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{Locator: (*packNameToFullName)[directDepName]})
 	}
 	return rootDependency
 }
 
 // splitNameAndVersion splits package name for package version for th following format ONLY: package-name@version
-func splitNameAndVersion(packageFullName string) (packageCleanName string, packageVersion string, err2 error) {
+func splitNameAndVersion(packageFullName string) (packageCleanName string, packageVersion string, err error) {
 	indexOfLastAt := strings.LastIndex(packageFullName, "@")
 	if indexOfLastAt == -1 {
-		err2 = errors.New("received package name of incorrect format (expected: package-name@version)")
+		err = errors.New("received package name of incorrect format (expected: package-name@version)")
 		return
 	}
 	packageCleanName = packageFullName[:indexOfLastAt]
@@ -314,7 +312,6 @@ type Yarn1DependencyTree struct {
 type Yarn1DependencyDetails struct {
 	Name         string                   `json:"name,omitempty"`
 	Dependencies []Yarn1DependencyPointer `json:"children,omitempty"`
-	Color        string                   `json:"color"`
 }
 
 type Yarn1DependencyPointer struct {
@@ -333,7 +330,7 @@ func (yd *YarnDependency) Name() string {
 	if strings.Contains(yd.Value[1:], "@") {
 		atSignIndex := strings.Index(yd.Value[1:], "@") + 1
 		return yd.Value[:atSignIndex]
-	} else {
+	} else { // In some cases when using yarn V1 we encounter package names without their version (project's package name)
 		return yd.Value
 	}
 }

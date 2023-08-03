@@ -71,7 +71,7 @@ func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 	pacInfo := PackageInfo{Name: "build-info-go-tests"}
 	_, _, err = GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
 	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "fetching dependencies failed since '"+pacInfo.Name+"' doesn't present in your lockfile\nPlease run 'yarn install' to update lockfile\n"))
+	assert.Contains(t, err.Error(), "fetching dependencies failed since '"+pacInfo.Name+"' doesn't present in your lockfile\nPlease run 'yarn install' to update lockfile\n")
 }
 
 func updateDirYarnVersion(executablePath string, srcPath string, versionToSet string) (err error) {
@@ -123,10 +123,9 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 	assert.Len(t, dependenciesMap, 6)
 	for dependencyName, depInfo := range dependenciesMap {
 		var packageCleanName, packageVersion string
-		var err2 error
 		if dependencyName != root.Value {
-			packageCleanName, packageVersion, err2 = splitNameAndVersion(dependencyName)
-			assert.NoError(t, err2)
+			packageCleanName, packageVersion, err = splitNameAndVersion(dependencyName)
+			assert.NoError(t, err)
 			if packageCleanName == "" || packageVersion == "" {
 				assert.NoError(t, errors.New("got an empty dependency name/version or in incorrect format (expected: package-name@version) "))
 			}
@@ -140,8 +139,8 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 			assert.NotNil(t, depInfo.Details.Dependencies)
 			subDependencies := []string{"loose-envify"}
 			for _, depPointer := range depInfo.Details.Dependencies {
-				packageName, _, err3 := splitNameAndVersion(depPointer.Locator)
-				assert.NoError(t, errors.Join(err2, err3))
+				packageName, _, err := splitNameAndVersion(depPointer.Locator)
+				assert.NoError(t, err)
 				assert.Contains(t, subDependencies, packageName)
 			}
 		case "xml":
