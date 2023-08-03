@@ -410,9 +410,13 @@ func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 }
 
 type PackageInfo struct {
-	Name    string `json:"name,omitempty"`
-	Version string `json:"version,omitempty"`
-	Scope   string
+	Name                 string            `json:"name"`
+	Version              string            `json:"version"`
+	Dependencies         map[string]string `json:"dependencies"`
+	DevDependencies      map[string]string `json:"devDependencies"`
+	PeerDependencies     map[string]string `json:"peerDependencies"`
+	OptionalDependencies map[string]string `json:"optionalDependencies"`
+	Scope                string
 }
 
 func ReadPackageInfoFromPackageJson(packageJsonDirectory string, npmVersion *version.Version) (*PackageInfo, error) {
