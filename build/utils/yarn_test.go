@@ -136,7 +136,7 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 			assert.Nil(t, depInfo.Details.Dependencies)
 		case "loose-envify":
 			assert.NotNil(t, depInfo.Details.Dependencies)
-			assert.Equal(t, len(depInfo.Details.Dependencies), 1)
+			assert.Len(t, depInfo.Details.Dependencies, 1)
 		case "js-tokens":
 			assert.Nil(t, depInfo.Details.Dependencies)
 		case root.Value:

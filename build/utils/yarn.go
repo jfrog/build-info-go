@@ -196,7 +196,7 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 		dependenciesMap[curDependency.Name] = dependency
 	}
 
-	rootProject := buildYarn1Root(packageInfo, &packNameToFullName)
+	rootProject := buildYarn1Root(packageInfo, packNameToFullName)
 	root = &rootProject
 	dependenciesMap[root.Value] = root
 	return
@@ -272,7 +272,7 @@ func GetYarnDependencyKeyFromLocator(yarnDepLocator string) string {
 }
 
 // buildYarn1Root builds the root of the project's dependency tree (from direct dependencies in package.json)
-func buildYarn1Root(packageInfo *PackageInfo, packNameToFullName *map[string]string) YarnDependency {
+func buildYarn1Root(packageInfo *PackageInfo, packNameToFullName map[string]string) YarnDependency {
 	rootDependency := YarnDependency{
 		Value:   packageInfo.Name,
 		Details: YarnDepDetails{Version: packageInfo.Version},
@@ -284,7 +284,7 @@ func buildYarn1Root(packageInfo *PackageInfo, packNameToFullName *map[string]str
 	rootDeps = append(rootDeps, maps.Keys(packageInfo.OptionalDependencies)...)
 
 	for _, directDepName := range rootDeps {
-		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{Locator: (*packNameToFullName)[directDepName]})
+		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{Locator: packNameToFullName[directDepName]})
 	}
 	return rootDependency
 }
