@@ -289,8 +289,9 @@ func buildYarn1Root(packageInfo *PackageInfo, packNameToFullName *map[string]str
 	return rootDependency
 }
 
-// splitNameAndVersion splits package name for package version for th following format ONLY: package-name@version
+// splitNameAndVersion splits package name for package version for th following formats ONLY: package-name@version, package-name@npm:version
 func splitNameAndVersion(packageFullName string) (packageCleanName string, packageVersion string, err error) {
+	packageFullName = strings.Replace(packageFullName, "npm:", "", 1)
 	indexOfLastAt := strings.LastIndex(packageFullName, "@")
 	if indexOfLastAt == -1 {
 		err = errors.New("received package name of incorrect format (expected: package-name@version)")

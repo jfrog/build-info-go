@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"bytes"
-	"errors"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -76,21 +74,8 @@ func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
 
 func updateDirYarnVersion(executablePath string, srcPath string, versionToSet string) (err error) {
 	command := exec.Command(executablePath, "set", "version", versionToSet)
-
 	command.Dir = srcPath
-	outBuffer := bytes.NewBuffer([]byte{})
-	command.Stdout = outBuffer
-	errBuffer := bytes.NewBuffer([]byte{})
-	command.Stderr = errBuffer
 	err = command.Run()
-
-	if err != nil {
-		// urfave/cli (aka codegangsta) exits when an ExitError is returned, so if it's an ExitError we'll convert it to a regular error.
-		if _, ok := err.(*exec.ExitError); ok {
-			err = errors.New(err.Error())
-		}
-		return
-	}
 	return
 }
 
@@ -127,7 +112,7 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 			packageCleanName, packageVersion, err = splitNameAndVersion(dependencyName)
 			assert.NoError(t, err)
 			if packageCleanName == "" || packageVersion == "" {
-				assert.NoError(t, errors.New("got an empty dependency name/version or in incorrect format (expected: package-name@version) "))
+				t.Error("got an empty dependency name/version or in incorrect format (expected: package-name@version) ")
 			}
 		} else {
 			packageCleanName = root.Value
@@ -161,7 +146,7 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 				assert.Contains(t, expectedLocators, dependency.Locator)
 			}
 		default:
-			assert.NoError(t, errors.New("package "+dependencyName+" should not be inside the dependencies map"))
+			t.Error("package '" + dependencyName + "' should not be inside the dependencies map")
 		}
 	}
 }
@@ -180,4 +165,27 @@ func TestYarnDependency_Name(t *testing.T) {
 		yarnDep := YarnDependency{Value: testCase.packageFullName}
 		assert.Equal(t, testCase.packageExpectedName, yarnDep.Name())
 	}
+}
+
+func TestSplitNameAndVersion(t *testing.T) {
+	testCases := []struct {
+		packageFullName string
+		expectedName    string
+		expectedVersion string
+	}{
+		{"json@1.2.3", "json", "1.2.3"},
+		{"@babel/highlight@7.14.0", "@babel/highlight", "7.14.0"},
+		{"json@npm:1.2.3", "json", "1.2.3"},
+		{"@babel/highlight@npm:7.14.0", "@babel/highlight", "7.14.0"},
+	}
+	for _, testCase := range testCases {
+		packageCleanName, packageVersion, err := splitNameAndVersion(testCase.packageFullName)
+		assert.NoError(t, err)
+		assert.Equal(t, testCase.expectedName, packageCleanName)
+		assert.Equal(t, testCase.expectedVersion, packageVersion)
+	}
+
+	incorrectFormatPackageName := "json:1.2.3"
+	_, _, err := splitNameAndVersion(incorrectFormatPackageName)
+	assert.Error(t, err)
 }
