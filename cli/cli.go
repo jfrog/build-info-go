@@ -55,7 +55,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				}
 				err = goModule.CalcDependencies()
 				if err != nil {
-					return
+					// return
 				}
 				return printBuild(bld, context.String(formatFlag))
 			},
