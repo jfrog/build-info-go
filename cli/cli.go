@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,7 +13,6 @@ import (
 	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
-	"github.com/pkg/errors"
 	clitool "github.com/urfave/cli/v2"
 )
 
