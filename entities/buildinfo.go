@@ -1,14 +1,13 @@
 package entities
 
 import (
+	"errors"
 	"github.com/jfrog/build-info-go/utils/compareutils"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/gofrog/stringutils"
