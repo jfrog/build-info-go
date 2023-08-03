@@ -1,7 +1,6 @@
 package build
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	buildutils "github.com/jfrog/build-info-go/build/utils"
@@ -11,7 +10,6 @@ import (
 	"golang.org/x/exp/slices"
 	"os"
 	"os/exec"
-	"strings"
 )
 
 const minSupportedYarnVersion = "2.4.0"
@@ -158,7 +156,7 @@ func (ym *YarnModule) AddArtifacts(artifacts ...entities.Artifact) error {
 }
 
 func validateYarnVersion(executablePath, srcPath string) error {
-	yarnVersionStr, err := getVersion(executablePath, srcPath)
+	yarnVersionStr, err := buildutils.GetVersion(executablePath, srcPath)
 	if err != nil {
 		return err
 	}
@@ -167,19 +165,6 @@ func validateYarnVersion(executablePath, srcPath string) error {
 		return errors.New("Yarn must have version " + minSupportedYarnVersion + " or higher. The current version is: " + yarnVersionStr)
 	}
 	return nil
-}
-
-func getVersion(executablePath, srcPath string) (string, error) {
-	command := exec.Command(executablePath, "--version")
-	command.Dir = srcPath
-	outBuffer := bytes.NewBuffer([]byte{})
-	command.Stdout = outBuffer
-	command.Stderr = os.Stderr
-	err := command.Run()
-	if _, ok := err.(*exec.ExitError); ok {
-		err = errors.New(err.Error())
-	}
-	return strings.TrimSpace(outBuffer.String()), err
 }
 
 func RunYarnCommand(executablePath, srcPath string, args ...string) error {
