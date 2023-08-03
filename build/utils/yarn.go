@@ -184,7 +184,7 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 
 	// Adding child dependencies for each dependency
 	for _, curDependency := range depTree.Data.DepTree {
-		dependency := *(dependenciesMap[curDependency.Name])
+		dependency := dependenciesMap[curDependency.Name]
 
 		for _, subDep := range curDependency.Dependencies {
 			subDepName, _, err := splitNameAndVersion(subDep.DependencyName)
@@ -193,7 +193,7 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 			}
 			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, packNameToFullName[subDepName]})
 		}
-		dependenciesMap[curDependency.Name] = &dependency
+		dependenciesMap[curDependency.Name] = dependency
 	}
 
 	rootProject := buildYarn1Root(packageInfo, &packNameToFullName)
