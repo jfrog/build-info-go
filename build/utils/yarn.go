@@ -196,8 +196,8 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 		dependenciesMap[curDependency.Name] = dependency
 	}
 
-	rootProject := buildYarn1Root(packageInfo, packNameToFullName)
-	root = &rootProject
+	rootDependency := buildYarn1Root(packageInfo, packNameToFullName)
+	root = &rootDependency
 	dependenciesMap[root.Value] = root
 	return
 }
