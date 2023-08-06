@@ -15,12 +15,12 @@ import (
 )
 
 const (
-	MavenHome                       = "M2_HOME"
-	MavenExtractorFileName          = "build-info-extractor-maven3-%s-uber.jar"
-	classworldsConfFileName         = "classworlds.conf"
-	PropertiesTempFolderName        = "properties"
-	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
-	MavenExtractorDependencyVersion = "2.40.0"
+	MavenHome                              = "M2_HOME"
+	MavenExtractorFileName                 = "build-info-extractor-maven3-%s-uber.jar"
+	classworldsConfFileName                = "classworlds.conf"
+	PropertiesTempFolderName               = "properties"
+	MavenExtractorRemotePath               = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
+	MavenExtractorDependencyDefaultVersion = "2.40.0"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -31,6 +31,15 @@ const (
 	load ${m3plugin.lib}/*.jar
 	`
 )
+
+func MavenExtractorDependencyVersion() string {
+	version := os.Getenv("MAVEN_EXTRACTOR_VERSION")
+	if version != "" {
+		return version
+	} else {
+		return MavenExtractorDependencyDefaultVersion
+	}
+}
 
 var mavenHomeRegex = regexp.MustCompile(`^Maven\shome:\s(.+)`)
 
@@ -74,7 +83,7 @@ func newMavenModule(containingBuild *Build, srcPath string) (*MavenModule, error
 	if err != nil {
 		return nil, err
 	}
-	extractorLocalPath := filepath.Join(home, dependenciesDirName, "maven", MavenExtractorDependencyVersion)
+	extractorLocalPath := filepath.Join(home, dependenciesDirName, "maven", MavenExtractorDependencyVersion())
 	return &MavenModule{
 		srcPath:         srcPath,
 		containingBuild: containingBuild,
@@ -283,8 +292,9 @@ func (mm *MavenModule) extractMavenPath(mavenVersionOutput bytes.Buffer) (mavenH
 }
 
 func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
-	filename := fmt.Sprintf(MavenExtractorFileName, MavenExtractorDependencyVersion)
-	filePath := fmt.Sprintf(MavenExtractorRemotePath, MavenExtractorDependencyVersion)
+	mavenExtractorDependencyVersion := MavenExtractorDependencyVersion()
+	filename := fmt.Sprintf(MavenExtractorFileName, mavenExtractorDependencyVersion)
+	filePath := fmt.Sprintf(MavenExtractorRemotePath, mavenExtractorDependencyVersion)
 	if err := utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc, logger); err != nil {
 		return err
 	}
