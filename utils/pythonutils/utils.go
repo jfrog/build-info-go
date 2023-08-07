@@ -169,7 +169,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	return dependenciesMap, nil
 }
 
-func GetLogParsers(dependenciesMap map[string]entities.Dependency, log utils.Log) (dependencyNameParser, downloadedFileParser, pipEnvCachedParser, installedPackagesParser gofrogcmd.CmdOutputPattern) {
+func GetLogParsers(dependenciesMap map[string]entities.Dependency, log utils.Log) (dependencyNameParser, downloadedFileParser, usingCachedParser, installedPackagesParser gofrogcmd.CmdOutputPattern) {
 	// Create regular expressions for log parsing.
 	collectingRegexp := regexp.MustCompile(`^Collecting\s(\w[\w-.]+)`)
 	downloadingRegexp := regexp.MustCompile(`^\s*Downloading\s([^\s]*)\s\(`)
@@ -260,7 +260,7 @@ func GetLogParsers(dependenciesMap map[string]entities.Dependency, log utils.Log
 	var cache string
 
 	// Extract and arrange cache file name.
-	pipEnvCachedParser = gofrogcmd.CmdOutputPattern{
+	usingCachedParser = gofrogcmd.CmdOutputPattern{
 		RegExp: getAllCharsRegexp,
 		// This regular expression allows matching any input, while the execFunc verifies whether the line contains the phrase "Using cached."
 		//  If it does, we proceed to concatenate subsequent lines until we encounter a "(" symbol, indicating the end of the cache file path.
