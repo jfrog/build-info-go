@@ -14,10 +14,10 @@ func TestGetUsingCacheParser(t *testing.T) {
 		text        string
 		expectedMap map[string]entities.Dependency
 	}{
-		{"Collecting package\n\n Using cached \n https://link\n to\ncache (16 kB)", getExpectedMap()},
-		{"Collecting package\nUsing cached \n https://link \n to \ncache \n (16 kB)", getExpectedMap()},
+		{"Collecting package\n\n Using cached \n https://this/is\nthe/link\n to\ncache (16 kB)", getExpectedMap()},
+		{"Collecting package\nUsing cached \n https://thisis\nthe/link \n to \ncache \n (16 kB)", getExpectedMap()},
 		{"Collecting package\n Using cached \n\n https://link \n\n to \n\ncache (16 kB)\n\n", getExpectedMap()},
-		{"Collecting package\n Using cached \n\n https://link \n\n to \n\ncache \n\n(16 kB)\n\n", getExpectedMap()},
+		{"Collecting package\n Using cached \n\n https://this/is\nthe/link \n\n to \n\ncache \n\n(16 kB)\n\n", getExpectedMap()},
 	}
 	dependenciesMap := map[string]entities.Dependency{}
 	dependencyNameParser, downloadedFileParser, pipEnvCachedParser, installedPackagesParser := GetLogParsers(dependenciesMap, &utils.NullLog{})
