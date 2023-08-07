@@ -161,6 +161,15 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	installCmd.Dir = srcPath
 	dependenciesMap := map[string]entities.Dependency{}
 
+	dependencyNameParser, downloadedFileParser, pipEnvCachedParser, installedPackagesParser := GetLogParsers(dependenciesMap, log)
+	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &pipEnvCachedParser, &installedPackagesParser)
+	if err != nil {
+		return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
+	}
+	return dependenciesMap, nil
+}
+
+func GetLogParsers(dependenciesMap map[string]entities.Dependency, log utils.Log) (dependencyNameParser, downloadedFileParser, pipEnvCachedParser, installedPackagesParser gofrogcmd.CmdOutputPattern) {
 	// Create regular expressions for log parsing.
 	collectingRegexp := regexp.MustCompile(`^Collecting\s(\w[\w-.]+)`)
 	downloadingRegexp := regexp.MustCompile(`^\s*Downloading\s([^\s]*)\s\(`)
@@ -171,7 +180,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	expectingPackageFilePath := false
 
 	// Extract downloaded package name.
-	dependencyNameParser := gofrogcmd.CmdOutputPattern{
+	dependencyNameParser = gofrogcmd.CmdOutputPattern{
 		RegExp: collectingRegexp,
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 			// If this pattern matched a second time before downloaded-file-name was found, prompt a message.
@@ -199,7 +208,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	}
 
 	// Extract downloaded file, stored in Artifactory.
-	downloadedFileParser := gofrogcmd.CmdOutputPattern{
+	downloadedFileParser = gofrogcmd.CmdOutputPattern{
 		RegExp: downloadingRegexp,
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 			// Check for out of bound results.
@@ -232,7 +241,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	}
 
 	// Extract already installed packages names.
-	installedPackagesParser := gofrogcmd.CmdOutputPattern{
+	installedPackagesParser = gofrogcmd.CmdOutputPattern{
 		RegExp: alreadySatisfiedRegexp,
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 			// Check for out of bound results.
@@ -251,7 +260,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	var cache string
 
 	// Extract and arrange cache file name.
-	pipEnvCachedParser := gofrogcmd.CmdOutputPattern{
+	pipEnvCachedParser = gofrogcmd.CmdOutputPattern{
 		RegExp: getAllCharsRegexp,
 		// This regular expression allows matching any input, while the execFunc verifies whether the line contains the phrase "Using cached."
 		//  If it does, we proceed to concatenate subsequent lines until we encounter a "(" symbol, indicating the end of the cache file path.
@@ -295,10 +304,5 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			return pattern.Line, nil
 		},
 	}
-	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &pipEnvCachedParser, &installedPackagesParser)
-	if err != nil {
-		return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
-	}
-
-	return dependenciesMap, nil
+	return
 }
