@@ -56,7 +56,7 @@ func (nm *NpmModule) Build() error {
 	if len(nm.npmArgs) > 0 {
 		output, _, err := buildutils.RunNpmCmd(nm.executablePath, nm.srcPath, nm.npmArgs, &utils.NullLog{})
 		if len(output) > 0 {
-			nm.containingBuild.logger.Output(string(output))
+			nm.containingBuild.logger.Info(string(output))
 		}
 		if err != nil {
 			return err
