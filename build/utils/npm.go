@@ -371,7 +371,7 @@ func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) 
 	errResult = errBuffer.Bytes()
 	stdResult = outBuffer.Bytes()
 	if err != nil {
-		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(tmpArgs, " ") + "'\nError output is:\n" + string(errResult) + "\nCommand error: is:\n" + err.Error())
+		err = fmt.Errorf("error while running '%s %s': %s\n%s", executablePath, strings.Join(tmpArgs, " "), string(errResult), err.Error())
 		return
 	}
 	// The npm command is the first element in tmpArgs array.
@@ -441,6 +441,9 @@ func ReadPackageInfo(data []byte, npmVersion *version.Version) (*PackageInfo, er
 }
 
 func (pi *PackageInfo) BuildInfoModuleId() string {
+	if pi.Name == "" || pi.Version == "" {
+		return ""
+	}
 	nameBase := fmt.Sprintf("%s:%s", pi.Name, pi.Version)
 	if pi.Scope == "" {
 		return nameBase
@@ -450,6 +453,7 @@ func (pi *PackageInfo) BuildInfoModuleId() string {
 
 func (pi *PackageInfo) GetDeployPath() string {
 	fileName := fmt.Sprintf("%s-%s.tgz", pi.Name, pi.Version)
+	// The hyphen part below "/-/" is there in order to follow the layout used by the public NPM registry.
 	if pi.Scope == "" {
 		return fmt.Sprintf("%s/-/%s", pi.Name, fileName)
 	}
