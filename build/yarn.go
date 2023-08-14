@@ -6,13 +6,10 @@ import (
 	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
-	"github.com/jfrog/gofrog/version"
 	"golang.org/x/exp/slices"
 	"os"
 	"os/exec"
 )
-
-const minSupportedYarnVersion = "2.4.0"
 
 type YarnModule struct {
 	containingBuild          *Build
@@ -156,13 +153,9 @@ func (ym *YarnModule) AddArtifacts(artifacts ...entities.Artifact) error {
 }
 
 func validateYarnVersion(executablePath, srcPath string) error {
-	yarnVersionStr, err := buildutils.GetVersion(executablePath, srcPath)
+	_, err := buildutils.GetVersion(executablePath, srcPath)
 	if err != nil {
 		return err
-	}
-	yarnVersion := version.NewVersion(yarnVersionStr)
-	if yarnVersion.Compare(minSupportedYarnVersion) > 0 {
-		return errors.New("Yarn must have version " + minSupportedYarnVersion + " or higher. The current version is: " + yarnVersionStr)
 	}
 	return nil
 }
