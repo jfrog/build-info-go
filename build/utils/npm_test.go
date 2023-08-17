@@ -296,7 +296,7 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 // 2. node_module doesn't exist in the project and generating dependencies needs package-lock.
 func validateDependencies(t *testing.T, projectPath string, npmArgs []string) {
 	// Install dependencies in the npm project.
-	_, _, err := RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs,"ci"), logger)
+	_, _, err := RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs, "ci"), logger)
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
