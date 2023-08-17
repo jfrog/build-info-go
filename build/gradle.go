@@ -119,7 +119,7 @@ func (gm *GradleModule) createGradleRunConfig() (*gradleRunConfig, error) {
 		env:                gm.gradleExtractorDetails.props,
 		gradle:             gradleExecPath,
 		extractorPropsFile: extractorPropsFile,
-		tasks:              strings.Join(gm.gradleExtractorDetails.tasks, " "),
+		tasks:              gm.gradleExtractorDetails.tasks,
 		initScript:         gm.gradleExtractorDetails.initScript,
 		logger:             gm.containingBuild.logger,
 	}, nil
@@ -175,7 +175,7 @@ func GetGradleExecPath(useWrapper bool) (string, error) {
 type gradleRunConfig struct {
 	gradle             string
 	extractorPropsFile string
-	tasks              string
+	tasks              []string
 	initScript         string
 	env                map[string]string
 	logger             utils.Log
@@ -187,7 +187,7 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 	if config.initScript != "" {
 		cmd = append(cmd, "--init-script", config.initScript)
 	}
-	cmd = append(cmd, strings.Split(config.tasks, " ")...)
+	cmd = append(cmd, config.tasks...)
 	config.logger.Info("Running gradle command:", strings.Join(cmd, " "))
 	return exec.Command(cmd[0], cmd[1:]...)
 }
