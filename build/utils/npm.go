@@ -488,7 +488,7 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(append(npmArgs, "--json=false"), "config"), log)
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if len(errData) > 0 {
-		log.Warn("error while running the command :'" + executablePath + " " + strings.Join(npmArgs, " ") + ":\n" + string(errData))
+		log.Warn("error while running the command: '" + executablePath + " " + strings.Join(npmArgs, " ") + ":\n" + string(errData))
 	}
 	if err != nil {
 		return "", fmt.Errorf("'%s %s' npm config command failed with an error: %s", executablePath, strings.Join(npmArgs, " "), err.Error())
