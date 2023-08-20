@@ -124,8 +124,7 @@ func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, l
 	if err != nil {
 		// It is optional for the function to return this error.
 		log.Warn(err.Error())
-	}
-	if len(errData) > 0 {
+	} else if len(errData) > 0 {
 		log.Warn("Encountered some issues while running 'npm ls' command:\n" + strings.TrimSpace(string(errData)))
 	}
 	return
@@ -146,8 +145,7 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
 	if err != nil {
 		log.Warn(err.Error())
-	}
-	if len(errData) > 0 {
+	} else if len(errData) > 0 {
 		log.Warn("Encountered some issues while running 'npm ls' command:\n" + strings.TrimSpace(string(errData)))
 	}
 	return data, nil
@@ -485,12 +483,11 @@ func removeVersionPrefixes(packageInfo *PackageInfo) {
 func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log utils.Log) (string, error) {
 	npmArgs = append([]string{"get", "cache"}, npmArgs...)
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(append(npmArgs, "--json=false"), "config"), log)
-	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
-	if len(errData) > 0 {
-		log.Warn("Encountered some issues while running 'npm get cache' command:\n" + string(errData))
-	}
 	if err != nil {
 		return "", err
+	} else if len(errData) > 0 {
+		// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
+		log.Warn("Encountered some issues while running 'npm get cache' command:\n" + string(errData))
 	}
 	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
 	found, err := utils.IsDirExists(cachePath, true)
