@@ -126,7 +126,7 @@ func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, l
 		log.Warn(err.Error())
 	}
 	if len(errData) > 0 {
-		log.Warn("Encountered some issues while running 'npm ls' command:\n" + string(errData))
+		log.Warn("Encountered some issues while running 'npm ls' command:\n" + strings.TrimSpace(string(errData)))
 	}
 	return
 }
@@ -148,7 +148,7 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string
 		log.Warn(err.Error())
 	}
 	if len(errData) > 0 {
-		log.Warn("Encountered some issues while running 'npm ls' command:\n" + string(errData))
+		log.Warn("Encountered some issues while running 'npm ls' command:\n" + strings.TrimSpace(string(errData)))
 	}
 	return data, nil
 }
@@ -487,7 +487,7 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(append(npmArgs, "--json=false"), "config"), log)
 	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 	if len(errData) > 0 {
-		log.Warn("error while running the command '" + executablePath + " " + strings.Join(npmArgs, " ") + "' :\n" + string(errData))
+		log.Warn("Encountered some issues while running 'npm get cache' command:\n" + string(errData))
 	}
 	if err != nil {
 		return "", err
