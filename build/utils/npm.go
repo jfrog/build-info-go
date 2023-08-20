@@ -123,10 +123,10 @@ func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, l
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
 	if err != nil {
 		// It is optional for the function to return this error.
-		log.Warn("npm list command failed with error:", err.Error())
+		log.Warn(err.Error())
 	}
 	if len(errData) > 0 {
-		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+		log.Warn("Encountered some issues while running 'npm ls' command:\n" + string(errData))
 	}
 	return
 }
@@ -145,10 +145,10 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string
 	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
 	if err != nil {
-		log.Warn("npm list command failed with error:", err.Error())
+		log.Warn(err.Error())
 	}
 	if len(errData) > 0 {
-		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+		log.Warn("Encountered some issues while running 'npm ls' command:\n" + string(errData))
 	}
 	return data, nil
 }
@@ -157,9 +157,9 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 	if npmVersion.AtLeast("6.0.0") {
 		npmArgs = append(npmArgs, "--package-lock-only")
 		// Installing package-lock to generate the dependencies map.
-		_, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "install"), log)
+		_, _, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "install"), log)
 		if err != nil {
-			return errors.New("Some errors occurred while installing package-lock: " + string(errData))
+			return err
 		}
 		return nil
 	}
@@ -491,7 +491,7 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 		log.Warn("error while running the command '" + executablePath + " " + strings.Join(npmArgs, " ") + "' :\n" + string(errData))
 	}
 	if err != nil {
-		return "", fmt.Errorf("'%s %s' npm config command failed with an error: %s", executablePath, strings.Join(npmArgs, " "), err.Error())
+		return "", err
 	}
 	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
 	found, err := utils.IsDirExists(cachePath, true)
