@@ -199,7 +199,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 }
 
 // A project built differently for each operating system.
-func TestDependenciesTreeDiffrentBetweenOss(t *testing.T) {
+func TestDependenciesTreeDifferentBetweenOKs(t *testing.T) {
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	assert.NoError(t, err)
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
@@ -242,19 +242,21 @@ func TestNpmProdFlag(t *testing.T) {
 		{"--prod", 1},
 	}
 	for _, entry := range testDependencyScopes {
-		projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project3", false, npmVersion)
-		defer cleanup()
-		cacachePath := filepath.Join(projectPath, "tmpcache")
-		npmArgs := []string{"--cache=" + cacachePath, entry.scope}
+		func() {
+			projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project3", false, npmVersion)
+			defer cleanup()
+			cacachePath := filepath.Join(projectPath, "tmpcache")
+			npmArgs := []string{"--cache=" + cacachePath, entry.scope}
 
-		// Install dependencies in the npm project.
-		_, _, err = RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs, "ci"), logger)
-		assert.NoError(t, err)
+			// Install dependencies in the npm project.
+			_, _, err = RunNpmCmd("npm", projectPath, AppendNpmCommand(npmArgs, "ci"), logger)
+			assert.NoError(t, err)
 
-		// Calculate dependencies with scope.
-		dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
-		assert.NoError(t, err)
-		assert.Len(t, dependencies, entry.totalDeps)
+			// Calculate dependencies with scope.
+			dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+			assert.NoError(t, err)
+			assert.Len(t, dependencies, entry.totalDeps)
+		}()
 	}
 }
 
