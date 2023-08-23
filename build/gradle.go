@@ -157,7 +157,7 @@ func (gm *GradleModule) getExtractorVersionAndInitScript(gradleExecPath string) 
 	if err != nil {
 		return "", "", err
 	}
-	gm.containingBuild.logger.Info("Using Gradle version:", gradleVersion)
+	gm.containingBuild.logger.Info("Using Gradle version:", gradleVersion.GetVersion())
 	if gradleVersion.AtLeast("6.8.1") {
 		return gradleExtractor5DependencyVersion, gradleInitScriptExtractor5, nil
 	}
