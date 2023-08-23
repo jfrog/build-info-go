@@ -61,7 +61,7 @@ type gradleExtractorDetails struct {
 }
 
 // Add a new Gradle module to a given build.
-func newGradleModule(containingBuild *Build, srcPath string) (*GradleModule, error) {
+func newGradleModule(containingBuild *Build, srcPath string) *GradleModule {
 	return &GradleModule{
 		srcPath:         srcPath,
 		containingBuild: containingBuild,
@@ -70,7 +70,7 @@ func newGradleModule(containingBuild *Build, srcPath string) (*GradleModule, err
 			propsDir: filepath.Join(containingBuild.tempDirPath, PropertiesTempFolderName),
 			props:    map[string]string{},
 		},
-	}, nil
+	}
 }
 
 func (gm *GradleModule) SetExtractorDetails(localExtractorPath, extractorPropsDir string, tasks []string, useWrapper, usePlugin bool, downloadExtractorFunc func(downloadTo, downloadFrom string) error, props map[string]string) *GradleModule {
