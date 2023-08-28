@@ -1,22 +1,37 @@
 package build
 
 import (
+	"bytes"
+	_ "embed"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/version"
 )
 
 const (
-	extractorPropsDir                = "BUILDINFO_PROPFILE"
-	GradleExtractorFileName          = "build-info-extractor-gradle-%s-uber.jar"
-	gradleInitScriptTemplate         = "gradle.init"
-	GradleExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
-	GradleExtractorDependencyVersion = "4.32.0"
+	extractorPropsDir                 = "BUILDINFO_PROPFILE"
+	gradleExtractorFileName           = "build-info-extractor-gradle-%s-uber.jar"
+	gradleInitScriptTemplate          = "gradle.init"
+	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
+	gradleExtractor4DependencyVersion = "4.32.0"
+	gradleExtractor5DependencyVersion = "5.1.3"
 )
+
+var versionRegex = regexp.MustCompile(`Gradle (\d+\.\d+(?:\.\d+|-\w+-\d+)?)`)
+
+//go:embed init-gradle-extractor-4.gradle
+var gradleInitScriptExtractor4 string
+
+//go:embed init-gradle-extractor-5.gradle
+var gradleInitScriptExtractor5 string
 
 type GradleModule struct {
 	// The build which contains the gradle module.
@@ -46,22 +61,16 @@ type gradleExtractorDetails struct {
 }
 
 // Add a new Gradle module to a given build.
-func newGradleModule(containingBuild *Build, srcPath string) (*GradleModule, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-	extractorLocalPath := filepath.Join(home, dependenciesDirName, "gradle", GradleExtractorDependencyVersion)
+func newGradleModule(containingBuild *Build, srcPath string) *GradleModule {
 	return &GradleModule{
 		srcPath:         srcPath,
 		containingBuild: containingBuild,
 		gradleExtractorDetails: &gradleExtractorDetails{
-			localPath: extractorLocalPath,
-			tasks:     []string{"artifactoryPublish"},
-			propsDir:  filepath.Join(containingBuild.tempDirPath, PropertiesTempFolderName),
-			props:     map[string]string{},
+			tasks:    []string{"artifactoryPublish"},
+			propsDir: filepath.Join(containingBuild.tempDirPath, PropertiesTempFolderName),
+			props:    map[string]string{},
 		},
-	}, err
+	}
 }
 
 func (gm *GradleModule) SetExtractorDetails(localExtractorPath, extractorPropsDir string, tasks []string, useWrapper, usePlugin bool, downloadExtractorFunc func(downloadTo, downloadFrom string) error, props map[string]string) *GradleModule {
@@ -78,35 +87,94 @@ func (gm *GradleModule) SetExtractorDetails(localExtractorPath, extractorPropsDi
 // Generates Gradle build-info.
 func (gm *GradleModule) CalcDependencies() (err error) {
 	gm.containingBuild.logger.Info("Running gradle...")
-	if gm.srcPath == "" {
-		if gm.srcPath, err = os.Getwd(); err != nil {
-			return
-		}
-	}
-
-	if err = downloadGradleDependencies(gm.gradleExtractorDetails.localPath, gm.gradleExtractorDetails.downloadExtractorFunc, gm.containingBuild.logger); err != nil {
+	wd, err := os.Getwd()
+	if err != nil {
 		return err
 	}
-	if !gm.gradleExtractorDetails.usePlugin {
-		gradlePluginFilename := fmt.Sprintf(GradleExtractorFileName, GradleExtractorDependencyVersion)
+	if gm.srcPath != "" {
+		if err = os.Chdir(gm.srcPath); err != nil {
+			return
+		}
+		defer func() {
+			err = errors.Join(err, os.Chdir(wd))
+		}()
+	}
 
-		gm.gradleExtractorDetails.initScript, err = getInitScript(gm.gradleExtractorDetails.localPath, gradlePluginFilename)
-		if err != nil {
+	gradleExecPath, err := GetGradleExecPath(gm.gradleExtractorDetails.useWrapper)
+	if err != nil {
+		return
+	}
+	if !gm.gradleExtractorDetails.usePlugin {
+		if err := gm.downloadGradleExtractor(gradleExecPath); err != nil {
 			return err
 		}
 	}
-	gradleRunConfig, err := gm.createGradleRunConfig()
+	gradleRunConfig, err := gm.createGradleRunConfig(gradleExecPath)
 	if err != nil {
 		return err
 	}
-	return gradleRunConfig.runCmd()
+	return gradleRunConfig.runCmd(os.Stdout, os.Stderr)
 }
 
-func (gm *GradleModule) createGradleRunConfig() (*gradleRunConfig, error) {
-	gradleExecPath, err := GetGradleExecPath(gm.gradleExtractorDetails.useWrapper)
+func (gm *GradleModule) downloadGradleExtractor(gradleExecPath string) (err error) {
+	gradleExtractorVersion, initScriptPattern, err := gm.getExtractorVersionAndInitScript(gradleExecPath)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	gm.containingBuild.logger.Debug("Using Gradle build-info extractor", gradleExtractorVersion)
+
+	dependencyLocalPath := filepath.Join(gm.gradleExtractorDetails.localPath, gradleExtractorVersion)
+	if err = downloadGradleDependencies(dependencyLocalPath, gradleExtractorVersion, gm.gradleExtractorDetails.downloadExtractorFunc, gm.containingBuild.logger); err != nil {
+		return err
+	}
+	gradlePluginFilename := fmt.Sprintf(gradleExtractorFileName, gradleExtractorVersion)
+
+	gm.gradleExtractorDetails.initScript, err = getInitScript(initScriptPattern, dependencyLocalPath, gradlePluginFilename)
+	return
+}
+
+// Return the Gradle extractor version and the relevant init script according to the Gradle version:
+// For Gradle >= 6.8.1 use Gradle extractor 5
+// For Gradle < 6.8.1 use Gradle extractor 4
+// gradleExecPath - The Gradle binary path
+func (gm *GradleModule) getExtractorVersionAndInitScript(gradleExecPath string) (string, string, error) {
+	gradleRunConfig := &gradleRunConfig{
+		gradle: gradleExecPath,
+		tasks:  "--version",
+		logger: gm.containingBuild.logger,
+	}
+
+	outBuffer := new(bytes.Buffer)
+	errBuffer := new(bytes.Buffer)
+	if err := gradleRunConfig.runCmd(outBuffer, errBuffer); err != nil {
+		return "", "", err
+	}
+	if errBuffer.Len() > 0 {
+		return "", "", errors.New("unexpected error occurred during attempt to get the Gradle version: " + errBuffer.String())
+	}
+
+	gradleVersion, err := parseGradleVersion(outBuffer.String())
+	if err != nil {
+		return "", "", err
+	}
+	gm.containingBuild.logger.Info("Using Gradle version:", gradleVersion.GetVersion())
+	if gradleVersion.AtLeast("6.8.1") {
+		return gradleExtractor5DependencyVersion, gradleInitScriptExtractor5, nil
+	}
+	return gradleExtractor4DependencyVersion, gradleInitScriptExtractor4, nil
+}
+
+// Parse the 'gradle --version' output and return the Gradle version.
+// versionOutput - The 'gradle --version' output
+func parseGradleVersion(versionOutput string) (*version.Version, error) {
+	match := versionRegex.FindStringSubmatch(versionOutput)
+	if len(match) == 0 {
+		return nil, errors.New("couldn't parse the Gradle version: " + versionOutput)
+	}
+	return version.NewVersion(match[1]), nil
+}
+
+func (gm *GradleModule) createGradleRunConfig(gradleExecPath string) (*gradleRunConfig, error) {
 	buildInfoPath, err := createEmptyBuildInfoFile(gm.containingBuild)
 	if err != nil {
 		return nil, err
@@ -125,13 +193,13 @@ func (gm *GradleModule) createGradleRunConfig() (*gradleRunConfig, error) {
 	}, nil
 }
 
-func downloadGradleDependencies(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
-	filename := fmt.Sprintf(GradleExtractorFileName, GradleExtractorDependencyVersion)
-	filePath := fmt.Sprintf(GradleExtractorRemotePath, GradleExtractorDependencyVersion)
+func downloadGradleDependencies(downloadTo, gradleExtractorVersion string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
+	filename := fmt.Sprintf(gradleExtractorFileName, gradleExtractorVersion)
+	filePath := fmt.Sprintf(gradleExtractorRemotePath, gradleExtractorVersion)
 	return utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc, logger)
 }
 
-func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, error) {
+func getInitScript(initScriptPattern, gradleDependenciesDir, gradlePluginFilename string) (string, error) {
 	gradleDependenciesDir, err := filepath.Abs(gradleDependenciesDir)
 	if err != nil {
 		return "", err
@@ -145,7 +213,7 @@ func getInitScript(gradleDependenciesDir, gradlePluginFilename string) (string, 
 
 	gradlePluginPath := filepath.Join(gradleDependenciesDir, gradlePluginFilename)
 	gradlePluginPath = strings.ReplaceAll(gradlePluginPath, "\\", "\\\\")
-	initScriptContent := strings.ReplaceAll(GradleInitScript, "${pluginLibDir}", gradlePluginPath)
+	initScriptContent := strings.ReplaceAll(initScriptPattern, "${pluginLibDir}", gradlePluginPath)
 	if !utils.IsPathExists(gradleDependenciesDir) {
 		err = os.MkdirAll(gradleDependenciesDir, 0777)
 		if err != nil {
@@ -192,54 +260,14 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 	return exec.Command(cmd[0], cmd[1:]...)
 }
 
-func (config *gradleRunConfig) runCmd() error {
+func (config *gradleRunConfig) runCmd(stdout, stderr io.Writer) error {
 	command := config.GetCmd()
 	command.Env = os.Environ()
 	for k, v := range config.env {
 		command.Env = append(command.Env, k+"="+v)
 	}
 	command.Env = append(command.Env, extractorPropsDir+"="+config.extractorPropsFile)
-	command.Stderr = os.Stderr
-	command.Stdout = os.Stderr
+	command.Stderr = stderr
+	command.Stdout = stdout
 	return command.Run()
 }
-
-const GradleInitScript = `import org.jfrog.gradle.plugin.artifactory.ArtifactoryPlugin
-import org.jfrog.gradle.plugin.artifactory.task.ArtifactoryTask
-
-initscript {
-    dependencies {
-        classpath fileTree('${pluginLibDir}')
-    }
-}
-
-addListener(new BuildInfoPluginListener())
-class BuildInfoPluginListener extends BuildAdapter {
-
-    def void projectsLoaded(Gradle gradle) {
-        Map<String, String> projectProperties = new HashMap<String, String>(gradle.startParameter.getProjectProperties())
-        projectProperties.put("build.start", Long.toString(System.currentTimeMillis()))
-        gradle.startParameter.setProjectProperties(projectProperties)
-
-        Project root = gradle.getRootProject()
-        root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
-        if (!"buildSrc".equals(root.name)) {
-            root.allprojects {
-                apply {
-                    apply plugin: ArtifactoryPlugin
-                }
-            }
-        }
-
-        // Set the "mavenJava" and "ivyJava" publications or
-        // "archives" configuration to all Artifactory tasks.
-        for (Project p : root.getAllprojects()) {
-            Task t = p.getTasks().findByName(ArtifactoryTask.ARTIFACTORY_PUBLISH_TASK_NAME)
-            if (t != null) {
-                ArtifactoryTask task = (ArtifactoryTask) t
-                task.setCiServerBuild()
-            }
-        }
-    }
-}
-`
