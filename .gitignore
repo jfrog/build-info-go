@@ -15,5 +15,5 @@ build-info-go.exe
 bi
 bi.exe
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Gradle
+.gradle
