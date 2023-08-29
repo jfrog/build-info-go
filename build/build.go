@@ -85,7 +85,7 @@ func (b *Build) AddMavenModule(srcPath string) (*MavenModule, error) {
 
 // AddGradleModule adds a Gradle module to this Build. Pass srcPath as an empty string if the root of the Gradle project is the working directory.
 func (b *Build) AddGradleModule(srcPath string) (*GradleModule, error) {
-	return newGradleModule(b, srcPath)
+	return newGradleModule(b, srcPath), nil
 }
 
 // AddNpmModule adds a Npm module to this Build. Pass srcPath as an empty string if the root of the Npm project is the working directory.
