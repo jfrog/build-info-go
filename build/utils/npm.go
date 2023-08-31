@@ -403,7 +403,7 @@ func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	return version.NewVersion(string(versionData)), npmExecPath, nil
+	return version.NewVersion(strings.TrimSpace(string(versionData))), npmExecPath, nil
 }
 
 type PackageInfo struct {
