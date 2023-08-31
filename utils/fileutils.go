@@ -416,13 +416,13 @@ func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) e
 		if slices.Contains(excludeNames, filepath.Base(v)) {
 			continue
 		}
-		var exists bool
-		exists, err = IsDirExists(v, false)
+		var isDir bool
+		isDir, err = IsDirExists(v, false)
 		if err != nil {
 			return err
 		}
 
-		if exists {
+		if isDir {
 			toPath := toPath + GetFileSeparator() + filepath.Base(v)
 			err = CopyDir(v, toPath, true, nil)
 			if err != nil {
