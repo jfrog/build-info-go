@@ -411,31 +411,28 @@ func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) e
 		return err
 	}
 
-	for _, v := range files {
+	for _, file := range files {
+		fileName := filepath.Base(file)
 		// Skip if excluded
-		if slices.Contains(excludeNames, filepath.Base(v)) {
+		if slices.Contains(excludeNames, fileName) {
 			continue
 		}
 		var isDir bool
-		isDir, err = IsDirExists(v, false)
+		isDir, err = IsDirExists(file, false)
 		if err != nil {
 			return err
 		}
 
 		if isDir {
-			toPath := toPath + GetFileSeparator() + filepath.Base(v)
-			err = CopyDir(v, toPath, true, nil)
-			if err != nil {
-				return err
-			}
-			continue
+			err = CopyDir(file, filepath.Join(toPath, fileName), true, nil)
+		} else {
+			err = CopyFile(toPath, file)
 		}
-		err = CopyFile(toPath, v)
 		if err != nil {
 			return err
 		}
 	}
-	return err
+	return nil
 }
 
 func CopyFile(dst, src string) (err error) {
