@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"golang.org/x/exp/slices"
 	"io"
@@ -410,61 +411,56 @@ func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) e
 		return err
 	}
 
-	for _, v := range files {
+	for _, file := range files {
+		fileName := filepath.Base(file)
 		// Skip if excluded
-		if slices.Contains(excludeNames, filepath.Base(v)) {
+		if slices.Contains(excludeNames, fileName) {
 			continue
 		}
-
-		dir, err := IsDirExists(v, false)
+		var isDir bool
+		isDir, err = IsDirExists(file, false)
 		if err != nil {
 			return err
 		}
 
-		if dir {
-			toPath := toPath + GetFileSeparator() + filepath.Base(v)
-			err := CopyDir(v, toPath, true, nil)
-			if err != nil {
-				return err
-			}
-			continue
+		if isDir {
+			err = CopyDir(file, filepath.Join(toPath, fileName), true, nil)
+		} else {
+			err = CopyFile(toPath, file)
 		}
-		err = CopyFile(toPath, v)
 		if err != nil {
 			return err
 		}
 	}
-	return err
+	return nil
 }
 
 func CopyFile(dst, src string) (err error) {
 	srcFile, err := os.Open(src)
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
-		e := srcFile.Close()
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, srcFile.Close())
 	}()
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return
+	}
 	fileName, _ := GetFileAndDirFromPath(src)
 	dstPath, err := CreateFilePath(dst, fileName)
 	if err != nil {
-		return err
+		return
 	}
-	dstFile, err := os.Create(dstPath)
+	dstFile, err := os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, srcInfo.Mode())
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
-		e := dstFile.Close()
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, dstFile.Close())
 	}()
 	_, err = io.Copy(dstFile, srcFile)
-	return err
+	return
 }
 
 func GetFileSeparator() string {
