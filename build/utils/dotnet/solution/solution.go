@@ -33,7 +33,7 @@ func Load(path, slnFile string, log utils.Log) (Solution, error) {
 		return solution, err
 	}
 	// Find all potential dependencies sources: packages.config and project.assets.json files.
-	err = solution.getDependenciesSources(slnProjects)
+	err = solution.findDependenciesSources(slnProjects)
 	if err != nil {
 		return solution, err
 	}
@@ -311,13 +311,13 @@ func removeQuotes(value string) string {
 	return strings.Trim(strings.TrimSpace(value), "\"")
 }
 
-// getDependenciesSourcesInProjectsDir Find potential dependencies sources: packages.config and project.assets.json files.
+// findDependenciesSourcesInProjectsDir Find potential dependencies sources: packages.config and project.assets.json files.
 // For each project:
 // 1. Check if the project is located under the solutions' directory (which was scanned before)
 // 2. If it doesn't -find all potential dependencies sources for the relevant projects:
 //   - 'project.assets.json' files are located in 'obj' directory in project's root.
 //   - 'packages.config' files are located in the project root/ in solutions root in a directory named after project's name.
-func (solution *solution) getDependenciesSourcesInProjectsDir(slnProjects []project.Project) error {
+func (solution *solution) findDependenciesSourcesInProjectsDir(slnProjects []project.Project) error {
 	// Walk and search for dependencies sources files in project's directories.
 	for _, project := range slnProjects {
 		// Before running this function we already looked for dependencies sources in solutions directory.
@@ -335,7 +335,7 @@ func (solution *solution) getDependenciesSourcesInProjectsDir(slnProjects []proj
 }
 
 // Find all potential dependencies sources: packages.config and project.assets.json files.
-func (solution *solution) getDependenciesSourcesInSolutionsDir() error {
+func (solution *solution) findDependenciesSourcesInSolutionsDir() error {
 	err := gofrog.Walk(solution.path, func(path string, f os.FileInfo, err error) error {
 		return solution.addPathToDependenciesSourcesIfNeeded(path)
 	}, true)
@@ -355,10 +355,10 @@ func (solution *solution) addPathToDependenciesSourcesIfNeeded(path string) erro
 }
 
 // Find all potential dependencies sources: packages.config and project.assets.json files in solution/project root.
-func (solution *solution) getDependenciesSources(slnProjects []project.Project) error {
-	err := solution.getDependenciesSourcesInSolutionsDir()
+func (solution *solution) findDependenciesSources(slnProjects []project.Project) error {
+	err := solution.findDependenciesSourcesInSolutionsDir()
 	if err != nil {
 		return err
 	}
-	return solution.getDependenciesSourcesInProjectsDir(slnProjects)
+	return solution.findDependenciesSourcesInProjectsDir(slnProjects)
 }
