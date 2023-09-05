@@ -20,7 +20,7 @@ type Solution interface {
 	BuildInfo(module string, log utils.Log) (*buildinfo.BuildInfo, error)
 	Marshal() ([]byte, error)
 	GetProjects() []project.Project
-	GetDependenciesSources() []string
+	DependenciesSourcesExist() bool
 }
 
 var projectRegExp *regexp.Regexp
@@ -140,8 +140,8 @@ func (solution *solution) GetProjects() []project.Project {
 	return solution.projects
 }
 
-func (solution *solution) GetDependenciesSources() []string {
-	return solution.dependenciesSources
+func (solution *solution) DependenciesSourcesExist() bool {
+	return len(solution.dependenciesSources) > 0
 }
 
 func (solution *solution) getProjectsListFromSlns(log utils.Log) ([]project.Project, error) {
