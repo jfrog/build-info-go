@@ -362,5 +362,3 @@ func (solution *solution) getDependenciesSources(slnProjects []project.Project) 
 	}
 	return solution.getDependenciesSourcesInProjectsDir(slnProjects)
 }
-
-// Bla
