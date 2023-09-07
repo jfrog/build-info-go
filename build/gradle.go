@@ -21,7 +21,7 @@ const (
 	gradleExtractorFileName           = "build-info-extractor-gradle-%s-uber.jar"
 	gradleInitScriptTemplate          = "gradle.init"
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
-	gradleExtractor4DependencyVersion = "4.32.0"
+	gradleExtractor4DependencyVersion = "4.33.5"
 	gradleExtractor5DependencyVersion = "5.1.5"
 )
 
