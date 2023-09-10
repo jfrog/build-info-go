@@ -64,7 +64,7 @@ pipelines:
               JFROG_CLI_BUILD_NAME=$JFROG_CLI_BUILD_NAME 
               JFROG_CLI_BUILD_NUMBER=$JFROG_CLI_BUILD_NUMBER 
               JFROG_CLI_BUILD_PROJECT=$JFROG_CLI_BUILD_PROJECT 
-              buildscripts/build.sh "$NEXT_VERSION"
+              release/build.sh "$NEXT_VERSION"
             - jf rt bag && jf rt bce
             - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER
 
