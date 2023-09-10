@@ -69,7 +69,6 @@ pipelines:
             - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER
 
             # Update build-info.json
-            - curl -X GET "https://releases.jfrog.io/artifactory/bi-cli/v1/%5BRELEASE%5D/$operating_system-$architecture/bi" -L -o bi
             - chmod u+x bi
             - ./bi go > build-info.json
             - git add build-info.json
