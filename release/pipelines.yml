@@ -69,6 +69,7 @@ pipelines:
             - jf rt bp $JFROG_CLI_BUILD_NAME $JFROG_CLI_BUILD_NUMBER
 
             # Update build-info.json
+            - ./buildscripts/build.sh
             - chmod u+x bi
             - ./bi go > build-info.json
             - git add build-info.json
