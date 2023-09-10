@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu, windows, macOS ]
+        os: [ ubuntu, windows, macos ]
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
