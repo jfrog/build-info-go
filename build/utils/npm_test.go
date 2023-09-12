@@ -192,7 +192,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
-	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "jfrogtest", npmArgs, true, logger)
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "jfrogtest", NpmTreeDepListParam{Args: npmArgs}, true, logger)
 	assert.NoError(t, err)
 
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
@@ -214,7 +214,7 @@ func TestDependenciesTreeDifferentBetweenOKs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
-	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "bundle-dependencies", npmArgs, true, logger)
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "bundle-dependencies", NpmTreeDepListParam{Args: npmArgs}, true, logger)
 	assert.NoError(t, err)
 
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
@@ -222,7 +222,7 @@ func TestDependenciesTreeDifferentBetweenOKs(t *testing.T) {
 	// Remove node_modules directory, then calculate dependencies by package-lock.
 	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
 
-	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", NpmTreeDepListParam{Args: npmArgs}, true, logger)
 	assert.NoError(t, err)
 
 	// Asserting there is at least one dependency.
@@ -253,7 +253,7 @@ func TestNpmProdFlag(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Calculate dependencies with scope.
-			dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+			dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", NpmTreeDepListParam{Args: npmArgs}, true, logger)
 			assert.NoError(t, err)
 			assert.Len(t, dependencies, entry.totalDeps)
 		}()
@@ -302,7 +302,7 @@ func validateDependencies(t *testing.T, projectPath string, npmArgs []string) {
 	assert.NoError(t, err)
 
 	// Calculate dependencies.
-	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", NpmTreeDepListParam{Args: npmArgs}, true, logger)
 	assert.NoError(t, err)
 
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
@@ -310,7 +310,7 @@ func validateDependencies(t *testing.T, projectPath string, npmArgs []string) {
 	// Remove node_modules directory, then calculate dependencies by package-lock.
 	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
 
-	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", npmArgs, true, logger)
+	dependencies, err = CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", NpmTreeDepListParam{Args: npmArgs}, true, logger)
 	assert.NoError(t, err)
 
 	// Asserting there is at least one dependency.
