@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"testing"
 	"time"
 
@@ -213,62 +212,68 @@ func TestDependencyPackageLockOnly(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(path, "package-lock.json"), data, info.Mode().Perm()))
 	// sleep so the package.json modified time will be bigger than the package-lock.json, this make sure it will recalculate lock file.
-	time.Sleep(time.Millisecond * 1000)
+	time.Sleep(time.Millisecond * 20)
 	require.NoError(t, os.Chtimes(filepath.Join(path, "package.json"), time.Now(), time.Now()))
 
 	// Calculate dependencies.
-	dependencies, err := CalculateNpmDependenciesList("npm", path, "jfrogtest",
-		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: true, OverWritePackageLock: true}, true, logger)
+	dependencies, err := CalculateDependenciesMap("npm", path, "jfrogtest",
+		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: true, OverWritePackageLock: true}, logger)
 	assert.NoError(t, err)
-	expectedDeps := []entities.Dependency{{
-		Id:          "underscore:1.13.6",
-		Scopes:      []string{"prod"},
-		RequestedBy: [][]string{{"jfrogtest"}},
-		Checksum: entities.Checksum{
-			Sha1:   "04786a1f589dc6c09f761fc5f45b89e935136441",
-			Md5:    "945e1ea169a281c296b82ad2dd5466f6",
-			Sha256: "aef5a43ac7f903136a93e75a274e3a7b50de1a92277e1666457cabf62eeb0140",
-		},
-	},
-		{
-			Id:          "cors.js:0.0.1-security",
-			Scopes:      []string{"prod"},
-			RequestedBy: [][]string{{"jfrogtest"}},
-			Checksum: entities.Checksum{
-				Sha1:   "a1304531e44d11f4406b424b8377c3f3f1d3a934",
-				Md5:    "f798d8a0d5e59e0d1b10a8fdc7660df0",
-				Sha256: "e2352450325dba7f38c45ec43ca77eab2cdba66fdb232061045e7039ada1da7e",
+	expectedRes := map[string]*dependencyInfo{
+		"underscore:1.13.6": {
+			Dependency: entities.Dependency{
+				Id:          "underscore:1.13.6",
+				Scopes:      []string{"prod"},
+				RequestedBy: [][]string{{"jfrogtest"}},
+				Checksum:    entities.Checksum{},
+			},
+			npmLsDependency: &npmLsDependency{
+				Name:      "underscore",
+				Version:   "1.13.6",
+				Integrity: "sha512-+A5Sja4HP1M08MaXya7p5LvjuM7K6q/2EaC0+iovj/wOcMsTzMvDFbasi/oSapiwOlt252IqsKqPjCl7huKS0A==",
 			},
 		},
-		{
-			Id:          "lightweight:0.1.0",
-			Scopes:      []string{"prod"},
-			RequestedBy: [][]string{{"jfrogtest"}},
-			Checksum: entities.Checksum{
-				Sha1:   "5e154f8080f0e07a3a28950a5e5ee563df625ed3",
-				Md5:    "8a0ac99046e2c9c962aee498633eccc3",
-				Sha256: "4119c009fa51fba45331235f00908ab77f2a402ee37e47dfc2dd8d422faa160f",
+		"cors.js:0.0.1-security": {
+			Dependency: entities.Dependency{
+				Id:          "cors.js:0.0.1-security",
+				Scopes:      []string{"prod"},
+				RequestedBy: [][]string{{"jfrogtest"}},
+				Checksum:    entities.Checksum{},
+			},
+			npmLsDependency: &npmLsDependency{
+				Name:      "cors.js",
+				Version:   "0.0.1-security",
+				Integrity: "sha512-Cu4D8imt82jd/AuMBwTpjrXiULhaMdig2MD2NBhRKbbcuCTWeyN2070SCEDaJuI/4kA1J9Nnvj6/cBe/zfnrrw==",
 			},
 		},
-		{
-			Id:          "minimist:0.1.0",
-			Type:        "",
-			Scopes:      []string{"prod"},
-			RequestedBy: [][]string{{"jfrogtest"}},
-			Checksum: entities.Checksum{
-				Sha1:   "99df657a52574c21c9057497df742790b2b4c0de",
-				Md5:    "0c9e3002c2af447fcf831fe3f751b2d8",
-				Sha256: "d8d08725641599bd538ef91f6e77109fec81f74aecaa994d568d61b44d06df6d",
+		"lightweight:0.1.0": {
+			Dependency: entities.Dependency{
+				Id:          "lightweight:0.1.0",
+				Scopes:      []string{"prod"},
+				RequestedBy: [][]string{{"jfrogtest"}},
+				Checksum:    entities.Checksum{},
+			},
+			npmLsDependency: &npmLsDependency{
+				Name:      "lightweight",
+				Version:   "0.1.0",
+				Integrity: "sha512-10pYSQA9EJqZZnXDR0urhg8Z0Y1XnRfi41ZFj3ZFTKJ5PjRq82HzT7LKlPyxewy3w2WA2POfi3jQQn7Y53oPcQ==",
+			},
+		},
+		"minimist:0.1.0": {
+			Dependency: entities.Dependency{
+				Id:          "minimist:0.1.0",
+				Scopes:      []string{"prod"},
+				RequestedBy: [][]string{{"jfrogtest"}},
+				Checksum:    entities.Checksum{},
+			},
+			npmLsDependency: &npmLsDependency{
+				Name:      "minimist",
+				Version:   "0.1.0",
+				Integrity: "sha512-wR5Ipl99t0mTGwLjQJnBjrP/O7zBbLZqvA3aw32DmLx+nXHfWctUjzDjnDx09pX1Po86WFQazF9xUzfMea3Cnw==",
 			},
 		},
 	}
-	sort.Slice(expectedDeps, func(i, j int) bool {
-		return expectedDeps[i].Id > expectedDeps[j].Id
-	})
-	sort.Slice(dependencies, func(i, j int) bool {
-		return dependencies[i].Id > dependencies[j].Id
-	})
-	assert.Equal(t, expectedDeps, dependencies)
+	assert.Equal(t, expectedRes, dependencies)
 }
 
 // A project built differently for each operating system.
