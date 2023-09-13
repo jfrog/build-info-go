@@ -205,17 +205,13 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 // This test case check that CalculateNpmDependenciesList ignore node_modules and update package-lock.json when needed,
 // this according to the params 'IgnoreNodeModules' and 'OverWritePackageLock'.
 func TestDependencyPackageLockOnly(t *testing.T) {
-	path, err := filepath.Abs(filepath.Join("..", "testdata/npm/project6"))
-	assert.NoError(t, err)
+	path, cleanup := testdatautils.CreateTestProject(t, filepath.Join("..", "testdata/npm/project6"))
+	defer cleanup()
 	data, err := os.ReadFile(filepath.Join(path, "package-lock_test.json"))
 	require.NoError(t, err)
 	info, err := os.Stat(filepath.Join(path, "package-lock_test.json"))
 	require.NoError(t, err)
 	os.WriteFile(filepath.Join(path, "package-lock.json"), data, info.Mode().Perm())
-	defer func() {
-		assert.NoError(t, os.Remove(filepath.Join(path, "package-lock.json")))
-		assert.NoError(t, os.Remove(filepath.Join(path, "node_modules", ".package-lock.json")))
-	}()
 	// sleep so the package.json modified time will be bigger than the package-lock.json, this make sure it will recalculate lock file.
 	time.Sleep(time.Millisecond * 5)
 	require.NoError(t, os.Chtimes(filepath.Join(path, "package.json"), time.Now(), time.Now()))
