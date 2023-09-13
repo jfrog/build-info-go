@@ -211,9 +211,9 @@ func TestDependencyPackageLockOnly(t *testing.T) {
 	require.NoError(t, err)
 	info, err := os.Stat(filepath.Join(path, "package-lock_test.json"))
 	require.NoError(t, err)
-	os.WriteFile(filepath.Join(path, "package-lock.json"), data, info.Mode().Perm())
+	require.NoError(t, os.WriteFile(filepath.Join(path, "package-lock.json"), data, info.Mode().Perm()))
 	// sleep so the package.json modified time will be bigger than the package-lock.json, this make sure it will recalculate lock file.
-	time.Sleep(time.Millisecond * 5)
+	time.Sleep(time.Millisecond * 1000)
 	require.NoError(t, os.Chtimes(filepath.Join(path, "package.json"), time.Now(), time.Now()))
 
 	// Calculate dependencies.
