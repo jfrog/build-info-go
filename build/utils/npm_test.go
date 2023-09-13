@@ -1,10 +1,14 @@
 package utils
 
 import (
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"testing"
+	"time"
 
 	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	"github.com/jfrog/build-info-go/utils"
@@ -196,6 +200,79 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+}
+
+// This test case check that CalculateNpmDependenciesList ignore node_modules and update package-lock.json when needed,
+// this according to the params 'IgnoreNodeModules' and 'OverWritePackageLock'.
+func TestDependencyPackageLockOnly(t *testing.T) {
+	path, err := filepath.Abs(filepath.Join("..", "testdata/npm/project6"))
+	assert.NoError(t, err)
+	data, err := os.ReadFile(filepath.Join(path, "package-lock_test.json"))
+	require.NoError(t, err)
+	info, err := os.Stat(filepath.Join(path, "package-lock_test.json"))
+	require.NoError(t, err)
+	os.WriteFile(filepath.Join(path, "package-lock.json"), data, info.Mode().Perm())
+	defer func() {
+		assert.NoError(t, os.Remove(filepath.Join(path, "package-lock.json")))
+		assert.NoError(t, os.Remove(filepath.Join(path, "node_modules", ".package-lock.json")))
+	}()
+	// sleep so the package.json modified time will be bigger than the package-lock.json, this make sure it will recalculate lock file.
+	time.Sleep(time.Millisecond * 5)
+	require.NoError(t, os.Chtimes(filepath.Join(path, "package.json"), time.Now(), time.Now()))
+
+	// Calculate dependencies.
+	dependencies, err := CalculateNpmDependenciesList("npm", path, "jfrogtest",
+		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: true, OverWritePackageLock: true}, true, logger)
+	assert.NoError(t, err)
+	expectedDeps := []entities.Dependency{{
+		Id:          "underscore:1.13.6",
+		Scopes:      []string{"prod"},
+		RequestedBy: [][]string{{"jfrogtest"}},
+		Checksum: entities.Checksum{
+			Sha1:   "04786a1f589dc6c09f761fc5f45b89e935136441",
+			Md5:    "945e1ea169a281c296b82ad2dd5466f6",
+			Sha256: "aef5a43ac7f903136a93e75a274e3a7b50de1a92277e1666457cabf62eeb0140",
+		},
+	},
+		{
+			Id:          "cors.js:0.0.1-security",
+			Scopes:      []string{"prod"},
+			RequestedBy: [][]string{{"jfrogtest"}},
+			Checksum: entities.Checksum{
+				Sha1:   "a1304531e44d11f4406b424b8377c3f3f1d3a934",
+				Md5:    "f798d8a0d5e59e0d1b10a8fdc7660df0",
+				Sha256: "e2352450325dba7f38c45ec43ca77eab2cdba66fdb232061045e7039ada1da7e",
+			},
+		},
+		{
+			Id:          "lightweight:0.1.0",
+			Scopes:      []string{"prod"},
+			RequestedBy: [][]string{{"jfrogtest"}},
+			Checksum: entities.Checksum{
+				Sha1:   "5e154f8080f0e07a3a28950a5e5ee563df625ed3",
+				Md5:    "8a0ac99046e2c9c962aee498633eccc3",
+				Sha256: "4119c009fa51fba45331235f00908ab77f2a402ee37e47dfc2dd8d422faa160f",
+			},
+		},
+		{
+			Id:          "minimist:0.1.0",
+			Type:        "",
+			Scopes:      []string{"prod"},
+			RequestedBy: [][]string{{"jfrogtest"}},
+			Checksum: entities.Checksum{
+				Sha1:   "99df657a52574c21c9057497df742790b2b4c0de",
+				Md5:    "0c9e3002c2af447fcf831fe3f751b2d8",
+				Sha256: "d8d08725641599bd538ef91f6e77109fec81f74aecaa994d568d61b44d06df6d",
+			},
+		},
+	}
+	sort.Slice(expectedDeps, func(i, j int) bool {
+		return expectedDeps[i].Id > expectedDeps[j].Id
+	})
+	sort.Slice(dependencies, func(i, j int) bool {
+		return dependencies[i].Id > dependencies[j].Id
+	})
+	assert.Equal(t, expectedDeps, dependencies)
 }
 
 // A project built differently for each operating system.
