@@ -204,6 +204,10 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 // This test case check that CalculateNpmDependenciesList ignore node_modules and update package-lock.json when needed,
 // this according to the params 'IgnoreNodeModules' and 'OverWritePackageLock'.
 func TestDependencyPackageLockOnly(t *testing.T) {
+	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+	if !npmVersion.AtLeast("7.0.0") {
+		t.Skip("Running on npm v7 and above only, skipping...")
+	}
 	path, cleanup := testdatautils.CreateTestProject(t, filepath.Join("..", "testdata/npm/project6"))
 	defer cleanup()
 	data, err := os.ReadFile(filepath.Join(path, "package-lock_test.json"))
