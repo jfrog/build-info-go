@@ -205,6 +205,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 // this according to the params 'IgnoreNodeModules' and 'OverWritePackageLock'.
 func TestDependencyPackageLockOnly(t *testing.T) {
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+	require.NoError(t, err)
 	if !npmVersion.AtLeast("7.0.0") {
 		t.Skip("Running on npm v7 and above only, skipping...")
 	}
