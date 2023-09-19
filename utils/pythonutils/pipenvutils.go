@@ -26,3 +26,16 @@ func getPipenvDependencies(srcPath string) (dependenciesGraph map[string][]strin
 	dependenciesGraph, topLevelDependencies, err = parseDependenciesToGraph(packages)
 	return
 }
+
+// Return the location of the env folder dependencies
+func getPipenvRoot() string {
+	// Run pipenv graph
+	pipenvGraphCmd := utils.NewCommand("pipenv", "", []string{"venv"})
+	output, err := pipenvGraphCmd.RunWithOutput()
+	if err != nil {
+		return ""
+	}
+	print(output)
+	// TODO parse output to get the location
+	return ""
+}

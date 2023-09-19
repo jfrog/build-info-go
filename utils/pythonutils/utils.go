@@ -261,3 +261,21 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	}
 	return dependenciesMap, nil
 }
+
+func GetPythonTechs(technologies []string) (extraRoots []string) {
+	root := ""
+	for _, tech := range technologies {
+		switch tech {
+		case string(Pipenv):
+			root = getPipenvRoot()
+		case string(Poetry):
+			root = getPoetryRoot()
+		case string(Pip):
+			root = getPipRoot()
+		}
+		if root != "" {
+			extraRoots = append(extraRoots, root)
+		}
+	}
+	return
+}
