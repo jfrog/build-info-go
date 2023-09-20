@@ -9,8 +9,8 @@ build () {
   exeName="$4"
   echo "Building $exeName for $GOOS-$GOARCH ..."
 
-  CGO_ENABLED=0 jf go build -o "$exeName" -ldflags '-w -extldflags "-static" -X main.cliVersion='$version main.go
-  chmod +x $exeName
+  CGO_ENABLED=0 jf go build -o "$exeName" -ldflags '-w -extldflags "-static" -X main.cliVersion='"$version" main.go
+  chmod +x "$exeName"
 
   # Run verification after building plugin for the correct platform of this image.
   if [[ "$pkg" = "linux-386" ]]; then
@@ -26,7 +26,7 @@ buildAndUpload () {
   fileExtension="$4"
   exeName="bi$fileExtension"
 
-  build $pkg $goos $goarch $exeName
+  build "$pkg" "$goos" "$goarch" "$exeName"
 
   destPath="$pkgPath/$version/$pkg/$exeName"
   echo "Uploading $exeName to $destPath ..."
