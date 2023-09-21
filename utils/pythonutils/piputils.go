@@ -1,6 +1,7 @@
 package pythonutils
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -204,4 +205,26 @@ func getProjectIdFromFileContent(content []byte) (string, error) {
 	}
 
 	return nameMatch[1] + ":" + versionMatch[1], nil
+}
+
+func getPipRoot() (path string, err error) {
+	// Check if virtual env is preset
+	path = os.Getenv(virtualEnvVariable)
+	if path != "" {
+		return
+	}
+	command := exec.Command("pip", "-V")
+	outBuffer := bytes.NewBuffer([]byte{})
+	command.Stdout = outBuffer
+	if err = command.Run(); err != nil {
+		return
+	}
+	// Define a regular expression to match the path.
+	re := regexp.MustCompile(`from (.+) \(python`)
+	// Find the path using the regular expression.
+	match := re.FindStringSubmatch(outBuffer.String())
+	if len(match) >= 2 {
+		path = match[1]
+	}
+	return
 }

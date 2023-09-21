@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -28,6 +29,10 @@ type PoetryPackage struct {
 
 type PoetryLock struct {
 	Package []*PoetryPackage
+}
+
+type packagedDirectUrl struct {
+	Url string
 }
 
 // Extract all poetry dependencies from the pyproject.toml and poetry.lock files.
@@ -218,6 +223,25 @@ func getSitePackagesPath(commandArgs []string, srcPath string) (sitePackagesPath
 	return
 }
 
-type packagedDirectUrl struct {
-	Url string
+func getPoetryRoot() (path string, err error) {
+	cmd := exec.Command("poetry", "env", "info")
+	// Capture the output of the command.
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+	// Convert the output to a string.
+	outputStr := string(output)
+	// Define a regular expression to match the virtual environment location.
+	re := regexp.MustCompile(`Location:\s+(.+)`)
+	// Find the location using the regular expression.
+	matches := re.FindStringSubmatch(outputStr)
+	if len(matches) >= 2 {
+		location := strings.TrimSpace(matches[1])
+		fmt.Println("Virtual Environment Path:", location)
+	} else {
+		fmt.Println("Virtual environment location not found in the output.")
+	}
+	return
 }

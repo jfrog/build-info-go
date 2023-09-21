@@ -16,6 +16,8 @@ const (
 	Pip    PythonTool = "pip"
 	Pipenv PythonTool = "pipenv"
 	Poetry PythonTool = "poetry"
+
+	virtualEnvVariable = "VIRTUAL_ENV"
 )
 
 type PythonTool string
@@ -262,20 +264,17 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	return dependenciesMap, nil
 }
 
-func GetPythonTechs(technologies []string) (extraRoots []string) {
-	root := ""
-	for _, tech := range technologies {
-		switch tech {
-		case string(Pipenv):
-			root = getPipenvRoot()
-		case string(Poetry):
-			root = getPoetryRoot()
-		case string(Pip):
-			root = getPipRoot()
-		}
-		if root != "" {
-			extraRoots = append(extraRoots, root)
-		}
+func GetPythonEnvRoot(technology string) (root string, err error) {
+	switch PythonTool(technology) {
+	case Pipenv:
+		// Currently not supported by applicability scanner.
+		return getPipenvRoot()
+		// Currently not supported by applicability scanner.
+	case Poetry:
+		return getPoetryRoot()
+	case Pip:
+		return getPipRoot()
+	default:
+		return
 	}
-	return
 }
