@@ -599,14 +599,10 @@ func calcChecksumDetails(filePath string) (checksum entities.Checksum, err error
 		err = errors.Join(err, file.Close())
 	}()
 
-	checksum, err = calcChecksumDetailsFromReader(file)
-	return
-}
-
-func calcChecksumDetailsFromReader(reader io.Reader) (entities.Checksum, error) {
-	checksumInfo, err := CalcChecksums(reader)
+	checksumInfo, err := CalcChecksums(file)
 	if err != nil {
 		return entities.Checksum{}, err
 	}
-	return entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}, nil
+	checksum = entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}
+	return
 }
