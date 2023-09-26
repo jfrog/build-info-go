@@ -546,7 +546,7 @@ func ReadNLines(path string, total int) (lines []string, err error) {
 	bufferedReader := bufio.NewReader(reader)
 	for i := 0; i < total; i++ {
 		var line []byte
-		line, _, err = r.ReadLine()
+		line, _, err = bufferedReader.ReadLine()
 		lines = append(lines, string(line))
 		if err == io.EOF {
 			err = nil
