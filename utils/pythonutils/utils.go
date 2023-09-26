@@ -3,6 +3,7 @@ package pythonutils
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -265,11 +266,14 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 }
 
 func GetPythonEnvRoot(technology string) (root string, err error) {
+	// Virtual Env can be found using env variable if virtual env is active.
+	root = os.Getenv(virtualEnvVariable)
+	if root != "" {
+		return
+	}
 	switch PythonTool(technology) {
 	case Pipenv:
-		// Currently not supported by applicability scanner.
 		return getPipenvRoot()
-		// Currently not supported by applicability scanner.
 	case Poetry:
 		return getPoetryRoot()
 	case Pip:

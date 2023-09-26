@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -208,11 +209,6 @@ func getProjectIdFromFileContent(content []byte) (string, error) {
 }
 
 func getPipRoot() (path string, err error) {
-	// Check if virtual env is preset
-	path = os.Getenv(virtualEnvVariable)
-	if path != "" {
-		return
-	}
 	command := exec.Command("pip", "-V")
 	outBuffer := bytes.NewBuffer([]byte{})
 	command.Stdout = outBuffer
@@ -222,9 +218,11 @@ func getPipRoot() (path string, err error) {
 	// Define a regular expression to match the path.
 	re := regexp.MustCompile(`from (.+) \(python`)
 	// Find the path using the regular expression.
-	match := re.FindStringSubmatch(outBuffer.String())
+	output := outBuffer.String()
+	match := re.FindStringSubmatch(output)
 	if len(match) >= 2 {
-		path = match[1]
+		path = strings.TrimSuffix(match[1], "/pip")
 	}
+	err = fmt.Errorf("failed to get pip env root folder, pip -V outout : %s", output)
 	return
 }

@@ -223,7 +223,7 @@ func getSitePackagesPath(commandArgs []string, srcPath string) (sitePackagesPath
 	return
 }
 
-func getPoetryRoot() (path string, err error) {
+func getPoetryRoot() (location string, err error) {
 	cmd := exec.Command("poetry", "env", "info")
 	// Capture the output of the command.
 	output, err := cmd.CombinedOutput()
@@ -238,10 +238,8 @@ func getPoetryRoot() (path string, err error) {
 	// Find the location using the regular expression.
 	matches := re.FindStringSubmatch(outputStr)
 	if len(matches) >= 2 {
-		location := strings.TrimSpace(matches[1])
-		fmt.Println("Virtual Environment Path:", location)
-	} else {
-		fmt.Println("Virtual environment location not found in the output.")
+		location = strings.TrimSpace(matches[1])
 	}
+	err = fmt.Errorf("failed to extract poetry env path, poetry env ouput: %s", outputStr)
 	return
 }
