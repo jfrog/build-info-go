@@ -135,7 +135,7 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmListParams Np
 	if isDirExistsErr != nil {
 		return nil, isDirExistsErr
 	}
-	if !isPackageLockExist || (npmListParams.OverWritePackageLock && checkIfLockFileShouldBeUpdated(srcPath, log)) {
+	if !isPackageLockExist || (npmListParams.OverwritePackageLock && checkIfLockFileShouldBeUpdated(srcPath, log)) {
 		err := installPackageLock(executablePath, srcPath, npmListParams.Args, log, npmVersion)
 		if err != nil {
 			return nil, err
@@ -164,8 +164,8 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 	return errors.New("it looks like you’re using version " + npmVersion.GetVersion() + " of the npm client. Versions below 6.0.0 require running `npm install` before running this command")
 }
 
-// check package.json modified,
-// this can hint us new packages added to package.json which were not updated in package-lock.json..
+// Check if package.json has been modified.
+// This might indicate the addition of new packages to package.json that haven't been reflected in package-lock.json.
 func checkIfLockFileShouldBeUpdated(srcPath string, log utils.Log) bool {
 	packageJsonInfo, err := os.Stat(filepath.Join(srcPath, "package.json"))
 	if err != nil {
@@ -193,10 +193,10 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 
 type NpmTreeDepListParam struct {
 	Args []string
-	// ignore node modules folder if exists.
+	// Ignore the node_modules folder if exists, using the '--package-lock-only' flag
 	IgnoreNodeModules bool
-	// rewrite package lock json if exists.
-	OverWritePackageLock bool
+	// Rewrite package-lock.json, if exists.
+	OverwritePackageLock bool
 }
 
 // npm >=7 ls results for a single dependency

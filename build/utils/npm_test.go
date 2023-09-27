@@ -201,8 +201,8 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
-// This test case check that CalculateNpmDependenciesList ignore node_modules and update package-lock.json when needed,
-// this according to the params 'IgnoreNodeModules' and 'OverWritePackageLock'.
+// This test case verifies that CalculateNpmDependenciesList correctly handles the exclusion of 'node_modules'
+// and updates 'package-lock.json' as required, based on the 'IgnoreNodeModules' and 'OverwritePackageLock' parameters.
 func TestDependencyPackageLockOnly(t *testing.T) {
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	require.NoError(t, err)
@@ -211,20 +211,20 @@ func TestDependencyPackageLockOnly(t *testing.T) {
 	}
 	path, cleanup := testdatautils.CreateTestProject(t, filepath.Join("..", "testdata/npm/project6"))
 	defer cleanup()
-	data, err := os.ReadFile(filepath.Join(path, "package-lock_test.json"))
-	require.NoError(t, err)
-	info, err := os.Stat(filepath.Join(path, "package-lock_test.json"))
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(path, "package-lock.json"), data, info.Mode().Perm()))
+	assert.NoError(t, utils.MoveFile(filepath.Join(path, "package-lock_test.json"), filepath.Join(path, "package-lock.json")))
 	// sleep so the package.json modified time will be bigger than the package-lock.json, this make sure it will recalculate lock file.
-	time.Sleep(time.Millisecond * 20)
-	require.NoError(t, os.Chtimes(filepath.Join(path, "package.json"), time.Now(), time.Now()))
+	require.NoError(t, os.Chtimes(filepath.Join(path, "package.json"), time.Now(), time.Now().Add(time.Millisecond*20)))
 
 	// Calculate dependencies.
 	dependencies, err := CalculateDependenciesMap("npm", path, "jfrogtest",
-		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: true, OverWritePackageLock: true}, logger)
+		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: true, OverwritePackageLock: true}, logger)
 	assert.NoError(t, err)
-	expectedRes := map[string]*dependencyInfo{
+	var expectedRes = getExpectedRespForTestDependencyPackageLockOnly()
+	assert.Equal(t, expectedRes, dependencies)
+}
+
+func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInfo {
+	return map[string]*dependencyInfo{
 		"underscore:1.13.6": {
 			Dependency: entities.Dependency{
 				Id:          "underscore:1.13.6",
@@ -278,7 +278,6 @@ func TestDependencyPackageLockOnly(t *testing.T) {
 			},
 		},
 	}
-	assert.Equal(t, expectedRes, dependencies)
 }
 
 // A project built differently for each operating system.
