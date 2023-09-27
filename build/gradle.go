@@ -149,12 +149,12 @@ func (gm *GradleModule) getExtractorVersionAndInitScript(gradleExecPath string) 
 	if err := gradleRunConfig.runCmd(outBuffer, errBuffer); err != nil {
 		return "", "", err
 	}
-	if errBuffer.Len() > 0 {
-		return "", "", errors.New("unexpected error occurred during attempt to get the Gradle version: " + errBuffer.String())
-	}
 
 	gradleVersion, err := parseGradleVersion(outBuffer.String())
 	if err != nil {
+		if errBuffer.Len() > 0 {
+			err = errors.Join(err, errors.New(errBuffer.String()))
+		}
 		return "", "", err
 	}
 	gm.containingBuild.logger.Info("Using Gradle version:", gradleVersion.GetVersion())
