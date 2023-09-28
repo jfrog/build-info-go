@@ -304,7 +304,8 @@ func splitNameAndVersion(packageFullName string) (packageCleanName string, packa
 	packageCleanName = packageFullName[:indexOfLastAt]
 
 	if strings.Contains(packageCleanName, "@") {
-		// Packages may have @ at their name due to package scoping of unique naming convention related to the package itself which is unknown by Yarn itself
+		// Packages may have @ at their name due to package scoping or package aliasing
+		// In order to precess the dependencies correctly we need names without aliases or unique naming conventions that exists in some packages
 		packageCleanName, err = getFinalPackageName(packageCleanName)
 	}
 	return
