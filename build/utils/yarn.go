@@ -326,7 +326,7 @@ func getFinalPackageName(packageNameToClean string) (string, error) {
 
 	// When reaching this case we have a scoped package with a unique naming convention. We take only the first part of the name which is the package's name only
 	// Example: @my-package@other-dependent-package --> @my-package
-	return packageNameToClean[indexOfLastAt+1:], nil
+	return packageNameToClean[:indexOfLastAt], nil
 
 }
 
