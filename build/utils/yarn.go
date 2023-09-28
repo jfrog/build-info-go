@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/parallel"
@@ -170,7 +171,8 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 
 	// Initializing dependencies map without child dependencies for each dependency + creating a map that maps: package-name -> package-name@version
 	for _, curDependency := range depTree.Data.DepTree {
-		packageCleanName, packageVersion, err := splitNameAndVersion(curDependency.Name)
+		var packageCleanName, packageVersion string
+		packageCleanName, packageVersion, err = splitNameAndVersion(curDependency.Name)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -187,7 +189,8 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 		dependency := dependenciesMap[curDependency.Name]
 
 		for _, subDep := range curDependency.Dependencies {
-			subDepName, _, err := splitNameAndVersion(subDep.DependencyName)
+			var subDepName string
+			subDepName, _, err = splitNameAndVersion(subDep.DependencyName)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -297,9 +300,33 @@ func splitNameAndVersion(packageFullName string) (packageCleanName string, packa
 		err = errors.New("received package name of incorrect format (expected: package-name@version)")
 		return
 	}
-	packageCleanName = packageFullName[:indexOfLastAt]
 	packageVersion = packageFullName[indexOfLastAt+1:]
+	packageCleanName = packageFullName[:indexOfLastAt]
+
+	if strings.Contains(packageCleanName, "@") {
+		// Packages may have @ at their name due to package scoping of unique naming convention related to the package itself which is unknown by Yarn itself
+		packageCleanName, err = getFinalPackageName(packageCleanName)
+	}
 	return
+}
+
+func getFinalPackageName(packageNameToClean string) (string, error) {
+	atSignCount := strings.Count(packageNameToClean, "@")
+	if atSignCount > 2 || (atSignCount == 2 && packageNameToClean[0] != '@') {
+		// A package's name without a version my have at most two @ signs- in the beginning (scoped package)
+		// And in the middle if the package's naming convention specify additional dependency. Example: string-width-cjs@npm:string-width@^4.2.0
+		return "", fmt.Errorf("couldn't parse package name '%s' due to unfaliliar naming convention", packageNameToClean)
+	}
+	indexOfLastAt := strings.LastIndex(packageNameToClean, "@")
+	if indexOfLastAt == 0 {
+		// When in this case we have only a single @ sign at the beginning (scoped package)
+		return packageNameToClean, nil
+	}
+
+	// When reaching this case we have a scoped package with a unique naming convention. We take only the first part of the name which is the package's name only
+	// Example: @my-package@other-dependent-package --> @my-package
+	return packageNameToClean[:indexOfLastAt], nil
+
 }
 
 type Yarn1Data struct {
