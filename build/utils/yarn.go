@@ -313,8 +313,9 @@ func splitNameAndVersion(packageFullName string) (packageCleanName string, packa
 func getFinalPackageName(packageNameToClean string) (string, error) {
 	atSignCount := strings.Count(packageNameToClean, "@")
 	if atSignCount > 2 || (atSignCount == 2 && packageNameToClean[0] != '@') {
-		// A package's name without a version my have at most two @ signs- in the beginning (scoped package)
-		// And in the middle if the package's naming convention specify additional dependency. Example: string-width-cjs@npm:string-width@^4.2.0
+		// A package's name without a version my have at most two @ signs:
+		// At the beginning (scoped package)
+		// At the middle if the package uses aliasing. Example: string-width-cjs@npm:string-width@^4.2.0
 		return "", fmt.Errorf("couldn't parse package name '%s' due to unfaliliar naming convention", packageNameToClean)
 	}
 	indexOfLastAt := strings.LastIndex(packageNameToClean, "@")
@@ -325,7 +326,7 @@ func getFinalPackageName(packageNameToClean string) (string, error) {
 
 	// When reaching this case we have a scoped package with a unique naming convention. We take only the first part of the name which is the package's name only
 	// Example: @my-package@other-dependent-package --> @my-package
-	return packageNameToClean[:indexOfLastAt], nil
+	return packageNameToClean[indexOfLastAt+1:], nil
 
 }
 
