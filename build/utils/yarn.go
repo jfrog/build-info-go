@@ -194,7 +194,13 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 			if err != nil {
 				return nil, nil, err
 			}
-			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, packNameToFullName[subDepName]})
+
+			packageWithResolvedVersion := packNameToFullName[subDepName]
+			if packageWithResolvedVersion == "" {
+				err = fmt.Errorf("couldn't find resolved version for '%s' in 'yarn list' output", subDep.DependencyName)
+				return
+			}
+			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, packageWithResolvedVersion})
 		}
 		dependenciesMap[curDependency.Name] = dependency
 	}
@@ -306,29 +312,26 @@ func splitNameAndVersion(packageFullName string) (packageCleanName string, packa
 	if strings.Contains(packageCleanName, "@") {
 		// Packages may have @ at their name due to package scoping or package aliasing
 		// In order to precess the dependencies correctly we need names without aliases or unique naming conventions that exists in some packages
-		packageCleanName, err = getFinalPackageName(packageCleanName)
+		packageCleanName, err = removeAliasingFromPackageName(packageCleanName) //removeAlias
 	}
 	return
 }
 
-func getFinalPackageName(packageNameToClean string) (string, error) {
+func removeAliasingFromPackageName(packageNameToClean string) (string, error) {
 	atSignCount := strings.Count(packageNameToClean, "@")
 	if atSignCount > 2 || (atSignCount == 2 && packageNameToClean[0] != '@') {
-		// A package's name without a version my have at most two @ signs:
+		// For a package's name without a version we support @ in two places:
 		// At the beginning (scoped package)
 		// At the middle if the package uses aliasing. Example: string-width-cjs@npm:string-width@^4.2.0
-		return "", fmt.Errorf("couldn't parse package name '%s' due to unfaliliar naming convention", packageNameToClean)
+		return "", fmt.Errorf("couldn't parse package name '%s' due to unfamiliar naming convention", packageNameToClean)
 	}
-	indexOfLastAt := strings.LastIndex(packageNameToClean, "@")
-	if indexOfLastAt == 0 {
-		// When in this case we have only a single @ sign at the beginning (scoped package)
+	indexOfLastAt := strings.LastIndex(packageNameToClean[1:], "@")
+	if indexOfLastAt == -1 {
+		// This case covers scoped package: @my-package
 		return packageNameToClean, nil
 	}
-
-	// When reaching this case we have a scoped package with a unique naming convention. We take only the first part of the name which is the package's name only
-	// Example: @my-package@other-dependent-package --> @my-package
-	return packageNameToClean[:indexOfLastAt], nil
-
+	// This case covers an aliased package: @my-package@other-dependent-package --> @my-package
+	return packageNameToClean[:indexOfLastAt+1], nil
 }
 
 type Yarn1Data struct {
