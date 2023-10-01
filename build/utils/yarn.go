@@ -312,26 +312,20 @@ func splitNameAndVersion(packageFullName string) (packageCleanName string, packa
 	if strings.Contains(packageCleanName, "@") {
 		// Packages may have '@' at their name due to package scoping or package aliasing
 		// In order to process the dependencies correctly we need names without aliases or unique naming conventions that exist in some packages
-		packageCleanName, err = removeAliasingFromPackageName(packageCleanName)
+		packageCleanName = removeAliasingFromPackageName(packageCleanName)
 	}
 	return
 }
 
-func removeAliasingFromPackageName(packageNameToClean string) (string, error) {
-	atSignCount := strings.Count(packageNameToClean, "@")
-	if atSignCount > 2 || (atSignCount == 2 && packageNameToClean[0] != '@') {
-		// For a package's name without a version we support @ in two places:
-		// At the beginning (scoped package)
-		// At the middle if the package uses aliasing. Example: string-width-cjs@npm:string-width@^4.2.0
-		return "", fmt.Errorf("couldn't parse package name '%s' due to unfamiliar naming convention", packageNameToClean)
-	}
+func removeAliasingFromPackageName(packageNameToClean string) string {
 	indexOfLastAt := strings.LastIndex(packageNameToClean[1:], "@")
+
 	if indexOfLastAt == -1 {
 		// This case covers scoped package: @my-package
-		return packageNameToClean, nil
+		return packageNameToClean
 	}
-	// This case covers an aliased package: @my-package@other-dependent-package --> @my-package
-	return packageNameToClean[:indexOfLastAt+1], nil
+	// This case covers an aliased package: @my-package@other-dependent-package --> @my-package / my-package@other-dependent-package --> my-package
+	return packageNameToClean[:indexOfLastAt+1]
 }
 
 type Yarn1Data struct {
