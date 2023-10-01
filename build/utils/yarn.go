@@ -318,7 +318,7 @@ func splitNameAndVersion(packageFullName string) (packageCleanName string, packa
 }
 
 func removeAliasingFromPackageName(packageNameToClean string) string {
-	indexOfLastAt := strings.LastIndex(packageNameToClean[1:], "@")
+	indexOfLastAt := strings.Index(packageNameToClean[1:], "@")
 
 	if indexOfLastAt == -1 {
 		// This case covers scoped package: @my-package
