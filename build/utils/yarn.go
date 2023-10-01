@@ -312,7 +312,7 @@ func splitNameAndVersion(packageFullName string) (packageCleanName string, packa
 	if strings.Contains(packageCleanName, "@") {
 		// Packages may have @ at their name due to package scoping or package aliasing
 		// In order to precess the dependencies correctly we need names without aliases or unique naming conventions that exists in some packages
-		packageCleanName, err = removeAliasingFromPackageName(packageCleanName) //removeAlias
+		packageCleanName, err = removeAliasingFromPackageName(packageCleanName)
 	}
 	return
 }
