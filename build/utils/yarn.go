@@ -174,7 +174,7 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 		var packageCleanName, packageVersion string
 		packageCleanName, packageVersion, err = splitNameAndVersion(curDependency.Name)
 		if err != nil {
-			return nil, nil, err
+			return
 		}
 
 		dependenciesMap[curDependency.Name] = &YarnDependency{
@@ -192,7 +192,7 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 			var subDepName string
 			subDepName, _, err = splitNameAndVersion(subDep.DependencyName)
 			if err != nil {
-				return nil, nil, err
+				return
 			}
 
 			packageWithResolvedVersion := packNameToFullName[subDepName]
@@ -310,8 +310,8 @@ func splitNameAndVersion(packageFullName string) (packageCleanName string, packa
 	packageCleanName = packageFullName[:indexOfLastAt]
 
 	if strings.Contains(packageCleanName, "@") {
-		// Packages may have @ at their name due to package scoping or package aliasing
-		// In order to precess the dependencies correctly we need names without aliases or unique naming conventions that exists in some packages
+		// Packages may have '@' at their name due to package scoping or package aliasing
+		// In order to process the dependencies correctly we need names without aliases or unique naming conventions that exist in some packages
 		packageCleanName, err = removeAliasingFromPackageName(packageCleanName)
 	}
 	return
