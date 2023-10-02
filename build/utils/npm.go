@@ -351,14 +351,13 @@ func appendScopes(oldScopes []string, newScopes []string) []string {
 }
 
 func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
-	log.Debug("Running npm " + npmArgs[0] + " command.")
 	args := make([]string, 0)
 	for i := 0; i < len(npmArgs); i++ {
 		if strings.TrimSpace(npmArgs[i]) != "" {
 			args = append(args, npmArgs[i])
 		}
 	}
-
+	log.Debug("Running 'npm " + strings.Join(npmArgs, " ") + "' command.")
 	command := exec.Command(executablePath, args...)
 	command.Dir = srcPath
 	outBuffer := bytes.NewBuffer([]byte{})
@@ -369,7 +368,7 @@ func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) 
 	errResult = errBuffer.Bytes()
 	stdResult = outBuffer.Bytes()
 	if err != nil {
-		err = fmt.Errorf("error while running '%s %s': %s\n%s", executablePath, strings.Join(args, " "), strings.TrimSpace(string(errResult)), err.Error())
+		err = fmt.Errorf("error while running '%s %s': %s\n%s", executablePath, strings.Join(args, " "), err.Error(), strings.TrimSpace(string(errResult)))
 		return
 	}
 	log.Debug("npm '" + strings.Join(args, " ") + "' standard output is:\n" + strings.TrimSpace(string(stdResult)))
