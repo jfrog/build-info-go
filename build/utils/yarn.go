@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/parallel"
@@ -170,9 +171,10 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 
 	// Initializing dependencies map without child dependencies for each dependency + creating a map that maps: package-name -> package-name@version
 	for _, curDependency := range depTree.Data.DepTree {
-		packageCleanName, packageVersion, err := splitNameAndVersion(curDependency.Name)
+		var packageCleanName, packageVersion string
+		packageCleanName, packageVersion, err = splitNameAndVersion(curDependency.Name)
 		if err != nil {
-			return nil, nil, err
+			return
 		}
 
 		dependenciesMap[curDependency.Name] = &YarnDependency{
@@ -187,11 +189,18 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 		dependency := dependenciesMap[curDependency.Name]
 
 		for _, subDep := range curDependency.Dependencies {
-			subDepName, _, err := splitNameAndVersion(subDep.DependencyName)
+			var subDepName string
+			subDepName, _, err = splitNameAndVersion(subDep.DependencyName)
 			if err != nil {
-				return nil, nil, err
+				return
 			}
-			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, packNameToFullName[subDepName]})
+
+			packageWithResolvedVersion := packNameToFullName[subDepName]
+			if packageWithResolvedVersion == "" {
+				err = fmt.Errorf("couldn't find resolved version for '%s' in 'yarn list' output", subDep.DependencyName)
+				return
+			}
+			dependency.Details.Dependencies = append(dependency.Details.Dependencies, YarnDependencyPointer{subDep.DependencyName, packageWithResolvedVersion})
 		}
 		dependenciesMap[curDependency.Name] = dependency
 	}
@@ -297,9 +306,26 @@ func splitNameAndVersion(packageFullName string) (packageCleanName string, packa
 		err = errors.New("received package name of incorrect format (expected: package-name@version)")
 		return
 	}
-	packageCleanName = packageFullName[:indexOfLastAt]
 	packageVersion = packageFullName[indexOfLastAt+1:]
+	packageCleanName = packageFullName[:indexOfLastAt]
+
+	if strings.Contains(packageCleanName, "@") {
+		// Packages may have '@' at their name due to package scoping or package aliasing
+		// In order to process the dependencies correctly we need names without aliases or unique naming conventions that exist in some packages
+		packageCleanName = removeAliasingFromPackageName(packageCleanName)
+	}
 	return
+}
+
+func removeAliasingFromPackageName(packageNameToClean string) string {
+	indexOfLastAt := strings.Index(packageNameToClean[1:], "@")
+
+	if indexOfLastAt == -1 {
+		// This case covers scoped package: @my-package
+		return packageNameToClean
+	}
+	// This case covers an aliased package: @my-package@other-dependent-package --> @my-package / my-package@other-dependent-package --> my-package
+	return packageNameToClean[:indexOfLastAt+1]
 }
 
 type Yarn1Data struct {
