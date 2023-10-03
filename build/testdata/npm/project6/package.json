@@ -1,0 +1,17 @@
+{
+  "name": "npm_test2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "lightweight": "^0.1.0",
+    "minimist": "^0.1.0",
+    "underscore": "^1.13.6",
+    "cors.js": "0.0.1-security"
+  }
+}

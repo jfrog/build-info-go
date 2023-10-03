@@ -1,0 +1,36 @@
+{
+  "name": "project6",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "project6",
+      "version": "1.0.0",
+      "license": "ISC",
+      "dependencies": {
+        "lightweight": "^0.1.0",
+        "minimist": "^0.1.0",
+        "underscore": "^1.13.6"
+      }
+    },
+    "node_modules/lightweight": {
+      "version": "0.1.0",
+      "resolved": "https://registry.npmjs.org/lightweight/-/lightweight-0.1.0.tgz",
+      "integrity": "sha512-10pYSQA9EJqZZnXDR0urhg8Z0Y1XnRfi41ZFj3ZFTKJ5PjRq82HzT7LKlPyxewy3w2WA2POfi3jQQn7Y53oPcQ==",
+      "bin": {
+        "lwt": "bin/lwt.js"
+      }
+    },
+    "node_modules/minimist": {
+      "version": "0.1.0",
+      "resolved": "https://registry.npmjs.org/minimist/-/minimist-0.1.0.tgz",
+      "integrity": "sha512-wR5Ipl99t0mTGwLjQJnBjrP/O7zBbLZqvA3aw32DmLx+nXHfWctUjzDjnDx09pX1Po86WFQazF9xUzfMea3Cnw=="
+    },
+    "node_modules/underscore": {
+      "version": "1.13.6",
+      "resolved": "https://registry.npmjs.org/underscore/-/underscore-1.13.6.tgz",
+      "integrity": "sha512-+A5Sja4HP1M08MaXya7p5LvjuM7K6q/2EaC0+iovj/wOcMsTzMvDFbasi/oSapiwOlt252IqsKqPjCl7huKS0A=="
+    }
+  }
+}
