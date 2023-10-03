@@ -17,19 +17,19 @@ import (
 )
 
 // CalculateNpmDependenciesList gets an npm project's dependencies.
-func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
+func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
 	// Calculate npm dependency tree using 'npm ls...'.
-	dependenciesMap, err := CalculateDependenciesMap(executablePath, srcPath, moduleId, npmArgs, log)
+	dependenciesMap, err := CalculateDependenciesMap(executablePath, srcPath, moduleId, npmParams, log)
 	if err != nil {
 		return nil, err
 	}
 	var cacache *cacache
 	if calculateChecksums {
 		// Get local npm cache.
-		cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmArgs, log)
+		cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmParams.Args, log)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +87,7 @@ type dependencyInfo struct {
 
 // Run 'npm list ...' command and parse the returned result to create a dependencies map of.
 // The dependencies map looks like name:version -> entities.Dependency.
-func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (map[string]*dependencyInfo, error) {
+func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmListParams NpmTreeDepListParam, log utils.Log) (map[string]*dependencyInfo, error) {
 	dependenciesMap := make(map[string]*dependencyInfo)
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs).
 	npmVersion, err := GetNpmVersion(executablePath, log)
@@ -100,10 +100,10 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	}
 	var data []byte
 	// If we don't have node_modules, the function will use the package-lock dependencies.
-	if nodeModulesExist {
-		data = runNpmLsWithNodeModules(executablePath, srcPath, npmArgs, log)
+	if nodeModulesExist && !npmListParams.IgnoreNodeModules {
+		data = runNpmLsWithNodeModules(executablePath, srcPath, npmListParams.Args, log)
 	} else {
-		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmArgs, log, npmVersion)
+		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmListParams, log, npmVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -130,19 +130,19 @@ func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, l
 	return
 }
 
-func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) ([]byte, error) {
+func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmListParams NpmTreeDepListParam, log utils.Log, npmVersion *version.Version) ([]byte, error) {
 	isPackageLockExist, isDirExistsErr := utils.IsFileExists(filepath.Join(srcPath, "package-lock.json"), false)
 	if isDirExistsErr != nil {
 		return nil, isDirExistsErr
 	}
-	if !isPackageLockExist {
-		err := installPackageLock(executablePath, srcPath, npmArgs, log, npmVersion)
+	if !isPackageLockExist || (npmListParams.OverwritePackageLock && checkIfLockFileShouldBeUpdated(srcPath, log)) {
+		err := installPackageLock(executablePath, srcPath, npmListParams.Args, log, npmVersion)
 		if err != nil {
 			return nil, err
 		}
 	}
-	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
-	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
+	npmListParams.Args = append(npmListParams.Args, "--json", "--all", "--long", "--package-lock-only")
+	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmListParams.Args, "ls"), log)
 	if err != nil {
 		log.Warn(err.Error())
 	} else if len(errData) > 0 {
@@ -164,12 +164,39 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 	return errors.New("it looks like you’re using version " + npmVersion.GetVersion() + " of the npm client. Versions below 6.0.0 require running `npm install` before running this command")
 }
 
+// Check if package.json has been modified.
+// This might indicate the addition of new packages to package.json that haven't been reflected in package-lock.json.
+func checkIfLockFileShouldBeUpdated(srcPath string, log utils.Log) bool {
+	packageJsonInfo, err := os.Stat(filepath.Join(srcPath, "package.json"))
+	if err != nil {
+		log.Warn("Failed to get file info for package.json, err: %v", err)
+		return false
+	}
+
+	packageJsonInfoModTime := packageJsonInfo.ModTime()
+	packageLockInfo, err := os.Stat(filepath.Join(srcPath, "package-lock.json"))
+	if err != nil {
+		log.Warn("Failed to get file info for package-lock.json, err: %v", err)
+		return false
+	}
+	packageLockInfoModTime := packageLockInfo.ModTime()
+	return packageJsonInfoModTime.After(packageLockInfoModTime)
+}
+
 func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
 	versionData, _, err := RunNpmCmd(executablePath, "", []string{"--version"}, log)
 	if err != nil {
 		return nil, err
 	}
 	return version.NewVersion(string(versionData)), nil
+}
+
+type NpmTreeDepListParam struct {
+	Args []string
+	// Ignore the node_modules folder if exists, using the '--package-lock-only' flag
+	IgnoreNodeModules bool
+	// Rewrite package-lock.json, if exists.
+	OverwritePackageLock bool
 }
 
 // npm >=7 ls results for a single dependency
