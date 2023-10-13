@@ -75,7 +75,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
 	}
 	if len(otherMissingDeps) > 0 {
-		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try to delete 'node_models' and/or 'package-lock.json'.")
+		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.")
 	}
 	return dependenciesList, nil
 }
