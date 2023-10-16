@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"golang.org/x/exp/slices"
 	"io"
@@ -106,50 +107,44 @@ func MoveFile(sourcePath, destPath string) (err error) {
 	var inputFile *os.File
 	inputFile, err = os.Open(sourcePath)
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
 		if inputFileOpen {
-			e := inputFile.Close()
-			if err == nil {
-				err = e
-			}
+			err = errors.Join(err, inputFile.Close())
 		}
 	}()
 	inputFileInfo, err := inputFile.Stat()
 	if err != nil {
-		return err
+		return
 	}
 
 	var outputFile *os.File
 	outputFile, err = os.Create(destPath)
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
-		e := outputFile.Close()
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, outputFile.Close())
 	}()
 
 	_, err = io.Copy(outputFile, inputFile)
 	if err != nil {
-		return err
+		return
 	}
 	err = os.Chmod(destPath, inputFileInfo.Mode())
 	if err != nil {
-		return err
+		return
 	}
 
 	// The copy was successful, so now delete the original file
 	err = inputFile.Close()
 	if err != nil {
-		return err
+		return
 	}
 	inputFileOpen = false
 	err = os.Remove(sourcePath)
-	return err
+	return
 }
 
 // Return the list of files and directories in the specified path
@@ -231,12 +226,10 @@ func DownloadFile(downloadTo string, fromUrl string) (err error) {
 	// Get the data
 	resp, err := http.Get(fromUrl)
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
-		if deferErr := resp.Body.Close(); err == nil {
-			err = deferErr
-		}
+		err = errors.Join(err, resp.Body.Close())
 	}()
 	if resp.StatusCode != http.StatusOK {
 		err = fmt.Errorf("download failed. status code: %s", resp.Status)
@@ -249,9 +242,7 @@ func DownloadFile(downloadTo string, fromUrl string) (err error) {
 		return
 	}
 	defer func() {
-		if deferErr := out.Close(); err == nil {
-			err = deferErr
-		}
+		err = errors.Join(err, out.Close())
 	}()
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
@@ -310,22 +301,19 @@ func removeDirContents(dirPath string) (err error) {
 		return
 	}
 	defer func() {
-		e := d.Close()
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, d.Close())
 	}()
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return err
+		return
 	}
 	for _, name := range names {
 		err = os.RemoveAll(filepath.Join(dirPath, name))
 		if err != nil {
-			return err
+			return
 		}
 	}
-	return nil
+	return
 }
 
 // Old runs/tests may leave junk at temp dir.
@@ -410,61 +398,56 @@ func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) e
 		return err
 	}
 
-	for _, v := range files {
+	for _, file := range files {
+		fileName := filepath.Base(file)
 		// Skip if excluded
-		if slices.Contains(excludeNames, filepath.Base(v)) {
+		if slices.Contains(excludeNames, fileName) {
 			continue
 		}
-
-		dir, err := IsDirExists(v, false)
+		var isDir bool
+		isDir, err = IsDirExists(file, false)
 		if err != nil {
 			return err
 		}
 
-		if dir {
-			toPath := toPath + GetFileSeparator() + filepath.Base(v)
-			err := CopyDir(v, toPath, true, nil)
-			if err != nil {
-				return err
-			}
-			continue
+		if isDir {
+			err = CopyDir(file, filepath.Join(toPath, fileName), true, nil)
+		} else {
+			err = CopyFile(toPath, file)
 		}
-		err = CopyFile(toPath, v)
 		if err != nil {
 			return err
 		}
 	}
-	return err
+	return nil
 }
 
 func CopyFile(dst, src string) (err error) {
 	srcFile, err := os.Open(src)
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
-		e := srcFile.Close()
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, srcFile.Close())
 	}()
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return
+	}
 	fileName, _ := GetFileAndDirFromPath(src)
 	dstPath, err := CreateFilePath(dst, fileName)
 	if err != nil {
-		return err
+		return
 	}
-	dstFile, err := os.Create(dstPath)
+	dstFile, err := os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, srcInfo.Mode())
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
-		e := dstFile.Close()
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, dstFile.Close())
 	}()
 	_, err = io.Copy(dstFile, srcFile)
-	return err
+	return
 }
 
 func GetFileSeparator() string {
@@ -539,17 +522,15 @@ func Unmarshal(filePath string, loadTarget interface{}) (err error) {
 		return
 	}
 	defer func() {
-		closeErr := jsonFile.Close()
-		if err == nil {
-			err = closeErr
-		}
+		err = errors.Join(err, jsonFile.Close())
 	}()
 	var byteValue []byte
 	byteValue, err = io.ReadAll(jsonFile)
 	if err != nil {
 		return
 	}
-	return json.Unmarshal(byteValue, &loadTarget)
+	err = json.Unmarshal(byteValue, &loadTarget)
+	return
 }
 
 // strip '\n' or read until EOF, return error if read error
@@ -557,26 +538,25 @@ func Unmarshal(filePath string, loadTarget interface{}) (err error) {
 func ReadNLines(path string, total int) (lines []string, err error) {
 	reader, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer func() {
-		deferErr := reader.Close()
-		if err == nil {
-			err = deferErr
-		}
+		err = errors.Join(err, reader.Close())
 	}()
-	r := bufio.NewReader(reader)
+	bufferedReader := bufio.NewReader(reader)
 	for i := 0; i < total; i++ {
-		line, _, err := r.ReadLine()
+		var line []byte
+		line, _, err = bufferedReader.ReadLine()
 		lines = append(lines, string(line))
 		if err == io.EOF {
+			err = nil
 			break
 		}
 		if err != nil {
-			return nil, err
+			return
 		}
 	}
-	return lines, nil
+	return
 }
 
 type FileDetails struct {
@@ -589,7 +569,7 @@ func GetFileDetails(filePath string, includeChecksums bool) (details *FileDetail
 	if includeChecksums {
 		details.Checksum, err = calcChecksumDetails(filePath)
 		if err != nil {
-			return details, err
+			return
 		}
 	} else {
 		details.Checksum = entities.Checksum{}
@@ -597,40 +577,32 @@ func GetFileDetails(filePath string, includeChecksums bool) (details *FileDetail
 
 	file, err := os.Open(filePath)
 	defer func() {
-		e := file.Close()
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, file.Close())
 	}()
 	if err != nil {
-		return nil, err
+		return
 	}
 	fileInfo, err := file.Stat()
 	if err != nil {
-		return nil, err
+		return
 	}
 	details.Size = fileInfo.Size()
-	return details, nil
+	return
 }
 
 func calcChecksumDetails(filePath string) (checksum entities.Checksum, err error) {
 	file, err := os.Open(filePath)
+	if err != nil {
+		return
+	}
 	defer func() {
-		e := file.Close()
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, file.Close())
 	}()
-	if err != nil {
-		return entities.Checksum{}, err
-	}
-	return calcChecksumDetailsFromReader(file)
-}
 
-func calcChecksumDetailsFromReader(reader io.Reader) (entities.Checksum, error) {
-	checksumInfo, err := CalcChecksums(reader)
+	checksumInfo, err := CalcChecksums(file)
 	if err != nil {
 		return entities.Checksum{}, err
 	}
-	return entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}, nil
+	checksum = entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}
+	return
 }

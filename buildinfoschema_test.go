@@ -29,7 +29,7 @@ func TestNpmSchema(t *testing.T) {
 }
 
 func TestYarnSchema(t *testing.T) {
-	validateBuildInfoSchema(t, "yarn", filepath.Join("yarn", "project"), func() {})
+	validateBuildInfoSchema(t, "yarn", filepath.Join("yarn", "v2", "project"), func() {})
 }
 
 // Validate a build info schema for the input project.

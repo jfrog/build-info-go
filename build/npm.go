@@ -54,10 +54,12 @@ func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 
 func (nm *NpmModule) Build() error {
 	if len(nm.npmArgs) > 0 {
-		_, errData, err := buildutils.RunNpmCmd(nm.executablePath, nm.srcPath, nm.npmArgs, &utils.NullLog{})
+		output, _, err := buildutils.RunNpmCmd(nm.executablePath, nm.srcPath, nm.npmArgs, &utils.NullLog{})
+		if len(output) > 0 {
+			nm.containingBuild.logger.Output(strings.TrimSpace(string(output)))
+		}
 		if err != nil {
-			// NpmArgs[0] includes the npm command.
-			return errors.New("couldn't run npm " + nm.npmArgs[0] + ": " + string(errData))
+			return err
 		}
 		// After executing the user-provided command, cleaning npmArgs is needed.
 		nm.filterNpmArgsFlags()
@@ -72,7 +74,8 @@ func (nm *NpmModule) CalcDependencies() error {
 	if !nm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}
-	buildInfoDependencies, err := buildutils.CalculateNpmDependenciesList(nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, true, nm.containingBuild.logger)
+	buildInfoDependencies, err := buildutils.CalculateNpmDependenciesList(nm.executablePath, nm.srcPath, nm.name,
+		buildutils.NpmTreeDepListParam{Args: nm.npmArgs}, true, nm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
