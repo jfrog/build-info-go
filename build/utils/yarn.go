@@ -293,7 +293,9 @@ func buildYarn1Root(packageInfo *PackageInfo, packNameToFullName map[string]stri
 	rootDeps = append(rootDeps, maps.Keys(packageInfo.OptionalDependencies)...)
 
 	for _, directDepName := range rootDeps {
-		rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{Locator: packNameToFullName[directDepName]})
+		if fullPackageName, packageExist := packNameToFullName[directDepName]; packageExist {
+			rootDependency.Details.Dependencies = append(rootDependency.Details.Dependencies, YarnDependencyPointer{Locator: fullPackageName})
+		}
 	}
 	return rootDependency
 }
@@ -357,9 +359,9 @@ func (yd *YarnDependency) Name() string {
 	if strings.Contains(yd.Value[1:], "@") {
 		atSignIndex := strings.Index(yd.Value[1:], "@") + 1
 		return yd.Value[:atSignIndex]
-	} else { // In some cases when using yarn V1 we encounter package names without their version (project's package name)
-		return yd.Value
 	}
+	// In some cases when using yarn V1 we encounter package names without their version (project's package name)
+	return yd.Value
 }
 
 type YarnDepDetails struct {
