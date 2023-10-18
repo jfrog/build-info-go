@@ -73,3 +73,11 @@ func PrintBuildInfoMismatch(t *testing.T, expected, actual []entities.Module) {
 	assert.NoError(t, err)
 	t.Errorf("build-info don't match. want: \n%v\ngot:\n%s\n", string(excpectedStr), string(actualStr))
 }
+
+func CreateTempDirWithCallbackAndAssert(t *testing.T) (string, func()) {
+	tempDirPath, err := utils.CreateTempDir()
+	assert.NoError(t, err, "Couldn't create temp dir")
+	return tempDirPath, func() {
+		assert.NoError(t, utils.RemoveTempDir(tempDirPath), "Couldn't remove temp dir")
+	}
+}

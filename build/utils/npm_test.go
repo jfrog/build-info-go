@@ -1,13 +1,15 @@
 package utils
 
 import (
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/stretchr/testify/require"
+	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/stretchr/testify/require"
 
 	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	"github.com/jfrog/build-info-go/utils"
@@ -16,7 +18,7 @@ import (
 
 var logger = utils.NewDefaultLogger(utils.INFO)
 
-func TestReadPackageInfoFromPackageJson(t *testing.T) {
+func TestReadPackageInfo(t *testing.T) {
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	if err != nil {
 		assert.NoError(t, err)
@@ -31,20 +33,64 @@ func TestReadPackageInfoFromPackageJson(t *testing.T) {
 			&PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: ""}},
 		{`{ "name": "@jfrog/build-info-go-tests", "version": "1.0.0", "description": "test package"}`,
 			&PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: "@jfrog"}},
+		{`{}`, &PackageInfo{}},
 	}
 	for _, test := range tests {
 		t.Run(test.json, func(t *testing.T) {
 			packInfo, err := ReadPackageInfo([]byte(test.json), npmVersion)
-			if err != nil {
-				t.Error("No error was expected in this test", err)
-			}
-
-			equals := reflect.DeepEqual(test.pi, packInfo)
-			if !equals {
-				t.Error("expected:", test.pi, "got:", packInfo)
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.pi, packInfo)
 		})
 	}
+}
+
+func TestReadPackageInfoFromPackageJsonIfExist(t *testing.T) {
+	// Prepare tests data
+	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+	assert.NoError(t, err)
+	path, err := filepath.Abs(filepath.Join("..", "testdata"))
+	assert.NoError(t, err)
+	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project1", false, npmVersion)
+	defer cleanup()
+
+	// Prepare test cases
+	testCases := []struct {
+		testName             string
+		packageJsonDirectory string
+		expectedPackageInfo  *PackageInfo
+	}{
+		{"Happy flow", projectPath, &PackageInfo{Name: "build-info-go-tests", Version: "1.0.0"}},
+		{"No package.json in path", path, &PackageInfo{Name: "", Version: ""}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.testName, func(t *testing.T) {
+			// Read package info
+			packageInfo, err := ReadPackageInfoFromPackageJsonIfExist(testCase.packageJsonDirectory, npmVersion)
+			assert.NoError(t, err)
+
+			// Remove "v" prefix, if exist
+			removeVersionPrefixes(packageInfo)
+
+			// Check results
+			assert.Equal(t, testCase.expectedPackageInfo.Name, packageInfo.Name)
+			assert.Equal(t, testCase.expectedPackageInfo.Version, strings.TrimPrefix(packageInfo.Version, "v"))
+		})
+	}
+}
+
+func TestReadPackageInfoFromPackageJsonIfExistErr(t *testing.T) {
+	// Prepare test data
+	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+	assert.NoError(t, err)
+	tempDir, createTempDirCallback := testdatautils.CreateTempDirWithCallbackAndAssert(t)
+	assert.NoError(t, err)
+	defer createTempDirCallback()
+
+	// Create bad package.json file and expect error
+	assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "package.json"), []byte("non json file"), 0600))
+	_, err = ReadPackageInfoFromPackageJsonIfExist(tempDir, npmVersion)
+	assert.IsType(t, &json.SyntaxError{}, err)
 }
 
 func TestGetDeployPath(t *testing.T) {
@@ -57,10 +103,7 @@ func TestGetDeployPath(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.expectedPath, func(t *testing.T) {
-			actualPath := test.pi.GetDeployPath()
-			if actualPath != test.expectedPath {
-				t.Error("expected:", test.expectedPath, "got:", actualPath)
-			}
+			assert.Equal(t, test.expectedPath, test.pi.GetDeployPath())
 		})
 	}
 }
@@ -93,15 +136,8 @@ func TestParseDependencies(t *testing.T) {
 	}
 	dependencies := make(map[string]*dependencyInfo)
 	err = parseDependencies(dependenciesJsonList, []string{"root"}, dependencies, npmLsDependencyParser, utils.NewDefaultLogger(utils.INFO))
-	if err != nil {
-		t.Error(err)
-	}
-	if len(expectedDependenciesList) != len(dependencies) {
-		t.Error("The expected dependencies list length is", len(expectedDependenciesList), "and should be:\n", expectedDependenciesList,
-			"\nthe actual dependencies list length is", len(dependencies), "and the list is:\n", dependencies)
-		t.Error("The expected dependencies list length is", len(expectedDependenciesList), "and should be:\n", expectedDependenciesList,
-			"\nthe actual dependencies list length is", len(dependencies), "and the list is:\n", dependencies)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, len(expectedDependenciesList), len(dependencies))
 	for _, eDependency := range expectedDependenciesList {
 		found := false
 		for aDependency, v := range dependencies {
@@ -110,9 +146,7 @@ func TestParseDependencies(t *testing.T) {
 				break
 			}
 		}
-		if !found {
-			t.Error("The expected dependency:", eDependency, "is missing from the actual dependencies list:\n", dependencies)
-		}
+		assert.True(t, found, "The expected dependency:", eDependency, "is missing from the actual dependencies list:\n", dependencies)
 	}
 }
 
@@ -136,9 +170,7 @@ func TestAppendScopes(t *testing.T) {
 	}
 	for _, v := range scopes {
 		result := appendScopes(v.a, v.b)
-		if !assert.ElementsMatch(t, result, v.expected) {
-			t.Errorf("appendScopes(\"%s\",\"%s\") => '%s', want '%s'", v.a, v.b, result, v.expected)
-		}
+		assert.ElementsMatch(t, result, v.expected, "appendScopes(\"%s\",\"%s\") => '%s', want '%s'", v.a, v.b, result, v.expected)
 	}
 }
 
@@ -299,7 +331,7 @@ func TestDependenciesTreeDifferentBetweenOKs(t *testing.T) {
 	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "bundle-dependencies", NpmTreeDepListParam{Args: npmArgs}, true, logger)
 	assert.NoError(t, err)
 
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+	assert.Greater(t, len(dependencies), 0, "Error: dependencies are not found!")
 
 	// Remove node_modules directory, then calculate dependencies by package-lock.
 	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
@@ -308,7 +340,7 @@ func TestDependenciesTreeDifferentBetweenOKs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Asserting there is at least one dependency.
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+	assert.Greater(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
 func TestNpmProdFlag(t *testing.T) {
@@ -387,7 +419,7 @@ func validateDependencies(t *testing.T, projectPath string, npmArgs []string) {
 	dependencies, err := CalculateNpmDependenciesList("npm", projectPath, "build-info-go-tests", NpmTreeDepListParam{Args: npmArgs}, true, logger)
 	assert.NoError(t, err)
 
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+	assert.Greater(t, len(dependencies), 0, "Error: dependencies are not found!")
 
 	// Remove node_modules directory, then calculate dependencies by package-lock.
 	assert.NoError(t, utils.RemoveTempDir(filepath.Join(projectPath, "node_modules")))
@@ -396,5 +428,5 @@ func validateDependencies(t *testing.T, projectPath string, npmArgs []string) {
 	assert.NoError(t, err)
 
 	// Asserting there is at least one dependency.
-	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
+	assert.Greater(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
