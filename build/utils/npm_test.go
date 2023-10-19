@@ -11,7 +11,7 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/stretchr/testify/require"
 
-	testdatautils "github.com/jfrog/build-info-go/build/testdata"
+	"github.com/jfrog/build-info-go/tests"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -44,13 +44,13 @@ func TestReadPackageInfo(t *testing.T) {
 	}
 }
 
-func TestReadPackageInfoFromPackageJsonIfExist(t *testing.T) {
+func TestReadPackageInfoFromPackageJsonIfExists(t *testing.T) {
 	// Prepare tests data
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	assert.NoError(t, err)
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project1", false, npmVersion)
+	projectPath, cleanup := tests.CreateNpmTest(t, path, "project1", false, npmVersion)
 	defer cleanup()
 
 	// Prepare test cases
@@ -66,7 +66,7 @@ func TestReadPackageInfoFromPackageJsonIfExist(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.testName, func(t *testing.T) {
 			// Read package info
-			packageInfo, err := ReadPackageInfoFromPackageJsonIfExist(testCase.packageJsonDirectory, npmVersion)
+			packageInfo, err := ReadPackageInfoFromPackageJsonIfExists(testCase.packageJsonDirectory, npmVersion)
 			assert.NoError(t, err)
 
 			// Remove "v" prefix, if exist
@@ -83,13 +83,13 @@ func TestReadPackageInfoFromPackageJsonIfExistErr(t *testing.T) {
 	// Prepare test data
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	assert.NoError(t, err)
-	tempDir, createTempDirCallback := testdatautils.CreateTempDirWithCallbackAndAssert(t)
+	tempDir, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
 	assert.NoError(t, err)
 	defer createTempDirCallback()
 
 	// Create bad package.json file and expect error
 	assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "package.json"), []byte("non json file"), 0600))
-	_, err = ReadPackageInfoFromPackageJsonIfExist(tempDir, npmVersion)
+	_, err = ReadPackageInfoFromPackageJsonIfExists(tempDir, npmVersion)
 	assert.IsType(t, &json.SyntaxError{}, err)
 }
 
@@ -180,7 +180,7 @@ func TestBundledDependenciesList(t *testing.T) {
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
 
-	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project1", false, npmVersion)
+	projectPath, cleanup := tests.CreateNpmTest(t, path, "project1", false, npmVersion)
 	defer cleanup()
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cacachePath}
@@ -200,7 +200,7 @@ func TestConflictsDependenciesList(t *testing.T) {
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
 
-	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project5", true, npmVersion)
+	projectPath, cleanup := tests.CreateNpmTest(t, path, "project5", true, npmVersion)
 	defer cleanup()
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cacachePath}
@@ -218,7 +218,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	// Create the second npm project which has a transitive dependency without integrity (ansi-regex:5.0.0).
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project2", true, npmVersion)
+	projectPath, cleanup := tests.CreateNpmTest(t, path, "project2", true, npmVersion)
 	defer cleanup()
 
 	// Run npm CI to create this special case where the 'ansi-regex:5.0.0' is missing the integrity.
@@ -241,7 +241,7 @@ func TestDependencyPackageLockOnly(t *testing.T) {
 	if !npmVersion.AtLeast("7.0.0") {
 		t.Skip("Running on npm v7 and above only, skipping...")
 	}
-	path, cleanup := testdatautils.CreateTestProject(t, filepath.Join("..", "testdata/npm/project6"))
+	path, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata/npm/project6"))
 	defer cleanup()
 	assert.NoError(t, utils.MoveFile(filepath.Join(path, "package-lock_test.json"), filepath.Join(path, "package-lock.json")))
 	// sleep so the package.json modified time will be bigger than the package-lock.json, this make sure it will recalculate lock file.
@@ -318,7 +318,7 @@ func TestDependenciesTreeDifferentBetweenOKs(t *testing.T) {
 	assert.NoError(t, err)
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project4", true, npmVersion)
+	projectPath, cleanup := tests.CreateNpmTest(t, path, "project4", true, npmVersion)
 	defer cleanup()
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 
@@ -357,7 +357,7 @@ func TestNpmProdFlag(t *testing.T) {
 	}
 	for _, entry := range testDependencyScopes {
 		func() {
-			projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project3", false, npmVersion)
+			projectPath, cleanup := tests.CreateNpmTest(t, path, "project3", false, npmVersion)
 			defer cleanup()
 			cacachePath := filepath.Join(projectPath, "tmpcache")
 			npmArgs := []string{"--cache=" + cacachePath, entry.scope}
@@ -382,7 +382,7 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	// Create the first npm project which contains peerDependencies, devDependencies & bundledDependencies
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project1", false, npmVersion)
+	projectPath, cleanup := tests.CreateNpmTest(t, path, "project1", false, npmVersion)
 	defer cleanup()
 	cachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cachePath}

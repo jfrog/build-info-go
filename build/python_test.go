@@ -9,7 +9,7 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 
-	testdatautils "github.com/jfrog/build-info-go/build/testdata"
+	"github.com/jfrog/build-info-go/tests"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,7 +47,7 @@ func testGenerateBuildInfoForPython(t *testing.T, pythonTool pythonutils.PythonT
 	assert.NoError(t, err)
 	// Create python project
 	projectPath := filepath.Join(testdataDir, "python", string(pythonTool))
-	tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, projectPath)
+	tmpProjectPath, cleanup := tests.CreateTestProject(t, projectPath)
 	defer cleanup()
 
 	// Install dependencies in the pip project.
@@ -59,11 +59,11 @@ func testGenerateBuildInfoForPython(t *testing.T, pythonTool pythonutils.PythonT
 	if assert.NoError(t, err) {
 		// Verify results.
 		expectedBuildInfoJson := filepath.Join(projectPath, expectedResultsJson)
-		expectedBuildInfo := testdatautils.GetBuildInfo(t, expectedBuildInfoJson)
+		expectedBuildInfo := tests.GetBuildInfo(t, expectedBuildInfoJson)
 		match, err := entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules)
 		assert.NoError(t, err)
 		if !match {
-			testdatautils.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
+			tests.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
 		}
 	}
 }

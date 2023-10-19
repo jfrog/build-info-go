@@ -1,4 +1,4 @@
-package testdata
+package tests
 
 import (
 	"encoding/json"
@@ -53,12 +53,10 @@ func CreateNpmTest(t *testing.T, testdataPath, projectDirName string, withOsInPa
 		switch runtime.GOOS {
 		case "windows":
 			npmVersionDir = filepath.Join(npmVersionDir, "windows")
-
 		case "linux":
 			npmVersionDir = filepath.Join(npmVersionDir, "linux")
-
 		default:
-			//MacOs
+			// MacOs
 			npmVersionDir = filepath.Join(npmVersionDir, "macos")
 		}
 	}

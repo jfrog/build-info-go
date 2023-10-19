@@ -443,8 +443,8 @@ type PackageInfo struct {
 }
 
 // Read and populate package name, version and scope from the package.json file in the provided directory.
-// If package.json does not exist, return an empty PackageInfo object.
-func ReadPackageInfoFromPackageJsonIfExist(packageJsonDirectory string, npmVersion *version.Version) (*PackageInfo, error) {
+// If package.json does not exist, return an empty PackageInfo struct.
+func ReadPackageInfoFromPackageJsonIfExists(packageJsonDirectory string, npmVersion *version.Version) (*PackageInfo, error) {
 	packageJson, err := os.ReadFile(filepath.Join(packageJsonDirectory, "package.json"))
 	if err != nil {
 		if os.IsNotExist(err) {

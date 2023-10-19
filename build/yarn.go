@@ -50,7 +50,7 @@ func newYarnModule(srcPath string, containingBuild *Build) (*YarnModule, error) 
 	}
 
 	// Read module name
-	packageInfo, err := buildutils.ReadPackageInfoFromPackageJsonIfExist(srcPath, nil)
+	packageInfo, err := buildutils.ReadPackageInfoFromPackageJsonIfExists(srcPath, nil)
 	if err != nil {
 		return nil, err
 	}
