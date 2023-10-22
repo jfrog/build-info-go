@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	testdatautils "github.com/jfrog/build-info-go/build/testdata"
+	"github.com/jfrog/build-info-go/tests"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,7 +45,7 @@ var moduleNameTestProvider = []struct {
 func TestDetermineModuleName(t *testing.T) {
 	for _, test := range moduleNameTestProvider {
 		t.Run(strings.Join([]string{test.projectName, test.moduleName}, "/"), func(t *testing.T) {
-			tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, filepath.Join("..", "testdata", "pip", test.projectName))
+			tmpProjectPath, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata", "pip", test.projectName))
 			defer cleanup()
 
 			// Determine module name

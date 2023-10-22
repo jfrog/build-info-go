@@ -1,10 +1,10 @@
 package build
 
 import (
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/stretchr/testify/assert"
 )
 
 func validateModule(t *testing.T, module entities.Module, expectedDependencies, expectedArtifacts int, moduleName string, moduleType entities.ModuleType, depsContainChecksums bool) {
@@ -25,13 +25,5 @@ func validateModule(t *testing.T, module entities.Module, expectedDependencies, 
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Sha1, "Empty Sha1 field.")
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Md5, "Empty MD5 field.")
 		assert.NotEmpty(t, module.Dependencies[0].Checksum.Sha256, "Empty SHA256 field.")
-	}
-}
-
-func createTempDirWithCallbackAndAssert(t *testing.T) (string, func()) {
-	tempDirPath, err := utils.CreateTempDir()
-	assert.NoError(t, err, "Couldn't create temp dir")
-	return tempDirPath, func() {
-		assert.NoError(t, utils.RemoveTempDir(tempDirPath), "Couldn't remove temp dir")
 	}
 }

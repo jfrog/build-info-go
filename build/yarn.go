@@ -3,13 +3,14 @@ package build
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+
 	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/version"
 	"golang.org/x/exp/slices"
-	"os"
-	"os/exec"
 )
 
 const minSupportedYarnVersion = "2.4.0"
@@ -49,7 +50,7 @@ func newYarnModule(srcPath string, containingBuild *Build) (*YarnModule, error) 
 	}
 
 	// Read module name
-	packageInfo, err := buildutils.ReadPackageInfoFromPackageJson(srcPath, nil)
+	packageInfo, err := buildutils.ReadPackageInfoFromPackageJsonIfExists(srcPath, nil)
 	if err != nil {
 		return nil, err
 	}

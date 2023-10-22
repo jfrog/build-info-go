@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/tests"
 	"github.com/jfrog/build-info-go/utils"
 	"os"
 	"path/filepath"
@@ -45,7 +45,7 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	assert.NoError(t, err)
 	// Create maven project
 	projectPath := filepath.Join(testdataDir, "maven", "project")
-	tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, projectPath)
+	tmpProjectPath, cleanup := tests.CreateTestProject(t, projectPath)
 	defer cleanup()
 	// Add maven project as module in build-info.
 	mavenModule, err := mavenBuild.AddMavenModule(tmpProjectPath)
@@ -65,7 +65,7 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 		match, err := entities.IsEqualModuleSlices(buildInfo.Modules, expectedModules)
 		assert.NoError(t, err)
 		if !match {
-			testdatautils.PrintBuildInfoMismatch(t, expectedModules, buildInfo.Modules)
+			tests.PrintBuildInfoMismatch(t, expectedModules, buildInfo.Modules)
 		}
 	}
 }

@@ -6,12 +6,12 @@ import (
 	"sort"
 	"testing"
 
-	testdatautils "github.com/jfrog/build-info-go/build/testdata"
+	"github.com/jfrog/build-info-go/tests"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetProjectNameFromPyproject(t *testing.T) {
-	tests := []struct {
+	testCases := []struct {
 		poetryProject       string
 		expectedProjectName string
 	}{
@@ -19,22 +19,22 @@ func TestGetProjectNameFromPyproject(t *testing.T) {
 		{"nodevdeps", "my-poetry-project:1.1.17"},
 	}
 
-	for _, test := range tests {
-		t.Run(test.poetryProject, func(t *testing.T) {
-			tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", test.poetryProject))
+	for _, testCase := range testCases {
+		t.Run(testCase.poetryProject, func(t *testing.T) {
+			tmpProjectPath, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", testCase.poetryProject))
 			defer cleanup()
 
 			actualValue, err := extractProjectFromPyproject(filepath.Join(tmpProjectPath, "pyproject.toml"))
 			assert.NoError(t, err)
-			if actualValue.Name != test.expectedProjectName {
-				t.Errorf("Expected value: %s, got: %s.", test.expectedProjectName, actualValue)
+			if actualValue.Name != testCase.expectedProjectName {
+				t.Errorf("Expected value: %s, got: %s.", testCase.expectedProjectName, actualValue)
 			}
 		})
 	}
 }
 
 func TestGetProjectDependencies(t *testing.T) {
-	tests := []struct {
+	testCases := []struct {
 		poetryProject                  string
 		expectedDirectDependencies     []string
 		expectedTransitiveDependencies [][]string
@@ -43,22 +43,22 @@ func TestGetProjectDependencies(t *testing.T) {
 		{"nodevdeps", []string{"numpy:1.23.0", "python:"}, [][]string{nil, nil, nil}},
 	}
 
-	for _, test := range tests {
-		t.Run(test.poetryProject, func(t *testing.T) {
-			tmpProjectPath, cleanup := testdatautils.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", test.poetryProject))
+	for _, testCase := range testCases {
+		t.Run(testCase.poetryProject, func(t *testing.T) {
+			tmpProjectPath, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", testCase.poetryProject))
 			defer cleanup()
 
 			graph, directDependencies, err := getPoetryDependencies(tmpProjectPath)
 			assert.NoError(t, err)
 			sort.Strings(directDependencies)
-			if !reflect.DeepEqual(directDependencies, test.expectedDirectDependencies) {
-				t.Errorf("Expected value: %s, got: %s.", test.expectedDirectDependencies, directDependencies)
+			if !reflect.DeepEqual(directDependencies, testCase.expectedDirectDependencies) {
+				t.Errorf("Expected value: %s, got: %s.", testCase.expectedDirectDependencies, directDependencies)
 			}
 			for i, directDependency := range directDependencies {
 				transitiveDependencies := graph[directDependency]
 				sort.Strings(transitiveDependencies)
-				if !reflect.DeepEqual(transitiveDependencies, test.expectedTransitiveDependencies[i]) {
-					t.Errorf("Expected value: %s, got: %s.", test.expectedTransitiveDependencies[i], graph[directDependency])
+				if !reflect.DeepEqual(transitiveDependencies, testCase.expectedTransitiveDependencies[i]) {
+					t.Errorf("Expected value: %s, got: %s.", testCase.expectedTransitiveDependencies[i], graph[directDependency])
 				}
 			}
 		})
