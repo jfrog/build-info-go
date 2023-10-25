@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,8 @@ import (
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/version"
 )
+
+const npmInstallCommand = "install"
 
 // CalculateNpmDependenciesList gets an npm project's dependencies.
 func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
@@ -136,12 +139,12 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmListParams Np
 		return nil, isDirExistsErr
 	}
 	if !isPackageLockExist || (npmListParams.OverwritePackageLock && checkIfLockFileShouldBeUpdated(srcPath, log)) {
-		err := installPackageLock(executablePath, srcPath, npmListParams.Args, log, npmVersion)
+		err := installPackageLock(executablePath, srcPath, npmListParams.InstallCommandArgs, npmListParams.Args, log, npmVersion)
 		if err != nil {
 			return nil, err
 		}
 	}
-	npmListParams.Args = append(npmListParams.Args, "--json", "--all", "--long", "--package-lock-only")
+	npmListParams.Args = append(npmListParams.Args, "--json", "--all", "--long", "--package-lock-only", "--no-audit")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmListParams.Args, "ls"), log)
 	if err != nil {
 		log.Warn(err.Error())
@@ -151,9 +154,10 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmListParams Np
 	return data, nil
 }
 
-func installPackageLock(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
+func installPackageLock(executablePath, srcPath string, npmInstallCommandArgs []string, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
 	if npmVersion.AtLeast("6.0.0") {
 		npmArgs = append(npmArgs, "--package-lock-only")
+		npmArgs = append(npmArgs, filterUniqueArgs(npmInstallCommandArgs, npmArgs)...)
 		// Installing package-lock to generate the dependencies map.
 		_, _, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "install"), log)
 		if err != nil {
@@ -162,6 +166,20 @@ func installPackageLock(executablePath, srcPath string, npmArgs []string, log ut
 		return nil
 	}
 	return errors.New("it looks like you’re using version " + npmVersion.GetVersion() + " of the npm client. Versions below 6.0.0 require running `npm install` before running this command")
+}
+
+// filters out all args from argsToFilter that already in existingArgs. In addition, filters out npm install command and leave only flags within the final returned args
+func filterUniqueArgs(argsToFilter []string, existingArgs []string) []string {
+	var filteredArgs []string
+	for _, arg := range argsToFilter {
+		if arg == npmInstallCommand {
+			continue
+		}
+		if !slices.Contains(existingArgs, arg) {
+			filteredArgs = append(filteredArgs, arg)
+		}
+	}
+	return filteredArgs
 }
 
 // Check if package.json has been modified.
@@ -192,7 +210,8 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 }
 
 type NpmTreeDepListParam struct {
-	Args []string
+	Args               []string
+	InstallCommandArgs []string
 	// Ignore the node_modules folder if exists, using the '--package-lock-only' flag
 	IgnoreNodeModules bool
 	// Rewrite package-lock.json, if exists.
