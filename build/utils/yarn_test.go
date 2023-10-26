@@ -36,7 +36,7 @@ func TestBuildYarnV1Dependencies(t *testing.T) {
 
 func TestGetYarnDependenciesUninstalled(t *testing.T) {
 	checkGetYarnDependenciesUninstalled(t, "2.4.0")
-	checkGetYarnDependenciesUninstalled(t, "latest")
+	checkGetYarnDependenciesUninstalled(t, "3.6.4")
 }
 
 func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
