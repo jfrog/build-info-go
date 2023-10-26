@@ -144,7 +144,7 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmListParams Np
 			return nil, err
 		}
 	}
-	npmListParams.Args = append(npmListParams.Args, "--json", "--all", "--long", "--package-lock-only", "--no-audit")
+	npmListParams.Args = append(npmListParams.Args, "--json", "--all", "--long", "--package-lock-only")
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmListParams.Args, "ls"), log)
 	if err != nil {
 		log.Warn(err.Error())
