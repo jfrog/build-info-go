@@ -157,7 +157,7 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmListParams Np
 func installPackageLock(executablePath, srcPath string, npmInstallCommandArgs, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
 	if npmVersion.AtLeast("6.0.0") {
 		npmArgs = append(npmArgs, "--package-lock-only")
-		// Adding 'install' command flags provided by the user, if such were provided in previous steps of the flow, and making sure no duplicates will be inserted
+		// Including any 'install' command flags that were supplied by the user in preceding steps of the process, while ensuring that duplicates are avoided.
 		npmArgs = append(npmArgs, filterUniqueArgs(npmInstallCommandArgs, npmArgs)...)
 		// Installing package-lock to generate the dependencies map.
 		_, _, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "install"), log)
@@ -169,7 +169,7 @@ func installPackageLock(executablePath, srcPath string, npmInstallCommandArgs, n
 	return errors.New("it looks like you’re using version " + npmVersion.GetVersion() + " of the npm client. Versions below 6.0.0 require running `npm install` before running this command")
 }
 
-// Filters out all args from argsToFilter that already in existingArgs. In addition, filters out npm install command and leave only flags within the final returned args
+// Removes any arguments from argsToFilter that are already present in existingArgs. Furthermore, excludes the "install" command and retains only the flags in the resulting argument list.
 func filterUniqueArgs(argsToFilter []string, existingArgs []string) []string {
 	var filteredArgs []string
 	for _, arg := range argsToFilter {
@@ -211,10 +211,9 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 }
 
 type NpmTreeDepListParam struct {
-	// Required for 'install' and 'ls' commands that might be executed while building NPM dependency tree
+	// Required for the 'install' and 'ls' commands that could be triggered during the construction of the NPM dependency tree
 	Args []string
-	// 'Install' command args provided by the user. These are optional arguments, which are addable only from certain entry points.
-	// These arguments might be used while building NPM dependency tree, that might require running 'npm install...'
+	// Optional user-supplied arguments for the 'install' command. These arguments are not available from all entry points. They may be employed when constructing the NPM dependency tree, which could necessitate the execution of 'npm install...'
 	InstallCommandArgs []string
 	// Ignore the node_modules folder if exists, using the '--package-lock-only' flag
 	IgnoreNodeModules bool
