@@ -63,7 +63,7 @@ func getOrCreateBuildGeneralDetails(buildName, buildNumber string, buildTime tim
 		log.Debug("Reading build general details from: " + partialsBuildDir)
 		var generalDetails *buildinfo.General
 		generalDetails, err = ReadBuildInfoGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath)
-		return generalDetails.Timestamp, nil
+		return generalDetails.Timestamp, err
 	}
 	log.Debug("Saving build general details at: " + partialsBuildDir)
 	meta := buildinfo.General{
