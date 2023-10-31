@@ -25,7 +25,7 @@ func TestReadPackageInfo(t *testing.T) {
 		return
 	}
 
-	tests := []struct {
+	testcases := []struct {
 		json string
 		pi   *PackageInfo
 	}{
@@ -35,7 +35,7 @@ func TestReadPackageInfo(t *testing.T) {
 			&PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: "@jfrog"}},
 		{`{}`, &PackageInfo{}},
 	}
-	for _, test := range tests {
+	for _, test := range testcases {
 		t.Run(test.json, func(t *testing.T) {
 			packInfo, err := ReadPackageInfo([]byte(test.json), npmVersion)
 			assert.NoError(t, err)
@@ -94,14 +94,14 @@ func TestReadPackageInfoFromPackageJsonIfExistErr(t *testing.T) {
 }
 
 func TestGetDeployPath(t *testing.T) {
-	tests := []struct {
+	testcases := []struct {
 		expectedPath string
 		pi           *PackageInfo
 	}{
 		{`build-info-go-tests/-/build-info-go-tests-1.0.0.tgz`, &PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: ""}},
 		{`@jfrog/build-info-go-tests/-/build-info-go-tests-1.0.0.tgz`, &PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: "@jfrog"}},
 	}
-	for _, test := range tests {
+	for _, test := range testcases {
 		t.Run(test.expectedPath, func(t *testing.T) {
 			assert.Equal(t, test.expectedPath, test.pi.GetDeployPath())
 		})
@@ -429,4 +429,37 @@ func validateDependencies(t *testing.T, projectPath string, npmArgs []string) {
 
 	// Asserting there is at least one dependency.
 	assert.Greater(t, len(dependencies), 0, "Error: dependencies are not found!")
+}
+
+func TestFilterUniqueArgs(t *testing.T) {
+	var testcases = []struct {
+		argsToFilter   []string
+		alreadyExists  []string
+		expectedResult []string
+	}{
+		{
+			argsToFilter:   []string{"install"},
+			alreadyExists:  []string{},
+			expectedResult: nil,
+		},
+		{
+			argsToFilter:   []string{"install", "--flagA"},
+			alreadyExists:  []string{"--flagA"},
+			expectedResult: nil,
+		},
+		{
+			argsToFilter:   []string{"install", "--flagA", "--flagB"},
+			alreadyExists:  []string{"--flagA"},
+			expectedResult: []string{"--flagB"},
+		},
+		{
+			argsToFilter:   []string{"install", "--flagA", "--flagB"},
+			alreadyExists:  []string{"--flagA", "--flagC"},
+			expectedResult: []string{"--flagB"},
+		},
+	}
+
+	for _, testcase := range testcases {
+		assert.Equal(t, testcase.expectedResult, filterUniqueArgs(testcase.argsToFilter, testcase.alreadyExists))
+	}
 }
