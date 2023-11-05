@@ -12,7 +12,7 @@ const (
 	configPropertiesPathTempPrefix = "extractorProperties"
 	buildInfoPathKey               = "buildInfo.generated.build.info"
 	buildNameKey                   = "buildInfo.build.name"
-	buildTimeStampKey              = "buildInfo.build.timestamp"
+	buildTimestampKey              = "buildInfo.build.timestamp"
 	buildNumberKey                 = "buildInfo.build.number"
 	projectKey                     = "buildInfo.build.project"
 )
@@ -67,7 +67,7 @@ func CreateExtractorPropsFile(extractorConfPath, buildInfoPath, buildName, build
 	var buildProperties = map[string]string{
 		buildInfoPathKey:  buildInfoPath,
 		buildNameKey:      buildName,
-		buildTimeStampKey: fmt.Sprintf("%d", buildTimestamp.UnixMilli()),
+		buildTimestampKey: fmt.Sprintf("%d", buildTimestamp.UnixMilli()),
 		buildNumberKey:    buildNumber,
 		projectKey:        project,
 	}
