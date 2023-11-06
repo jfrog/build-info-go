@@ -378,6 +378,10 @@ func (b *Build) buildNameAndNumberProvided() bool {
 	return len(b.buildName) > 0 && len(b.buildNumber) > 0
 }
 
+func (b *Build) GetBuildTimestamp() time.Time {
+	return b.buildTimestamp
+}
+
 type partialModule struct {
 	moduleType   entities.ModuleType
 	artifacts    map[string]entities.Artifact
