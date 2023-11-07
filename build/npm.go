@@ -43,7 +43,7 @@ func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 	}
 
 	// Read module name
-	packageInfo, err := buildutils.ReadPackageInfoFromPackageJson(srcPath, npmVersion)
+	packageInfo, err := buildutils.ReadPackageInfoFromPackageJsonIfExists(srcPath, npmVersion)
 	if err != nil {
 		return nil, err
 	}

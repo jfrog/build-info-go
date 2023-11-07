@@ -1,4 +1,4 @@
-package testdata
+package tests
 
 import (
 	"encoding/json"
@@ -53,12 +53,10 @@ func CreateNpmTest(t *testing.T, testdataPath, projectDirName string, withOsInPa
 		switch runtime.GOOS {
 		case "windows":
 			npmVersionDir = filepath.Join(npmVersionDir, "windows")
-
 		case "linux":
 			npmVersionDir = filepath.Join(npmVersionDir, "linux")
-
 		default:
-			//MacOs
+			// MacOs
 			npmVersionDir = filepath.Join(npmVersionDir, "macos")
 		}
 	}
@@ -72,4 +70,12 @@ func PrintBuildInfoMismatch(t *testing.T, expected, actual []entities.Module) {
 	actualStr, err := json.MarshalIndent(actual, "", "  ")
 	assert.NoError(t, err)
 	t.Errorf("build-info don't match. want: \n%v\ngot:\n%s\n", string(excpectedStr), string(actualStr))
+}
+
+func CreateTempDirWithCallbackAndAssert(t *testing.T) (string, func()) {
+	tempDirPath, err := utils.CreateTempDir()
+	assert.NoError(t, err, "Couldn't create temp dir")
+	return tempDirPath, func() {
+		assert.NoError(t, utils.RemoveTempDir(tempDirPath), "Couldn't remove temp dir")
+	}
 }
