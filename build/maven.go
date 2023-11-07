@@ -137,7 +137,7 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	extractorProps, err := utils.CreateExtractorPropsFile(mm.extractorDetails.propsDir, buildInfoPath, mm.containingBuild.buildName, mm.containingBuild.buildNumber, mm.containingBuild.projectKey, mm.extractorDetails.props)
+	extractorProps, err := utils.CreateExtractorPropsFile(mm.extractorDetails.propsDir, buildInfoPath, mm.containingBuild.buildName, mm.containingBuild.buildNumber, mm.containingBuild.buildTimestamp, mm.containingBuild.projectKey, mm.extractorDetails.props)
 	if err != nil {
 		return nil, err
 	}

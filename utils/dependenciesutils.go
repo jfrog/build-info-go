@@ -1,15 +1,18 @@
 package utils
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 )
 
 const (
 	configPropertiesPathTempPrefix = "extractorProperties"
 	buildInfoPathKey               = "buildInfo.generated.build.info"
 	buildNameKey                   = "buildInfo.build.name"
+	buildTimestampKey              = "buildInfo.build.timestamp"
 	buildNumberKey                 = "buildInfo.build.number"
 	projectKey                     = "buildInfo.build.project"
 )
@@ -47,7 +50,7 @@ func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downlo
 // project - JFrog Project key of the current build
 // configProperties - Data of the actual extractor's properties.
 // Returns the extractor Config file path.
-func CreateExtractorPropsFile(extractorConfPath, buildInfoPath, buildName, buildNumber, project string, configProperties map[string]string) (string, error) {
+func CreateExtractorPropsFile(extractorConfPath, buildInfoPath, buildName, buildNumber string, buildTimestamp time.Time, project string, configProperties map[string]string) (string, error) {
 	if err := os.MkdirAll(extractorConfPath, 0777); err != nil {
 		return "", err
 	}
@@ -62,10 +65,11 @@ func CreateExtractorPropsFile(extractorConfPath, buildInfoPath, buildName, build
 		}
 	}()
 	var buildProperties = map[string]string{
-		buildInfoPathKey: buildInfoPath,
-		buildNameKey:     buildName,
-		buildNumberKey:   buildNumber,
-		projectKey:       project,
+		buildInfoPathKey:  buildInfoPath,
+		buildNameKey:      buildName,
+		buildTimestampKey: fmt.Sprintf("%d", buildTimestamp.UnixMilli()),
+		buildNumberKey:    buildNumber,
+		projectKey:        project,
 	}
 	return propertiesFile.Name(), writeProps(propertiesFile, configProperties, buildProperties)
 }
