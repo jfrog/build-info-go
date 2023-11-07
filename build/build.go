@@ -28,6 +28,7 @@ const (
 type Build struct {
 	buildName         string
 	buildNumber       string
+	buildTimestamp    time.Time
 	projectKey        string
 	tempDirPath       string
 	logger            utils.Log
@@ -38,13 +39,14 @@ type Build struct {
 	buildUrl          string
 }
 
-func NewBuild(buildName, buildNumber, projectKey, tempDirPath string, logger utils.Log) *Build {
+func NewBuild(buildName, buildNumber string, buildTimestamp time.Time, projectKey, tempDirPath string, logger utils.Log) *Build {
 	return &Build{
-		buildName:   buildName,
-		buildNumber: buildNumber,
-		projectKey:  projectKey,
-		tempDirPath: tempDirPath,
-		logger:      logger,
+		buildName:      buildName,
+		buildNumber:    buildNumber,
+		buildTimestamp: buildTimestamp,
+		projectKey:     projectKey,
+		tempDirPath:    tempDirPath,
+		logger:         logger,
 	}
 }
 
@@ -336,8 +338,8 @@ func (b *Build) readPartialBuildInfoFiles() (entities.Partials, error) {
 	return partials, nil
 }
 
-func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
-	partialsBuildDir, err := utils.GetPartialsBuildDir(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath)
+func ReadBuildInfoGeneralDetails(buildName, buildNumber, projectKey, buildsDirPath string) (*entities.General, error) {
+	partialsBuildDir, err := utils.GetPartialsBuildDir(buildName, buildNumber, projectKey, buildsDirPath)
 	if err != nil {
 		return nil, err
 	}
@@ -348,10 +350,10 @@ func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
 	}
 	if !fileExists {
 		var buildString string
-		if b.projectKey != "" {
-			buildString = fmt.Sprintf("build-name: <%s>, build-number: <%s> and project: <%s>", b.buildName, b.buildNumber, b.projectKey)
+		if projectKey != "" {
+			buildString = fmt.Sprintf("build-name: <%s>, build-number: <%s> and project: <%s>", buildName, buildNumber, projectKey)
 		} else {
-			buildString = fmt.Sprintf("build-name: <%s> and build-number: <%s>", b.buildName, b.buildNumber)
+			buildString = fmt.Sprintf("build-name: <%s> and build-number: <%s>", buildName, buildNumber)
 		}
 		return nil, errors.New("Failed to construct the build-info to be published. " +
 			"This may be because there were no previous commands, which collected build-info for " + buildString)
@@ -368,8 +370,16 @@ func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
 	return details, nil
 }
 
+func (b *Build) readBuildInfoGeneralDetails() (*entities.General, error) {
+	return ReadBuildInfoGeneralDetails(b.buildName, b.buildNumber, b.projectKey, b.tempDirPath)
+}
+
 func (b *Build) buildNameAndNumberProvided() bool {
 	return len(b.buildName) > 0 && len(b.buildNumber) > 0
+}
+
+func (b *Build) GetBuildTimestamp() time.Time {
+	return b.buildTimestamp
 }
 
 type partialModule struct {
