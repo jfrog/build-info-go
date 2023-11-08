@@ -20,7 +20,7 @@ const (
 	classworldsConfFileName         = "classworlds.conf"
 	PropertiesTempFolderName        = "properties"
 	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
-	MavenExtractorDependencyVersion = "2.41.5"
+	MavenExtractorDependencyVersion = "2.41.7"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -137,7 +137,7 @@ func (mm *MavenModule) createMvnRunConfig() (*mvnRunConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	extractorProps, err := utils.CreateExtractorPropsFile(mm.extractorDetails.propsDir, buildInfoPath, mm.containingBuild.buildName, mm.containingBuild.buildNumber, mm.containingBuild.projectKey, mm.extractorDetails.props)
+	extractorProps, err := utils.CreateExtractorPropsFile(mm.extractorDetails.propsDir, buildInfoPath, mm.containingBuild.buildName, mm.containingBuild.buildNumber, mm.containingBuild.buildTimestamp, mm.containingBuild.projectKey, mm.extractorDetails.props)
 	if err != nil {
 		return nil, err
 	}
