@@ -22,7 +22,7 @@ const (
 	gradleInitScriptTemplate          = "gradle.init"
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
 	gradleExtractor4DependencyVersion = "4.33.5"
-	gradleExtractor5DependencyVersion = "5.1.5"
+	gradleExtractor5DependencyVersion = "5.1.10"
 )
 
 var versionRegex = regexp.MustCompile(`Gradle (\d+\.\d+(?:\.\d+|-\w+-\d+)?)`)
