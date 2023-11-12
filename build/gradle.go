@@ -22,7 +22,7 @@ const (
 	gradleInitScriptTemplate          = "gradle.init"
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
 	gradleExtractor4DependencyVersion = "4.33.5"
-	gradleExtractor5DependencyVersion = "5.1.5"
+	gradleExtractor5DependencyVersion = "5.1.10"
 )
 
 var versionRegex = regexp.MustCompile(`Gradle (\d+\.\d+(?:\.\d+|-\w+-\d+)?)`)
@@ -179,7 +179,7 @@ func (gm *GradleModule) createGradleRunConfig(gradleExecPath string) (*gradleRun
 	if err != nil {
 		return nil, err
 	}
-	extractorPropsFile, err := utils.CreateExtractorPropsFile(gm.gradleExtractorDetails.propsDir, buildInfoPath, gm.containingBuild.buildName, gm.containingBuild.buildNumber, gm.containingBuild.projectKey, gm.gradleExtractorDetails.props)
+	extractorPropsFile, err := utils.CreateExtractorPropsFile(gm.gradleExtractorDetails.propsDir, buildInfoPath, gm.containingBuild.buildName, gm.containingBuild.buildNumber, gm.containingBuild.buildTimestamp, gm.containingBuild.projectKey, gm.gradleExtractorDetails.props)
 	if err != nil {
 		return nil, err
 	}
