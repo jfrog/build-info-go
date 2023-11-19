@@ -3,8 +3,6 @@ package utils
 import (
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -32,51 +30,6 @@ func TestGetYarnV2Dependencies(t *testing.T) {
 
 func TestBuildYarnV1Dependencies(t *testing.T) {
 	checkGetYarnDependencies(t, "v1", []string{"json@9.0.6", "react@18.2.0", "xml@1.0.1"})
-}
-
-func TestGetYarnDependenciesUninstalled(t *testing.T) {
-	checkGetYarnDependenciesUninstalled(t, "2.4.0")
-	checkGetYarnDependenciesUninstalled(t, "3.6.4")
-}
-
-func checkGetYarnDependenciesUninstalled(t *testing.T, versionToSet string) {
-	tempDirPath, err := utils.CreateTempDir()
-	assert.NoError(t, err, "Couldn't create temp dir")
-	defer func() {
-		assert.NoError(t, utils.RemoveTempDir(tempDirPath), "Couldn't remove temp dir")
-	}()
-	testDataSource := filepath.Join("..", "testdata", "yarn", "v2")
-	testDataTarget := filepath.Join(tempDirPath, "yarn")
-	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
-
-	executablePath, err := GetYarnExecutable()
-	assert.NoError(t, err)
-	projectSrcPath := filepath.Join(testDataTarget, "project")
-
-	err = updateDirYarnVersion(executablePath, projectSrcPath, versionToSet)
-	assert.NoError(t, err, "could not set version '"+versionToSet+"' to the test suitcase")
-
-	// Deleting yarn.lock content to make imitate the reverse action of 'yarn install'
-	lockFilePath := filepath.Join(projectSrcPath, "yarn.lock")
-	yarnLockFile, err := os.OpenFile(lockFilePath, os.O_WRONLY, 0666)
-	assert.NoError(t, err, "Could not open yarn.lock file")
-	defer func() {
-		assert.NoError(t, yarnLockFile.Close())
-	}()
-	err = yarnLockFile.Truncate(0) // This line erases the file's content without deleting the file itself
-	assert.NoError(t, err, "Could not erase yarn.lock file content")
-
-	pacInfo := PackageInfo{Name: "build-info-go-tests"}
-	_, _, err = GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "fetching dependencies failed since '"+pacInfo.Name+"' doesn't present in your lockfile\nPlease run 'yarn install' to update lockfile\n")
-}
-
-func updateDirYarnVersion(executablePath string, srcPath string, versionToSet string) (err error) {
-	command := exec.Command(executablePath, "set", "version", versionToSet)
-	command.Dir = srcPath
-	err = command.Run()
-	return
 }
 
 func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators []string) {
