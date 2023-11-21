@@ -62,7 +62,8 @@ func GetPythonDependenciesFiles(tool PythonTool, args []string, log utils.Log, s
 	case Pip, Pipenv:
 		return InstallWithLogParsing(tool, args, log, srcPath)
 	case Poetry:
-		return extractPoetryDependenciesFiles(srcPath, args, log)
+		log.Warn("Poetry commands are not supporting collecting dependencies files")
+		return make(map[string]entities.Dependency), nil
 	default:
 		return nil, errors.New(string(tool) + " commands are not supported.")
 	}
