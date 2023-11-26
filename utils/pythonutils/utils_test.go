@@ -81,21 +81,20 @@ Collecting PyYAML==5.1.2 (from jfrog-python-example==1.0)
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			aggFunc, captures := validateCaptures(testCase.expectedCapture)
+			aggFunc, captures := getCapturesFromTest(testCase.expectedCapture)
 			runDummyTextStream(t, testCase.text, getMultilineSplitCaptureOutputPattern(
 				testCase.startCapturePattern,
 				testCase.captureGroupPattern,
 				testCase.endCapturePattern,
 				aggFunc,
 			))
-			if assert.Len(t, (*captures), 1, fmt.Sprintf("Expected 1 captured group, got size: %d", len(*captures))) {
-				assert.Equal(t, testCase.expectedCapture, (*captures)[0], fmt.Sprintf("Expected capture group: %s, got: %s", testCase.expectedCapture, (*captures)[0]))
-			}
+			assert.Len(t, (*captures), 1, fmt.Sprintf("Expected 1 captured group, got size: %d", len(*captures)))
+			assert.Equal(t, testCase.expectedCapture, (*captures)[0], fmt.Sprintf("Expected capture group: %s, got: %s", testCase.expectedCapture, (*captures)[0]))
 		})
 	}
 }
 
-func validateCaptures(expectedCaptures ...string) (func(pattern *gofrogcmd.CmdOutputPattern) (string, error), *[]string) {
+func getCapturesFromTest(expectedCaptures ...string) (func(pattern *gofrogcmd.CmdOutputPattern) (string, error), *[]string) {
 	captures := []string{}
 	aggFunc := func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 		captured := extractFileNameFromRegexCaptureGroup(pattern)

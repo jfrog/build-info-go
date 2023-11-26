@@ -174,7 +174,7 @@ func getMultilineSplitCaptureOutputPattern(startCollectingPattern, captureGroup,
 	collectingMultiLineValue := false
 	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{RegExp: regexp.MustCompile(".*"), ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 		// Check if the line matches the startCollectingPattern.
-		if !collectingMultiLineValue && startCollectionRegexp.Match([]byte(pattern.Line)) {
+		if !collectingMultiLineValue && startCollectionRegexp.MatchString(pattern.Line) {
 			// Start collecting lines.
 			collectingMultiLineValue = true
 			lineBuffer = pattern.Line
@@ -188,10 +188,10 @@ func getMultilineSplitCaptureOutputPattern(startCollectingPattern, captureGroup,
 		// Add the line content to the buffer.
 		lineBuffer += pattern.Line
 		// Check if the line matches the endCollectingPattern.
-		if endCollectionRegexp.Match([]byte(pattern.Line)) {
+		if endCollectionRegexp.MatchString(pattern.Line) {
 			collectingMultiLineValue = false
 			// Simulate a one line content check to make sure we have regex match.
-			if oneLineRegex.Match([]byte(lineBuffer)) {
+			if oneLineRegex.MatchString(lineBuffer) {
 				return handler(&gofrogcmd.CmdOutputPattern{Line: pattern.Line, MatchedResults: oneLineRegex.FindStringSubmatch(lineBuffer)})
 			}
 		}
@@ -301,9 +301,7 @@ func extractFileNameFromRegexCaptureGroup(pattern *gofrogcmd.CmdOutputPattern) (
 	filePath := pattern.MatchedResults[1]
 	lastSlashIndex := strings.LastIndex(filePath, "/")
 	if lastSlashIndex == -1 {
-		fileName = filePath
-	} else {
-		fileName = filePath[lastSlashIndex+1:]
+		return filePath
 	}
-	return
+	return filePath[lastSlashIndex+1:]
 }
