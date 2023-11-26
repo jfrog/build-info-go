@@ -29,7 +29,7 @@ func newPythonModule(srcPath string, tool pythonutils.PythonTool, containingBuil
 }
 
 func (pm *PythonModule) RunInstallAndCollectDependencies(commandArgs []string) error {
-	dependenciesMap, err := pythonutils.GetPythonDependenciesFiles(pm.tool, commandArgs, pm.containingBuild.logger, pm.srcPath)
+	dependenciesMap, err := pythonutils.GetPythonDependenciesFiles(pm.tool, commandArgs, pm.containingBuild.buildName, pm.containingBuild.buildNumber, pm.containingBuild.logger, pm.srcPath)
 	if err != nil {
 		return err
 	}
