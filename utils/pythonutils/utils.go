@@ -16,6 +16,12 @@ const (
 	Pip    PythonTool = "pip"
 	Pipenv PythonTool = "pipenv"
 	Poetry PythonTool = "poetry"
+
+	startDownloadingPattern = `^\s*Downloading\s`
+	downloadingCaptureGroup = `[^\s]*`
+	startUsingCachedPattern = `^\s*Using\scached\s`
+	usingCacheCaptureGroup  = `[\S]+`
+	endPattern              = `\s\(`
 )
 
 type PythonTool string
@@ -155,6 +161,50 @@ func getFilePath(srcPath, fileName string) (string, error) {
 	return filePath, nil
 }
 
+// Create the CmdOutputPattern objects that can capture group content that may span multiple lines for logs that have line size limitations.
+// Since the log parser parse line by line, we need to create a parser that can capture group content that may span multiple lines.
+func getMultilineSplitCaptureOutputPattern(startCollectingPattern, captureGroup, endCollectingPattern string, handler func(pattern *gofrogcmd.CmdOutputPattern) (string, error)) (parsers []*gofrogcmd.CmdOutputPattern) {
+	// Prepare regex patterns.
+	oneLineRegex := regexp.MustCompile(startCollectingPattern + `(` + captureGroup + `)` + endCollectingPattern)
+	startCollectionRegexp := regexp.MustCompile(startCollectingPattern)
+	endCollectionRegexp := regexp.MustCompile(endCollectingPattern)
+
+	// Create a parser for single line pattern matches.
+	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{RegExp: oneLineRegex, ExecFunc: handler})
+
+	// Create a parser for multi line pattern matches.
+	lineBuffer := ""
+	collectingMultiLineValue := false
+	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{RegExp: regexp.MustCompile(".*"), ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
+		// Check if the line matches the startCollectingPattern.
+		if !collectingMultiLineValue && startCollectionRegexp.MatchString(pattern.Line) {
+			// Start collecting lines.
+			collectingMultiLineValue = true
+			lineBuffer = pattern.Line
+			// We assume that the content is multiline so no need to check end at this point.
+			// Single line will be handled and matched by the other parser.
+			return pattern.Line, nil
+		}
+		if !collectingMultiLineValue {
+			return pattern.Line, nil
+		}
+		// Add the line content to the buffer.
+		lineBuffer += pattern.Line
+		// Check if the line matches the endCollectingPattern.
+		if endCollectionRegexp.MatchString(pattern.Line) {
+			collectingMultiLineValue = false
+			// Simulate a one line content check to make sure we have regex match.
+			if oneLineRegex.MatchString(lineBuffer) {
+				return handler(&gofrogcmd.CmdOutputPattern{Line: pattern.Line, MatchedResults: oneLineRegex.FindStringSubmatch(lineBuffer)})
+			}
+		}
+
+		return pattern.Line, nil
+	}})
+
+	return
+}
+
 func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log, srcPath string) (map[string]entities.Dependency, error) {
 	if tool == Pipenv {
 		// Add verbosity flag to pipenv commands to collect necessary data
@@ -164,19 +214,14 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	installCmd.Dir = srcPath
 
 	dependenciesMap := map[string]entities.Dependency{}
-
-	// Create regular expressions for log parsing.
-	collectingRegexp := regexp.MustCompile(`^Collecting\s(\w[\w-.]+)`)
-	downloadingRegexp := regexp.MustCompile(`^\s*Downloading\s([^\s]*)\s\(`)
-	usingCachedRegexp := regexp.MustCompile(`^\s*Using\scached\s([\S]+)\s\(`)
-	alreadySatisfiedRegexp := regexp.MustCompile(`^Requirement\salready\ssatisfied:\s(\w[\w-.]+)`)
+	parsers := []*gofrogcmd.CmdOutputPattern{}
 
 	var packageName string
 	expectingPackageFilePath := false
 
 	// Extract downloaded package name.
-	dependencyNameParser := gofrogcmd.CmdOutputPattern{
-		RegExp: collectingRegexp,
+	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{
+		RegExp: regexp.MustCompile(`^Collecting\s(\w[\w-.]+)`),
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 			// If this pattern matched a second time before downloaded-file-name was found, prompt a message.
 			if expectingPackageFilePath {
@@ -189,7 +234,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			}
 
 			// Check for out of bound results.
-			if len(pattern.MatchedResults)-1 < 0 {
+			if len(pattern.MatchedResults)-1 <= 0 {
 				log.Debug(fmt.Sprintf("Failed extracting package name from line: %s", pattern.Line))
 				return pattern.Line, nil
 			}
@@ -200,49 +245,34 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 
 			return pattern.Line, nil
 		},
-	}
+	})
 
-	// Extract downloaded file, stored in Artifactory.
-	downloadedFileParser := gofrogcmd.CmdOutputPattern{
-		RegExp: downloadingRegexp,
-		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-			// Check for out of bound results.
-			if len(pattern.MatchedResults)-1 < 0 {
-				log.Debug(fmt.Sprintf("Failed extracting download path from line: %s", pattern.Line))
-				return pattern.Line, nil
-			}
-
-			// If this pattern matched before package-name was found, do not collect this path.
-			if !expectingPackageFilePath {
-				log.Debug(fmt.Sprintf("Could not resolve package name for download path: %s , continuing...", packageName))
-				return pattern.Line, nil
-			}
-
-			// Save dependency information.
-			filePath := pattern.MatchedResults[1]
-			lastSlashIndex := strings.LastIndex(filePath, "/")
-			var fileName string
-			if lastSlashIndex == -1 {
-				fileName = filePath
-			} else {
-				fileName = filePath[lastSlashIndex+1:]
-			}
-			dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
-			expectingPackageFilePath = false
-
-			log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
+	saveCaptureGroupAsDependencyInfo := func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
+		fileName := extractFileNameFromRegexCaptureGroup(pattern)
+		if fileName == "" {
+			log.Debug(fmt.Sprintf("Failed extracting download path from line: %s", pattern.Line))
 			return pattern.Line, nil
-		},
+		}
+		// If this pattern matched before package-name was found, do not collect this path.
+		if !expectingPackageFilePath {
+			log.Debug(fmt.Sprintf("Could not resolve package name for download path: %s , continuing...", packageName))
+			return pattern.Line, nil
+		}
+		// Save dependency information.
+		dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
+		expectingPackageFilePath = false
+		log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
+		return pattern.Line, nil
 	}
 
-	cachedFileParser := gofrogcmd.CmdOutputPattern{
-		RegExp:   usingCachedRegexp,
-		ExecFunc: downloadedFileParser.ExecFunc,
-	}
+	// Extract downloaded file, stored in Artifactory. (value at log may be split into multiple lines)
+	parsers = append(parsers, getMultilineSplitCaptureOutputPattern(startDownloadingPattern, downloadingCaptureGroup, endPattern, saveCaptureGroupAsDependencyInfo)...)
+	// Extract cached file, stored in Artifactory. (value at log may be split into multiple lines)
+	parsers = append(parsers, getMultilineSplitCaptureOutputPattern(startUsingCachedPattern, usingCacheCaptureGroup, endPattern, saveCaptureGroupAsDependencyInfo)...)
 
 	// Extract already installed packages names.
-	installedPackagesParser := gofrogcmd.CmdOutputPattern{
-		RegExp: alreadySatisfiedRegexp,
+	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{
+		RegExp: regexp.MustCompile(`^Requirement\salready\ssatisfied:\s(\w[\w-.]+)`),
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 			// Check for out of bound results.
 			if len(pattern.MatchedResults)-1 < 0 {
@@ -255,12 +285,26 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			log.Debug(fmt.Sprintf("Found package: %s already installed", pattern.MatchedResults[1]))
 			return pattern.Line, nil
 		},
-	}
+	})
 
 	// Execute command.
-	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, &dependencyNameParser, &downloadedFileParser, &cachedFileParser, &installedPackagesParser)
+	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(installCmd, true, parsers...)
 	if err != nil {
 		return nil, fmt.Errorf("failed running %s command with error: '%s - %s'", string(tool), err.Error(), errorOut)
 	}
 	return dependenciesMap, nil
+}
+
+func extractFileNameFromRegexCaptureGroup(pattern *gofrogcmd.CmdOutputPattern) (fileName string) {
+	// Check for out of bound results (no captures).
+	if len(pattern.MatchedResults) <= 1 {
+		return ""
+	}
+	// Extract file information from capture group.
+	filePath := pattern.MatchedResults[1]
+	lastSlashIndex := strings.LastIndex(filePath, "/")
+	if lastSlashIndex == -1 {
+		return filePath
+	}
+	return filePath[lastSlashIndex+1:]
 }
