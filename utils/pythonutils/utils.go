@@ -57,12 +57,14 @@ type packageType struct {
 	InstalledVersion string `json:"installed_version,omitempty"`
 }
 
-func GetPythonDependenciesFiles(tool PythonTool, args []string, log utils.Log, srcPath string) (map[string]entities.Dependency, error) {
+func GetPythonDependenciesFiles(tool PythonTool, args []string, buildName, buildNumber string, log utils.Log, srcPath string) (map[string]entities.Dependency, error) {
 	switch tool {
 	case Pip, Pipenv:
 		return InstallWithLogParsing(tool, args, log, srcPath)
 	case Poetry:
-		log.Warn("Poetry commands are not supporting collecting dependencies files")
+		if buildName != "" && buildNumber != "" {
+			log.Warn("Poetry commands are not supporting collecting dependencies files")
+		}
 		return make(map[string]entities.Dependency), nil
 	default:
 		return nil, errors.New(string(tool) + " commands are not supported.")
