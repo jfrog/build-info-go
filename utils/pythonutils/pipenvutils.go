@@ -2,7 +2,8 @@ package pythonutils
 
 import (
 	"encoding/json"
-	"github.com/jfrog/build-info-go/utils"
+
+	"github.com/jfrog/gofrog/io"
 )
 
 // Executes pipenv graph.
@@ -11,7 +12,7 @@ import (
 // 'topLevelPackagesList' - list of all top level dependencies ( root dependencies only)
 func getPipenvDependencies(srcPath string) (dependenciesGraph map[string][]string, topLevelDependencies []string, err error) {
 	// Run pipenv graph
-	pipenvGraphCmd := utils.NewCommand("pipenv", "graph", []string{"--json"})
+	pipenvGraphCmd := io.NewCommand("pipenv", "graph", []string{"--json"})
 	pipenvGraphCmd.Dir = srcPath
 	output, err := pipenvGraphCmd.RunWithOutput()
 	if err != nil {
