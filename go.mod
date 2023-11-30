@@ -26,3 +26,5 @@ require (
 	golang.org/x/sys v0.12.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/jfrog/gofrog => github.com/jfrog/gofrog v1.3.2-0.20231130091721-6d742be8bc7a
