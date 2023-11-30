@@ -395,14 +395,6 @@ bi pipenv [pipenv command] [command options]
 
 Note: checksums calculation is not yet supported for pipenv projects.
 
-#### poetry
-
-```shell
-bi poetry [poetry command] [command options]
-```
-
-Note: checksums calculation is not yet supported for poetry projects.
-
 #### Dotnet
 
 ```shell
