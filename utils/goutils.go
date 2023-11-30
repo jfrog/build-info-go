@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"runtime"
 
+	"github.com/jfrog/gofrog/io"
 	"github.com/jfrog/gofrog/version"
 
 	"os"
@@ -39,7 +40,7 @@ func RunGo(goArg []string, repoUrl string) error {
 		return err
 	}
 
-	goCmd := NewCommand("go", "", goArg)
+	goCmd := io.NewCommand("go", "", goArg)
 	err = prepareGlobalRegExp()
 	if err != nil {
 		return err
@@ -148,7 +149,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 			}
 		}()
 	}
-	goCmd := NewCommand("go", "", commandArgs)
+	goCmd := io.NewCommand("go", "", commandArgs)
 	goCmd.Dir = projectDir
 
 	err = prepareGlobalRegExp()
@@ -230,7 +231,7 @@ func GetParsedGoVersion() (*version.Version, error) {
 }
 
 func getGoVersion() (string, error) {
-	goCmd := NewCommand("go", "version", nil)
+	goCmd := io.NewCommand("go", "version", nil)
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
 	return output, err
 }
@@ -288,7 +289,7 @@ func GetGoModCachePath() (string, error) {
 
 // GetGOPATH returns the location of the GOPATH
 func getGOPATH() (string, error) {
-	goCmd := NewCommand("go", "env", []string{"GOPATH"})
+	goCmd := io.NewCommand("go", "env", []string{"GOPATH"})
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
 	if err != nil {
 		return "", fmt.Errorf("could not find GOPATH env: %s", err.Error())
