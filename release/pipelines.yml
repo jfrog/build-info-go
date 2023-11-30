@@ -56,7 +56,7 @@ pipelines:
             - jf goc --repo-resolve ecosys-go-remote
 
             # Audit
-            - jf audit
+            - jf audit --go
 
             # Build and upload
             - >
