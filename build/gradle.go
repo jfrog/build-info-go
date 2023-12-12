@@ -23,6 +23,8 @@ const (
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
 	gradleExtractor4DependencyVersion = "4.33.6"
 	gradleExtractor5DependencyVersion = "5.1.10"
+	projectPropertiesFlag             = "-P"
+	systemPropertiesFlag              = "-D"
 )
 
 var versionRegex = regexp.MustCompile(`Gradle (\d+\.\d+(?:\.\d+|-\w+-\d+)?)`)
@@ -140,7 +142,7 @@ func (gm *GradleModule) downloadGradleExtractor(gradleExecPath string) (err erro
 func (gm *GradleModule) getExtractorVersionAndInitScript(gradleExecPath string) (string, string, error) {
 	gradleRunConfig := &gradleRunConfig{
 		gradle: gradleExecPath,
-		tasks:  "--version",
+		tasks:  []string{"--version"},
 		logger: gm.containingBuild.logger,
 	}
 
@@ -187,7 +189,7 @@ func (gm *GradleModule) createGradleRunConfig(gradleExecPath string) (*gradleRun
 		env:                gm.gradleExtractorDetails.props,
 		gradle:             gradleExecPath,
 		extractorPropsFile: extractorPropsFile,
-		tasks:              strings.Join(gm.gradleExtractorDetails.tasks, " "),
+		tasks:              gm.gradleExtractorDetails.tasks,
 		initScript:         gm.gradleExtractorDetails.initScript,
 		logger:             gm.containingBuild.logger,
 	}, nil
@@ -243,7 +245,7 @@ func GetGradleExecPath(useWrapper bool) (string, error) {
 type gradleRunConfig struct {
 	gradle             string
 	extractorPropsFile string
-	tasks              string
+	tasks              []string
 	initScript         string
 	env                map[string]string
 	logger             utils.Log
@@ -255,9 +257,23 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 	if config.initScript != "" {
 		cmd = append(cmd, "--init-script", config.initScript)
 	}
-	cmd = append(cmd, strings.Split(config.tasks, " ")...)
+	filteredTasks := handleGradleCommandProperties(config.tasks)
+	cmd = append(cmd, filteredTasks...)
 	config.logger.Info("Running gradle command:", strings.Join(cmd, " "))
 	return exec.Command(cmd[0], cmd[1:]...)
+}
+
+func handleGradleCommandProperties(tasks []string) []string {
+	var filteredArgs []string
+	for _, task := range tasks {
+		if !strings.HasPrefix(task, systemPropertiesFlag) && !strings.HasPrefix(task, projectPropertiesFlag) {
+			filteredArgs = append(filteredArgs, task)
+			continue
+		}
+		splitProperties := strings.Split(task, "=")
+		filteredArgs = append(filteredArgs, fmt.Sprintf(`%s="%s"`, splitProperties[0], splitProperties[1]))
+	}
+	return filteredArgs
 }
 
 func (config *gradleRunConfig) runCmd(stdout, stderr io.Writer) error {
