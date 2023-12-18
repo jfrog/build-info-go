@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/io"
 )
 
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
@@ -18,7 +19,7 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	if err != nil {
 		return nil, nil, err
 	}
-	localPipdeptree := utils.NewCommand("python", "", []string{localPipdeptreeScript, "--json"})
+	localPipdeptree := io.NewCommand("python", "", []string{localPipdeptreeScript, "--json"})
 	localPipdeptree.Dir = srcPath
 	output, err := localPipdeptree.RunWithOutput()
 	if err != nil {

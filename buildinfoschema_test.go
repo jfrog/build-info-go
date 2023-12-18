@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jfrog/build-info-go/build/testdata"
 	buildutils "github.com/jfrog/build-info-go/build/utils"
+	"github.com/jfrog/build-info-go/tests"
 	"github.com/jfrog/build-info-go/utils"
 
 	"github.com/stretchr/testify/assert"
@@ -67,7 +67,7 @@ func validateBuildInfoSchema(t *testing.T, commandName, pathInTestData string, i
 func prepareProject(t *testing.T, pathInTestdata string, install func()) func() {
 	wd, err := os.Getwd()
 	assert.NoError(t, err)
-	tempDir, cleanup := testdata.CreateTestProject(t, filepath.Join("build", "testdata", pathInTestdata))
+	tempDir, cleanup := tests.CreateTestProject(t, filepath.Join("build", "testdata", pathInTestdata))
 	assert.NoError(t, os.Chdir(tempDir))
 	install()
 

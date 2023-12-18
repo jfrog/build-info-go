@@ -43,7 +43,7 @@ func newNpmModule(srcPath string, containingBuild *Build) (*NpmModule, error) {
 	}
 
 	// Read module name
-	packageInfo, err := buildutils.ReadPackageInfoFromPackageJson(srcPath, npmVersion)
+	packageInfo, err := buildutils.ReadPackageInfoFromPackageJsonIfExists(srcPath, npmVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,8 @@ func (nm *NpmModule) CalcDependencies() error {
 	if !nm.containingBuild.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}
-	buildInfoDependencies, err := buildutils.CalculateNpmDependenciesList(nm.executablePath, nm.srcPath, nm.name, nm.npmArgs, true, nm.containingBuild.logger)
+	buildInfoDependencies, err := buildutils.CalculateNpmDependenciesList(nm.executablePath, nm.srcPath, nm.name,
+		buildutils.NpmTreeDepListParam{Args: nm.npmArgs}, true, nm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
