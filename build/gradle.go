@@ -265,12 +265,13 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 func handleGradleCommandProperties(tasks []string) []string {
 	var cmdArgs []string
 	for _, task := range tasks {
-		if !strings.HasPrefix(task, systemPropertiesFlag) && !strings.HasPrefix(task, projectPropertiesFlag) {
-			cmdArgs = append(cmdArgs, task)
-			continue
+		hasPropertiesFlag := strings.HasPrefix(task, systemPropertiesFlag) || strings.HasPrefix(task, projectPropertiesFlag)
+		isProperty := hasPropertiesFlag && strings.Contains(task, "=")
+		if isProperty {
+			propertyParts := strings.SplitN(task, "=", 2)
+			task = fmt.Sprintf(`%s="%s"`, propertyParts[0], propertyParts[1])
 		}
-		propertyParts := strings.SplitN(task, "=", 2)
-		cmdArgs = append(cmdArgs, fmt.Sprintf(`%s="%s"`, propertyParts[0], propertyParts[1]))
+		cmdArgs = append(cmdArgs, task)
 	}
 	return cmdArgs
 }
