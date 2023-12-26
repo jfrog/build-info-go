@@ -1,0 +1,16 @@
+version: "1.0"
+modules:
+  - exclude_patterns:
+      - "**/.git/**"
+      - "**/node_modules/**"
+
+      # Included in .gitignore:
+      - "**/.vscode/**"
+      - "**/.idea/**"
+    exclude_scanners:
+      - "iac"
+      - "sast"
+    scanners:
+      secrets:
+        exclude_patterns:
+          - "**/build/utils/dotnet/configfiletemplate.go**"
