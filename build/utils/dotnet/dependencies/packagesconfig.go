@@ -218,8 +218,8 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	if err != nil {
 		return nil, err
 	}
-	// Sometimes the nuspec file is encoded in utf-16.
-	// xml.Unmarshal doesn't support utf-16 encoding, so we need to convert it to utf-8.
+	// Sometimes the nuspec file is wrongly encoded in utf-16, the actual encoding is utf-8 but the xml header has 'enocding="utf-16"' key.
+	// xml.Unmarshal doesn't support utf-16 encoding, so we need to convert the header to utf-8.
 	utf8String := strings.Replace(string(nuspecContent), "utf-16", "utf-8", 1)
 	nuspec := &nuspec{}
 	err = xml.Unmarshal([]byte(utf8String), nuspec)
