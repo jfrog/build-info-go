@@ -257,12 +257,12 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 	if config.initScript != "" {
 		cmd = append(cmd, "--init-script", config.initScript)
 	}
-	cmd = append(cmd, handleCommandProperties(config.tasks)...)
+	cmd = append(cmd, formatCommandProperties(config.tasks)...)
 	config.logger.Info("Running gradle command:", strings.Join(cmd, " "))
 	return exec.Command(cmd[0], cmd[1:]...)
 }
 
-func handleCommandProperties(tasks []string) []string {
+func formatCommandProperties(tasks []string) []string {
 	var cmdArgs []string
 	for _, task := range tasks {
 		if isSystemOrProjectProperty(task) {

@@ -103,7 +103,7 @@ func TestParseGradleVersion(t *testing.T) {
 	}
 }
 
-func TestHandleCommandProperties(t *testing.T) {
+func TestFormatCommandProperties(t *testing.T) {
 	tests := []struct {
 		input    []string
 		expected []string
@@ -127,7 +127,7 @@ func TestHandleCommandProperties(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := handleCommandProperties(test.input)
+		result := formatCommandProperties(test.input)
 		assert.ElementsMatch(t, test.expected, result)
 	}
 }
