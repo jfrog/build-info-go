@@ -124,6 +124,10 @@ func TestHandleGradleCommandProperties(t *testing.T) {
 			input:    []string{"-Dparam1=value1", "run", "-Pkey2=value2", "-Dparam2=value2"},
 			expected: []string{`-Dparam1="value1"`, "run", `-Pkey2="value2"`, `-Dparam2="value2"`},
 		},
+		{
+			input:    []string{"-Dparam1=value1", "run", "-Psign"},
+			expected: []string{`-Dparam1="value1"`, "run", "-Psign"},
+		},
 	}
 
 	for _, test := range tests {
