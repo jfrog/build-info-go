@@ -103,35 +103,31 @@ func TestParseGradleVersion(t *testing.T) {
 	}
 }
 
-func TestHandleGradleCommandProperties(t *testing.T) {
+func TestHandleCommandProperties(t *testing.T) {
 	tests := []struct {
 		input    []string
 		expected []string
 	}{
 		{
 			input:    []string{"clean", "-Dparam=value", "build", "-Pkey=value"},
-			expected: []string{"clean", `-Dparam="value"`, "build", `-Pkey="value"`},
+			expected: []string{"clean", "-Dparam=value", "build", "-Pkey=value"},
 		},
 		{
-			input:    []string{"-Dprop1=value1", "test", "-Dprop2=value2"},
-			expected: []string{`-Dprop1="value1"`, "test", `-Dprop2="value2"`},
+			input:    []string{"-Dprop1=value1", "test", "-Pprop2=value2"},
+			expected: []string{"-Dprop1=value1", "test", "-Pprop2=value2"},
 		},
 		{
-			input:    []string{"-Dparam1=value1", "-Pkey1=value1", "-Dparam2=value2", "-Pkey2=value2"},
-			expected: []string{`-Dparam1="value1"`, `-Pkey1="value1"`, `-Dparam2="value2"`, `-Pkey2="value2"`},
-		},
-		{
-			input:    []string{"-Dparam1=value1", "run", "-Pkey2=value2", "-Dparam2=value2"},
-			expected: []string{`-Dparam1="value1"`, "run", `-Pkey2="value2"`, `-Dparam2="value2"`},
+			input:    []string{"-Dparam1=value1 value2", "-Pkey1=value1", "-Dparam2=value2", "-Pkey2=value1 value2"},
+			expected: []string{"-Dparam1='value1 value2'", "-Pkey1=value1", "-Dparam2=value2", "-Pkey2='value1 value2'"},
 		},
 		{
 			input:    []string{"-Dparam1=value1", "run", "-Psign"},
-			expected: []string{`-Dparam1="value1"`, "run", "-Psign"},
+			expected: []string{"-Dparam1=value1", "run", "-Psign"},
 		},
 	}
 
 	for _, test := range tests {
-		result := handleGradleCommandProperties(test.input)
+		result := handleCommandProperties(test.input)
 		assert.ElementsMatch(t, test.expected, result)
 	}
 }
