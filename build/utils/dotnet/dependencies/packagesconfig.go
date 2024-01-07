@@ -1,6 +1,7 @@
 package dependencies
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"github.com/jfrog/build-info-go/utils"
@@ -73,9 +74,9 @@ func (extractor *packagesExtractor) extract(packagesConfig *packagesConfig, glob
 			return err
 		}
 		if pack == nil {
-			// If doesn't exists lets build the array of alternative versions.
+			// If it doesn't exist lets build the array of alternative versions.
 			alternativeVersions := createAlternativeVersionForms(nuget.Version)
-			// Now lets do a loop to run over the alternative possibilities
+			// Now let's do a loop to run over the alternative possibilities
 			for i := 0; i < len(alternativeVersions); i++ {
 				nPackage.version = alternativeVersions[i]
 				pack, err = createNugetPackage(globalPackagesCache, nuget, nPackage, log)
@@ -133,7 +134,7 @@ func (extractor *packagesExtractor) loadPackagesConfig(dependenciesSource string
 	}
 
 	config := &packagesConfig{}
-	err = xml.Unmarshal(content, config)
+	err = xmlUnmarshal(content, config)
 	if err != nil {
 		return nil, err
 	}
@@ -218,9 +219,8 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	if err != nil {
 		return nil, err
 	}
-
 	nuspec := &nuspec{}
-	err = xml.Unmarshal(nuspecContent, nuspec)
+	err = xmlUnmarshal(nuspecContent, nuspec)
 	if err != nil {
 		pack := nPackage.id + ":" + nPackage.version
 		log.Warn("Package:", pack, "couldn't be parsed due to:", err.Error(), ". Skipping the package dependency.")
@@ -309,4 +309,16 @@ type xmlDependencies struct {
 type group struct {
 	TargetFramework string       `xml:"targetFramework,attr"`
 	Dependencies    []xmlPackage `xml:"dependency"`
+}
+
+// xmlUnmarshal is a wrapper for xml.Unmarshal, handling wrongly encoded utf-16 XML by replacing "utf-16" with "utf-8" in the header.
+func xmlUnmarshal(content []byte, obj interface{}) (err error) {
+	err = xml.Unmarshal(content, obj)
+	if err != nil {
+		// Sometimes the nuspec file is wrongly encoded in utf-16, the actual encoding is utf-8 but the xml header has 'encoding="utf-16"' key.
+		// xml.Unmarshal doesn't support utf-16 encoding, so we need to convert the header to utf-8.
+		utf8Bytes := bytes.Replace(content, []byte("utf-16"), []byte("utf-8"), 1)
+		err = xml.Unmarshal(utf8Bytes, obj)
+	}
+	return
 }
