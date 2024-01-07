@@ -6,7 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/CycloneDX/cyclonedx-go v0.7.2
 	github.com/buger/jsonparser v1.1.1
-	github.com/jfrog/gofrog v1.4.0
+	github.com/jfrog/gofrog v1.4.1
 	github.com/minio/sha256-simd v1.0.1
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
