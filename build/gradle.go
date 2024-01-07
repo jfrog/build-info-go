@@ -22,7 +22,7 @@ const (
 	gradleInitScriptTemplate          = "gradle.init"
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
 	gradleExtractor4DependencyVersion = "4.33.7"
-	gradleExtractor5DependencyVersion = "5.1.12"
+	gradleExtractor5DependencyVersion = "5.1.13"
 	projectPropertiesFlag             = "-P"
 	systemPropertiesFlag              = "-D"
 )
@@ -257,26 +257,35 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 	if config.initScript != "" {
 		cmd = append(cmd, "--init-script", config.initScript)
 	}
-	cmd = append(cmd, handleGradleCommandProperties(config.tasks)...)
+	cmd = append(cmd, formatCommandProperties(config.tasks)...)
 	config.logger.Info("Running gradle command:", strings.Join(cmd, " "))
 	return exec.Command(cmd[0], cmd[1:]...)
 }
 
-func handleGradleCommandProperties(tasks []string) []string {
+func formatCommandProperties(tasks []string) []string {
 	var cmdArgs []string
 	for _, task := range tasks {
-		if isGradleSystemOrProjectProperty(task) {
-			propertyParts := strings.SplitN(task, "=", 2)
-			task = fmt.Sprintf(`%s="%s"`, propertyParts[0], propertyParts[1])
+		if isSystemOrProjectProperty(task) {
+			task = quotePropertyIfNeeded(task)
 		}
 		cmdArgs = append(cmdArgs, task)
 	}
 	return cmdArgs
 }
 
-func isGradleSystemOrProjectProperty(task string) bool {
+func isSystemOrProjectProperty(task string) bool {
 	hasPropertiesFlag := strings.HasPrefix(task, systemPropertiesFlag) || strings.HasPrefix(task, projectPropertiesFlag)
 	return hasPropertiesFlag && strings.Contains(task, "=")
+}
+
+// Wraps system or project property value in quotes if its value contain spaces, e.g., -Dkey=val ue => -Dkey='val ue'
+func quotePropertyIfNeeded(task string) string {
+	parts := strings.SplitN(task, "=", 2)
+	if strings.Contains(parts[1], " ") {
+		return fmt.Sprintf(`%s='%s'`, parts[0], parts[1])
+	}
+
+	return task
 }
 
 func (config *gradleRunConfig) runCmd(stdout, stderr io.Writer) error {
