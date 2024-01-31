@@ -237,11 +237,11 @@ func getCargoHome(log utils.Log) (cargoHome string, err error) {
 }
 
 func getCachePath(log utils.Log) (string, error) {
-	goModCachePath, err := getCargoHome(log)
+	cargoHome, err := getCargoHome(log)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(goModCachePath, "registry", "cache"), nil
+	return filepath.Join(cargoHome, "registry", "cache"), nil
 }
 func getCrateLocation(cachePath, encodedDependencyId string, log utils.Log) (cratePath string, err error) {
 	moduleInfo := strings.Split(encodedDependencyId, ":")

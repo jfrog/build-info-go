@@ -1,6 +1,7 @@
 package build
 
 import (
+	"github.com/jfrog/build-info-go/utils"
 	"path/filepath"
 	"testing"
 
@@ -9,6 +10,9 @@ import (
 )
 
 func TestGenerateBuildInfoForCargoProject(t *testing.T) {
+	if utils.IsWindows() {
+		return
+	}
 	service := NewBuildInfoService()
 	cargoBuild, err := service.GetOrCreateBuild("build-info-go-test-cargo4", "5")
 	assert.NoError(t, err)

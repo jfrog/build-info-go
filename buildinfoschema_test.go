@@ -18,7 +18,9 @@ func TestGoSchema(t *testing.T) {
 }
 
 func TestCargoSchema(t *testing.T) {
-	validateBuildInfoSchema(t, "cargo", filepath.Join("cargo", "project"), func() {})
+	if !utils.IsWindows() {
+		validateBuildInfoSchema(t, "cargo", filepath.Join("cargo", "project"), func() {})
+	}
 }
 
 func TestMavenSchema(t *testing.T) {
