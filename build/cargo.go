@@ -35,7 +35,7 @@ func newCargoModule(srcPath string, containingBuild *Build) (*CargoModule, error
 	}
 
 	// Read module name
-	name, version, err := getModuleNameByDirWithVersion(srcPath, containingBuild.logger)
+	name, version, err := getModuleNameByDirWithVersion(srcPath)
 	if err != nil {
 		return nil, err
 	}
@@ -53,8 +53,7 @@ func getProjectRoot() (string, error) {
 	return utils.FindFileInDirAndParents(wd, cargoModuleFile)
 }
 
-func getModuleNameByDirWithVersion(projectDir string, log utils.Log) (string, string, error) {
-
+func getModuleNameByDirWithVersion(projectDir string) (string, string, error) {
 	var values map[string]map[string]string
 
 	_, err := toml.DecodeFile(path.Join(projectDir, cargoModuleFile), &values)
@@ -165,7 +164,6 @@ func populateCrate(packageId, zipPath string) (zipDependency entities.Dependency
 }
 
 var deplineRegex = regexp.MustCompile(`([0-9]+)(\S+) v(\S+)( \(.*\))?`)
-var depNoDepthlineRegex = regexp.MustCompile(`(\S+) v(\S+)( \(.*\))?`)
 
 func graphToMap(output string) map[string][]string {
 	var stack Stack
@@ -188,12 +186,13 @@ func graphToMap(output string) map[string][]string {
 		}
 		nameAndVersion := match[2] + ":" + match[3]
 
-		if depth == prevDepth {
+		switch {
+		case depth == prevDepth:
 			// no need to change parent or if 0, no need to store at all
-		} else if depth > prevDepth {
+		case depth > prevDepth:
 			stack.Push(currParent)
 			currParent = prevLineName
-		} else {
+		default:
 			diff := prevDepth - depth // how many parents to pop
 			for i := 0; i < diff; i++ {
 				currParent, _ = stack.Pop()
@@ -223,16 +222,15 @@ func getCargoHome(log utils.Log) (cargoHome string, err error) {
 			return "", err
 		}
 		cargoHome = path.Dir(path.Dir(cargo))
-	} else {
-		if !path.IsAbs(cargoHome) {
-			// for relative path, prepend current directory to it
-			wd, err := os.Getwd()
-			if err != nil {
-				return wd, err
-			}
-			cargoHome = filepath.Join(wd, cargoHome)
+	} else if !path.IsAbs(cargoHome) {
+		// for relative path, prepend current directory to it
+		wd, err := os.Getwd()
+		if err != nil {
+			return wd, err
 		}
+		cargoHome = filepath.Join(wd, cargoHome)
 	}
+
 	log.Debug("Cargo home location:", cargoHome)
 
 	return
