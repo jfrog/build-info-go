@@ -41,7 +41,9 @@ func newCargoModule(srcPath string, containingBuild *Build) (*CargoModule, error
 	}
 	return &CargoModule{name: name, version: version, srcPath: srcPath, containingBuild: containingBuild}, nil
 }
-
+func (gm *CargoModule) SetName(name string) {
+	gm.name = name
+}
 func getProjectRoot() (string, error) {
 	// Get the current directory.
 	wd, err := os.Getwd()
@@ -104,7 +106,25 @@ func (cm *CargoModule) loadDependencies() ([]entities.Dependency, error) {
 	populateRequestedByField(cm.name+":"+cm.version, emptyRequestedBy, dependenciesMap, dependenciesGraph)
 	return dependenciesMapToList(dependenciesMap), nil
 }
-
+func (cm *CargoModule) GetCargoMainArtifactAfterPublish() (artifact entities.Artifact, err error) {
+	wd, err := getProjectRoot()
+	if err != nil {
+		return
+	}
+	path := path.Join(wd, "target", "package", cm.name+"-"+cm.version+".crate")
+	artifact, err = populateArtifact(cm.name+":"+cm.version, path)
+	return
+}
+func populateArtifact(packageId, zipPath string) (artifact entities.Artifact, err error) {
+	artifact = entities.Artifact{Name: packageId}
+	md5, sha1, sha2, err := utils.GetFileChecksums(zipPath)
+	if err != nil {
+		return
+	}
+	artifact.Type = "cargo"
+	artifact.Checksum = entities.Checksum{Sha1: sha1, Md5: md5, Sha256: sha2}
+	return
+}
 func (cm *CargoModule) getCargoDependencies(cachePath string, depList map[string]bool) (map[string]entities.Dependency, error) {
 	// Create a map from dependency to parents
 	buildInfoDependencies := make(map[string]entities.Dependency)
