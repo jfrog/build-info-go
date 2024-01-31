@@ -17,6 +17,10 @@ func TestGoSchema(t *testing.T) {
 	validateBuildInfoSchema(t, "go", filepath.Join("golang", "project"), func() {})
 }
 
+func TestCargoSchema(t *testing.T) {
+	validateBuildInfoSchema(t, "cargo", filepath.Join("cargo", "project"), func() {})
+}
+
 func TestMavenSchema(t *testing.T) {
 	validateBuildInfoSchema(t, "mvn", filepath.Join("maven", "project"), func() {})
 }
