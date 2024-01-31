@@ -80,6 +80,11 @@ func (b *Build) AddGoModule(srcPath string) (*GoModule, error) {
 	return newGoModule(srcPath, b)
 }
 
+// AddCargoModule adds a Go module to this Build. Pass srcPath as an empty string if the root of the Cargo project is the working directory.
+func (b *Build) AddCargoModule(srcPath string) (*CargoModule, error) {
+	return newCargoModule(srcPath, b)
+}
+
 // AddMavenModule adds a Maven module to this Build. Pass srcPath as an empty string if the root of the Maven project is the working directory.
 func (b *Build) AddMavenModule(srcPath string) (*MavenModule, error) {
 	return newMavenModule(b, srcPath)
