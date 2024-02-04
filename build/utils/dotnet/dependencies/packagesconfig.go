@@ -1,13 +1,14 @@
 package dependencies
 
 import (
-	"bytes"
+	"encoding/binary"
 	"encoding/xml"
 	"fmt"
 	"github.com/jfrog/build-info-go/utils"
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/jfrog/build-info-go/build/utils/dotnet"
 	buildinfo "github.com/jfrog/build-info-go/entities"
@@ -315,10 +316,18 @@ type group struct {
 func xmlUnmarshal(content []byte, obj interface{}) (err error) {
 	err = xml.Unmarshal(content, obj)
 	if err != nil {
-		// Sometimes the nuspec file is wrongly encoded in utf-16, the actual encoding is utf-8 but the xml header has 'encoding="utf-16"' key.
-		// xml.Unmarshal doesn't support utf-16 encoding, so we need to convert the header to utf-8.
-		utf8Bytes := bytes.Replace(content, []byte("utf-16"), []byte("utf-8"), 1)
-		err = xml.Unmarshal(utf8Bytes, obj)
+		// Failed while trying to parse xml file. Nuspec file could be an utf-16 encoded file.
+		// xml.Unmarshal doesn't support utf-16 encoding, so we need to decode the utf16 by ourselves.
+
+		// Calculate the number of uint16 elements needed to represent UTF-16 content.
+		// Subtracting 2 to exclude the Byte Order Mark (BOM) size, if present.
+		size := (len(content) - 2) / 2
+
+		uint16Arr := make([]uint16, size)
+		for i := 0; i < size; i++ {
+			uint16Arr[i] = binary.LittleEndian.Uint16(content[i*2:])
+		}
+		err = xml.Unmarshal([]byte(string(utf16.Decode(uint16Arr))), obj)
 	}
 	return
 }
