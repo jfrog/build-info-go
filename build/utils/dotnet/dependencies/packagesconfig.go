@@ -4,15 +4,14 @@ import (
 	"encoding/binary"
 	"encoding/xml"
 	"fmt"
+	"github.com/jfrog/build-info-go/build/utils/dotnet"
+	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	gofrogcmd "github.com/jfrog/gofrog/io"
 	"os"
 	"path/filepath"
 	"strings"
 	"unicode/utf16"
-
-	"github.com/jfrog/build-info-go/build/utils/dotnet"
-	buildinfo "github.com/jfrog/build-info-go/entities"
-	gofrogcmd "github.com/jfrog/gofrog/io"
 )
 
 const PackagesFileName = "packages.config"
@@ -135,7 +134,7 @@ func (extractor *packagesExtractor) loadPackagesConfig(dependenciesSource string
 	}
 
 	config := &packagesConfig{}
-	err = xmlUnmarshal(content, config)
+	err = xmlUnmarshal(content, config, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +220,7 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 		return nil, err
 	}
 	nuspec := &nuspec{}
-	err = xmlUnmarshal(nuspecContent, nuspec)
+	err = xmlUnmarshal(nuspecContent, nuspec, log)
 	if err != nil {
 		pack := nPackage.id + ":" + nPackage.version
 		log.Warn("Package:", pack, "couldn't be parsed due to:", err.Error(), ". Skipping the package dependency.")
@@ -313,7 +312,7 @@ type group struct {
 }
 
 // xmlUnmarshal is a wrapper for xml.Unmarshal, handling wrongly encoded utf-16 XML by replacing "utf-16" with "utf-8" in the header.
-func xmlUnmarshal(content []byte, obj interface{}) (err error) {
+func xmlUnmarshal(content []byte, obj interface{}, log utils.Log) (err error) {
 	err = xml.Unmarshal(content, obj)
 	if err != nil {
 		// Failed while trying to parse xml file. Nuspec file could be an utf-16 encoded file.
@@ -327,6 +326,7 @@ func xmlUnmarshal(content []byte, obj interface{}) (err error) {
 		utf16BOM := "\uFEFF"
 		stringXml := strings.ReplaceAll(string(utf16.Decode(buf)), utf16BOM, "")
 
+		log.Info(stringXml)
 		// xml.Unmarshal doesn't support utf-16 encoding, so we need to convert the header to utf-8.
 		stringXml = strings.Replace(stringXml, "utf-16", "utf-8", 1)
 
