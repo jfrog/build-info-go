@@ -80,7 +80,7 @@ func TestLoadPackagesConfig(t *testing.T) {
 <packages>
   <package id="id1" version="1.0.0" targetFramework="net461" />
   <package id="id2" version="2.0.0" targetFramework="net461" />
-  <package id="utf16" version="2.0.0" targetFramework="net461" />
+  <package id="Microsoft.Web.Infrastructure" version="1.0.0.0" targetFramework="net461" />
 </packages>`)
 
 	packagesObj := &packagesConfig{}
@@ -92,7 +92,7 @@ func TestLoadPackagesConfig(t *testing.T) {
 		XmlPackages: []xmlPackage{
 			{Id: "id1", Version: "1.0.0"},
 			{Id: "id2", Version: "2.0.0"},
-			{Id: "utf16", Version: "2.0.0"},
+			{Id: "Microsoft.Web.Infrastructure", Version: "1.0.0.0"},
 		},
 	}
 
@@ -151,7 +151,7 @@ func TestExtractDependencies(t *testing.T) {
 	extractor, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcache"), log)
 	assert.NoError(t, err)
 
-	expectedAllDependencies := []string{"id1", "id2", "utf16"}
+	expectedAllDependencies := []string{"id1", "id2", "microsoft.web.infrastructure"}
 	allDependencies, err := extractor.AllDependencies(log)
 	assert.NoError(t, err)
 
@@ -161,7 +161,7 @@ func TestExtractDependencies(t *testing.T) {
 		}
 	}
 
-	expectedChildrenMap := map[string][]string{"id1": {"id2"}, "id2": {"id1"}, "utf16": {}}
+	expectedChildrenMap := map[string][]string{"id1": {"id2"}, "id2": {"id1"}, "microsoft.web.infrastructure": {"id1"}}
 	childrenMap, err := extractor.ChildrenMap()
 	assert.NoError(t, err)
 
@@ -169,7 +169,7 @@ func TestExtractDependencies(t *testing.T) {
 		t.Errorf("Expected: %s, Got: %s", expectedChildrenMap, childrenMap)
 	}
 
-	expectedDirectDependencies := []string{"id1", "id2", "utf16"}
+	expectedDirectDependencies := []string{"microsoft.web.infrastructure", "id1", "id2"}
 	directDependencies, err := extractor.DirectDependencies()
 	assert.NoError(t, err)
 

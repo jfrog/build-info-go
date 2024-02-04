@@ -319,15 +319,18 @@ func xmlUnmarshal(content []byte, obj interface{}) (err error) {
 		// Failed while trying to parse xml file. Nuspec file could be an utf-16 encoded file.
 		// xml.Unmarshal doesn't support utf-16 encoding, so we need to decode the utf16 by ourselves.
 
-		// Calculate the number of uint16 elements needed to represent UTF-16 content.
-		// Subtracting 2 to exclude the Byte Order Mark (BOM) size, if present.
-		size := (len(content) - 2) / 2
-
-		uint16Arr := make([]uint16, size)
-		for i := 0; i < size; i++ {
-			uint16Arr[i] = binary.LittleEndian.Uint16(content[i*2:])
+		buf := make([]uint16, len(content)/2)
+		for i := 0; i < len(content); i += 2 {
+			buf[i/2] = binary.LittleEndian.Uint16(content[i:])
 		}
-		err = xml.Unmarshal([]byte(string(utf16.Decode(uint16Arr))), obj)
+		// Remove utf-16 Byte Order Mark (BOM) if exists
+		utf16BOM := "\uFEFF"
+		stringXml := strings.ReplaceAll(string(utf16.Decode(buf)), utf16BOM, "")
+
+		// xml.Unmarshal doesn't support utf-16 encoding, so we need to convert the header to utf-8.
+		stringXml = strings.Replace(stringXml, "utf-16", "utf-8", 1)
+
+		err = xml.Unmarshal([]byte(stringXml), obj)
 	}
 	return
 }
