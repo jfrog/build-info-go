@@ -214,7 +214,7 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	nPackage.dependency = &buildinfo.Dependency{Id: nuget.Id + ":" + nuget.Version, Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}}
 
 	// Nuspec file that holds the metadata for the package.
-	nuspecPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, "nuspec"}, "."))
+	nuspecPath := filepath.Join(packagesPath, nuget.Id, nPackage.version, strings.Join([]string{nuget.Id, "nuspec"}, "."))
 	nuspecContent, err := os.ReadFile(nuspecPath)
 	if err != nil {
 		return nil, err
