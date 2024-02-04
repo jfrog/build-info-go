@@ -134,7 +134,7 @@ func (extractor *packagesExtractor) loadPackagesConfig(dependenciesSource string
 	}
 
 	config := &packagesConfig{}
-	err = xmlUnmarshal(content, config, nil)
+	err = xmlUnmarshal(content, config)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func searchRootDependencies(dfsHelper map[string]*dfsHelper, currentId string, a
 }
 
 func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPackage, log utils.Log) (*nugetPackage, error) {
-	nupkgPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, nPackage.version, "nupkg"}, "."))
+	nupkgPath := filepath.Join(packagesPath, nuget.Id, nPackage.version, strings.Join([]string{nuget.Id, nPackage.version, "nupkg"}, "."))
 
 	exists, err := utils.IsFileExists(nupkgPath, false)
 
@@ -220,7 +220,7 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 		return nil, err
 	}
 	nuspec := &nuspec{}
-	err = xmlUnmarshal(nuspecContent, nuspec, log)
+	err = xmlUnmarshal(nuspecContent, nuspec)
 	if err != nil {
 		pack := nPackage.id + ":" + nPackage.version
 		log.Warn("Package:", pack, "couldn't be parsed due to:", err.Error(), ". Skipping the package dependency.")
@@ -312,7 +312,7 @@ type group struct {
 }
 
 // xmlUnmarshal is a wrapper for xml.Unmarshal, handling wrongly encoded utf-16 XML by replacing "utf-16" with "utf-8" in the header.
-func xmlUnmarshal(content []byte, obj interface{}, log utils.Log) (err error) {
+func xmlUnmarshal(content []byte, obj interface{}) (err error) {
 	err = xml.Unmarshal(content, obj)
 	if err != nil {
 		// Failed while trying to parse xml file. Nuspec file could be an utf-16 encoded file.
@@ -326,7 +326,6 @@ func xmlUnmarshal(content []byte, obj interface{}, log utils.Log) (err error) {
 		utf16BOM := "\uFEFF"
 		stringXml := strings.ReplaceAll(string(utf16.Decode(buf)), utf16BOM, "")
 
-		log.Info(stringXml)
 		// xml.Unmarshal doesn't support utf-16 encoding, so we need to convert the header to utf-8.
 		stringXml = strings.Replace(stringXml, "utf-16", "utf-8", 1)
 
