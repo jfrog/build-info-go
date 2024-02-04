@@ -224,6 +224,7 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	if err != nil {
 		pack := nPackage.id + ":" + nPackage.version
 		log.Warn("Package:", pack, "couldn't be parsed due to:", err.Error(), ". Skipping the package dependency.")
+		log.Debug("nuspec content:\n" + string(nuspecContent))
 		return nPackage, nil
 	}
 
