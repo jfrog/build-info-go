@@ -1,20 +1,23 @@
 package dependencies
 
 import (
-	"bytes"
+	"encoding/binary"
 	"encoding/xml"
 	"fmt"
+	"github.com/jfrog/build-info-go/build/utils/dotnet"
+	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	gofrogcmd "github.com/jfrog/gofrog/io"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/jfrog/build-info-go/build/utils/dotnet"
-	buildinfo "github.com/jfrog/build-info-go/entities"
-	gofrogcmd "github.com/jfrog/gofrog/io"
+	"unicode/utf16"
 )
 
-const PackagesFileName = "packages.config"
+const (
+	PackagesFileName = "packages.config"
+	utf16BOM         = "\uFEFF"
+)
 
 // Register packages.config extractor
 func init() {
@@ -50,7 +53,7 @@ func (extractor *packagesExtractor) ChildrenMap() (map[string][]string, error) {
 // Create new packages.config extractor
 func (extractor *packagesExtractor) new(dependenciesSource string, log utils.Log) (Extractor, error) {
 	newExtractor := &packagesExtractor{allDependencies: map[string]*buildinfo.Dependency{}, childrenMap: map[string][]string{}}
-	packagesConfig, err := newExtractor.loadPackagesConfig(dependenciesSource)
+	packagesConfig, err := newExtractor.loadPackagesConfig(dependenciesSource, log)
 	if err != nil {
 		return nil, err
 	}
@@ -127,14 +130,14 @@ func createAlternativeVersionForms(originalVersion string) []string {
 	return alternativeVersions
 }
 
-func (extractor *packagesExtractor) loadPackagesConfig(dependenciesSource string) (*packagesConfig, error) {
+func (extractor *packagesExtractor) loadPackagesConfig(dependenciesSource string, log utils.Log) (*packagesConfig, error) {
 	content, err := os.ReadFile(dependenciesSource)
 	if err != nil {
 		return nil, err
 	}
 
 	config := &packagesConfig{}
-	err = xmlUnmarshal(content, config)
+	err = xmlUnmarshal(content, config, log)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +198,7 @@ func searchRootDependencies(dfsHelper map[string]*dfsHelper, currentId string, a
 }
 
 func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPackage, log utils.Log) (*nugetPackage, error) {
-	nupkgPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, nPackage.version, "nupkg"}, "."))
+	nupkgPath := filepath.Join(packagesPath, nuget.Id, nPackage.version, strings.Join([]string{nuget.Id, nPackage.version, "nupkg"}, "."))
 
 	exists, err := utils.IsFileExists(nupkgPath, false)
 
@@ -214,16 +217,17 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	nPackage.dependency = &buildinfo.Dependency{Id: nuget.Id + ":" + nuget.Version, Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}}
 
 	// Nuspec file that holds the metadata for the package.
-	nuspecPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, "nuspec"}, "."))
+	nuspecPath := filepath.Join(packagesPath, nuget.Id, nPackage.version, strings.Join([]string{nuget.Id, "nuspec"}, "."))
 	nuspecContent, err := os.ReadFile(nuspecPath)
 	if err != nil {
 		return nil, err
 	}
 	nuspec := &nuspec{}
-	err = xmlUnmarshal(nuspecContent, nuspec)
+	err = xmlUnmarshal(nuspecContent, nuspec, log)
 	if err != nil {
 		pack := nPackage.id + ":" + nPackage.version
 		log.Warn("Package:", pack, "couldn't be parsed due to:", err.Error(), ". Skipping the package dependency.")
+		log.Debug("nuspec content:\n" + string(nuspecContent))
 		return nPackage, nil
 	}
 
@@ -312,13 +316,23 @@ type group struct {
 }
 
 // xmlUnmarshal is a wrapper for xml.Unmarshal, handling wrongly encoded utf-16 XML by replacing "utf-16" with "utf-8" in the header.
-func xmlUnmarshal(content []byte, obj interface{}) (err error) {
+func xmlUnmarshal(content []byte, obj interface{}, log utils.Log) (err error) {
 	err = xml.Unmarshal(content, obj)
 	if err != nil {
-		// Sometimes the nuspec file is wrongly encoded in utf-16, the actual encoding is utf-8 but the xml header has 'encoding="utf-16"' key.
+		log.Debug("Failed while trying to parse xml file. Nuspec file could be an utf-16 encoded file.\n" +
+			"xml.Unmarshal doesn't support utf-16 encoding, so we need to decode the utf16 by ourselves.")
+
+		buf := make([]uint16, len(content)/2)
+		for i := 0; i < len(content); i += 2 {
+			buf[i/2] = binary.LittleEndian.Uint16(content[i:])
+		}
+		// Remove utf-16 Byte Order Mark (BOM) if exists
+		stringXml := strings.ReplaceAll(string(utf16.Decode(buf)), utf16BOM, "")
+
 		// xml.Unmarshal doesn't support utf-16 encoding, so we need to convert the header to utf-8.
-		utf8Bytes := bytes.Replace(content, []byte("utf-16"), []byte("utf-8"), 1)
-		err = xml.Unmarshal(utf8Bytes, obj)
+		stringXml = strings.Replace(stringXml, "utf-16", "utf-8", 1)
+
+		err = xml.Unmarshal([]byte(stringXml), obj)
 	}
 	return
 }
