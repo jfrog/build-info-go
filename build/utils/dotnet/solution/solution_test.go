@@ -17,7 +17,7 @@ import (
 var logger = utils.NewDefaultLogger(utils.INFO)
 
 func TestEmptySolution(t *testing.T) {
-	solution, err := Load(".", "", logger)
+	solution, err := Load(".", "", "", logger)
 	if err != nil {
 		t.Error(err)
 	}
@@ -160,7 +160,7 @@ func TestLoad(t *testing.T) {
 	// 1. located in the project's root directory.
 	// 2. located in solutions directory.
 	solution := solution{path: filepath.Join(wd, "testdata", "nugetproj", "solutions"), slnFile: "nugetproj.sln"}
-	solutions, err := Load(solution.path, solution.slnFile, log)
+	solutions, err := Load(solution.path, solution.slnFile, "", log)
 	if err != nil {
 		t.Error(err)
 	}
