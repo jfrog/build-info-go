@@ -14,7 +14,10 @@ import (
 	"unicode/utf16"
 )
 
-const PackagesFileName = "packages.config"
+const (
+	PackagesFileName = "packages.config"
+	utf16BOM         = "\uFEFF"
+)
 
 // Register packages.config extractor
 func init() {
@@ -50,7 +53,7 @@ func (extractor *packagesExtractor) ChildrenMap() (map[string][]string, error) {
 // Create new packages.config extractor
 func (extractor *packagesExtractor) new(dependenciesSource string, log utils.Log) (Extractor, error) {
 	newExtractor := &packagesExtractor{allDependencies: map[string]*buildinfo.Dependency{}, childrenMap: map[string][]string{}}
-	packagesConfig, err := newExtractor.loadPackagesConfig(dependenciesSource)
+	packagesConfig, err := newExtractor.loadPackagesConfig(dependenciesSource, log)
 	if err != nil {
 		return nil, err
 	}
@@ -127,14 +130,14 @@ func createAlternativeVersionForms(originalVersion string) []string {
 	return alternativeVersions
 }
 
-func (extractor *packagesExtractor) loadPackagesConfig(dependenciesSource string) (*packagesConfig, error) {
+func (extractor *packagesExtractor) loadPackagesConfig(dependenciesSource string, log utils.Log) (*packagesConfig, error) {
 	content, err := os.ReadFile(dependenciesSource)
 	if err != nil {
 		return nil, err
 	}
 
 	config := &packagesConfig{}
-	err = xmlUnmarshal(content, config)
+	err = xmlUnmarshal(content, config, log)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +223,7 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 		return nil, err
 	}
 	nuspec := &nuspec{}
-	err = xmlUnmarshal(nuspecContent, nuspec)
+	err = xmlUnmarshal(nuspecContent, nuspec, log)
 	if err != nil {
 		pack := nPackage.id + ":" + nPackage.version
 		log.Warn("Package:", pack, "couldn't be parsed due to:", err.Error(), ". Skipping the package dependency.")
@@ -313,18 +316,17 @@ type group struct {
 }
 
 // xmlUnmarshal is a wrapper for xml.Unmarshal, handling wrongly encoded utf-16 XML by replacing "utf-16" with "utf-8" in the header.
-func xmlUnmarshal(content []byte, obj interface{}) (err error) {
+func xmlUnmarshal(content []byte, obj interface{}, log utils.Log) (err error) {
 	err = xml.Unmarshal(content, obj)
 	if err != nil {
-		// Failed while trying to parse xml file. Nuspec file could be an utf-16 encoded file.
-		// xml.Unmarshal doesn't support utf-16 encoding, so we need to decode the utf16 by ourselves.
+		log.Debug("Failed while trying to parse xml file. Nuspec file could be an utf-16 encoded file.\n" +
+			"xml.Unmarshal doesn't support utf-16 encoding, so we need to decode the utf16 by ourselves.")
 
 		buf := make([]uint16, len(content)/2)
 		for i := 0; i < len(content); i += 2 {
 			buf[i/2] = binary.LittleEndian.Uint16(content[i:])
 		}
 		// Remove utf-16 Byte Order Mark (BOM) if exists
-		utf16BOM := "\uFEFF"
 		stringXml := strings.ReplaceAll(string(utf16.Decode(buf)), utf16BOM, "")
 
 		// xml.Unmarshal doesn't support utf-16 encoding, so we need to convert the header to utf-8.

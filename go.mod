@@ -6,13 +6,12 @@ require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/CycloneDX/cyclonedx-go v0.8.0
 	github.com/buger/jsonparser v1.1.1
-	github.com/dimchansky/utfbom v1.1.1
 	github.com/jfrog/gofrog v1.6.0
 	github.com/minio/sha256-simd v1.0.1
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a
+	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
 )
 
 require (
