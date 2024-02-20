@@ -80,6 +80,7 @@ func TestLoadPackagesConfig(t *testing.T) {
 <packages>
   <package id="id1" version="1.0.0" targetFramework="net461" />
   <package id="id2" version="2.0.0" targetFramework="net461" />
+  <package id="Microsoft.Web.Infrastructure" version="1.0.0.0" targetFramework="net461" />
 </packages>`)
 
 	packagesObj := &packagesConfig{}
@@ -91,6 +92,7 @@ func TestLoadPackagesConfig(t *testing.T) {
 		XmlPackages: []xmlPackage{
 			{Id: "id1", Version: "1.0.0"},
 			{Id: "id2", Version: "2.0.0"},
+			{Id: "Microsoft.Web.Infrastructure", Version: "1.0.0.0"},
 		},
 	}
 
@@ -149,7 +151,7 @@ func TestExtractDependencies(t *testing.T) {
 	extractor, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcache"), log)
 	assert.NoError(t, err)
 
-	expectedAllDependencies := []string{"id1", "id2"}
+	expectedAllDependencies := []string{"id1", "id2", "microsoft.web.infrastructure"}
 	allDependencies, err := extractor.AllDependencies(log)
 	assert.NoError(t, err)
 
@@ -159,7 +161,7 @@ func TestExtractDependencies(t *testing.T) {
 		}
 	}
 
-	expectedChildrenMap := map[string][]string{"id1": {"id2"}, "id2": {"id1"}}
+	expectedChildrenMap := map[string][]string{"id1": {"id2"}, "id2": {"id1"}, "microsoft.web.infrastructure": {"id1"}}
 	childrenMap, err := extractor.ChildrenMap()
 	assert.NoError(t, err)
 
@@ -167,7 +169,7 @@ func TestExtractDependencies(t *testing.T) {
 		t.Errorf("Expected: %s, Got: %s", expectedChildrenMap, childrenMap)
 	}
 
-	expectedDirectDependencies := []string{"id1", "id2"}
+	expectedDirectDependencies := []string{"microsoft.web.infrastructure", "id1", "id2"}
 	directDependencies, err := extractor.DirectDependencies()
 	assert.NoError(t, err)
 
@@ -186,7 +188,7 @@ func TestPackageNotFoundWithoutFailure(t *testing.T) {
 
 func extractDependencies(globalPackagePath string, log utils.Log) (Extractor, error) {
 	extractor := &packagesExtractor{allDependencies: map[string]*buildinfo.Dependency{}, childrenMap: map[string][]string{}}
-	packagesConfig, err := extractor.loadPackagesConfig(filepath.Join("testdata", "packagesproject", "packages.config"))
+	packagesConfig, err := extractor.loadPackagesConfig(filepath.Join("testdata", "packagesproject", "packages.config"), log)
 	if err != nil {
 		return extractor, err
 	}
