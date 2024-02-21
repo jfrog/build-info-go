@@ -198,7 +198,7 @@ func searchRootDependencies(dfsHelper map[string]*dfsHelper, currentId string, a
 }
 
 func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPackage, log utils.Log) (*nugetPackage, error) {
-	nupkgPath := filepath.Join(packagesPath, nuget.Id, nPackage.version, strings.Join([]string{nuget.Id, nPackage.version, "nupkg"}, "."))
+	nupkgPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, nPackage.version, "nupkg"}, "."))
 
 	exists, err := utils.IsFileExists(nupkgPath, false)
 
@@ -217,7 +217,7 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	nPackage.dependency = &buildinfo.Dependency{Id: nuget.Id + ":" + nuget.Version, Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}}
 
 	// Nuspec file that holds the metadata for the package.
-	nuspecPath := filepath.Join(packagesPath, nuget.Id, nPackage.version, strings.Join([]string{nuget.Id, "nuspec"}, "."))
+	nuspecPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, "nuspec"}, "."))
 	nuspecContent, err := os.ReadFile(nuspecPath)
 	if err != nil {
 		return nil, err
