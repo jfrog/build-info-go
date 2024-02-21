@@ -30,7 +30,7 @@ var algorithmFunc = map[Algorithm]func() hash.Hash{
 	SHA256: sha256.New,
 }
 
-func GetFileChecksums(filePath string, checksumType ...Algorithm) (md5, sha1, sha2 string, err error) {
+func GetFileChecksums(filePath string, checksumType ...Algorithm) (checksumInfo map[Algorithm]string, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return
@@ -41,12 +41,7 @@ func GetFileChecksums(filePath string, checksumType ...Algorithm) (md5, sha1, sh
 			err = e
 		}
 	}()
-	checksumInfo, err := CalcChecksums(file, checksumType...)
-	if err != nil {
-		return
-	}
-	md5, sha1, sha2 = checksumInfo[MD5], checksumInfo[SHA1], checksumInfo[SHA256]
-	return
+	return CalcChecksums(file, checksumType...)
 }
 
 // CalcChecksums calculates all hashes at once using AsyncMultiWriter. The file is therefore read only once.

@@ -28,16 +28,16 @@ func TestGetFileChecksums(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Calculate only sha1 and match
-	actualMd5, actualSha1, actualSha256, err := GetFileChecksums(tempFile.Name(), SHA1)
+	checksumInfo, err := GetFileChecksums(tempFile.Name(), SHA1)
 	assert.NoError(t, err)
-	assert.Empty(t, actualMd5)
-	assert.Equal(t, expectedSha1, actualSha1)
-	assert.Empty(t, actualSha256)
+	assert.Empty(t, checksumInfo[MD5])
+	assert.Equal(t, expectedSha1, checksumInfo[SHA1])
+	assert.Empty(t, checksumInfo[SHA256])
 
 	// Calculate all checksums and match
-	actualMd5, actualSha1, actualSha256, err = GetFileChecksums(tempFile.Name())
+	checksumInfo, err = GetFileChecksums(tempFile.Name())
 	assert.NoError(t, err)
-	assert.Equal(t, expectedMd5, actualMd5)
-	assert.Equal(t, expectedSha1, actualSha1)
-	assert.Equal(t, expectedSha256, actualSha256)
+	assert.Equal(t, expectedMd5, checksumInfo[MD5])
+	assert.Equal(t, expectedSha1, checksumInfo[SHA1])
+	assert.Equal(t, expectedSha256, checksumInfo[SHA256])
 }
