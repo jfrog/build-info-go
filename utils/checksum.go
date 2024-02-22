@@ -30,7 +30,7 @@ var algorithmFunc = map[Algorithm]func() hash.Hash{
 	SHA256: sha256.New,
 }
 
-func GetFileChecksums(filePath string, checksumType ...Algorithm) (checksumInfo map[Algorithm]string, err error) {
+func GetFileChecksums(filePath string, checksumType ...Algorithm) (checksums map[Algorithm]string, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return
