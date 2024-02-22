@@ -2,6 +2,8 @@ package utils
 
 import (
 	"bufio"
+	"errors"
+
 	//#nosec G501 -- md5 is supported by Artifactory.
 	"crypto/md5"
 	//#nosec G505 -- sha1 is supported by Artifactory.
@@ -36,10 +38,7 @@ func GetFileChecksums(filePath string, checksumType ...Algorithm) (checksums map
 		return
 	}
 	defer func() {
-		e := file.Close()
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, file.Close())
 	}()
 	return CalcChecksums(file, checksumType...)
 }
