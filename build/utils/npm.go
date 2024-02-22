@@ -381,11 +381,11 @@ func calculateChecksum(cacache *cacache, name, version, integrity string) (md5 s
 	if err != nil {
 		return
 	}
-	checksumInfo, err := utils.GetFileChecksums(path)
+	checksums, err := utils.GetFileChecksums(path)
 	if err != nil {
 		return
 	}
-	return checksumInfo[utils.MD5], checksumInfo[utils.SHA1], checksumInfo[utils.SHA256], err
+	return checksums[utils.MD5], checksums[utils.SHA1], checksums[utils.SHA256], err
 }
 
 // Merge two scopes and remove duplicates.

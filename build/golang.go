@@ -164,12 +164,12 @@ func (gm *GoModule) getPackagePathIfExists(cachePath, encodedDependencyId string
 func populateZip(packageId, zipPath string) (zipDependency entities.Dependency, err error) {
 	// Zip file dependency for the build-info
 	zipDependency = entities.Dependency{Id: packageId}
-	checksumInfo, err := utils.GetFileChecksums(zipPath)
+	checksums, err := utils.GetFileChecksums(zipPath)
 	if err != nil {
 		return
 	}
 	zipDependency.Type = "zip"
-	zipDependency.Checksum = entities.Checksum{Sha1: checksumInfo[utils.SHA1], Md5: checksumInfo[utils.MD5], Sha256: checksumInfo[utils.SHA256]}
+	zipDependency.Checksum = entities.Checksum{Sha1: checksums[utils.SHA1], Md5: checksums[utils.MD5], Sha256: checksums[utils.SHA256]}
 	return
 }
 
