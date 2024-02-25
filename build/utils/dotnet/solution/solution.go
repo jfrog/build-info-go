@@ -186,7 +186,7 @@ func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, ex
 			continue
 		}
 		// Exclude projects by pattern.
-		if exclude, err := isProjectExcluded(projFilePath, excludePattern, log); err != nil {
+		if exclude, err := isProjectExcluded(projFilePath, excludePattern); err != nil {
 			log.Error(err)
 			continue
 		} else if exclude {
@@ -203,7 +203,7 @@ func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, ex
 	return projects, nil
 }
 
-func isProjectExcluded(projFilePath, excludePattern string, log utils.Log) (exclude bool, err error) {
+func isProjectExcluded(projFilePath, excludePattern string) (exclude bool, err error) {
 	if len(excludePattern) == 0 {
 		return
 	}
