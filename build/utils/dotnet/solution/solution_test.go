@@ -163,7 +163,7 @@ func TestLoad(t *testing.T) {
 		expectedProjectCount int
 	}{
 		{"noExcludePattern", "", 2},
-		{"excludePattern", `(^.*.*/proj1.*/.*.*$)`, 1},
+		{"excludePattern", filepath.Join(`(^.*.*`, "proj1", ".*.*$)"), 1},
 	}
 
 	for _, testCase := range testCases {
