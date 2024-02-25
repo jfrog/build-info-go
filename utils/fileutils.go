@@ -606,3 +606,39 @@ func calcChecksumDetails(filePath string) (checksum entities.Checksum, err error
 	checksum = entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}
 	return
 }
+
+// TODO ERAN fix comment
+// Checks for every file in filesList whether it exists. If so it copies the file to a temporary dir.
+// Returns the path to the directory with all the copied files, or an empty path if none of the files existed
+// The user is responsible to remove containerDir after finish using it
+func KeepFilesInTempDirIfExist(filesList []string) (containerDir string, err error) {
+	if containerDir, err = CreateTempDir(); err != nil {
+		return
+	}
+	defer func() {
+		if err != nil {
+			err = errors.Join(RemoveTempDir(containerDir))
+		}
+	}()
+
+	anyFileOrDirExist := false
+	for _, filePath := range filesList {
+		var exists bool
+		if exists, err = IsFileExists(filePath, false); err != nil {
+			return
+		}
+
+		if exists {
+			anyFileOrDirExist = true
+			if err = CopyFile(containerDir, filePath); err != nil {
+				return
+			}
+		}
+	}
+
+	if !anyFileOrDirExist {
+		err = os.Remove(containerDir)
+		containerDir = ""
+	}
+	return
+}
