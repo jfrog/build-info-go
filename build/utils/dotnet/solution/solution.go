@@ -154,6 +154,9 @@ func (solution *solution) getProjectsListFromSlns(excludePattern string, log uti
 		return nil, err
 	}
 	if slnProjects != nil {
+		if len(excludePattern) > 0 {
+			log.Debug(fmt.Sprintf("Testing to exclude projects by pattern: %s", excludePattern))
+		}
 		return solution.parseProjectsFromSolutionFile(slnProjects, excludePattern, log)
 	}
 	return nil, nil
@@ -183,17 +186,12 @@ func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, ex
 			continue
 		}
 		// Exclude projects by pattern.
-		if len(excludePattern) > 0 {
-			log.Debug(fmt.Sprintf("Testing to exclude projects by pattern: %s", excludePattern))
-			exclude, err := regexp.MatchString(excludePattern, projFilePath)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
-			if exclude {
-				log.Debug(fmt.Sprintf("The path '%s' is excluded", projFilePath))
-				continue
-			}
+		if exclude, err := isProjectExcluded(projFilePath, excludePattern, log); err != nil {
+			log.Error(err)
+			continue
+		} else if exclude {
+			log.Debug(fmt.Sprintf("Skipping a project \"%s\", since the path '%s' is excluded", projectName, projFilePath))
+			continue
 		}
 		// Looking for .*proj files.
 		if !strings.HasSuffix(filepath.Ext(projFilePath), "proj") {
@@ -203,6 +201,13 @@ func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, ex
 		projects = append(projects, project.CreateProject(projectName, filepath.Dir(projFilePath)))
 	}
 	return projects, nil
+}
+
+func isProjectExcluded(projFilePath, excludePattern string, log utils.Log) (exclude bool, err error) {
+	if len(excludePattern) == 0 {
+		return
+	}
+	return regexp.MatchString(excludePattern, projFilePath)
 }
 
 func (solution *solution) loadSingleProjectFromDir(log utils.Log) error {
