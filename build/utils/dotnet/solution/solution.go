@@ -25,10 +25,10 @@ type Solution interface {
 
 var projectRegExp *regexp.Regexp
 
-func Load(path, slnFile string, log utils.Log) (Solution, error) {
+func Load(path, slnFile, excludePattern string, log utils.Log) (Solution, error) {
 	solution := &solution{path: path, slnFile: slnFile}
 	// Reads all projects from '.sln' files.
-	slnProjects, err := solution.getProjectsListFromSlns(log)
+	slnProjects, err := solution.getProjectsListFromSlns(excludePattern, log)
 	if err != nil {
 		return solution, err
 	}
@@ -148,13 +148,16 @@ func (solution *solution) DependenciesSourcesAndProjectsPathExist() bool {
 	return len(solution.dependenciesSources) > 0 && len(solution.projects) > 0
 }
 
-func (solution *solution) getProjectsListFromSlns(log utils.Log) ([]project.Project, error) {
+func (solution *solution) getProjectsListFromSlns(excludePattern string, log utils.Log) ([]project.Project, error) {
 	slnProjects, err := solution.getProjectsFromSlns()
 	if err != nil {
 		return nil, err
 	}
 	if slnProjects != nil {
-		return solution.parseProjectsFromSolutionFile(slnProjects, log)
+		if len(excludePattern) > 0 {
+			log.Debug(fmt.Sprintf("Testing to exclude projects by pattern: %s", excludePattern))
+		}
+		return solution.parseProjectsFromSolutionFile(slnProjects, excludePattern, log)
 	}
 	return nil, nil
 }
@@ -174,12 +177,20 @@ func (solution *solution) loadProjects(slnProjects []project.Project, log utils.
 	return nil
 }
 
-func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, log utils.Log) ([]project.Project, error) {
+func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, excludePattern string, log utils.Log) ([]project.Project, error) {
 	var projects []project.Project
 	for _, projectLine := range slnProjects {
 		projectName, projFilePath, err := parseProjectLine(projectLine, solution.path)
 		if err != nil {
 			log.Error(err)
+			continue
+		}
+		// Exclude projects by pattern.
+		if exclude, err := isProjectExcluded(projFilePath, excludePattern); err != nil {
+			log.Error(err)
+			continue
+		} else if exclude {
+			log.Debug(fmt.Sprintf("Skipping a project \"%s\", since the path '%s' is excluded", projectName, projFilePath))
 			continue
 		}
 		// Looking for .*proj files.
@@ -190,6 +201,13 @@ func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, lo
 		projects = append(projects, project.CreateProject(projectName, filepath.Dir(projFilePath)))
 	}
 	return projects, nil
+}
+
+func isProjectExcluded(projFilePath, excludePattern string) (exclude bool, err error) {
+	if len(excludePattern) == 0 {
+		return
+	}
+	return regexp.MatchString(excludePattern, projFilePath)
 }
 
 func (solution *solution) loadSingleProjectFromDir(log utils.Log) error {

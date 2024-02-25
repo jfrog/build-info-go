@@ -84,7 +84,7 @@ func (dm *DotnetModule) CalcDependencies() error {
 	if err != nil {
 		return err
 	}
-	sol, err := solution.Load(dm.solutionPath, slnFile, dm.containingBuild.logger)
+	sol, err := solution.Load(dm.solutionPath, slnFile, "", dm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
