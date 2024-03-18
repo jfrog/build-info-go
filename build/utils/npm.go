@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/buger/jsonparser"
 	"github.com/jfrog/build-info-go/entities"
@@ -380,7 +381,11 @@ func calculateChecksum(cacache *cacache, name, version, integrity string) (md5 s
 	if err != nil {
 		return
 	}
-	return utils.GetFileChecksums(path)
+	checksums, err := utils.GetFileChecksums(path)
+	if err != nil {
+		return
+	}
+	return checksums[utils.MD5], checksums[utils.SHA1], checksums[utils.SHA256], err
 }
 
 // Merge two scopes and remove duplicates.
