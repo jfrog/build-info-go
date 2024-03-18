@@ -11,155 +11,35 @@
       "id": "github.com/jfrog/build-info-go",
       "dependencies": [
         {
-          "id": "github.com/urfave/cli/v2:v2.27.1",
+          "id": "github.com/xrash/smetrics:v0.0.0-20201216005158-039620a65673",
           "type": "zip",
           "requestedBy": [
             [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "c437cebc0750758eaab4906811916035efaf46bf",
-          "md5": "9e1040379513ae9a01332c37ad8f0d78",
-          "sha256": "52d60db880c758bdfd6b5fb67a7063b53dc08f3a63802ea1c4e290ae408f11b3"
-        },
-        {
-          "id": "github.com/xeipuuv/gojsonpointer:v0.0.0-20180127040702-4e3ac2762d5f",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/xeipuuv/gojsonschema:v1.2.0",
-              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/xeipuuv/gojsonschema:v1.2.0",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "c00ffab826fdd7e3aa1284ed3a0918cbdf2ec095",
-          "md5": "812aaf45e505b2953d31a75ce668e46e",
-          "sha256": "5b1a4bcc8e003f214c92b3fa52959d9eb0e3af1c0c529efa55815db951146e48"
-        },
-        {
-          "id": "github.com/pmezard/go-difflib:v1.0.0",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/gofrog:v1.6.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.4",
-              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.4",
-              "github.com/jfrog/gofrog:v1.6.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.4",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "f200e2a5211b527ef2d2ff301718ccc4ad5c705b",
-          "md5": "fb72df530a7f3fca56ccc192c9f30a58",
-          "sha256": "de04cecc1a4b8d53e4357051026794bcbc54f2e6a260cfac508ce69d5d6457a0"
-        },
-        {
-          "id": "github.com/jfrog/gofrog:v1.6.0",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "475aca72f99661c31520655c457b831216298b5b",
-          "md5": "e9e6b1f73d09996a634c426281256e13",
-          "sha256": "685ce4c7f7b3a2f9f069379cb655368050bb42549ea33873a89cecb223c2e86b"
-        },
-        {
-          "id": "github.com/buger/jsonparser:v1.1.1",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "e0c54d96564262a70bc7ed33fb3ee2b15596f68f",
-          "md5": "7ab77d10951f73b96b9c19a6cca51bb1",
-          "sha256": "be17ef1b44c22eac645eeac80f0e26cdfc70d77262e631358e00c2aa817eab8c"
-        },
-        {
-          "id": "github.com/cpuguy83/go-md2man/v2:v2.0.2",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/urfave/cli/v2:v2.27.1",
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "cab8c09415bb3aa49892aac866a2732980d44c95",
-          "md5": "86a066c9aaad807da54f481b8286f8ce",
-          "sha256": "70a7e609809cf2a92c5535104db5eb82d75c54bfcfed2d224e87dd2fd9729f62"
-        },
-        {
-          "id": "github.com/russross/blackfriday/v2:v2.1.0",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/cpuguy83/go-md2man/v2:v2.0.2",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/cpuguy83/go-md2man/v2:v2.0.2",
               "github.com/urfave/cli/v2:v2.27.1",
               "github.com/jfrog/build-info-go"
             ],
             [
-              "github.com/urfave/cli/v2:v2.27.1",
               "github.com/jfrog/build-info-go"
             ]
           ],
-          "sha1": "b733cda2c795193ad2a65e13dcd7529b93bf04e9",
-          "md5": "eea4411c54002a5fb7d0db351270eefe",
-          "sha256": "7852750d58a053ce38b01f2c203208817564f552ebf371b2b630081d7004c6ae"
+          "sha1": "79a771d85bf5b4df5b583c8435343b323f52995e",
+          "md5": "b5a17afb05c11c10713e33e390729bd7",
+          "sha256": "bbebb9a00f44ff3e27bec16111effdcf2706d727821a4833ec8da19aad96e26d"
         },
         {
-          "id": "github.com/!cyclone!d!x/cyclonedx-go:v0.8.0",
+          "id": "github.com/jfrog/gofrog:v1.6.3",
           "type": "zip",
           "requestedBy": [
             [
               "github.com/jfrog/build-info-go"
             ]
           ],
-          "sha1": "295993006bfe6085a808c5ed9c8e210a6790217b",
-          "md5": "784986a05b774fc16942ec0978297fed",
-          "sha256": "32f507e078e7093518db8933dd0b4ba83a6eae30aa7bf731f1a019165c88f74b"
+          "sha1": "7731dd85a4d411705b2d0e1657c12ed5ed6da638",
+          "md5": "8377c41d4191d8f0061dfed980e55485",
+          "sha256": "340dda3c41a2fdcdc1b5c55ba780fecc93ceace92916f5a624d83d5667a32df4"
         },
         {
-          "id": "github.com/davecgh/go-spew:v1.1.1",
+          "id": "github.com/xeipuuv/gojsonschema:v1.2.0",
           "type": "zip",
           "requestedBy": [
             [
@@ -168,41 +48,23 @@
             ],
             [
               "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/gofrog:v1.6.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.4",
-              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.4",
-              "github.com/jfrog/gofrog:v1.6.0",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/stretchr/testify:v1.8.4",
-              "github.com/jfrog/build-info-go"
             ]
           ],
-          "sha1": "0f9760bda0c6ccacac5e57f62d0f5ad9c7dab03f",
-          "md5": "feef6644bd69286382139b28be3f0b91",
-          "sha256": "6b44a843951f371b7010c754ecc3cabefe815d5ced1c5b9409fb2d697e8a890d"
+          "sha1": "e1529901eb2cf8c9ff2b1fbf504cb08d05d3d578",
+          "md5": "ebbf84ea1a07065b100c33e2736e6d03",
+          "sha256": "55c8ce068257aa0d263aad7470113dafcd50f955ee754fc853c2fdcd31ad096f"
         },
         {
-          "id": "golang.org/x/exp:v0.0.0-20240213143201-ec583247a57a",
+          "id": "github.com/minio/sha256-simd:v1.0.1",
           "type": "zip",
           "requestedBy": [
             [
               "github.com/jfrog/build-info-go"
             ]
           ],
-          "sha1": "109d12b447281267eb4a33182b7b337f1c2e7a87",
-          "md5": "aa5736fbce71f5445909d34800459416",
-          "sha256": "8ccaa530254f149d4fa0d7f44dee83f8b12eef2067ae22b5b2cb9527ab0da7e9"
+          "sha1": "c6b381b6f945ddea88df93edebf185f29c7fc477",
+          "md5": "89452597fdd0efbda45051a98284f8cd",
+          "sha256": "e8805d8f0438b7fa0286c0cb160180ad8fc726e06bca1eabcd59c142523c625c"
         },
         {
           "id": "gopkg.in/yaml.v3:v3.0.1",
@@ -213,7 +75,7 @@
               "github.com/jfrog/build-info-go"
             ],
             [
-              "github.com/jfrog/gofrog:v1.6.0",
+              "github.com/jfrog/gofrog:v1.6.3",
               "github.com/jfrog/build-info-go"
             ],
             [
@@ -223,7 +85,7 @@
             ],
             [
               "github.com/stretchr/testify:v1.8.4",
-              "github.com/jfrog/gofrog:v1.6.0",
+              "github.com/jfrog/gofrog:v1.6.3",
               "github.com/jfrog/build-info-go"
             ],
             [
@@ -243,6 +105,46 @@
           "sha256": "aab8fbc4e6300ea08e6afe1caea18a21c90c79f489f52c53e2f20431f1a9a015"
         },
         {
+          "id": "github.com/!cyclone!d!x/cyclonedx-go:v0.8.0",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "295993006bfe6085a808c5ed9c8e210a6790217b",
+          "md5": "784986a05b774fc16942ec0978297fed",
+          "sha256": "32f507e078e7093518db8933dd0b4ba83a6eae30aa7bf731f1a019165c88f74b"
+        },
+        {
+          "id": "golang.org/x/exp:v0.0.0-20240213143201-ec583247a57a",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "109d12b447281267eb4a33182b7b337f1c2e7a87",
+          "md5": "aa5736fbce71f5445909d34800459416",
+          "sha256": "8ccaa530254f149d4fa0d7f44dee83f8b12eef2067ae22b5b2cb9527ab0da7e9"
+        },
+        {
+          "id": "github.com/!burnt!sushi/toml:v1.3.2",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/urfave/cli/v2:v2.27.1",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "a0fc876bb92fdbe9ad75c300588f2c63e954985c",
+          "md5": "e06df9631c9e1897912dfa92a40b4928",
+          "sha256": "5de246a0cb4c256f3fd5d0db8a08a114f58af0c2e193bbf0ad9012104adbb6b2"
+        },
+        {
           "id": "github.com/klauspost/cpuid/v2:v2.2.3",
           "type": "zip",
           "requestedBy": [
@@ -257,18 +159,6 @@
           "sha1": "6429461f86edd94bb679272748c522f41f6453df",
           "md5": "1bbcae037201b315dccd6e535b20bca0",
           "sha256": "f68ff82caa807940fee615b4898d428365761eeb36861959ca8b91a034bd0e7e"
-        },
-        {
-          "id": "github.com/minio/sha256-simd:v1.0.1",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "c6b381b6f945ddea88df93edebf185f29c7fc477",
-          "md5": "89452597fdd0efbda45051a98284f8cd",
-          "sha256": "e8805d8f0438b7fa0286c0cb160180ad8fc726e06bca1eabcd59c142523c625c"
         },
         {
           "id": "github.com/xeipuuv/gojsonreference:v0.0.0-20180127040603-bd5ef7bd5415",
@@ -296,36 +186,16 @@
           "sha256": "7ec98f4df894413f4dc58c8df330ca8b24ff425b05a8e1074c3028c99f7e45e7"
         },
         {
-          "id": "github.com/xeipuuv/gojsonschema:v1.2.0",
+          "id": "github.com/urfave/cli/v2:v2.27.1",
           "type": "zip",
           "requestedBy": [
-            [
-              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
-              "github.com/jfrog/build-info-go"
-            ],
             [
               "github.com/jfrog/build-info-go"
             ]
           ],
-          "sha1": "e1529901eb2cf8c9ff2b1fbf504cb08d05d3d578",
-          "md5": "ebbf84ea1a07065b100c33e2736e6d03",
-          "sha256": "55c8ce068257aa0d263aad7470113dafcd50f955ee754fc853c2fdcd31ad096f"
-        },
-        {
-          "id": "github.com/xrash/smetrics:v0.0.0-20201216005158-039620a65673",
-          "type": "zip",
-          "requestedBy": [
-            [
-              "github.com/urfave/cli/v2:v2.27.1",
-              "github.com/jfrog/build-info-go"
-            ],
-            [
-              "github.com/jfrog/build-info-go"
-            ]
-          ],
-          "sha1": "79a771d85bf5b4df5b583c8435343b323f52995e",
-          "md5": "b5a17afb05c11c10713e33e390729bd7",
-          "sha256": "bbebb9a00f44ff3e27bec16111effdcf2706d727821a4833ec8da19aad96e26d"
+          "sha1": "c437cebc0750758eaab4906811916035efaf46bf",
+          "md5": "9e1040379513ae9a01332c37ad8f0d78",
+          "sha256": "52d60db880c758bdfd6b5fb67a7063b53dc08f3a63802ea1c4e290ae408f11b3"
         },
         {
           "id": "github.com/stretchr/testify:v1.8.4",
@@ -336,7 +206,7 @@
               "github.com/jfrog/build-info-go"
             ],
             [
-              "github.com/jfrog/gofrog:v1.6.0",
+              "github.com/jfrog/gofrog:v1.6.3",
               "github.com/jfrog/build-info-go"
             ],
             [
@@ -348,7 +218,66 @@
           "sha256": "e206daaede0bd03de060bdfbeb984ac2c49b83058753fffc93fe0c220ea87532"
         },
         {
-          "id": "github.com/!burnt!sushi/toml:v1.3.2",
+          "id": "github.com/davecgh/go-spew:v1.1.1",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/gofrog:v1.6.3",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.4",
+              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.4",
+              "github.com/jfrog/gofrog:v1.6.3",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.4",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "0f9760bda0c6ccacac5e57f62d0f5ad9c7dab03f",
+          "md5": "feef6644bd69286382139b28be3f0b91",
+          "sha256": "6b44a843951f371b7010c754ecc3cabefe815d5ced1c5b9409fb2d697e8a890d"
+        },
+        {
+          "id": "github.com/russross/blackfriday/v2:v2.1.0",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/cpuguy83/go-md2man/v2:v2.0.2",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/cpuguy83/go-md2man/v2:v2.0.2",
+              "github.com/urfave/cli/v2:v2.27.1",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/urfave/cli/v2:v2.27.1",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "b733cda2c795193ad2a65e13dcd7529b93bf04e9",
+          "md5": "eea4411c54002a5fb7d0db351270eefe",
+          "sha256": "7852750d58a053ce38b01f2c203208817564f552ebf371b2b630081d7004c6ae"
+        },
+        {
+          "id": "github.com/cpuguy83/go-md2man/v2:v2.0.2",
           "type": "zip",
           "requestedBy": [
             [
@@ -359,12 +288,83 @@
               "github.com/jfrog/build-info-go"
             ]
           ],
-          "sha1": "a0fc876bb92fdbe9ad75c300588f2c63e954985c",
-          "md5": "e06df9631c9e1897912dfa92a40b4928",
-          "sha256": "5de246a0cb4c256f3fd5d0db8a08a114f58af0c2e193bbf0ad9012104adbb6b2"
+          "sha1": "cab8c09415bb3aa49892aac866a2732980d44c95",
+          "md5": "86a066c9aaad807da54f481b8286f8ce",
+          "sha256": "70a7e609809cf2a92c5535104db5eb82d75c54bfcfed2d224e87dd2fd9729f62"
+        },
+        {
+          "id": "github.com/pmezard/go-difflib:v1.0.0",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/gofrog:v1.6.3",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.4",
+              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.4",
+              "github.com/jfrog/gofrog:v1.6.3",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/stretchr/testify:v1.8.4",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "f200e2a5211b527ef2d2ff301718ccc4ad5c705b",
+          "md5": "fb72df530a7f3fca56ccc192c9f30a58",
+          "sha256": "de04cecc1a4b8d53e4357051026794bcbc54f2e6a260cfac508ce69d5d6457a0"
+        },
+        {
+          "id": "github.com/xeipuuv/gojsonpointer:v0.0.0-20180127040702-4e3ac2762d5f",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/xeipuuv/gojsonschema:v1.2.0",
+              "github.com/CycloneDX/cyclonedx-go:v0.8.0",
+              "github.com/jfrog/build-info-go"
+            ],
+            [
+              "github.com/xeipuuv/gojsonschema:v1.2.0",
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "c00ffab826fdd7e3aa1284ed3a0918cbdf2ec095",
+          "md5": "812aaf45e505b2953d31a75ce668e46e",
+          "sha256": "5b1a4bcc8e003f214c92b3fa52959d9eb0e3af1c0c529efa55815db951146e48"
+        },
+        {
+          "id": "github.com/buger/jsonparser:v1.1.1",
+          "type": "zip",
+          "requestedBy": [
+            [
+              "github.com/jfrog/build-info-go"
+            ]
+          ],
+          "sha1": "e0c54d96564262a70bc7ed33fb3ee2b15596f68f",
+          "md5": "7ab77d10951f73b96b9c19a6cca51bb1",
+          "sha256": "be17ef1b44c22eac645eeac80f0e26cdfc70d77262e631358e00c2aa817eab8c"
         }
       ]
     }
   ],
-  "started": "2024-02-21T12:26:15.116+0000"
+  "started": "2024-03-18T14:10:15.587+0000"
 }
