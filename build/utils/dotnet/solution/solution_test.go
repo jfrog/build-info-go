@@ -17,7 +17,7 @@ import (
 var logger = utils.NewDefaultLogger(utils.INFO)
 
 func TestEmptySolution(t *testing.T) {
-	solution, err := Load(".", "", logger)
+	solution, err := Load(".", "", "", logger)
 	if err != nil {
 		t.Error(err)
 	}
@@ -142,6 +142,7 @@ func replaceCarriageSign(results []string) {
 }
 
 func TestLoad(t *testing.T) {
+	// Prepare
 	log := utils.NewDefaultLogger(utils.INFO)
 	wd, err := os.Getwd()
 	if err != nil {
@@ -156,13 +157,26 @@ func TestLoad(t *testing.T) {
 	nugetCmd := exec.Command("nuget", "restore", filepath.Join(wd, "tmp", "nugetproj", "solutions", "nugetproj.sln"))
 	assert.NoError(t, nugetCmd.Run())
 
-	// 'nugetproj' contains 2 'packages.config' files for 2 projects -
-	// 1. located in the project's root directory.
-	// 2. located in solutions directory.
-	solution := solution{path: filepath.Join(wd, "testdata", "nugetproj", "solutions"), slnFile: "nugetproj.sln"}
-	solutions, err := Load(solution.path, solution.slnFile, log)
-	if err != nil {
-		t.Error(err)
+	testCases := []struct {
+		name                 string
+		excludePattern       string
+		expectedProjectCount int
+	}{
+		{"noExcludePattern", "", 2},
+		{"excludePattern", "proj1", 1},
 	}
-	assert.Equal(t, 2, len(solutions.GetProjects()))
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// 'nugetproj' contains 2 'packages.config' files for 2 projects -
+			// 1. located in the project's root directory.
+			// 2. located in solutions directory.
+			solution := solution{path: filepath.Join(wd, "testdata", "nugetproj", "solutions"), slnFile: "nugetproj.sln"}
+			solutions, err := Load(solution.path, solution.slnFile, testCase.excludePattern, log)
+			if err != nil {
+				t.Error(err)
+			}
+			assert.Equal(t, testCase.expectedProjectCount, len(solutions.GetProjects()))
+		})
+	}
 }
