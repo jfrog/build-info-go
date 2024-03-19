@@ -2,10 +2,12 @@ package build
 
 import (
 	"errors"
-	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	buildutils "github.com/jfrog/build-info-go/build/utils"
+	"github.com/jfrog/build-info-go/tests"
 
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
@@ -79,9 +81,9 @@ func TestAppendDependencyRecursively(t *testing.T) {
 
 func TestGenerateBuildInfoForYarnProject(t *testing.T) {
 	// Copy the project directory to a temporary directory
-	tempDirPath, createTempDirCallback := createTempDirWithCallbackAndAssert(t)
+	tempDirPath, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
 	defer createTempDirCallback()
-	testDataSource := filepath.Join("testdata", "yarn")
+	testDataSource := filepath.Join("testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
 
@@ -100,14 +102,14 @@ func TestGenerateBuildInfoForYarnProject(t *testing.T) {
 	buildInfo, err := yarnBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 2, 1, "build-info-go-tests:v1.0.0", entities.Npm, false)
+	validateModule(t, buildInfo.Modules[0], 5, 1, "build-info-go-tests:v1.0.0", entities.Npm, false)
 }
 
 func TestCollectDepsForYarnProjectWithTraverse(t *testing.T) {
 	// Copy the project directory to a temporary directory
-	tempDirPath, createTempDirCallback := createTempDirWithCallbackAndAssert(t)
+	tempDirPath, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
 	defer createTempDirCallback()
-	testDataSource := filepath.Join("testdata", "yarn")
+	testDataSource := filepath.Join("testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
 
@@ -131,16 +133,24 @@ func TestCollectDepsForYarnProjectWithTraverse(t *testing.T) {
 	buildInfo, err := yarnBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 1, 0, "build-info-go-tests:v1.0.0", entities.Npm, true)
-	assert.Equal(t, "json:9.0.6", buildInfo.Modules[0].Dependencies[0].Id)
-	assert.Equal(t, "test123", buildInfo.Modules[0].Dependencies[0].Sha1)
+	validateModule(t, buildInfo.Modules[0], 4, 0, "build-info-go-tests:v1.0.0", entities.Npm, true)
+	var dependencies []string
+	for _, dep := range buildInfo.Modules[0].Dependencies {
+		dependencies = append(dependencies, dep.Id)
+	}
+
+	expectedDependencies := []string{"js-tokens:4.0.0", "json:9.0.6", "loose-envify:1.4.0", "react:18.2.0"}
+
+	for _, expectedDep := range expectedDependencies {
+		assert.Contains(t, dependencies, expectedDep)
+	}
 }
 
 func TestCollectDepsForYarnProjectWithErrorInTraverse(t *testing.T) {
 	// Copy the project directory to a temporary directory
-	tempDirPath, createTempDirCallback := createTempDirWithCallbackAndAssert(t)
+	tempDirPath, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
 	defer createTempDirCallback()
-	testDataSource := filepath.Join("testdata", "yarn")
+	testDataSource := filepath.Join("testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
 
@@ -161,9 +171,9 @@ func TestCollectDepsForYarnProjectWithErrorInTraverse(t *testing.T) {
 
 func TestBuildYarnProjectWithArgs(t *testing.T) {
 	// Copy the project directory to a temporary directory
-	tempDirPath, createTempDirCallback := createTempDirWithCallbackAndAssert(t)
+	tempDirPath, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
 	defer createTempDirCallback()
-	testDataSource := filepath.Join("testdata", "yarn")
+	testDataSource := filepath.Join("testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
 
@@ -181,5 +191,5 @@ func TestBuildYarnProjectWithArgs(t *testing.T) {
 	buildInfo, err := yarnBuild.ToBuildInfo()
 	assert.NoError(t, err)
 	assert.Len(t, buildInfo.Modules, 1)
-	validateModule(t, buildInfo.Modules[0], 3, 0, "build-info-go-tests:v1.0.0", entities.Npm, false)
+	validateModule(t, buildInfo.Modules[0], 6, 0, "build-info-go-tests:v1.0.0", entities.Npm, false)
 }

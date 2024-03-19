@@ -10,26 +10,30 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/buger/jsonparser"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/version"
 )
 
+const npmInstallCommand = "install"
+
 // CalculateNpmDependenciesList gets an npm project's dependencies.
-func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmArgs []string, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
+func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
 	// Calculate npm dependency tree using 'npm ls...'.
-	dependenciesMap, err := CalculateDependenciesMap(executablePath, srcPath, moduleId, npmArgs, log)
+	dependenciesMap, err := CalculateDependenciesMap(executablePath, srcPath, moduleId, npmParams, log)
 	if err != nil {
 		return nil, err
 	}
 	var cacache *cacache
 	if calculateChecksums {
 		// Get local npm cache.
-		cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmArgs, log)
+		cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmParams.Args, log)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +79,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmA
 		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
 	}
 	if len(otherMissingDeps) > 0 {
-		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try to delete 'node_models' and/or 'package-lock.json'.")
+		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.")
 	}
 	return dependenciesList, nil
 }
@@ -87,7 +91,7 @@ type dependencyInfo struct {
 
 // Run 'npm list ...' command and parse the returned result to create a dependencies map of.
 // The dependencies map looks like name:version -> entities.Dependency.
-func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs []string, log utils.Log) (map[string]*dependencyInfo, error) {
+func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmListParams NpmTreeDepListParam, log utils.Log) (map[string]*dependencyInfo, error) {
 	dependenciesMap := make(map[string]*dependencyInfo)
 	// These arguments must be added at the end of the command, to override their other values (if existed in nm.npmArgs).
 	npmVersion, err := GetNpmVersion(executablePath, log)
@@ -100,10 +104,10 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmArgs 
 	}
 	var data []byte
 	// If we don't have node_modules, the function will use the package-lock dependencies.
-	if nodeModulesExist {
-		data = runNpmLsWithNodeModules(executablePath, srcPath, npmArgs, log)
+	if nodeModulesExist && !npmListParams.IgnoreNodeModules {
+		data = runNpmLsWithNodeModules(executablePath, srcPath, npmListParams.Args, log)
 	} else {
-		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmArgs, log, npmVersion)
+		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmListParams, log, npmVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -123,47 +127,80 @@ func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, l
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
 	if err != nil {
 		// It is optional for the function to return this error.
-		log.Warn("npm list command failed with error:", err.Error())
-	}
-	if len(errData) > 0 {
-		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+		log.Warn(err.Error())
+	} else if len(errData) > 0 {
+		log.Warn("Encountered some issues while running 'npm ls' command:\n" + strings.TrimSpace(string(errData)))
 	}
 	return
 }
 
-func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) ([]byte, error) {
+func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmListParams NpmTreeDepListParam, log utils.Log, npmVersion *version.Version) ([]byte, error) {
 	isPackageLockExist, isDirExistsErr := utils.IsFileExists(filepath.Join(srcPath, "package-lock.json"), false)
 	if isDirExistsErr != nil {
 		return nil, isDirExistsErr
 	}
-	if !isPackageLockExist {
-		err := installPackageLock(executablePath, srcPath, npmArgs, log, npmVersion)
+	if !isPackageLockExist || (npmListParams.OverwritePackageLock && checkIfLockFileShouldBeUpdated(srcPath, log)) {
+		err := installPackageLock(executablePath, srcPath, npmListParams.InstallCommandArgs, npmListParams.Args, log, npmVersion)
 		if err != nil {
 			return nil, err
 		}
 	}
-	npmArgs = append(npmArgs, "--json", "--all", "--long", "--package-lock-only")
-	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
+	npmListParams.Args = append(npmListParams.Args, "--json", "--all", "--long", "--package-lock-only")
+	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmListParams.Args, "ls"), log)
 	if err != nil {
-		log.Warn("npm list command failed with error:", err.Error())
-	}
-	if len(errData) > 0 {
-		log.Warn("Some errors occurred while collecting dependencies info:\n" + string(errData))
+		log.Warn(err.Error())
+	} else if len(errData) > 0 {
+		log.Warn("Encountered some issues while running 'npm ls' command:\n" + strings.TrimSpace(string(errData)))
 	}
 	return data, nil
 }
 
-func installPackageLock(executablePath, srcPath string, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
+func installPackageLock(executablePath, srcPath string, npmInstallCommandArgs, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
 	if npmVersion.AtLeast("6.0.0") {
 		npmArgs = append(npmArgs, "--package-lock-only")
+		// Including any 'install' command flags that were supplied by the user in preceding steps of the process, while ensuring that duplicates are avoided.
+		npmArgs = append(npmArgs, filterUniqueArgs(npmInstallCommandArgs, npmArgs)...)
 		// Installing package-lock to generate the dependencies map.
-		_, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "install"), log)
+		_, _, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "install"), log)
 		if err != nil {
-			return errors.New("Some errors occurred while installing package-lock: " + string(errData))
+			return err
 		}
 		return nil
 	}
 	return errors.New("it looks like you’re using version " + npmVersion.GetVersion() + " of the npm client. Versions below 6.0.0 require running `npm install` before running this command")
+}
+
+// Removes any arguments from argsToFilter that are already present in existingArgs. Furthermore, excludes the "install" command and retains only the flags in the resulting argument list.
+func filterUniqueArgs(argsToFilter []string, existingArgs []string) []string {
+	var filteredArgs []string
+	for _, arg := range argsToFilter {
+		if arg == npmInstallCommand {
+			continue
+		}
+		if !slices.Contains(existingArgs, arg) {
+			filteredArgs = append(filteredArgs, arg)
+		}
+	}
+	return filteredArgs
+}
+
+// Check if package.json has been modified.
+// This might indicate the addition of new packages to package.json that haven't been reflected in package-lock.json.
+func checkIfLockFileShouldBeUpdated(srcPath string, log utils.Log) bool {
+	packageJsonInfo, err := os.Stat(filepath.Join(srcPath, "package.json"))
+	if err != nil {
+		log.Warn("Failed to get file info for package.json, err: %v", err)
+		return false
+	}
+
+	packageJsonInfoModTime := packageJsonInfo.ModTime()
+	packageLockInfo, err := os.Stat(filepath.Join(srcPath, "package-lock.json"))
+	if err != nil {
+		log.Warn("Failed to get file info for package-lock.json, err: %v", err)
+		return false
+	}
+	packageLockInfoModTime := packageLockInfo.ModTime()
+	return packageJsonInfoModTime.After(packageLockInfoModTime)
 }
 
 func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, error) {
@@ -172,6 +209,17 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 		return nil, err
 	}
 	return version.NewVersion(string(versionData)), nil
+}
+
+type NpmTreeDepListParam struct {
+	// Required for the 'install' and 'ls' commands that could be triggered during the construction of the NPM dependency tree
+	Args []string
+	// Optional user-supplied arguments for the 'install' command. These arguments are not available from all entry points. They may be employed when constructing the NPM dependency tree, which could necessitate the execution of 'npm install...'
+	InstallCommandArgs []string
+	// Ignore the node_modules folder if exists, using the '--package-lock-only' flag
+	IgnoreNodeModules bool
+	// Rewrite package-lock.json, if exists.
+	OverwritePackageLock bool
 }
 
 // npm >=7 ls results for a single dependency
@@ -333,7 +381,11 @@ func calculateChecksum(cacache *cacache, name, version, integrity string) (md5 s
 	if err != nil {
 		return
 	}
-	return utils.GetFileChecksums(path)
+	checksums, err := utils.GetFileChecksums(path)
+	if err != nil {
+		return
+	}
+	return checksums[utils.MD5], checksums[utils.SHA1], checksums[utils.SHA256], err
 }
 
 // Merge two scopes and remove duplicates.
@@ -353,15 +405,14 @@ func appendScopes(oldScopes []string, newScopes []string) []string {
 }
 
 func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) (stdResult, errResult []byte, err error) {
-	log.Debug("Running npm " + npmArgs[0] + " command.")
-	tmpArgs := make([]string, 0)
+	args := make([]string, 0)
 	for i := 0; i < len(npmArgs); i++ {
 		if strings.TrimSpace(npmArgs[i]) != "" {
-			tmpArgs = append(tmpArgs, npmArgs[i])
+			args = append(args, npmArgs[i])
 		}
 	}
-
-	command := exec.Command(executablePath, tmpArgs...)
+	log.Debug("Running 'npm " + strings.Join(npmArgs, " ") + "' command.")
+	command := exec.Command(executablePath, args...)
 	command.Dir = srcPath
 	outBuffer := bytes.NewBuffer([]byte{})
 	command.Stdout = outBuffer
@@ -371,11 +422,10 @@ func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) 
 	errResult = errBuffer.Bytes()
 	stdResult = outBuffer.Bytes()
 	if err != nil {
-		err = errors.New("error while running the command :'" + executablePath + " " + strings.Join(tmpArgs, " ") + "'\nError output is:\n" + string(errResult) + "\nCommand error: is:\n" + err.Error())
+		err = fmt.Errorf("error while running '%s %s': %s\n%s", executablePath, strings.Join(args, " "), err.Error(), strings.TrimSpace(string(errResult)))
 		return
 	}
-	// The npm command is the first element in tmpArgs array.
-	log.Debug("npm " + tmpArgs[0] + " standard output is:\n" + string(stdResult))
+	log.Debug("npm '" + strings.Join(args, " ") + "' standard output is:\n" + strings.TrimSpace(string(stdResult)))
 	return
 }
 
@@ -406,19 +456,29 @@ func GetNpmVersionAndExecPath(log utils.Log) (*version.Version, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	return version.NewVersion(string(versionData)), npmExecPath, nil
+	return version.NewVersion(strings.TrimSpace(string(versionData))), npmExecPath, nil
 }
 
 type PackageInfo struct {
-	Name    string `json:"name,omitempty"`
-	Version string `json:"version,omitempty"`
-	Scope   string
+	Name                 string            `json:"name"`
+	Version              string            `json:"version"`
+	Dependencies         map[string]string `json:"dependencies"`
+	DevDependencies      map[string]string `json:"devDependencies"`
+	PeerDependencies     map[string]string `json:"peerDependencies"`
+	OptionalDependencies map[string]string `json:"optionalDependencies"`
+	Scope                string
 }
 
-func ReadPackageInfoFromPackageJson(packageJsonDirectory string, npmVersion *version.Version) (*PackageInfo, error) {
+// Read and populate package name, version and scope from the package.json file in the provided directory.
+// If package.json does not exist, return an empty PackageInfo struct.
+func ReadPackageInfoFromPackageJsonIfExists(packageJsonDirectory string, npmVersion *version.Version) (*PackageInfo, error) {
 	packageJson, err := os.ReadFile(filepath.Join(packageJsonDirectory, "package.json"))
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			return &PackageInfo{}, nil
+		} else {
+			return nil, err
+		}
 	}
 	return ReadPackageInfo(packageJson, npmVersion)
 }
@@ -437,6 +497,9 @@ func ReadPackageInfo(data []byte, npmVersion *version.Version) (*PackageInfo, er
 }
 
 func (pi *PackageInfo) BuildInfoModuleId() string {
+	if pi.Name == "" || pi.Version == "" {
+		return ""
+	}
 	nameBase := fmt.Sprintf("%s:%s", pi.Name, pi.Version)
 	if pi.Scope == "" {
 		return nameBase
@@ -446,6 +509,7 @@ func (pi *PackageInfo) BuildInfoModuleId() string {
 
 func (pi *PackageInfo) GetDeployPath() string {
 	fileName := fmt.Sprintf("%s-%s.tgz", pi.Name, pi.Version)
+	// The hyphen part below "/-/" is there in order to follow the layout used by the public NPM registry.
 	if pi.Scope == "" {
 		return fmt.Sprintf("%s/-/%s", pi.Name, fileName)
 	}
@@ -478,12 +542,11 @@ func removeVersionPrefixes(packageInfo *PackageInfo) {
 func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log utils.Log) (string, error) {
 	npmArgs = append([]string{"get", "cache"}, npmArgs...)
 	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(append(npmArgs, "--json=false"), "config"), log)
-	// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
-	if len(errData) > 0 {
-		log.Warn("error while running the command :'" + executablePath + " " + strings.Join(npmArgs, " ") + ":\n" + string(errData))
-	}
 	if err != nil {
-		return "", fmt.Errorf("'%s %s' npm config command failed with an error: %s", executablePath, strings.Join(npmArgs, " "), err.Error())
+		return "", err
+	} else if len(errData) > 0 {
+		// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
+		log.Warn("Encountered some issues while running 'npm get cache' command:\n" + string(errData))
 	}
 	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
 	found, err := utils.IsDirExists(cachePath, true)

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	testdatautils "github.com/jfrog/build-info-go/build/testdata"
 	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/tests"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,7 +28,7 @@ func TestGenerateBuildInfoForNpm(t *testing.T) {
 	// Create npm project.
 	path, err := filepath.Abs(filepath.Join(".", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project3", false, npmVersion)
+	projectPath, cleanup := tests.CreateNpmTest(t, path, "project3", false, npmVersion)
 	defer cleanup()
 
 	// Install dependencies in the npm project.
@@ -45,11 +45,11 @@ func TestGenerateBuildInfoForNpm(t *testing.T) {
 
 	// Verify results.
 	expectedBuildInfoJson := filepath.Join(projectPath, "expected_npm_buildinfo.json")
-	expectedBuildInfo := testdatautils.GetBuildInfo(t, expectedBuildInfoJson)
+	expectedBuildInfo := tests.GetBuildInfo(t, expectedBuildInfoJson)
 	match, err := entities.IsEqualModuleSlices(buildInfo.Modules, expectedBuildInfo.Modules)
 	assert.NoError(t, err)
 	if !match {
-		testdatautils.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
+		tests.PrintBuildInfoMismatch(t, expectedBuildInfo.Modules, buildInfo.Modules)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestFilterNpmArgsFlags(t *testing.T) {
 	// Create npm project.
 	path, err := filepath.Abs(filepath.Join(".", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := testdatautils.CreateNpmTest(t, path, "project3", false, npmVersion)
+	projectPath, cleanup := tests.CreateNpmTest(t, path, "project3", false, npmVersion)
 	defer cleanup()
 
 	// Set arguments in npmArgs.

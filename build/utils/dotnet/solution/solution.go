@@ -20,14 +20,15 @@ type Solution interface {
 	BuildInfo(module string, log utils.Log) (*buildinfo.BuildInfo, error)
 	Marshal() ([]byte, error)
 	GetProjects() []project.Project
+	GetDependenciesSources() []string
 }
 
 var projectRegExp *regexp.Regexp
 
-func Load(path, slnFile string, log utils.Log) (Solution, error) {
+func Load(path, slnFile, excludePattern string, log utils.Log) (Solution, error) {
 	solution := &solution{path: path, slnFile: slnFile}
 	// Reads all projects from '.sln' files.
-	slnProjects, err := solution.getProjectsListFromSlns(log)
+	slnProjects, err := solution.getProjectsListFromSlns(excludePattern, log)
 	if err != nil {
 		return solution, err
 	}
@@ -52,35 +53,35 @@ type solution struct {
 func (solution *solution) BuildInfo(moduleName string, log utils.Log) (*buildinfo.BuildInfo, error) {
 	build := &buildinfo.BuildInfo{}
 	var modules []buildinfo.Module
-	for _, project := range solution.projects {
+	for _, currProject := range solution.projects {
 		// Get All project dependencies
-		dependencies, err := project.Extractor().AllDependencies(log)
+		projectDependencies, err := currProject.Extractor().AllDependencies(log)
 		if err != nil {
 			return nil, err
 		}
-		directDeps, err := project.Extractor().DirectDependencies()
+		directDeps, err := currProject.Extractor().DirectDependencies()
 		if err != nil {
 			return nil, err
 		}
-		childrenMap, err := project.Extractor().ChildrenMap()
+		childrenMap, err := currProject.Extractor().ChildrenMap()
 		if err != nil {
 			return nil, err
 		}
 
 		// Create module
-		module := buildinfo.Module{Id: getModuleId(moduleName, project.Name()), Type: buildinfo.Nuget}
+		module := buildinfo.Module{Id: getModuleId(moduleName, currProject.Name()), Type: buildinfo.Nuget}
 
 		// Populate requestedBy field
 		for _, directDepName := range directDeps {
 			// Populate the direct dependency requested by only if the dependency exist in the cache
-			if directDep, exist := dependencies[directDepName]; exist {
+			if directDep, exist := projectDependencies[directDepName]; exist {
 				directDep.RequestedBy = [][]string{{module.Id}}
-				populateRequestedBy(*directDep, dependencies, childrenMap)
+				populateRequestedBy(*directDep, projectDependencies, childrenMap)
 			}
 		}
 
 		// Populate module dependencies
-		for _, dep := range dependencies {
+		for _, dep := range projectDependencies {
 			// If dependency has no RequestedBy field, it means that the dependency not accessible in the current project.
 			// In that case, the dependency is assumed to be under a project which is referenced by this project.
 			// We therefore don't include the dependency in the build-info.
@@ -139,13 +140,24 @@ func (solution *solution) GetProjects() []project.Project {
 	return solution.projects
 }
 
-func (solution *solution) getProjectsListFromSlns(log utils.Log) ([]project.Project, error) {
+func (solution *solution) GetDependenciesSources() []string {
+	return solution.dependenciesSources
+}
+
+func (solution *solution) DependenciesSourcesAndProjectsPathExist() bool {
+	return len(solution.dependenciesSources) > 0 && len(solution.projects) > 0
+}
+
+func (solution *solution) getProjectsListFromSlns(excludePattern string, log utils.Log) ([]project.Project, error) {
 	slnProjects, err := solution.getProjectsFromSlns()
 	if err != nil {
 		return nil, err
 	}
 	if slnProjects != nil {
-		return solution.parseProjectsFromSolutionFile(slnProjects, log)
+		if len(excludePattern) > 0 {
+			log.Debug(fmt.Sprintf("Testing to exclude projects by pattern: %s", excludePattern))
+		}
+		return solution.parseProjectsFromSolutionFile(slnProjects, excludePattern, log)
 	}
 	return nil, nil
 }
@@ -156,8 +168,8 @@ func (solution *solution) loadProjects(slnProjects []project.Project, log utils.
 		return solution.loadSingleProjectFromDir(log)
 	}
 	// Loading all projects listed in the relevant '.sln' files.
-	for _, project := range slnProjects {
-		err := solution.loadSingleProject(project, log)
+	for _, slnProject := range slnProjects {
+		err := solution.loadSingleProject(slnProject, log)
 		if err != nil {
 			return err
 		}
@@ -165,12 +177,20 @@ func (solution *solution) loadProjects(slnProjects []project.Project, log utils.
 	return nil
 }
 
-func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, log utils.Log) ([]project.Project, error) {
+func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, excludePattern string, log utils.Log) ([]project.Project, error) {
 	var projects []project.Project
 	for _, projectLine := range slnProjects {
 		projectName, projFilePath, err := parseProjectLine(projectLine, solution.path)
 		if err != nil {
 			log.Error(err)
+			continue
+		}
+		// Exclude projects by pattern.
+		if exclude, err := isProjectExcluded(projFilePath, excludePattern); err != nil {
+			log.Error(err)
+			continue
+		} else if exclude {
+			log.Debug(fmt.Sprintf("Skipping a project \"%s\", since the path '%s' is excluded", projectName, projFilePath))
 			continue
 		}
 		// Looking for .*proj files.
@@ -181,6 +201,13 @@ func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, lo
 		projects = append(projects, project.CreateProject(projectName, filepath.Dir(projFilePath)))
 	}
 	return projects, nil
+}
+
+func isProjectExcluded(projFilePath, excludePattern string) (exclude bool, err error) {
+	if len(excludePattern) == 0 {
+		return
+	}
+	return regexp.MatchString(excludePattern, projFilePath)
 }
 
 func (solution *solution) loadSingleProjectFromDir(log utils.Log) error {
@@ -314,11 +341,11 @@ func removeQuotes(value string) string {
 //   - 'packages.config' files are located in the project root/ in solutions root in a directory named after project's name.
 func (solution *solution) getDependenciesSourcesInProjectsDir(slnProjects []project.Project) error {
 	// Walk and search for dependencies sources files in project's directories.
-	for _, project := range slnProjects {
+	for _, slnProject := range slnProjects {
 		// Before running this function we already looked for dependencies sources in solutions directory.
 		// If a project isn't located under solutions' dir - we should look for the dependencies sources in this specific project's directory.
-		if !strings.HasPrefix(project.RootPath(), solution.path) {
-			err := gofrog.Walk(project.RootPath(), func(path string, f os.FileInfo, err error) error {
+		if !strings.HasPrefix(slnProject.RootPath(), solution.path) {
+			err := gofrog.Walk(slnProject.RootPath(), func(path string, f os.FileInfo, err error) error {
 				return solution.addPathToDependenciesSourcesIfNeeded(path)
 			}, true)
 			if err != nil {

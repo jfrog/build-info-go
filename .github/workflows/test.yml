@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu, windows, macOS ]
+        os: [ ubuntu, windows, macos ]
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
@@ -29,7 +29,7 @@ jobs:
             python: "3.x"
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: actions/setup-go@v3
@@ -37,7 +37,7 @@ jobs:
           go-version: 1.20.x
 
       - name: Setup Python3
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
 
@@ -51,7 +51,7 @@ jobs:
           check-latest: true
 
       - name: Go Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}

@@ -1,0 +1,41 @@
+import org.jfrog.gradle.plugin.artifactory.ArtifactoryPlugin
+import org.jfrog.gradle.plugin.artifactory.ArtifactoryPluginSettings
+import org.jfrog.gradle.plugin.artifactory.Constant
+import org.jfrog.gradle.plugin.artifactory.task.ArtifactoryTask
+
+initscript {
+    dependencies {
+        classpath fileTree('${pluginLibDir}')
+    }
+}
+
+beforeSettings { Settings settings ->
+    settings.apply plugin: ArtifactoryPluginSettings
+}
+
+projectsLoaded { Gradle gradle ->
+    Map<String, String> projectProperties = new HashMap<String, String>(gradle.startParameter.getProjectProperties())
+    projectProperties.put("build.start", Long.toString(System.currentTimeMillis()))
+    gradle.startParameter.setProjectProperties(projectProperties)
+    Project root = gradle.getRootProject()
+    root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
+    if (!"buildSrc".equals(root.name)) {
+        root.allprojects {
+            apply {
+                apply plugin: ArtifactoryPlugin
+            }
+        }
+    }
+
+    // Set the CI Server mode to all Artifactory tasks.
+    for (Project p : root.getAllprojects()) {
+        try {
+            TaskProvider<? extends Task> subCollectInfoTask = p.getTasks().named(Constant.ARTIFACTORY_PUBLISH_TASK_NAME, ArtifactoryTask.class);
+            subCollectInfoTask.configure { task ->
+                task.setCiServerBuild()
+            }
+        } catch (UnknownTaskException ignored) {
+            root.logger.debug("Can't find sub project configured for {}", p.getPath());
+        }
+    }
+}

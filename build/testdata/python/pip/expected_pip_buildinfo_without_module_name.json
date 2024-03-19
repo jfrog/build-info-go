@@ -30,7 +30,7 @@
         },
         {
           "id": "six:1.16.0",
-          "type": "whl",
+          "type": "metadata",
           "requestedBy": [
             [
               "nltk:3.4.5",
