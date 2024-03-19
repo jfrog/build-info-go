@@ -2,18 +2,16 @@ package utils
 
 import (
 	"bufio"
-	"errors"
-
 	//#nosec G501 -- md5 is supported by Artifactory.
 	"crypto/md5"
 	//#nosec G505 -- sha1 is supported by Artifactory.
 	"crypto/sha1"
 	"fmt"
+	ioutils "github.com/jfrog/gofrog/io"
+	"github.com/minio/sha256-simd"
 	"hash"
 	"io"
 	"os"
-
-	"github.com/minio/sha256-simd"
 )
 
 type Algorithm int
@@ -37,9 +35,7 @@ func GetFileChecksums(filePath string, checksumType ...Algorithm) (checksums map
 	if err != nil {
 		return
 	}
-	defer func() {
-		err = errors.Join(err, file.Close())
-	}()
+	defer ioutils.Close(file, &err)
 	return CalcChecksums(file, checksumType...)
 }
 

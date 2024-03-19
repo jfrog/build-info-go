@@ -173,10 +173,7 @@ func (mm *MavenModule) CalcDependencies() (err error) {
 	defer func() {
 		fileExist, e := utils.IsFileExists(mvnRunConfig.buildInfoProperties, false)
 		if fileExist && e == nil {
-			e = os.Remove(mvnRunConfig.buildInfoProperties)
-		}
-		if err == nil {
-			err = e
+			err = errors.Join(err, os.Remove(mvnRunConfig.buildInfoProperties))
 		}
 	}()
 	mvnRunConfig.SetOutputWriter(mm.outputWriter)

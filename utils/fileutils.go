@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	ioutils "github.com/jfrog/gofrog/io"
 	"golang.org/x/exp/slices"
 	"io"
 	"net/http"
@@ -576,9 +577,7 @@ func GetFileDetails(filePath string, includeChecksums bool) (details *FileDetail
 	}
 
 	file, err := os.Open(filePath)
-	defer func() {
-		err = errors.Join(err, file.Close())
-	}()
+	defer ioutils.Close(file, &err)
 	if err != nil {
 		return
 	}
@@ -595,9 +594,7 @@ func calcChecksumDetails(filePath string) (checksum entities.Checksum, err error
 	if err != nil {
 		return
 	}
-	defer func() {
-		err = errors.Join(err, file.Close())
-	}()
+	defer ioutils.Close(file, &err)
 
 	checksums, err := CalcChecksums(file)
 	if err != nil {
