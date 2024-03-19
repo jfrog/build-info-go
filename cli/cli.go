@@ -44,10 +44,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				defer func() {
-					e := bld.Clean()
-					if err == nil {
-						err = e
-					}
+					err = errors.Join(err, bld.Clean())
 				}()
 				goModule, err := bld.AddGoModule("")
 				if err != nil {
@@ -73,10 +70,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				defer func() {
-					e := bld.Clean()
-					if err == nil {
-						err = e
-					}
+					err = errors.Join(err, bld.Clean())
 				}()
 				mavenModule, err := bld.AddMavenModule("")
 				if err != nil {
@@ -102,10 +96,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				defer func() {
-					e := bld.Clean()
-					if err == nil {
-						err = e
-					}
+					err = errors.Join(err, bld.Clean())
 				}()
 				gradleModule, err := bld.AddGradleModule("")
 				if err != nil {
@@ -131,10 +122,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				defer func() {
-					e := bld.Clean()
-					if err == nil {
-						err = e
-					}
+					err = errors.Join(err, bld.Clean())
 				}()
 				npmModule, err := bld.AddNpmModule("")
 				if err != nil {
@@ -164,10 +152,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				defer func() {
-					e := bld.Clean()
-					if err == nil {
-						err = e
-					}
+					err = errors.Join(err, bld.Clean())
 				}()
 				nugetModule, err := bld.AddNugetModules("")
 				if err != nil {
@@ -193,10 +178,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				defer func() {
-					e := bld.Clean()
-					if err == nil {
-						err = e
-					}
+					err = errors.Join(err, bld.Clean())
 				}()
 				dotnetModule, err := bld.AddDotnetModules("")
 				if err != nil {
@@ -223,10 +205,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				defer func() {
-					e := bld.Clean()
-					if err == nil {
-						err = e
-					}
+					err = errors.Join(err, bld.Clean())
 				}()
 				yarnModule, err := bld.AddYarnModule("")
 				if err != nil {
@@ -257,10 +236,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				defer func() {
-					e := bld.Clean()
-					if err == nil {
-						err = e
-					}
+					err = errors.Join(err, bld.Clean())
 				}()
 				pythonModule, err := bld.AddPythonModule("", pythonutils.Pip)
 				if err != nil {
@@ -291,10 +267,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return
 				}
 				defer func() {
-					e := bld.Clean()
-					if err == nil {
-						err = e
-					}
+					err = errors.Join(err, bld.Clean())
 				}()
 				pythonModule, err := bld.AddPythonModule("", pythonutils.Pipenv)
 				if err != nil {
