@@ -2,7 +2,7 @@ package utils
 
 import (
 	"bufio"
-	"errors"
+	ioutils "github.com/jfrog/gofrog/io"
 
 	//#nosec G501 -- md5 is supported by Artifactory.
 	"crypto/md5"
@@ -37,9 +37,7 @@ func GetFileChecksums(filePath string, checksumType ...Algorithm) (checksums map
 	if err != nil {
 		return
 	}
-	defer func() {
-		err = errors.Join(err, file.Close())
-	}()
+	defer ioutils.Close(file, &err)
 	return CalcChecksums(file, checksumType...)
 }
 

@@ -115,10 +115,7 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 		return nil, err
 	}
 	defer func() {
-		e := utils.RemoveTempDir(eggBase)
-		if err == nil {
-			err = e
-		}
+		err = errors.Join(err, utils.RemoveTempDir(eggBase))
 	}()
 
 	// Run python 'egg_info --egg-base <eggBase>' command.
