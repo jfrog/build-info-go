@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -59,10 +60,7 @@ func CreateExtractorPropsFile(extractorConfPath, buildInfoPath, buildName, build
 		return "", err
 	}
 	defer func() {
-		deferErr := propertiesFile.Close()
-		if err == nil {
-			err = deferErr
-		}
+		err = errors.Join(err, propertiesFile.Close())
 	}()
 	var buildProperties = map[string]string{
 		buildInfoPathKey:  buildInfoPath,

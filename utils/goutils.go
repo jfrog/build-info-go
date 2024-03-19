@@ -143,10 +143,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 	}
 	if err == nil {
 		defer func() {
-			e := os.WriteFile(filepath.Join(projectDir, "go.sum"), sumFileContent, sumFileStat.Mode())
-			if err == nil {
-				err = e
-			}
+			err = errors.Join(err, os.WriteFile(filepath.Join(projectDir, "go.sum"), sumFileContent, sumFileStat.Mode()))
 		}()
 	}
 	goCmd := io.NewCommand("go", "", commandArgs)

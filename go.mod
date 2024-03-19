@@ -8,10 +8,10 @@ require (
 	github.com/buger/jsonparser v1.1.1
 	github.com/jfrog/gofrog v1.6.3
 	github.com/minio/sha256-simd v1.0.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
+	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
 )
 
 require (
