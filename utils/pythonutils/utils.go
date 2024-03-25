@@ -3,6 +3,7 @@ package pythonutils
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -307,5 +308,10 @@ func extractFileNameFromRegexCaptureGroup(pattern *gofrogcmd.CmdOutputPattern) (
 	if lastSlashIndex == -1 {
 		return filePath
 	}
-	return filePath[lastSlashIndex+1:]
+	latComponent := filePath[lastSlashIndex+1:]
+	unescapedComponent, err := url.QueryUnescape(latComponent)
+	if err != nil {
+		return latComponent
+	}
+	return unescapedComponent
 }
