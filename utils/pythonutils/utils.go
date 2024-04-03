@@ -308,10 +308,12 @@ func extractFileNameFromRegexCaptureGroup(pattern *gofrogcmd.CmdOutputPattern) (
 	if lastSlashIndex == -1 {
 		return filePath
 	}
-	latComponent := filePath[lastSlashIndex+1:]
-	unescapedComponent, err := url.QueryUnescape(latComponent)
-	if err != nil {
-		return latComponent
+	lastComponent := filePath[lastSlashIndex+1:]
+	// Unescape the last component, for example 'PyYAML-5.1.2%2Bsp1.tar.gz' -> 'PyYAML-5.1.2+sp1.tar.gz'.
+	unescapedComponent, _ := url.QueryUnescape(lastComponent)
+	if unescapedComponent == "" {
+		// Couldn't escape, will use the raw string
+		return lastComponent
 	}
 	return unescapedComponent
 }
