@@ -56,17 +56,17 @@ func TestReadNLines(t *testing.T) {
 }
 
 func TestCreateTempDir(t *testing.T) {
-    tempDir, err := CreateTempDir()
-    assert.NoError(t, err)
+	tempDir, err := CreateTempDir()
+	assert.NoError(t, err)
 
-    _, err = os.Stat(tempDir)
+	_, err = os.Stat(tempDir)
 	assert.NotErrorIs(t, err, os.ErrNotExist)
 
 	defer func() {
-	// Check that a timestamp can be extracted from the temp dir name
-	_, err = extractTimestamp(tempDir)
-	assert.NoError(t, err)
+		// Check that a timestamp can be extracted from the temp dir name
+		_, err = extractTimestamp(tempDir)
+		assert.NoError(t, err)
 
-    assert.NoError(t, os.RemoveAll(tempDir))
+		assert.NoError(t, os.RemoveAll(tempDir))
 	}()
 }
