@@ -62,9 +62,11 @@ func TestCreateTempDir(t *testing.T) {
     _, err = os.Stat(tempDir)
 	assert.NotErrorIs(t, err, os.ErrNotExist)
 
+	defer func() {
 	// Check that a timestamp can be extracted from the temp dir name
 	_, err = extractTimestamp(tempDir)
 	assert.NoError(t, err)
 
-	assert.NoError(t, os.RemoveAll(tempDir))
+    assert.NoError(t, os.RemoveAll(tempDir))
+	}()
 }
