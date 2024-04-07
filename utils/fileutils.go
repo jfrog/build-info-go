@@ -273,7 +273,7 @@ func GetFileContentAndInfo(filePath string) (fileContent []byte, fileInfo os.Fil
 func CreateTempDir() (string, error) {
 	tempDirBase := os.TempDir()
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	return os.MkdirTemp(tempDirBase, tempDirPrefix+timestamp+"-")
+	return os.MkdirTemp(tempDirBase, tempDirPrefix+timestamp+"-*")
 }
 
 func RemoveTempDir(dirPath string) error {
