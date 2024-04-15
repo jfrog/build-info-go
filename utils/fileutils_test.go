@@ -54,3 +54,19 @@ func TestReadNLines(t *testing.T) {
 	assert.True(t, strings.HasPrefix(lines[1], "781"))
 	assert.True(t, strings.HasSuffix(lines[1], ":true}}}"))
 }
+
+func TestCreateTempDir(t *testing.T) {
+	tempDir, err := CreateTempDir()
+	assert.NoError(t, err)
+
+	_, err = os.Stat(tempDir)
+	assert.NotErrorIs(t, err, os.ErrNotExist)
+
+	defer func() {
+		// Check that a timestamp can be extracted from the temp dir name
+		_, err = extractTimestamp(tempDir)
+		assert.NoError(t, err)
+
+		assert.NoError(t, os.RemoveAll(tempDir))
+	}()
+}
