@@ -77,6 +77,20 @@ Collecting PyYAML==5.1.2 (from jfrog-python-example==1.0)
 			  Installing build dependencies: started`,
 			expectedCapture: `PyYAML-5.1.2.tar.gz`,
 		},
+		{
+			name:                "Downloading - multi line captures",
+			startCapturePattern: startDownloadingPattern,
+			captureGroupPattern: downloadingCaptureGroup,
+			endCapturePattern:   endPattern,
+			text: `  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting PyYAML==5.1.2 (from jfrog-python-example==1.0)
+  Downloading http://localhost:8081/artifactory/api/pypi/cli-pypi-virtual-1698
+829558/packages/packages/e3/e8/b3212641ee2718d556df0f23f78de8303f068fe29cdaa7a91018849
+582fe/PyYAML-5.1.2%2Bsp1.tar.gz (265 kB)
+	 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 265.0/265.0 kB 364.4 MB/s eta 0:00:00
+			  Installing build dependencies: started`,
+			expectedCapture: `PyYAML-5.1.2+sp1.tar.gz`,
+		},
 	}
 
 	for _, testCase := range tests {
