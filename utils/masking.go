@@ -11,5 +11,5 @@ const CredentialsInUrlRegexp = `(?:http|https|git)://.+@`
 // Remove the credentials information from the line.
 func RemoveCredentials(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 	splitResult := strings.Split(pattern.MatchedResults[0], "//")
-	return strings.Replace(pattern.Line, pattern.MatchedResults[0], splitResult[0]+"//***@", -1), nil
+	return strings.ReplaceAll(pattern.Line, pattern.MatchedResults[0], splitResult[0]+"//***@"), nil
 }
