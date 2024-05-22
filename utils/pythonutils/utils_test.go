@@ -2,6 +2,8 @@ package pythonutils
 
 import (
 	"fmt"
+	"github.com/jfrog/build-info-go/utils"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -138,4 +140,80 @@ func runDummyTextStream(t *testing.T, txt string, parsers []*gofrogcmd.CmdOutput
 			}
 		}
 	}
+}
+
+func TestMaskPreKnownCredentials(t *testing.T) {
+	tests := []struct {
+		name                string
+		inputText           string
+		credentialsArgument string
+	}{
+		{
+			name: "Single line credentials",
+			inputText: `
+Preparing Installation of "toml==0.10.2; python_version >= '2.6' and 
+python_version not in '3.0, 3.1, 3.2' 
+--hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b 
+--hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"
+$ 
+/usr/local/Cellar/pipenv/2023.12.1/libexec/lib/python3.12/site-packages/pipenv/p
+atched/pip/__pip-runner__.py install -i 
+https://user:not.an.actual.token@myplatform.jfrog.io/artifactory/api/pypi/cli-pipenv-pypi-virtual-1715766379/simple 
+--no-input --upgrade --no-deps -r 
+/var/folders/2c/cdvww2550p90b0sdbz6w6jqc0000gn/T/pipenv-bs956chg-requirements/pi
+penv-hejkfcsj-hashed-reqs.txt`,
+			credentialsArgument: "https://user:not.an.actual.token@myplatform.jfrog.io/artifactory/api/pypi/cli-pipenv-pypi-virtual-1715766379/simple",
+		},
+		{
+			name: "Multiline credentials",
+			inputText: `
+Preparing Installation of "toml==0.10.2; python_version >= '2.6' and 
+python_version not in '3.0, 3.1, 3.2' 
+--hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b 
+--hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"
+$ 
+/usr/local/Cellar/pipenv/2023.12.1/libexec/lib/python3.12/site-packages/pipenv/p
+atched/pip/__pip-runner__.py install -i 
+https://user:not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an.
+actual.token.not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an.
+actual.token.not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an.
+actual.token@myplatform.jfrog.io/artifactory/api/pypi/cli-pipenv-pypi-virtual-17
+15766379/simple 
+--no-input --upgrade --no-deps -r 
+/var/folders/2c/cdvww2550p90b0sdbz6w6jqc0000gn/T/pipenv-bs956chg-requirements/pi
+penv-hejkfcsj-hashed-reqs.txt`,
+			credentialsArgument: "https://user:not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an." +
+				"actual.token.not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an." +
+				"actual.token.not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an." +
+				"actual.token@myplatform.jfrog.io/artifactory/api/pypi/cli-pipenv-pypi-virtual-17" +
+				"15766379/simple",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			assert.Contains(t, getOnelinerText(testCase.inputText), testCase.credentialsArgument)
+			outputText := maskCredentialsInText(t, testCase.inputText, testCase.credentialsArgument)
+			assert.NotContains(t, getOnelinerText(outputText), testCase.credentialsArgument)
+		})
+	}
+}
+
+// This method mimics RunCmdWithOutputParser, in which the masking parsers will be used.
+func maskCredentialsInText(t *testing.T, text, credentialsArgument string) string {
+	lines := strings.Split(text, "\n")
+	credentialsRegex := regexp.MustCompile(utils.CredentialsInUrlRegexp)
+	lineBuffer := ""
+	outputText := ""
+
+	for _, line := range lines {
+		outputLine, err := handlePotentialCredentialsInLogLine(line, credentialsArgument, &lineBuffer, credentialsRegex)
+		assert.NoError(t, err)
+		outputText += outputLine + "\n"
+	}
+	return outputText
+}
+
+func getOnelinerText(inputText string) string {
+	return strings.ReplaceAll(inputText, "\n", "")
 }
