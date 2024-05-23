@@ -94,16 +94,23 @@ func getListCmdArgs() (cmdArgs []string, err error) {
 	return []string{"list", "-mod=mod"}, nil
 }
 
+type HandleErrorFunc func(err error) (bool, error)
+
 // Runs go list -f {{with .Module}}{{.Path}}:{{.Version}}{{end}} all command and returns map of the dependencies
-func GetDependenciesList(projectDir string, log Log) (map[string]bool, error) {
+func GetDependenciesList(projectDir string, log Log, handleError HandleErrorFunc) (map[string]bool, error) {
 	cmdArgs, err := getListCmdArgs()
 	if err != nil {
 		return nil, err
 	}
 	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}:{{.Version}}{{end}}", "all"), log)
 	if err != nil {
-		// Errors occurred while running "go list". Run again and this time ignore errors (with '-e')
 		log.Warn("Errors occurred while building the Go dependency tree. The dependency tree may be incomplete: " + err.Error())
+		if handleError != nil {
+			if stop, newErr := handleError(err); stop {
+				return nil, newErr
+			}
+		}
+		// Errors occurred while running "go list". Run again and this time ignore errors (with '-e')
 		output, err = runDependenciesCmd(projectDir, append(cmdArgs, "-e", "-f", "{{with .Module}}{{.Path}}:{{.Version}}{{end}}", "all"), log)
 		if err != nil {
 			return nil, err

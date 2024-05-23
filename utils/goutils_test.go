@@ -113,7 +113,7 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 		err = os.Rename(filepath.Join(goModPath, "test.go"), filepath.Join(goModPath, "test.go.txt"))
 		assert.NoError(t, err)
 	}()
-	actual, err := GetDependenciesList(goModPath, log)
+	actual, err := GetDependenciesList(goModPath, log, nil)
 	assert.NoError(t, err)
 
 	// Since Go 1.16 'go list' command won't automatically update go.mod and go.sum.
