@@ -28,6 +28,11 @@ const (
 
 type PythonTool string
 
+var (
+	credentialsInUrlRegexp = regexp.MustCompile(utils.CredentialsInUrlRegexp)
+	catchAllRegexp         = regexp.MustCompile(".*")
+)
+
 // Parse pythonDependencyPackage list to dependencies map. (mapping dependency to his child deps)
 // Also returns a list of project's root dependencies
 func parseDependenciesToGraph(packages []pythonDependencyPackage) (map[string][]string, []string, error) {
@@ -177,7 +182,7 @@ func getMultilineSplitCaptureOutputPattern(startCollectingPattern, captureGroup,
 	// Create a parser for multi line pattern matches.
 	lineBuffer := ""
 	collectingMultiLineValue := false
-	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{RegExp: regexp.MustCompile(".*"), ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
+	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{RegExp: catchAllRegexp, ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 		// Check if the line matches the startCollectingPattern.
 		if !collectingMultiLineValue && startCollectionRegexp.MatchString(pattern.Line) {
 			// Start collecting lines.
@@ -205,6 +210,53 @@ func getMultilineSplitCaptureOutputPattern(startCollectingPattern, captureGroup,
 	}})
 
 	return
+}
+
+// Mask the pre-known credentials that are provided as command arguments from logs.
+// This function creates a log parser for each credentials argument.
+func maskPreKnownCredentials(args []string) (parsers []*gofrogcmd.CmdOutputPattern) {
+	for _, arg := range args {
+		// If this argument is a credentials argument, create a log parser that masks it.
+		if credentialsInUrlRegexp.MatchString(arg) {
+			parsers = append(parsers, maskCredentialsArgument(arg, credentialsInUrlRegexp)...)
+		}
+	}
+	return
+}
+
+// Creates a log parser that masks a pre-known credentials argument from logs.
+// Support both multiline (using the line buffer) and single line credentials.
+func maskCredentialsArgument(credentialsArgument string, credentialsRegex *regexp.Regexp) (parsers []*gofrogcmd.CmdOutputPattern) {
+	lineBuffer := ""
+	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{RegExp: catchAllRegexp, ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
+		return handlePotentialCredentialsInLogLine(pattern.Line, credentialsArgument, &lineBuffer, credentialsRegex)
+	}})
+
+	return
+}
+
+func handlePotentialCredentialsInLogLine(patternLine, credentialsArgument string, lineBuffer *string, credentialsRegex *regexp.Regexp) (string, error) {
+	patternLine = strings.TrimSpace(patternLine)
+	if patternLine == "" {
+		return patternLine, nil
+	}
+
+	*lineBuffer += patternLine
+	// If the accumulated line buffer is not a prefix of the credentials argument, reset the buffer and return the line unchanged.
+	if !strings.HasPrefix(credentialsArgument, *lineBuffer) {
+		*lineBuffer = ""
+		return patternLine, nil
+	}
+
+	// When the whole credential was found (aggregated multiline or single line), return it filtered.
+	if credentialsRegex.MatchString(*lineBuffer) {
+		filteredLine, err := utils.RemoveCredentials(&gofrogcmd.CmdOutputPattern{Line: *lineBuffer, MatchedResults: credentialsRegex.FindStringSubmatch(*lineBuffer)})
+		*lineBuffer = ""
+		return filteredLine, err
+	}
+
+	// Avoid logging parts of the credentials till they are fully found.
+	return "", nil
 }
 
 func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log, srcPath string) (map[string]entities.Dependency, error) {
@@ -271,6 +323,8 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	parsers = append(parsers, getMultilineSplitCaptureOutputPattern(startDownloadingPattern, downloadingCaptureGroup, endPattern, saveCaptureGroupAsDependencyInfo)...)
 	// Extract cached file, stored in Artifactory. (value at log may be split into multiple lines)
 	parsers = append(parsers, getMultilineSplitCaptureOutputPattern(startUsingCachedPattern, usingCacheCaptureGroup, endPattern, saveCaptureGroupAsDependencyInfo)...)
+
+	parsers = append(parsers, maskPreKnownCredentials(commandArgs)...)
 
 	// Extract already installed packages names.
 	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{

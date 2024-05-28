@@ -14,11 +14,12 @@ concurrency:
 jobs:
   unit-test:
     name: ${{ matrix.os }}, node ${{ matrix.node }}, python ${{ matrix.python }}
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu, windows, macos ]
+        # macos-latest = arm64, macos-14-large = amd64
+        os: [ ubuntu-latest, windows-latest, macos-latest, macos-14-large ]
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
@@ -27,6 +28,10 @@ jobs:
             python: "3.9"
           - node: "16.9"
             python: "3.x"
+        exclude:
+          # MacOS with ARM does not support node 14
+          - os: macos-latest
+            node: 14
 
     steps:
       - uses: actions/checkout@v4
