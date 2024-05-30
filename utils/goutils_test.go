@@ -82,16 +82,24 @@ func TestGetProjectRoot(t *testing.T) {
 }
 
 func TestGetDependenciesList(t *testing.T) {
-	testGetDependenciesList(t, "testGoList")
+	testGetDependenciesList(t, "testGoList", nil)
 }
 
 func TestGetDependenciesListWithIgnoreErrors(t *testing.T) {
 	// In some cases, we see that running go list on some Go packages may fail.
 	// We should allow ignoring the errors in such cases and build the Go dependency tree, even if partial.
-	testGetDependenciesList(t, "testBadGoList")
+	testGetDependenciesList(t, "testBadGoList", nil)
+	// In some cases we would like to exit after we receive an error, this can be done with custom error handle func.
+	// this test handleErrorFunc return an error
+	testGetDependenciesList(t, "testBadGoList", func(err error) (bool, error) {
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	})
 }
 
-func testGetDependenciesList(t *testing.T, testDir string) {
+func testGetDependenciesList(t *testing.T, testDir string, errorFunc HandleErrorFunc) {
 	log := NewDefaultLogger(ERROR)
 	goModPath := filepath.Join("testdata", "mods", testDir)
 	err := os.Rename(filepath.Join(goModPath, "go.mod.txt"), filepath.Join(goModPath, "go.mod"))
@@ -113,7 +121,11 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 		err = os.Rename(filepath.Join(goModPath, "test.go"), filepath.Join(goModPath, "test.go.txt"))
 		assert.NoError(t, err)
 	}()
-	actual, err := GetDependenciesList(goModPath, log, nil)
+	actual, err := GetDependenciesList(goModPath, log, errorFunc)
+	if errorFunc != nil {
+		assert.Error(t, err)
+		return
+	}
 	assert.NoError(t, err)
 
 	// Since Go 1.16 'go list' command won't automatically update go.mod and go.sum.

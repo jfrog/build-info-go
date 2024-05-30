@@ -91,6 +91,8 @@ func getListCmdArgs() (cmdArgs []string, err error) {
 	return []string{"list", "-mod=mod"}, nil
 }
 
+// The handle error function is designed to manage errors that occur while running the
+// 'go list' command. If the function returns true, the error will be propagated back to the caller.
 type HandleErrorFunc func(err error) (bool, error)
 
 // Runs go list -f {{with .Module}}{{.Path}}:{{.Version}}{{end}} all command and returns map of the dependencies
