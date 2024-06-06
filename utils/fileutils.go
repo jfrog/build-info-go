@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	ioutils "github.com/jfrog/gofrog/io"
 	"golang.org/x/exp/slices"
 	"io"
 	"net/http"
@@ -272,7 +273,7 @@ func GetFileContentAndInfo(filePath string) (fileContent []byte, fileInfo os.Fil
 func CreateTempDir() (string, error) {
 	tempDirBase := os.TempDir()
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	return os.MkdirTemp(tempDirBase, tempDirPrefix+timestamp+"-")
+	return os.MkdirTemp(tempDirBase, tempDirPrefix+timestamp+"-*")
 }
 
 func RemoveTempDir(dirPath string) error {
@@ -576,9 +577,7 @@ func GetFileDetails(filePath string, includeChecksums bool) (details *FileDetail
 	}
 
 	file, err := os.Open(filePath)
-	defer func() {
-		err = errors.Join(err, file.Close())
-	}()
+	defer ioutils.Close(file, &err)
 	if err != nil {
 		return
 	}
@@ -595,14 +594,12 @@ func calcChecksumDetails(filePath string) (checksum entities.Checksum, err error
 	if err != nil {
 		return
 	}
-	defer func() {
-		err = errors.Join(err, file.Close())
-	}()
+	defer ioutils.Close(file, &err)
 
-	checksumInfo, err := CalcChecksums(file)
+	checksums, err := CalcChecksums(file)
 	if err != nil {
 		return entities.Checksum{}, err
 	}
-	checksum = entities.Checksum{Md5: checksumInfo[MD5], Sha1: checksumInfo[SHA1], Sha256: checksumInfo[SHA256]}
+	checksum = entities.Checksum{Md5: checksums[MD5], Sha1: checksums[SHA1], Sha256: checksums[SHA256]}
 	return
 }

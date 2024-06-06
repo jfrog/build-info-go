@@ -16,9 +16,6 @@ import (
 	gofrogcmd "github.com/jfrog/gofrog/io"
 )
 
-// #nosec G101 -- False positive - no hardcoded credentials.
-const credentialsInUrlRegexp = `(http|https|git)://.+@`
-
 // Minimum go version, which its output does not require masking passwords in URLs.
 const minGoVersionForMasking = "go1.13"
 
@@ -143,10 +140,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 	}
 	if err == nil {
 		defer func() {
-			e := os.WriteFile(filepath.Join(projectDir, "go.sum"), sumFileContent, sumFileStat.Mode())
-			if err == nil {
-				err = e
-			}
+			err = errors.Join(err, os.WriteFile(filepath.Join(projectDir, "go.sum"), sumFileContent, sumFileStat.Mode()))
 		}()
 	}
 	goCmd := io.NewCommand("go", "", commandArgs)
@@ -240,7 +234,7 @@ func getGoVersion() (string, error) {
 func prepareGlobalRegExp() error {
 	var err error
 	if protocolRegExp == nil {
-		protocolRegExp, err = initRegExp(credentialsInUrlRegexp, removeCredentials)
+		protocolRegExp, err = initRegExp(CredentialsInUrlRegexp, RemoveCredentials)
 		if err != nil {
 			return err
 		}
@@ -261,12 +255,6 @@ func initRegExp(regex string, execFunc func(pattern *gofrogcmd.CmdOutputPattern)
 
 	outputPattern.ExecFunc = execFunc
 	return outputPattern, nil
-}
-
-// Remove the credentials information from the line.
-func removeCredentials(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-	splitResult := strings.Split(pattern.MatchedResults[0], "//")
-	return strings.Replace(pattern.Line, pattern.MatchedResults[0], splitResult[0]+"//", 1), nil
 }
 
 // GetCachePath returns the location of downloads dir inside the GOMODCACHE

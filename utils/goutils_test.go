@@ -97,7 +97,7 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 	err := os.Rename(filepath.Join(goModPath, "go.mod.txt"), filepath.Join(goModPath, "go.mod"))
 	assert.NoError(t, err)
 	defer func() {
-		err := os.Rename(filepath.Join(goModPath, "go.mod"), filepath.Join(goModPath, "go.mod.txt"))
+		err = os.Rename(filepath.Join(goModPath, "go.mod"), filepath.Join(goModPath, "go.mod.txt"))
 		assert.NoError(t, err)
 	}()
 	err = os.Rename(filepath.Join(goModPath, "go.sum.txt"), filepath.Join(goModPath, "go.sum"))
@@ -110,7 +110,7 @@ func testGetDependenciesList(t *testing.T, testDir string) {
 	err = os.Rename(filepath.Join(goModPath, "test.go.txt"), filepath.Join(goModPath, "test.go"))
 	assert.NoError(t, err)
 	defer func() {
-		err := os.Rename(filepath.Join(goModPath, "test.go"), filepath.Join(goModPath, "test.go.txt"))
+		err = os.Rename(filepath.Join(goModPath, "test.go"), filepath.Join(goModPath, "test.go.txt"))
 		assert.NoError(t, err)
 	}()
 	actual, err := GetDependenciesList(goModPath, log)

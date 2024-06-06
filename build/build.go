@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	ioutils "github.com/jfrog/gofrog/io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -225,12 +226,7 @@ func (b *Build) SaveBuildInfo(buildInfo *entities.BuildInfo) (err error) {
 	if err != nil {
 		return
 	}
-	defer func() {
-		e := tempFile.Close()
-		if err == nil {
-			err = e
-		}
-	}()
+	defer ioutils.Close(tempFile, &err)
 	_, err = tempFile.Write(content.Bytes())
 	return
 }
@@ -257,12 +253,7 @@ func (b *Build) SavePartialBuildInfo(partial *entities.Partial) (err error) {
 	if err != nil {
 		return
 	}
-	defer func() {
-		e := tempFile.Close()
-		if err == nil {
-			err = e
-		}
-	}()
+	defer ioutils.Close(tempFile, &err)
 	_, err = tempFile.Write(content.Bytes())
 	return
 }

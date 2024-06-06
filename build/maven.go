@@ -20,7 +20,7 @@ const (
 	classworldsConfFileName         = "classworlds.conf"
 	PropertiesTempFolderName        = "properties"
 	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
-	MavenExtractorDependencyVersion = "2.41.11"
+	MavenExtractorDependencyVersion = "2.41.16"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -173,10 +173,7 @@ func (mm *MavenModule) CalcDependencies() (err error) {
 	defer func() {
 		fileExist, e := utils.IsFileExists(mvnRunConfig.buildInfoProperties, false)
 		if fileExist && e == nil {
-			e = os.Remove(mvnRunConfig.buildInfoProperties)
-		}
-		if err == nil {
-			err = e
+			err = errors.Join(err, os.Remove(mvnRunConfig.buildInfoProperties))
 		}
 	}()
 	mvnRunConfig.SetOutputWriter(mm.outputWriter)
