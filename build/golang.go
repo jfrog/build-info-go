@@ -81,7 +81,7 @@ func (gm *GoModule) loadDependencies() ([]entities.Dependency, error) {
 }
 
 func (gm *GoModule) getGoDependencies(cachePath string) (map[string]entities.Dependency, error) {
-	modulesMap, err := utils.GetDependenciesList(gm.srcPath, gm.containingBuild.logger)
+	modulesMap, err := utils.GetDependenciesList(gm.srcPath, gm.containingBuild.logger, nil)
 	if err != nil || len(modulesMap) == 0 {
 		return nil, err
 	}
