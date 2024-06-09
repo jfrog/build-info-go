@@ -89,8 +89,8 @@ func TestGetDependenciesListWithIgnoreErrors(t *testing.T) {
 	// In some cases, we see that running go list on some Go packages may fail.
 	// We should allow ignoring the errors in such cases and build the Go dependency tree, even if partial.
 	testGetDependenciesList(t, "testBadGoList", nil)
-	// In some cases we would like to exit after we receive an error, this can be done with custom error handle func.
-	// this test handleErrorFunc return an error
+	// In some cases we would like to exit after we receive an error. This can be done with custom error handle func.
+	// This test handleErrorFunc return an error
 	testGetDependenciesList(t, "testBadGoList", func(err error) (bool, error) {
 		if err != nil {
 			return true, err
