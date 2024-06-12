@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"sort"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/gofrog/stringutils"
@@ -200,12 +201,23 @@ func (targetBuildInfo *BuildInfo) ToCycloneDxBom() (*cdx.BOM, error) {
 		}
 	}
 
+	sort.Slice(components, func (i, j int) bool {
+		return components[i].BOMRef < components[j].BOMRef
+	})
+
 	// Convert the map of dependencies to CycloneDX dependency objects
 	var dependencies []cdx.Dependency
 	for compRef, deps := range depMap {
 		depsSlice := maps.Keys(deps)
+		sort.Slice(depsSlice, func (i, j int) bool {
+			return depsSlice[i] < depsSlice[j]
+		})
 		dependencies = append(dependencies, cdx.Dependency{Ref: compRef, Dependencies: &depsSlice})
 	}
+
+	sort.Slice(dependencies, func(i, j int) bool {
+		return dependencies[i].Ref < dependencies[j].Ref
+	})
 
 	bom := cdx.NewBOM()
 	bom.Components = &components
