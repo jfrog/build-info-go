@@ -254,8 +254,8 @@ func TestToCycloneDxBOM(t *testing.T) {
 	}
 
 	cdxBom, err := buildInfo.ToCycloneDxBom()
-
 	assert.NoError(t, err)
+
 	componentsIsSorted := sort.SliceIsSorted(*cdxBom.Components, func(i, j int) bool {
 		return (*cdxBom.Components)[i].BOMRef < (*cdxBom.Components)[j].BOMRef
 	})
