@@ -224,8 +224,14 @@ func ListFilesByFilterFunc(path string, filterFunc func(filePath string) (bool, 
 }
 
 func DownloadFile(downloadTo string, fromUrl string) (err error) {
-	// Get the data
-	resp, err := http.Get(fromUrl)
+	req, err := http.NewRequest(http.MethodGet, fromUrl, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
 	if err != nil {
 		return
 	}
