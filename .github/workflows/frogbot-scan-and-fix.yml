@@ -19,11 +19,8 @@ jobs:
         with:
           ref: ${{ matrix.branch }}
 
-      # Install prerequisites
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.22.x
+      - name: Setup Go with cache
+        uses: jfrog/.github/actions/install-go-with-cache@main
 
       - uses: jfrog/frogbot@v2
         env:
