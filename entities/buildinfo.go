@@ -408,6 +408,8 @@ type Artifact struct {
 	Name string `json:"name,omitempty"`
 	Type string `json:"type,omitempty"`
 	Path string `json:"path,omitempty"`
+	// This field is not recognized by Artifactory, and is used for internal purposes only.
+	OriginalRepo string `json:"originalRepo,omitempty"`
 	Checksum
 }
 
