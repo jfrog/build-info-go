@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	ioutils "github.com/jfrog/gofrog/io"
 	"golang.org/x/exp/slices"
 	"io"
 	"net/http"
@@ -569,43 +568,4 @@ func ReadNLines(path string, total int) (lines []string, err error) {
 type FileDetails struct {
 	Checksum entities.Checksum
 	Size     int64
-}
-
-func GetFileDetails(filePath string, includeChecksums bool) (details *FileDetails, err error) {
-	details = new(FileDetails)
-	if includeChecksums {
-		details.Checksum, err = calcChecksumDetails(filePath)
-		if err != nil {
-			return
-		}
-	} else {
-		details.Checksum = entities.Checksum{}
-	}
-
-	file, err := os.Open(filePath)
-	defer ioutils.Close(file, &err)
-	if err != nil {
-		return
-	}
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return
-	}
-	details.Size = fileInfo.Size()
-	return
-}
-
-func calcChecksumDetails(filePath string) (checksum entities.Checksum, err error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return
-	}
-	defer ioutils.Close(file, &err)
-
-	checksums, err := CalcChecksums(file)
-	if err != nil {
-		return entities.Checksum{}, err
-	}
-	checksum = entities.Checksum{Md5: checksums[MD5], Sha1: checksums[SHA1], Sha256: checksums[SHA256]}
-	return
 }
