@@ -7,6 +7,7 @@ import (
 	"github.com/jfrog/build-info-go/build/utils/dotnet"
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/crypto"
 	gofrogcmd "github.com/jfrog/gofrog/io"
 	"os"
 	"path/filepath"
@@ -210,7 +211,7 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 		return nil, nil
 	}
 
-	fileDetails, err := utils.GetFileDetails(nupkgPath, true)
+	fileDetails, err := crypto.GetFileDetails(nupkgPath, true)
 	if err != nil {
 		return nil, err
 	}

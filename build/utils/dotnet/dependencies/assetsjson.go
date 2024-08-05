@@ -6,6 +6,7 @@ import (
 	"fmt"
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/crypto"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,7 +112,7 @@ func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.D
 			}
 			return nil, errors.New("The file " + nupkgFilePath + " doesn't exist in the NuGet cache directory.")
 		}
-		fileDetails, err := utils.GetFileDetails(nupkgFilePath, true)
+		fileDetails, err := crypto.GetFileDetails(nupkgFilePath, true)
 		if err != nil {
 			return nil, err
 		}

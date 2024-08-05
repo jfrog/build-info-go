@@ -5,10 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/crypto"
 	"path/filepath"
 	"strings"
-
-	"github.com/jfrog/build-info-go/utils"
 )
 
 // npm stores cache data in an opaque directory within the configured cache, named _cacache.
@@ -105,11 +105,11 @@ func (c *cacache) GetInfo(id string) (*cacacheInfo, error) {
 // "pacote:tarball:ansi-regex@5.0.0" ->
 // ~/.my-cache/index-v5/4e/22/eb8971d3255ba68fad66a1be245aaf480c23e8b02cf0dae7022549aece7c
 func (c *cacache) getIndexByKey(key string) (string, error) {
-	hashMap, err := utils.CalcChecksums(strings.NewReader(key), utils.SHA256)
+	hashMap, err := crypto.CalcChecksums(strings.NewReader(key), crypto.SHA256)
 	if err != nil {
 		return "", err
 	}
-	hashedKey := hashMap[utils.SHA256]
+	hashedKey := hashMap[crypto.SHA256]
 	return c.getIndexByHash(hashedKey)
 }
 
