@@ -356,5 +356,5 @@ func (config *mvnRunConfig) runCmd() error {
 		errResult := errBuffer.Bytes()
 		return fmt.Errorf("error while running '%s %s': %s\n%s", "mvn", strings.Join(command.Args, " "), err.Error(), strings.TrimSpace(string(errResult)))
 	}
-	return command.Run()
+	return nil
 }
