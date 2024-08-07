@@ -342,7 +342,8 @@ func (config *mvnRunConfig) SetOutputWriter(outputWriter io.Writer) *mvnRunConfi
 
 func (config *mvnRunConfig) runCmd() error {
 	command := config.GetCmd()
-	command.Stderr = os.Stderr
+	errBuffer := bytes.NewBuffer([]byte{})
+	command.Stderr = errBuffer
 	if config.outputWriter == nil {
 		command.Stdout = os.Stderr
 	} else {
@@ -350,5 +351,10 @@ func (config *mvnRunConfig) runCmd() error {
 	}
 	command.Dir = config.workspace
 	config.logger.Info("Running mvn command:", strings.Join(command.Args, " "))
+	err := command.Run()
+	if err != nil {
+		errResult := errBuffer.Bytes()
+		return fmt.Errorf("error while running '%s %s': %s\n%s", "mvn", strings.Join(command.Args, " "), err.Error(), strings.TrimSpace(string(errResult)))
+	}
 	return command.Run()
 }
