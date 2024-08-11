@@ -6,8 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/CycloneDX/cyclonedx-go v0.9.0
 	github.com/buger/jsonparser v1.1.1
-	github.com/jfrog/gofrog v1.7.4
-	github.com/minio/sha256-simd v1.0.1
+	github.com/jfrog/gofrog v1.7.5
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.2
 	github.com/xeipuuv/gojsonschema v1.2.0
@@ -19,6 +18,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.3 // indirect
+	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
