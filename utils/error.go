@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -12,7 +11,7 @@ type ForbiddenError struct {
 
 // Error implements the error interface for ForbiddenError.
 func (e *ForbiddenError) Error() string {
-	return fmt.Sprintf("403 Forbidden")
+	return "403 Forbidden"
 }
 
 // NewForbiddenError creates a new ForbiddenError with the given message.
