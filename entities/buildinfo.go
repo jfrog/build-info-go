@@ -343,6 +343,7 @@ type Module struct {
 	Artifacts         []Artifact   `json:"artifacts,omitempty"`
 	ExcludedArtifacts []Artifact   `json:"excludedArtifacts,omitempty"`
 	Dependencies      []Dependency `json:"dependencies,omitempty"`
+	Parent            string       `json:"parent,omitempty"`
 	// Used in aggregated builds - this field stores the checksums of the referenced build-info JSON.
 	Checksum
 }
