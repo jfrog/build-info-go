@@ -343,6 +343,9 @@ type Module struct {
 	Artifacts         []Artifact   `json:"artifacts,omitempty"`
 	ExcludedArtifacts []Artifact   `json:"excludedArtifacts,omitempty"`
 	Dependencies      []Dependency `json:"dependencies,omitempty"`
+	// Parent is used to store the parent module id, for multi-module projects.
+	// This field is not recognized by Artifactory, and is used for internal purposes only.
+	Parent string `json:"parent,omitempty"`
 	// Used in aggregated builds - this field stores the checksums of the referenced build-info JSON.
 	Checksum
 }
