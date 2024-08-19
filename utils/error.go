@@ -4,6 +4,15 @@ import (
 	"strings"
 )
 
+type PackageManager string
+
+const (
+	Npm   PackageManager = "npm"
+	Maven PackageManager = "maven"
+	Pip   PackageManager = "pip"
+	Go    PackageManager = "go"
+)
+
 // ForbiddenError represents a 403 Forbidden error.
 type ForbiddenError struct {
 	Message string
@@ -19,8 +28,8 @@ func NewForbiddenError() *ForbiddenError {
 	return &ForbiddenError{}
 }
 
-// IsForbiddenOutput verify the output is forbidden, each tech have its own forbidden output.
-func IsForbiddenOutput(tech string, cmdOutput string) bool {
+// IsForbiddenOutput checks whether the provided output includes a 403 Forbidden. The various package managers have their own forbidden output formats.
+func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 	switch tech {
 	case "npm":
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")

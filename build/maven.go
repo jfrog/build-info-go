@@ -357,7 +357,7 @@ func (config *mvnRunConfig) runCmd() (err error) {
 
 	err = command.Run()
 	if err != nil {
-		if utils.IsForbiddenOutput("maven", errBuffer.String()) {
+		if utils.IsForbiddenOutput(utils.Maven, errBuffer.String()) {
 			err = errors.Join(utils.NewForbiddenError(), err)
 		}
 	}
