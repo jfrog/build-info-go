@@ -8,7 +8,9 @@ import (
 	"github.com/jfrog/build-info-go/tests"
 	"github.com/jfrog/build-info-go/utils"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -125,5 +127,56 @@ func TestGetExecutableName(t *testing.T) {
 		result, err := filepath.Abs("mvnw.cmd")
 		assert.NoError(t, err)
 		assert.Equal(t, result, mvnHome)
+	}
+}
+
+func TestAddColorToCmdOutput(t *testing.T) {
+	testCases := []struct {
+		name           string
+		initialArgs    []string
+		expectedResult string
+		colorArgExist  bool
+	}{
+		{
+			name:          "Not a terminal, shouldn't add color",
+			initialArgs:   []string{"mvn"},
+			colorArgExist: false,
+		},
+		{
+			name:           "Terminal supports color and existing color argument",
+			initialArgs:    []string{"mvn", "-Dstyle.color=always"},
+			expectedResult: "Dstyle.color=always",
+			colorArgExist:  true,
+		},
+		{
+			name:           "Terminal supports color and existing color argument",
+			initialArgs:    []string{"mvn", "-Dstyle.color=never"},
+			expectedResult: "Dstyle.color=never",
+			colorArgExist:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Mock terminal support
+
+			// Create a mock exec.Cmd object
+			cmd := exec.Command(tc.initialArgs[0], tc.initialArgs[1:]...)
+
+			// Call the function to test
+			addColorToCmdOutput(cmd)
+
+			// Check if the argument was added
+			containsColorArg := false
+			for _, arg := range cmd.Args {
+				if strings.Contains(arg, "Dstyle.color") {
+					if strings.Contains(arg, tc.expectedResult) {
+						containsColorArg = true
+						break
+					}
+				}
+			}
+			assert.Equal(t, tc.colorArgExist, containsColorArg)
+		})
 	}
 }
