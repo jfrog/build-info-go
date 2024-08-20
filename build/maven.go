@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
+	"golang.org/x/term"
 )
 
 const (
@@ -340,15 +341,41 @@ func (config *mvnRunConfig) SetOutputWriter(outputWriter io.Writer) *mvnRunConfi
 	return config
 }
 
-func (config *mvnRunConfig) runCmd() error {
+func (config *mvnRunConfig) runCmd() (err error) {
 	command := config.GetCmd()
-	command.Stderr = os.Stderr
+	errBuffer := bytes.NewBuffer([]byte{})
+	multiWriter := io.MultiWriter(os.Stderr, errBuffer)
+	command.Stderr = multiWriter
 	if config.outputWriter == nil {
 		command.Stdout = os.Stderr
 	} else {
 		command.Stdout = config.outputWriter
 	}
 	command.Dir = config.workspace
+	addColorToCmdOutput(command)
 	config.logger.Info("Running mvn command:", strings.Join(command.Args, " "))
-	return command.Run()
+
+	err = command.Run()
+	if err != nil {
+		if utils.IsForbiddenOutput(utils.Maven, errBuffer.String()) {
+			err = errors.Join(utils.NewForbiddenError(), err)
+		}
+	}
+	return
+}
+
+// To always have color in Maven's output, add "-Dstyle.color=always" to the command line arguments
+func addColorToCmdOutput(command *exec.Cmd) {
+	if term.IsTerminal(int(os.Stderr.Fd())) {
+		shouldAddColor := true
+		for _, arg := range command.Args {
+			if strings.Contains(arg, "-Dstyle.color") {
+				shouldAddColor = false
+				break
+			}
+		}
+		if shouldAddColor {
+			command.Args = append(command.Args, "-Dstyle.color=always")
+		}
+	}
 }
