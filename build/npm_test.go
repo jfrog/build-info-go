@@ -28,8 +28,7 @@ func TestGenerateBuildInfoForNpm(t *testing.T) {
 	// Create npm project.
 	path, err := filepath.Abs(filepath.Join(".", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := tests.CreateNpmTest(t, path, "project3", false, npmVersion)
-	defer cleanup()
+	projectPath := tests.CreateNpmTest(t, path, "project3", false, npmVersion)
 
 	// Install dependencies in the npm project.
 	npmArgs := []string{"--cache=" + filepath.Join(projectPath, "tmpcache")}
@@ -66,8 +65,7 @@ func TestFilterNpmArgsFlags(t *testing.T) {
 	// Create npm project.
 	path, err := filepath.Abs(filepath.Join(".", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := tests.CreateNpmTest(t, path, "project3", false, npmVersion)
-	defer cleanup()
+	projectPath := tests.CreateNpmTest(t, path, "project3", false, npmVersion)
 
 	// Set arguments in npmArgs.
 	npmArgs := []string{"ls", "--package-lock-only"}
