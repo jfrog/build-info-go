@@ -47,8 +47,7 @@ func testGenerateBuildInfoForPython(t *testing.T, pythonTool pythonutils.PythonT
 	assert.NoError(t, err)
 	// Create python project
 	projectPath := filepath.Join(testdataDir, "python", string(pythonTool))
-	tmpProjectPath, cleanup := tests.CreateTestProject(t, projectPath)
-	defer cleanup()
+	tmpProjectPath := tests.CreateTestProject(t, projectPath)
 
 	// Install dependencies in the pip project.
 	pythonModule, err := pythonBuild.AddPythonModule(tmpProjectPath, pythonTool)

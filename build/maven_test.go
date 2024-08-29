@@ -17,15 +17,13 @@ import (
 )
 
 func TestDownloadDependencies(t *testing.T) {
-	tempDirPath, err := utils.CreateTempDir()
-	assert.NoError(t, err)
+	tempDirPath := t.TempDir()
 	defer func() {
-		assert.NoError(t, utils.RemoveTempDir(tempDirPath))
 		assert.NoError(t, utils.CleanOldDirs())
 	}()
 
 	// Download JAR and create classworlds.conf
-	err = downloadMavenExtractor(tempDirPath, nil, &utils.NullLog{})
+	err := downloadMavenExtractor(tempDirPath, nil, &utils.NullLog{})
 	assert.NoError(t, err)
 
 	// Make sure the Maven build-info extractor JAR and the classwords.conf file exist.
@@ -47,8 +45,7 @@ func TestGenerateBuildInfoForMavenProject(t *testing.T) {
 	assert.NoError(t, err)
 	// Create maven project
 	projectPath := filepath.Join(testdataDir, "maven", "project")
-	tmpProjectPath, cleanup := tests.CreateTestProject(t, projectPath)
-	defer cleanup()
+	tmpProjectPath := tests.CreateTestProject(t, projectPath)
 	// Add maven project as module in build-info.
 	mavenModule, err := mavenBuild.AddMavenModule(tmpProjectPath)
 	assert.NoError(t, err)

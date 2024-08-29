@@ -34,15 +34,13 @@ var downloadExtractorsFromReleasesCases = []struct {
 func TestDownloadExtractorsFromReleases(t *testing.T) {
 	for _, testCase := range downloadExtractorsFromReleasesCases {
 		t.Run(testCase.extractorVersion, func(t *testing.T) {
-			tempDirPath, err := utils.CreateTempDir()
-			assert.NoError(t, err)
+			tempDirPath := t.TempDir()
 			defer func() {
-				assert.NoError(t, utils.RemoveTempDir(tempDirPath))
 				assert.NoError(t, utils.CleanOldDirs())
 			}()
 
 			// Download JAR
-			err = downloadGradleDependencies(tempDirPath, testCase.extractorVersion, nil, &utils.NullLog{})
+			err := downloadGradleDependencies(tempDirPath, testCase.extractorVersion, nil, &utils.NullLog{})
 			assert.NoError(t, err)
 
 			// Make sure the Gradle build-info extractor JAR exist

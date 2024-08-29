@@ -50,8 +50,7 @@ func TestReadPackageInfoFromPackageJsonIfExists(t *testing.T) {
 	assert.NoError(t, err)
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := tests.CreateNpmTest(t, path, "project1", false, npmVersion)
-	defer cleanup()
+	projectPath := tests.CreateNpmTest(t, path, "project1", false, npmVersion)
 
 	// Prepare test cases
 	testCases := []struct {
@@ -83,9 +82,7 @@ func TestReadPackageInfoFromPackageJsonIfExistErr(t *testing.T) {
 	// Prepare test data
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
 	assert.NoError(t, err)
-	tempDir, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
-	assert.NoError(t, err)
-	defer createTempDirCallback()
+	tempDir := t.TempDir()
 
 	// Create bad package.json file and expect error
 	assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "package.json"), []byte("non json file"), 0600))
@@ -180,8 +177,7 @@ func TestBundledDependenciesList(t *testing.T) {
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
 
-	projectPath, cleanup := tests.CreateNpmTest(t, path, "project1", false, npmVersion)
-	defer cleanup()
+	projectPath := tests.CreateNpmTest(t, path, "project1", false, npmVersion)
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cacachePath}
 
@@ -200,8 +196,7 @@ func TestConflictsDependenciesList(t *testing.T) {
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
 
-	projectPath, cleanup := tests.CreateNpmTest(t, path, "project5", true, npmVersion)
-	defer cleanup()
+	projectPath := tests.CreateNpmTest(t, path, "project5", true, npmVersion)
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cacachePath}
 
@@ -218,8 +213,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	// Create the second npm project which has a transitive dependency without integrity (ansi-regex:5.0.0).
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := tests.CreateNpmTest(t, path, "project2", true, npmVersion)
-	defer cleanup()
+	projectPath := tests.CreateNpmTest(t, path, "project2", true, npmVersion)
 
 	// Run npm CI to create this special case where the 'ansi-regex:5.0.0' is missing the integrity.
 	npmArgs := []string{"--cache=" + filepath.Join(projectPath, "tmpcache")}
@@ -241,8 +235,7 @@ func TestDependencyPackageLockOnly(t *testing.T) {
 	if !npmVersion.AtLeast("7.0.0") {
 		t.Skip("Running on npm v7 and above only, skipping...")
 	}
-	path, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata/npm/project6"))
-	defer cleanup()
+	path := tests.CreateTestProject(t, filepath.Join("..", "testdata/npm/project6"))
 	assert.NoError(t, utils.MoveFile(filepath.Join(path, "package-lock_test.json"), filepath.Join(path, "package-lock.json")))
 	// sleep so the package.json modified time will be bigger than the package-lock.json, this make sure it will recalculate lock file.
 	require.NoError(t, os.Chtimes(filepath.Join(path, "package.json"), time.Now(), time.Now().Add(time.Millisecond*20)))
@@ -318,8 +311,7 @@ func TestDependenciesTreeDifferentBetweenOKs(t *testing.T) {
 	assert.NoError(t, err)
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := tests.CreateNpmTest(t, path, "project4", true, npmVersion)
-	defer cleanup()
+	projectPath := tests.CreateNpmTest(t, path, "project4", true, npmVersion)
 	cacachePath := filepath.Join(projectPath, "tmpcache")
 
 	// Install all the project's dependencies.
@@ -357,8 +349,7 @@ func TestNpmProdFlag(t *testing.T) {
 	}
 	for _, entry := range testDependencyScopes {
 		func() {
-			projectPath, cleanup := tests.CreateNpmTest(t, path, "project3", false, npmVersion)
-			defer cleanup()
+			projectPath := tests.CreateNpmTest(t, path, "project3", false, npmVersion)
 			cacachePath := filepath.Join(projectPath, "tmpcache")
 			npmArgs := []string{"--cache=" + cacachePath, entry.scope}
 
@@ -382,8 +373,7 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	// Create the first npm project which contains peerDependencies, devDependencies & bundledDependencies
 	path, err := filepath.Abs(filepath.Join("..", "testdata"))
 	assert.NoError(t, err)
-	projectPath, cleanup := tests.CreateNpmTest(t, path, "project1", false, npmVersion)
-	defer cleanup()
+	projectPath := tests.CreateNpmTest(t, path, "project1", false, npmVersion)
 	cachePath := filepath.Join(projectPath, "tmpcache")
 	npmArgs := []string{"--cache=" + cachePath}
 

@@ -45,8 +45,7 @@ var moduleNameTestProvider = []struct {
 func TestDetermineModuleName(t *testing.T) {
 	for _, test := range moduleNameTestProvider {
 		t.Run(strings.Join([]string{test.projectName, test.moduleName}, "/"), func(t *testing.T) {
-			tmpProjectPath, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata", "pip", test.projectName))
-			defer cleanup()
+			tmpProjectPath := tests.CreateTestProject(t, filepath.Join("..", "testdata", "pip", test.projectName))
 
 			// Determine module name
 			packageName, err := getPackageNameFromSetuppy(tmpProjectPath)

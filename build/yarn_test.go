@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	buildutils "github.com/jfrog/build-info-go/build/utils"
-	"github.com/jfrog/build-info-go/tests"
-
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/parallel"
@@ -81,8 +79,7 @@ func TestAppendDependencyRecursively(t *testing.T) {
 
 func TestGenerateBuildInfoForYarnProject(t *testing.T) {
 	// Copy the project directory to a temporary directory
-	tempDirPath, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
-	defer createTempDirCallback()
+	tempDirPath := t.TempDir()
 	testDataSource := filepath.Join("testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
@@ -107,8 +104,7 @@ func TestGenerateBuildInfoForYarnProject(t *testing.T) {
 
 func TestCollectDepsForYarnProjectWithTraverse(t *testing.T) {
 	// Copy the project directory to a temporary directory
-	tempDirPath, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
-	defer createTempDirCallback()
+	tempDirPath := t.TempDir()
 	testDataSource := filepath.Join("testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
@@ -148,8 +144,7 @@ func TestCollectDepsForYarnProjectWithTraverse(t *testing.T) {
 
 func TestCollectDepsForYarnProjectWithErrorInTraverse(t *testing.T) {
 	// Copy the project directory to a temporary directory
-	tempDirPath, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
-	defer createTempDirCallback()
+	tempDirPath := t.TempDir()
 	testDataSource := filepath.Join("testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
@@ -171,8 +166,7 @@ func TestCollectDepsForYarnProjectWithErrorInTraverse(t *testing.T) {
 
 func TestBuildYarnProjectWithArgs(t *testing.T) {
 	// Copy the project directory to a temporary directory
-	tempDirPath, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
-	defer createTempDirCallback()
+	tempDirPath := t.TempDir()
 	testDataSource := filepath.Join("testdata", "yarn", "v2")
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))

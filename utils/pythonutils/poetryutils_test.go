@@ -21,8 +21,7 @@ func TestGetProjectNameFromPyproject(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.poetryProject, func(t *testing.T) {
-			tmpProjectPath, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", testCase.poetryProject))
-			defer cleanup()
+			tmpProjectPath := tests.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", testCase.poetryProject))
 
 			actualValue, err := extractProjectFromPyproject(filepath.Join(tmpProjectPath, "pyproject.toml"))
 			assert.NoError(t, err)
@@ -45,8 +44,7 @@ func TestGetProjectDependencies(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.poetryProject, func(t *testing.T) {
-			tmpProjectPath, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", testCase.poetryProject))
-			defer cleanup()
+			tmpProjectPath := tests.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", testCase.poetryProject))
 
 			graph, directDependencies, err := getPoetryDependencies(tmpProjectPath)
 			assert.NoError(t, err)

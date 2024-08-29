@@ -67,13 +67,12 @@ func validateBuildInfoSchema(t *testing.T, commandName, pathInTestData string, i
 func prepareProject(t *testing.T, pathInTestdata string, install func()) func() {
 	wd, err := os.Getwd()
 	assert.NoError(t, err)
-	tempDir, cleanup := tests.CreateTestProject(t, filepath.Join("build", "testdata", pathInTestdata))
+	tempDir := tests.CreateTestProject(t, filepath.Join("build", "testdata", pathInTestdata))
 	assert.NoError(t, os.Chdir(tempDir))
 	install()
 
 	return func() {
 		assert.NoError(t, os.Chdir(wd))
-		cleanup()
 	}
 }
 
