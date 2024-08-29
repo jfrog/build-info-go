@@ -22,7 +22,7 @@ const (
 	gradleInitScriptTemplate          = "gradle.init"
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
 	gradleExtractor4DependencyVersion = "4.33.21"
-	gradleExtractor5DependencyVersion = "5.2.4"
+	gradleExtractor5DependencyVersion = "5.2.5"
 	projectPropertiesFlag             = "-P"
 	systemPropertiesFlag              = "-D"
 )
