@@ -34,11 +34,7 @@ func TestBuildYarnV1Dependencies(t *testing.T) {
 
 func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators []string) {
 	// Copy the project directory to a temporary directory
-	tempDirPath, err := utils.CreateTempDir()
-	assert.NoError(t, err, "Couldn't create temp dir")
-	defer func() {
-		assert.NoError(t, utils.RemoveTempDir(tempDirPath), "Couldn't remove temp dir")
-	}()
+	tempDirPath := t.TempDir()
 	testDataSource := filepath.Join("..", "testdata", "yarn", versionDir)
 	testDataTarget := filepath.Join(tempDirPath, "yarn")
 	assert.NoError(t, utils.CopyDir(testDataSource, testDataTarget, true, nil))
