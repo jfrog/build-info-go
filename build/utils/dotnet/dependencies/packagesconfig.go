@@ -4,15 +4,17 @@ import (
 	"encoding/binary"
 	"encoding/xml"
 	"fmt"
-	"github.com/jfrog/build-info-go/build/utils/dotnet"
-	buildinfo "github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
-	"github.com/jfrog/gofrog/crypto"
-	gofrogcmd "github.com/jfrog/gofrog/io"
 	"os"
 	"path/filepath"
 	"strings"
 	"unicode/utf16"
+
+	"github.com/jfrog/gofrog/crypto"
+	gofrogcmd "github.com/jfrog/gofrog/io"
+
+	"github.com/jfrog/build-info-go/build/utils/dotnet"
+	buildinfo "github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
 )
 
 const (
@@ -79,7 +81,7 @@ func (extractor *packagesExtractor) extract(packagesConfig *packagesConfig, glob
 		}
 		if pack == nil {
 			// If it doesn't exist lets build the array of alternative versions.
-			alternativeVersions := createAlternativeVersionForms(nuget.Version)
+			alternativeVersions := CreateAlternativeVersionForms(nuget.Version)
 			// Now let's do a loop to run over the alternative possibilities
 			for i := 0; i < len(alternativeVersions); i++ {
 				nPackage.version = alternativeVersions[i]
@@ -110,7 +112,7 @@ func (extractor *packagesExtractor) extract(packagesConfig *packagesConfig, glob
 // "1.22.33" --> []string{"1.22.33.0"}
 // "1.22.33.44" --> []string{}
 // "1.0.2" --> []string{"1.0.2.0"}
-func createAlternativeVersionForms(originalVersion string) []string {
+func CreateAlternativeVersionForms(originalVersion string) []string {
 	versionSlice := strings.Split(originalVersion, ".")
 	versionSliceSize := len(versionSlice)
 	for i := 4; i > versionSliceSize; i-- {
