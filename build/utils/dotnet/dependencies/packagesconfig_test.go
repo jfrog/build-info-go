@@ -61,7 +61,7 @@ func TestAlternativeVersionsForms(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.version, func(t *testing.T) {
-			actual := createAlternativeVersionForms(test.version)
+			actual := CreateAlternativeVersionForms(test.version)
 			sort.Strings(actual)
 			sort.Strings(test.expected)
 			if len(actual) != len(test.expected) {
