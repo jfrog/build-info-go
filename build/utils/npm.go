@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jfrog/gofrog/crypto"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -381,11 +382,11 @@ func calculateChecksum(cacache *cacache, name, version, integrity string) (md5 s
 	if err != nil {
 		return
 	}
-	checksums, err := utils.GetFileChecksums(path)
+	checksums, err := crypto.GetFileChecksums(path)
 	if err != nil {
 		return
 	}
-	return checksums[utils.MD5], checksums[utils.SHA1], checksums[utils.SHA256], err
+	return checksums[crypto.MD5], checksums[crypto.SHA1], checksums[crypto.SHA256], err
 }
 
 // Merge two scopes and remove duplicates.

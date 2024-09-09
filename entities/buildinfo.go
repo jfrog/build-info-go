@@ -355,6 +355,9 @@ type Module struct {
 	Artifacts         []Artifact   `json:"artifacts,omitempty"`
 	ExcludedArtifacts []Artifact   `json:"excludedArtifacts,omitempty"`
 	Dependencies      []Dependency `json:"dependencies,omitempty"`
+	// Parent is used to store the parent module id, for multi-module projects.
+	// This field is not recognized by Artifactory, and is used for internal purposes only.
+	Parent string `json:"parent,omitempty"`
 	// Used in aggregated builds - this field stores the checksums of the referenced build-info JSON.
 	Checksum
 }
@@ -420,6 +423,10 @@ type Artifact struct {
 	Name string `json:"name,omitempty"`
 	Type string `json:"type,omitempty"`
 	Path string `json:"path,omitempty"`
+	// The target repository to which the artifact was deployed to.
+	// Named 'original' because the repository might change throughout the lifecycle of the build.
+	// This field is not recognized by Artifactory, and is used for internal purposes only.
+	OriginalDeploymentRepo string `json:"originalDeploymentRepo,omitempty"`
 	Checksum
 }
 

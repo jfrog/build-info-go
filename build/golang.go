@@ -3,12 +3,12 @@ package build
 import (
 	"errors"
 	"fmt"
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/gofrog/crypto"
 	"path/filepath"
 	"strings"
 	"unicode"
-
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/utils"
 )
 
 type GoModule struct {
@@ -164,12 +164,12 @@ func (gm *GoModule) getPackagePathIfExists(cachePath, encodedDependencyId string
 func populateZip(packageId, zipPath string) (zipDependency entities.Dependency, err error) {
 	// Zip file dependency for the build-info
 	zipDependency = entities.Dependency{Id: packageId}
-	checksums, err := utils.GetFileChecksums(zipPath)
+	checksums, err := crypto.GetFileChecksums(zipPath)
 	if err != nil {
 		return
 	}
 	zipDependency.Type = "zip"
-	zipDependency.Checksum = entities.Checksum{Sha1: checksums[utils.SHA1], Md5: checksums[utils.MD5], Sha256: checksums[utils.SHA256]}
+	zipDependency.Checksum = entities.Checksum{Sha1: checksums[crypto.SHA1], Md5: checksums[crypto.MD5], Sha256: checksums[crypto.SHA256]}
 	return
 }
 
