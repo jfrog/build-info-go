@@ -184,10 +184,10 @@ func extractPackageNameFromEggBase(eggBase string) ([]byte, error) {
 // If pattern of package name of version not found, return an error.
 func getProjectNameAndVersionFromFileContent(content []byte) (string, string, error) {
 	// Create package-name regexp.
-	packageNameRegexp := regexp.MustCompile(`(?m)^Name:\s` + packageNameRegexp)
+	packageNameWithPrefixRegexp := regexp.MustCompile(`(?m)^Name:\s` + packageNameRegexp)
 
 	// Find first nameMatch of packageNameRegexp.
-	nameMatch := packageNameRegexp.FindStringSubmatch(string(content))
+	nameMatch := packageNameWithPrefixRegexp.FindStringSubmatch(string(content))
 	if len(nameMatch) < 2 {
 		return "", "", errors.New("failed extracting package name from content")
 	}
