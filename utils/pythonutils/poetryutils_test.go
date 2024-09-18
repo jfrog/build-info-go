@@ -24,7 +24,7 @@ func TestGetProjectNameFromPyproject(t *testing.T) {
 			tmpProjectPath, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata", "poetry", testCase.poetryProject))
 			defer cleanup()
 
-			actualValue, err := extractProjectFromPyproject(filepath.Join(tmpProjectPath, "pyproject.toml"))
+			actualValue, err := extractPoetryPackageFromPyProjectToml(filepath.Join(tmpProjectPath, "pyproject.toml"))
 			assert.NoError(t, err)
 			if actualValue.Name != testCase.expectedProjectName {
 				t.Errorf("Expected value: %s, got: %s.", testCase.expectedProjectName, actualValue)
