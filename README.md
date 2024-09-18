@@ -395,6 +395,12 @@ bi pipenv [pipenv command] [command options]
 
 Note: checksums calculation is not yet supported for pipenv projects.
 
+#### twine
+
+```shell
+bi twine [twine command] [command options]
+```
+
 #### Dotnet
 
 ```shell

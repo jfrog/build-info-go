@@ -373,6 +373,14 @@ func (b *Build) GetBuildTimestamp() time.Time {
 	return b.buildTimestamp
 }
 
+func (b *Build) AddArtifacts(moduleId string, moduleType entities.ModuleType, artifacts ...entities.Artifact) error {
+	if !b.buildNameAndNumberProvided() {
+		return errors.New("a build name must be provided in order to add artifacts")
+	}
+	partial := &entities.Partial{ModuleId: moduleId, ModuleType: moduleType, Artifacts: artifacts}
+	return b.SavePartialBuildInfo(partial)
+}
+
 type partialModule struct {
 	moduleType   entities.ModuleType
 	artifacts    map[string]entities.Artifact
