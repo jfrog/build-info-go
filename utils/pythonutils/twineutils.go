@@ -2,8 +2,12 @@ package pythonutils
 
 import (
 	"fmt"
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/gofrog/crypto"
 	gofrogcmd "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/gofrog/log"
+	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -56,4 +60,30 @@ func getArtifactsParser(artifactsPaths *[]string) (parser *gofrogcmd.CmdOutputPa
 			return pattern.Line, nil
 		},
 	}
+}
+
+// Create artifacts entities from the artifacts paths that were found during the upload.
+func CreateArtifactsFromPaths(artifactsPaths []string) (artifacts []entities.Artifact, err error) {
+	projectName, projectVersion, err := GetPipProjectNameAndVersion("")
+	if err != nil {
+		return
+	}
+	var absPath string
+	var fileDetails *crypto.FileDetails
+	for _, artifactPath := range artifactsPaths {
+		absPath, err = filepath.Abs(artifactPath)
+		if err != nil {
+			return nil, err
+		}
+		fileDetails, err = crypto.GetFileDetails(absPath, true)
+		if err != nil {
+			return nil, err
+		}
+
+		artifact := entities.Artifact{Name: filepath.Base(absPath), Path: path.Join(projectName, projectVersion, filepath.Base(absPath)),
+			Type: strings.TrimPrefix(filepath.Ext(absPath), ".")}
+		artifact.Checksum = entities.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}
+		artifacts = append(artifacts, artifact)
+	}
+	return
 }

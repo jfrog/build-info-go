@@ -89,11 +89,26 @@ func (pm *PythonModule) SetUpdateDepsChecksumInfoFunc(updateDepsChecksumInfoFunc
 	pm.updateDepsChecksumInfoFunc = updateDepsChecksumInfoFunc
 }
 
-func (pm *PythonModule) TwineUploadWithLogParsing(commandArgs []string) ([]string, error) {
+func (pm *PythonModule) TwineUploadWithLogParsing(commandArgs []string) ([]entities.Artifact, error) {
 	pm.SetModuleId()
-	return pythonutils.TwineUploadWithLogParsing(commandArgs, pm.srcPath)
+	artifactsPaths, err := pythonutils.TwineUploadWithLogParsing(commandArgs, pm.srcPath)
+	if err != nil {
+		return nil, err
+	}
+	return pythonutils.CreateArtifactsFromPaths(artifactsPaths)
 }
 
 func (pm *PythonModule) AddArtifacts(artifacts []entities.Artifact) error {
 	return pm.containingBuild.AddArtifacts(pm.id, entities.Python, artifacts...)
+}
+
+func (pm *PythonModule) TwineUploadAndGenerateBuild(commandArgs []string) error {
+	artifacts, err := pm.TwineUploadWithLogParsing(commandArgs)
+	if err != nil {
+		return err
+	}
+
+	buildInfoModule := entities.Module{Id: pm.id, Type: entities.Python, Artifacts: artifacts}
+	buildInfo := &entities.BuildInfo{Modules: []entities.Module{buildInfoModule}}
+	return pm.containingBuild.SaveBuildInfo(buildInfo)
 }
