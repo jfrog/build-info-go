@@ -97,11 +97,7 @@ func (nm *NpmModule) SetCollectBuildInfo(collectBuildInfo bool) {
 }
 
 func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {
-	if !nm.containingBuild.buildNameAndNumberProvided() {
-		return errors.New("a build name must be provided in order to add artifacts")
-	}
-	partial := &entities.Partial{ModuleId: nm.name, ModuleType: entities.Npm, Artifacts: artifacts}
-	return nm.containingBuild.SavePartialBuildInfo(partial)
+	return nm.containingBuild.AddArtifacts(nm.name, entities.Npm, artifacts...)
 }
 
 // This function discards the npm command in npmArgs and keeps only the command flags.
