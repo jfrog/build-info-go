@@ -25,7 +25,7 @@ const (
 	startUsingCachedPattern = `^\s*Using\scached\s`
 	usingCacheCaptureGroup  = `[\S]+`
 	endPattern              = `\s\(`
-	_packageNameRegexp      = `(\w[\w-.]+)`
+	packageNameRegexp       = `(\w[\w-.]+)`
 )
 
 type PythonTool string
@@ -277,7 +277,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 
 	// Extract downloaded package name.
 	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{
-		RegExp: regexp.MustCompile(`^Collecting\s` + _packageNameRegexp),
+		RegExp: regexp.MustCompile(`^Collecting\s` + packageNameRegexp),
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 			// If this pattern matched a second time before downloaded-file-name was found, prompt a message.
 			if expectingPackageFilePath {
@@ -330,7 +330,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 
 	// Extract already installed packages names.
 	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{
-		RegExp: regexp.MustCompile(`^Requirement\salready\ssatisfied:\s` + _packageNameRegexp),
+		RegExp: regexp.MustCompile(`^Requirement\salready\ssatisfied:\s` + packageNameRegexp),
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 			// Check for out of bound results.
 			if len(pattern.MatchedResults)-1 < 0 {

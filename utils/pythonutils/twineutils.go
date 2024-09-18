@@ -64,7 +64,7 @@ func getArtifactsParser(artifactsPaths *[]string) (parser *gofrogcmd.CmdOutputPa
 
 // Create artifacts entities from the artifacts paths that were found during the upload.
 func CreateArtifactsFromPaths(artifactsPaths []string) (artifacts []entities.Artifact, err error) {
-	projectName, projectVersion, err := GetPipProjectNameAndVersion("")
+	projectName, projectVersion, err := getPipProjectNameAndVersion("")
 	if err != nil {
 		return
 	}
