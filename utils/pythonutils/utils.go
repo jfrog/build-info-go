@@ -18,12 +18,14 @@ const (
 	Pip    PythonTool = "pip"
 	Pipenv PythonTool = "pipenv"
 	Poetry PythonTool = "poetry"
+	Twine  PythonTool = "twine"
 
 	startDownloadingPattern = `^\s*Downloading\s`
 	downloadingCaptureGroup = `[^\s]*`
 	startUsingCachedPattern = `^\s*Using\scached\s`
 	usingCacheCaptureGroup  = `[\S]+`
 	endPattern              = `\s\(`
+	packageNameRegexp       = `(\w[\w-.]+)`
 )
 
 type PythonTool string
@@ -99,10 +101,10 @@ func GetPythonDependencies(tool PythonTool, srcPath, localDependenciesPath strin
 
 func GetPackageName(tool PythonTool, srcPath string) (packageName string, err error) {
 	switch tool {
-	case Pip, Pipenv:
-		return getPackageNameFromSetuppy(srcPath)
+	case Pip, Pipenv, Twine:
+		return getPipProjectId(srcPath)
 	case Poetry:
-		packageName, _, err = getPackageNameFromPyproject(srcPath)
+		packageName, _, err = getPoetryPackageFromPyProject(srcPath)
 		return
 	default:
 		return "", errors.New(string(tool) + " commands are not supported.")
@@ -148,7 +150,7 @@ func updateDepsIdsAndRequestedBy(parentDependency entities.Dependency, dependenc
 				}
 				childDep.Type = fileType
 			}
-			// Convert Id field from filename to dependency id
+			// Convert ID field from filename to dependency id
 			childDep.Id = childId
 			// Reassign map entry with new entry copy
 			dependenciesMap[childName] = childDep
@@ -213,7 +215,7 @@ func getMultilineSplitCaptureOutputPattern(startCollectingPattern, captureGroup,
 }
 
 // Mask the pre-known credentials that are provided as command arguments from logs.
-// This function creates a log parser for each credentials argument.
+// This function creates a log parser for each credentials' argument.
 func maskPreKnownCredentials(args []string) (parsers []*gofrogcmd.CmdOutputPattern) {
 	for _, arg := range args {
 		// If this argument is a credentials argument, create a log parser that masks it.
@@ -268,14 +270,14 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	installCmd.Dir = srcPath
 
 	dependenciesMap := map[string]entities.Dependency{}
-	parsers := []*gofrogcmd.CmdOutputPattern{}
+	var parsers []*gofrogcmd.CmdOutputPattern
 
 	var packageName string
 	expectingPackageFilePath := false
 
 	// Extract downloaded package name.
 	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{
-		RegExp: regexp.MustCompile(`^Collecting\s(\w[\w-.]+)`),
+		RegExp: regexp.MustCompile(`^Collecting\s` + packageNameRegexp),
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 			// If this pattern matched a second time before downloaded-file-name was found, prompt a message.
 			if expectingPackageFilePath {
@@ -328,7 +330,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 
 	// Extract already installed packages names.
 	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{
-		RegExp: regexp.MustCompile(`^Requirement\salready\ssatisfied:\s(\w[\w-.]+)`),
+		RegExp: regexp.MustCompile(`^Requirement\salready\ssatisfied:\s` + packageNameRegexp),
 		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
 			// Check for out of bound results.
 			if len(pattern.MatchedResults)-1 < 0 {
