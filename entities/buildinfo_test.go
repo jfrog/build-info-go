@@ -2,6 +2,7 @@ package entities
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -238,4 +239,37 @@ func TestAppend(t *testing.T) {
 	results, err := IsEqualModuleSlices(expected.Modules, buildInfo1.Modules)
 	assert.NoError(t, err)
 	assert.True(t, results)
+}
+
+func TestToCycloneDxBOM(t *testing.T) {
+	dependencyA := Dependency{Id: "dependency-a", Checksum: Checksum{Sha1: "dependency-a-sha"}, RequestedBy: [][]string{{"dependency-c"}}}
+	dependencyB := Dependency{Id: "dependency-b", Checksum: Checksum{Sha1: "dependency-b-sha"}, RequestedBy: [][]string{{"dependency-b"}, {"dependency-c"}}}
+	dependencyC := Dependency{Id: "dependency-c", Checksum: Checksum{Sha1: "dependency-c-sha"}}
+
+	buildInfo := BuildInfo{
+		Modules: []Module{{
+			Id:           "module-id1",
+			Dependencies: []Dependency{dependencyC, dependencyB, dependencyA},
+		}},
+	}
+
+	cdxBom, err := buildInfo.ToCycloneDxBom()
+	assert.NoError(t, err)
+
+	componentsIsSorted := sort.SliceIsSorted(*cdxBom.Components, func(i, j int) bool {
+		return (*cdxBom.Components)[i].BOMRef < (*cdxBom.Components)[j].BOMRef
+	})
+	assert.True(t, componentsIsSorted)
+
+	dependenciesIsSorted := sort.SliceIsSorted(*cdxBom.Dependencies, func(i, j int) bool {
+		return (*cdxBom.Dependencies)[i].Ref < (*cdxBom.Dependencies)[j].Ref
+	})
+	assert.True(t, dependenciesIsSorted)
+
+	for _, dep := range *cdxBom.Dependencies {
+		dependsOnIsSorted := sort.SliceIsSorted(*dep.Dependencies, func(i, j int) bool {
+			return (*dep.Dependencies)[i] < (*dep.Dependencies)[j]
+		})
+		assert.True(t, dependsOnIsSorted)
+	}
 }

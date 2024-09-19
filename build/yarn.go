@@ -149,11 +149,7 @@ func (ym *YarnModule) SetTraverseDependenciesFunc(traverseDependenciesFunc func(
 }
 
 func (ym *YarnModule) AddArtifacts(artifacts ...entities.Artifact) error {
-	if !ym.containingBuild.buildNameAndNumberProvided() {
-		return errors.New("a build name must be provided in order to add artifacts")
-	}
-	partial := &entities.Partial{ModuleId: ym.name, ModuleType: entities.Npm, Artifacts: artifacts}
-	return ym.containingBuild.SavePartialBuildInfo(partial)
+	return ym.containingBuild.AddArtifacts(ym.name, entities.Npm, artifacts...)
 }
 
 func validateYarnVersion(executablePath, srcPath string) error {

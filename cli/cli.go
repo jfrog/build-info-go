@@ -285,6 +285,36 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				}
 			},
 		},
+		{
+			Name:      "twine",
+			Usage:     "Generate build-info for a twine project",
+			UsageText: "bi twine",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("twine-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					err = errors.Join(err, bld.Clean())
+				}()
+				pythonModule, err := bld.AddPythonModule("", pythonutils.Twine)
+				if err != nil {
+					return
+				}
+				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
+				if filteredArgs[0] == "upload" {
+					if err := pythonModule.TwineUploadAndGenerateBuild(filteredArgs[1:]); err != nil {
+						return err
+					}
+					return printBuild(bld, context.String(formatFlag))
+				} else {
+					return exec.Command("twine", filteredArgs[1:]...).Run()
+				}
+			},
+		},
 	}
 }
 

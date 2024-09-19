@@ -9,9 +9,6 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type PyprojectToml struct {
-	Tool map[string]PoetryPackage
-}
 type PoetryPackage struct {
 	Name            string
 	Version         string
@@ -31,7 +28,7 @@ func getPoetryDependencies(srcPath string) (graph map[string][]string, directDep
 		// Error was returned or poetry.lock does not exist in directory.
 		return map[string][]string{}, []string{}, err
 	}
-	projectName, directDependencies, err := getPackageNameFromPyproject(srcPath)
+	projectName, directDependencies, err := getPoetryPackageFromPyProject(srcPath)
 	if err != nil {
 		return map[string][]string{}, []string{}, err
 	}
@@ -56,24 +53,16 @@ func getPoetryDependencies(srcPath string) (graph map[string][]string, directDep
 	return graph, graph[projectName], nil
 }
 
-func getPackageNameFromPyproject(srcPath string) (string, []string, error) {
-	filePath, err := getPyprojectFilePath(srcPath)
+func getPoetryPackageFromPyProject(srcPath string) (string, []string, error) {
+	filePath, err := getPyProjectFilePath(srcPath)
 	if err != nil || filePath == "" {
-		// Error was returned or pyproject.toml does not exist in directory.
 		return "", []string{}, err
 	}
-	// Extract package name from pyproject.toml.
-	project, err := extractProjectFromPyproject(filePath)
+	project, err := extractPoetryPackageFromPyProjectToml(filePath)
 	if err != nil {
 		return "", []string{}, err
 	}
 	return project.Name, append(maps.Keys(project.Dependencies), maps.Keys(project.DevDependencies)...), nil
-}
-
-// Look for 'pyproject.toml' file in current work dir.
-// If found, return its absolute path.
-func getPyprojectFilePath(srcPath string) (string, error) {
-	return getFilePath(srcPath, "pyproject.toml")
 }
 
 // Look for 'poetry.lock' file in current work dir.
@@ -82,23 +71,18 @@ func getPoetryLockFilePath(srcPath string) (string, error) {
 	return getFilePath(srcPath, "poetry.lock")
 }
 
-// Get the project-name by parsing the pyproject.toml file.
-func extractProjectFromPyproject(pyprojectFilePath string) (project PoetryPackage, err error) {
-	content, err := os.ReadFile(pyprojectFilePath)
+// Get poetry package by parsing the pyproject.toml file.
+func extractPoetryPackageFromPyProjectToml(pyProjectFilePath string) (project PoetryPackage, err error) {
+	pyProjectFile, err := decodePyProjectToml(pyProjectFilePath)
 	if err != nil {
 		return
 	}
-	var pyprojectFile PyprojectToml
-	_, err = toml.Decode(string(content), &pyprojectFile)
-	if err != nil {
-		return
-	}
-	if poetryProject, ok := pyprojectFile.Tool["poetry"]; ok {
+	if poetryProject, ok := pyProjectFile.Tool["poetry"]; ok {
 		// Extract project name from file content.
 		poetryProject.Name = poetryProject.Name + ":" + poetryProject.Version
 		return poetryProject, nil
 	}
-	return PoetryPackage{}, errors.New("Couldn't find project name and version in " + pyprojectFilePath)
+	return PoetryPackage{}, errors.New("Couldn't find project name and version in " + pyProjectFilePath)
 }
 
 // Get the project-name by parsing the poetry.lock file

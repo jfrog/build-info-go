@@ -73,20 +73,20 @@ func writeScriptIfNeeded(targetDirPath, scriptName string) error {
 	return nil
 }
 
-func getPackageNameFromSetuppy(srcPath string) (string, error) {
+func getPackageDetailsFromSetuppy(srcPath string) (packageName string, packageVersion string, err error) {
 	filePath, err := getSetupPyFilePath(srcPath)
 	if err != nil || filePath == "" {
 		// Error was returned or setup.py does not exist in directory.
-		return "", err
+		return
 	}
 
 	// Extract package name from setup.py.
-	packageName, err := ExtractPackageNameFromSetupPy(filePath)
+	packageName, packageVersion, err = extractPackageNameFromSetupPy(filePath)
 	if err != nil {
 		// If setup.py egg_info command failed we use build name as module name and continue to pip-install execution
-		return "", errors.New("couldn't determine module-name after running the 'egg_info' command: " + err.Error())
+		return "", "", errors.New("couldn't determine module-name after running the 'egg_info' command: " + err.Error())
 	}
-	return packageName, nil
+	return packageName, packageVersion, nil
 }
 
 // Look for 'setup.py' file in current work dir.
@@ -95,16 +95,16 @@ func getSetupPyFilePath(srcPath string) (string, error) {
 	return getFilePath(srcPath, "setup.py")
 }
 
-// Get the project-name by running 'egg_info' command on setup.py and extracting it from 'PKG-INFO' file.
-func ExtractPackageNameFromSetupPy(setuppyFilePath string) (string, error) {
+// Get the project name and version by running 'egg_info' command on setup.py and extracting it from 'PKG-INFO' file.
+func extractPackageNameFromSetupPy(setuppyFilePath string) (string, string, error) {
 	// Execute egg_info command and return PKG-INFO content.
 	content, err := getEgginfoPkginfoContent(setuppyFilePath)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// Extract project name from file content.
-	return getProjectIdFromFileContent(content)
+	return getProjectNameAndVersionFromFileContent(content)
 }
 
 // Run egg-info command on setup.py. The command generates metadata files.
@@ -182,24 +182,51 @@ func extractPackageNameFromEggBase(eggBase string) ([]byte, error) {
 
 // Get package ID from PKG-INFO file content.
 // If pattern of package name of version not found, return an error.
-func getProjectIdFromFileContent(content []byte) (string, error) {
+func getProjectNameAndVersionFromFileContent(content []byte) (string, string, error) {
 	// Create package-name regexp.
-	packageNameRegexp := regexp.MustCompile(`(?m)^Name:\s(\w[\w-.]+)`)
+	packageNameWithPrefixRegexp := regexp.MustCompile(`(?m)^Name:\s` + packageNameRegexp)
 
 	// Find first nameMatch of packageNameRegexp.
-	nameMatch := packageNameRegexp.FindStringSubmatch(string(content))
+	nameMatch := packageNameWithPrefixRegexp.FindStringSubmatch(string(content))
 	if len(nameMatch) < 2 {
-		return "", errors.New("failed extracting package name from content")
+		return "", "", errors.New("failed extracting package name from content")
 	}
 
 	// Create package-version regexp.
-	packageVersionRegexp := regexp.MustCompile(`(?m)^Version:\s(\w[\w-.]+)`)
+	packageVersionRegexp := regexp.MustCompile(`(?m)^Version:\s` + packageNameRegexp)
 
 	// Find first match of packageNameRegexp.
 	versionMatch := packageVersionRegexp.FindStringSubmatch(string(content))
 	if len(versionMatch) < 2 {
-		return "", errors.New("failed extracting package version from content")
+		return "", "", errors.New("failed extracting package version from content")
 	}
 
-	return nameMatch[1] + ":" + versionMatch[1], nil
+	return nameMatch[1], versionMatch[1], nil
+}
+
+// Try getting the name and version from pyproject.toml or from setup.py, if those exist.
+func getPipProjectNameAndVersion(srcPath string) (projectName string, projectVersion string, err error) {
+	projectName, projectVersion, err = getPipProjectDetailsFromPyProjectToml(srcPath)
+	if err != nil || projectName != "" {
+		return
+	}
+	return getPackageDetailsFromSetuppy(srcPath)
+}
+
+// Returns project ID based on name and version from pyproject.toml or setup.py, if found.
+func getPipProjectId(srcPath string) (string, error) {
+	projectName, projectVersion, err := getPipProjectNameAndVersion(srcPath)
+	if err != nil || projectName == "" {
+		return "", err
+	}
+	return projectName + ":" + projectVersion, nil
+}
+
+// Try getting the name and version from pyproject.toml.
+func getPipProjectDetailsFromPyProjectToml(srcPath string) (projectName string, projectVersion string, err error) {
+	filePath, err := getPyProjectFilePath(srcPath)
+	if err != nil || filePath == "" {
+		return
+	}
+	return extractPipProjectDetailsFromPyProjectToml(filePath)
 }
