@@ -55,11 +55,7 @@ func (gm *GoModule) SetName(name string) {
 }
 
 func (gm *GoModule) AddArtifacts(artifacts ...entities.Artifact) error {
-	if !gm.containingBuild.buildNameAndNumberProvided() {
-		return errors.New("a build name must be provided in order to add artifacts")
-	}
-	partial := &entities.Partial{ModuleId: gm.name, ModuleType: entities.Go, Artifacts: artifacts}
-	return gm.containingBuild.SavePartialBuildInfo(partial)
+	return gm.containingBuild.AddArtifacts(gm.name, entities.Go, artifacts...)
 }
 
 func (gm *GoModule) loadDependencies() ([]entities.Dependency, error) {
