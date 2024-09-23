@@ -99,7 +99,7 @@ func TestGetDeployPath(t *testing.T) {
 		pi           *PackageInfo
 	}{
 		{`build-info-go-tests/-/build-info-go-tests-1.0.0.tgz`, &PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: ""}},
-		{`@jfrog/build-info-go-tests/-/build-info-go-tests-1.0.0.tgz`, &PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: "@jfrog"}},
+		{`@jfrog/build-info-go-tests/-/@jfrog/build-info-go-tests-1.0.0.tgz`, &PackageInfo{Name: "build-info-go-tests", Version: "1.0.0", Scope: "@jfrog"}},
 	}
 	for _, test := range testcases {
 		t.Run(test.expectedPath, func(t *testing.T) {
