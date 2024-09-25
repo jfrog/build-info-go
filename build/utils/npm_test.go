@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -233,6 +234,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
+/*
 // This test case verifies that CalculateNpmDependenciesList correctly handles the exclusion of 'node_modules'
 // and updates 'package-lock.json' as required, based on the 'IgnoreNodeModules' and 'OverwritePackageLock' parameters.
 func TestDependencyPackageLockOnly(t *testing.T) {
@@ -249,10 +251,72 @@ func TestDependencyPackageLockOnly(t *testing.T) {
 
 	// Calculate dependencies.
 	dependencies, err := CalculateDependenciesMap("npm", path, "jfrogtest",
-		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: true, OverwritePackageLock: true}, logger)
+		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: true, OverwritePackageLock: true}, logger, false)
 	assert.NoError(t, err)
 	var expectedRes = getExpectedRespForTestDependencyPackageLockOnly()
 	assert.Equal(t, expectedRes, dependencies)
+}
+
+*/
+
+func TestCalculateDependenciesMap(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		path                 string
+		ignoreNodeModules    bool
+		overwritePackageLock bool
+		recalculateLockFile  bool
+		skipInstall          bool
+	}{
+		{
+			// This test case verifies that we correctly handles the exclusion of 'node_modules'
+			// and updates 'package-lock.json' as required, based on the 'IgnoreNodeModules' and 'OverwritePackageLock' parameters.
+			name:                 "exclude node_modules and update package-lock.json",
+			path:                 "testdata/npm/project6",
+			ignoreNodeModules:    true,
+			overwritePackageLock: true,
+			recalculateLockFile:  true,
+			skipInstall:          false,
+		},
+		{
+			name:                 "install required but forbidden",
+			path:                 "testdata/npm/noBuildProject",
+			ignoreNodeModules:    false,
+			overwritePackageLock: false,
+			recalculateLockFile:  false,
+			skipInstall:          true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+			require.NoError(t, err)
+			if !npmVersion.AtLeast("7.0.0") {
+				t.Skip("Running on npm v7 and above only, skipping...")
+			}
+			path, cleanup := tests.CreateTestProject(t, filepath.Join("..", test.path))
+			defer cleanup()
+			if test.recalculateLockFile {
+				assert.NoError(t, utils.MoveFile(filepath.Join(path, "package-lock_test.json"), filepath.Join(path, "package-lock.json")))
+				// sleep so the package.json modified time will be bigger than the package-lock.json, this make sure it will recalculate lock file.
+				require.NoError(t, os.Chtimes(filepath.Join(path, "package.json"), time.Now(), time.Now().Add(time.Millisecond*20)))
+			}
+
+			dependencies, err := CalculateDependenciesMap("npm", path, "jfrogtest",
+				NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: test.ignoreNodeModules, OverwritePackageLock: test.overwritePackageLock}, logger, test.skipInstall)
+
+			if test.recalculateLockFile {
+				assert.NoError(t, err)
+				var expectedRes = getExpectedRespForTestDependencyPackageLockOnly()
+				assert.Equal(t, expectedRes, dependencies)
+			} else {
+				assert.Error(t, err)
+				var installForbiddenErr *utils.ErrInstallForbidden
+				assert.True(t, errors.As(err, &installForbiddenErr))
+			}
+		})
+	}
 }
 
 func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInfo {
