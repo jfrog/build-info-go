@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -26,6 +27,14 @@ func (e *ForbiddenError) Error() string {
 // NewForbiddenError creates a new ForbiddenError with the given message.
 func NewForbiddenError() *ForbiddenError {
 	return &ForbiddenError{}
+}
+
+type ErrInstallForbidden struct {
+	UninstalledDir string
+}
+
+func (err *ErrInstallForbidden) Error() string {
+	return fmt.Sprintf("Directory '%s' is not installed, and installation is porhibited by the user. Skipping SCA scan in this directory...", err.UninstalledDir)
 }
 
 // IsForbiddenOutput checks whether the provided output includes a 403 Forbidden. The various package managers have their own forbidden output formats.
