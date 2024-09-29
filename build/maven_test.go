@@ -180,3 +180,22 @@ func TestAddColorToCmdOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandWithRootProjectDir(t *testing.T) {
+	mvnc := &mvnRunConfig{
+		java:                "java",
+		plexusClassworlds:   "plexus",
+		cleassworldsConfig:  "",
+		mavenHome:           "",
+		pluginDependencies:  "",
+		workspace:           "",
+		goals:               nil,
+		buildInfoProperties: "",
+		mavenOpts:           nil,
+		logger:              nil,
+		outputWriter:        nil,
+		rootProjectDir:      "root",
+	}
+	cmd := mvnc.GetCmd()
+	assert.Equal(t, "-Dmaven.multiModuleProjectDirectory=root", cmd.Args[7])
+}
