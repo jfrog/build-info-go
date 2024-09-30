@@ -29,12 +29,12 @@ func NewForbiddenError() *ForbiddenError {
 	return &ForbiddenError{}
 }
 
-type ErrInstallForbidden struct {
+type ErrProjectNotInstalled struct {
 	UninstalledDir string
 }
 
-func (err *ErrInstallForbidden) Error() string {
-	return fmt.Sprintf("Directory '%s' is not installed, and installation is porhibited by the user. Skipping SCA scan in this directory...", err.UninstalledDir)
+func (err *ErrProjectNotInstalled) Error() string {
+	return fmt.Sprintf("Directory '%s' is not installed. Skipping SCA scan in this directory...", err.UninstalledDir)
 }
 
 // IsForbiddenOutput checks whether the provided output includes a 403 Forbidden. The various package managers have their own forbidden output formats.

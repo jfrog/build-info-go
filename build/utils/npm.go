@@ -157,13 +157,16 @@ func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmListParams Np
 	return data, nil
 }
 
-// We verify project installation status by examining 3 things:
-// 1) The presence of the package-lock.json file
-// 2) The presence of installation command that has been provided by the user
-// 3) A check if an override was specifically requested and the lock file should be updated
-// If install command was provided by the user - we install
-// If package-lock.json file is missing and OR if an override was requested and the lock file should be updated - we install, UNLESS the user requested to skip the installation
-// In this case we return an error
+// This function determines whether a project installation is required by evaluating the following criteria:
+// 1) Checks if the "package-lock.json" file exists in the project directory.
+// 2) Verifies if an installation command was provided by the user.
+// 3) Checks if the lock file should be updated due to an override request.
+//
+// Conditions for triggering installation:
+// - If the user provided an installation command, installation is required.
+// - If the "package-lock.json" file is missing or an override request to update the lock file exists, installation is required, unless the user explicitly requested to skip the installation.
+//
+// If installation is required but skipped by the user's request, an error is returned.
 func isInstallRequired(srcPath string, npmListParams NpmTreeDepListParam, log utils.Log, skipInstall bool) (bool, error) {
 	isPackageLockExist, err := utils.IsFileExists(filepath.Join(srcPath, "package-lock.json"), false)
 	if err != nil {
@@ -172,10 +175,14 @@ func isInstallRequired(srcPath string, npmListParams NpmTreeDepListParam, log ut
 
 	if len(npmListParams.InstallCommandArgs) > 0 {
 		return true, nil
-	} else if (!isPackageLockExist || (npmListParams.OverwritePackageLock && checkIfLockFileShouldBeUpdated(srcPath, log))) && skipInstall {
-		return false, &utils.ErrInstallForbidden{UninstalledDir: srcPath}
 	}
-	return !isPackageLockExist || (npmListParams.OverwritePackageLock && checkIfLockFileShouldBeUpdated(srcPath, log)), nil
+	if !isPackageLockExist || (npmListParams.OverwritePackageLock && checkIfLockFileShouldBeUpdated(srcPath, log)) {
+		if skipInstall {
+			return false, &utils.ErrProjectNotInstalled{UninstalledDir: srcPath}
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 func installPackageLock(executablePath, srcPath string, npmInstallCommandArgs, npmArgs []string, log utils.Log, npmVersion *version.Version) error {
