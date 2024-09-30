@@ -291,7 +291,7 @@ func (mm *MavenModule) extractMavenPath(mavenVersionOutput bytes.Buffer) (mavenH
 	return
 }
 
-func (mm *MavenModule) SetrootProjectDir(rootDir string) {
+func (mm *MavenModule) SetRootProjectDir(rootDir string) {
 	mm.rootProjectDir = rootDir
 }
 
