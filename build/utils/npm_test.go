@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -233,7 +234,7 @@ func TestDependencyWithNoIntegrity(t *testing.T) {
 	assert.Greaterf(t, len(dependencies), 0, "Error: dependencies are not found!")
 }
 
-// This test case verifies that CalculateNpmDependenciesList correctly handles the exclusion of 'node_modules'
+// This test case verifies that CalculateDependenciesMap correctly handles the exclusion of 'node_modules'
 // and updates 'package-lock.json' as required, based on the 'IgnoreNodeModules' and 'OverwritePackageLock' parameters.
 func TestDependencyPackageLockOnly(t *testing.T) {
 	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
@@ -249,10 +250,23 @@ func TestDependencyPackageLockOnly(t *testing.T) {
 
 	// Calculate dependencies.
 	dependencies, err := CalculateDependenciesMap("npm", path, "jfrogtest",
-		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: true, OverwritePackageLock: true}, logger)
+		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: true, OverwritePackageLock: true}, logger, false)
 	assert.NoError(t, err)
 	var expectedRes = getExpectedRespForTestDependencyPackageLockOnly()
 	assert.Equal(t, expectedRes, dependencies)
+}
+
+func TestCalculateDependenciesMapWithProhibitedInstallation(t *testing.T) {
+	path, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata", "npm", "noBuildProject"))
+	defer cleanup()
+
+	dependencies, err := CalculateDependenciesMap("npm", path, "jfrogtest",
+		NpmTreeDepListParam{Args: []string{}, IgnoreNodeModules: false, OverwritePackageLock: false}, logger, true)
+
+	assert.Nil(t, dependencies)
+	assert.Error(t, err)
+	var installForbiddenErr *utils.ErrProjectNotInstalled
+	assert.True(t, errors.As(err, &installForbiddenErr))
 }
 
 func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInfo {
