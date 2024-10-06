@@ -180,3 +180,35 @@ func TestAddColorToCmdOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandWithRootProjectDir(t *testing.T) {
+	mvnc := &mvnRunConfig{
+		java:                "myJava",
+		plexusClassworlds:   "myPlexus",
+		cleassworldsConfig:  "myCleassworldsConfig",
+		mavenHome:           "myMavenHome",
+		pluginDependencies:  "myPluginDependencies",
+		workspace:           "myWorkspace",
+		goals:               []string{"myGoal1", "myGoal2"},
+		buildInfoProperties: "myBuildInfoProperties",
+		mavenOpts:           []string{"myMavenOpt1", "myMavenOpt2"},
+		logger:              nil,
+		outputWriter:        nil,
+		rootProjectDir:      "myRootProjectDir",
+	}
+	cmd := mvnc.GetCmd()
+	assert.Equal(t, "myJava", cmd.Args[0])
+	assert.Equal(t, "-classpath", cmd.Args[1])
+	assert.Equal(t, "myPlexus", cmd.Args[2])
+	assert.Contains(t, cmd.Args, "-DbuildInfoConfig.propertiesFile=myBuildInfoProperties")
+	assert.Contains(t, cmd.Args, "-Dclassworlds.conf=myCleassworldsConfig")
+	assert.Contains(t, cmd.Args, "-Dclassworlds.conf=myCleassworldsConfig")
+	assert.Contains(t, cmd.Args, "-Dmaven.home=myMavenHome")
+	assert.Contains(t, cmd.Args, "-Dm3plugin.lib=myPluginDependencies")
+	assert.Contains(t, cmd.Args, "myGoal1")
+	assert.Contains(t, cmd.Args, "myGoal2")
+	assert.Contains(t, cmd.Args, "-DbuildInfoConfig.propertiesFile=myBuildInfoProperties")
+	assert.Contains(t, cmd.Args, "myMavenOpt1")
+	assert.Contains(t, cmd.Args, "myMavenOpt2")
+	assert.Contains(t, cmd.Args, "-Dmaven.multiModuleProjectDirectory=myRootProjectDir")
+}
