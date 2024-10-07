@@ -60,10 +60,17 @@ func TestCollectEnv(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			build, err := service.GetOrCreateBuild("bi-test", "1")
+			vcs := entities.Vcs{Url: "https://github.com/jfrog/build-info-go.git", Branch: "dev"}
+			vcsPartial1 := entities.Partial{VcsList: []entities.Vcs{vcs}}
+			vcsPartial2 := entities.Partial{VcsList: []entities.Vcs{vcs}} // adding same vcs twice to test if ToBuildInfo() removes duplicates below
 			assert.NoError(t, err)
+			assert.NoError(t, build.SavePartialBuildInfo(&vcsPartial1))
+			assert.NoError(t, build.SavePartialBuildInfo(&vcsPartial2))
 			assert.NoError(t, build.CollectEnv())
 			buildInfo, err := build.ToBuildInfo()
 			assert.NoError(t, err)
+			assert.Len(t, buildInfo.VcsList, 1)
+			assert.Equal(t, buildInfo.VcsList[0], vcs)
 			err = buildInfo.IncludeEnv(tc.include...)
 			if tc.expectError {
 				assert.Error(t, err)

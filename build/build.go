@@ -8,6 +8,7 @@ import (
 	ioutils "github.com/jfrog/gofrog/io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -281,7 +282,11 @@ func (b *Build) createBuildInfoFromPartials() (*entities.BuildInfo, error) {
 		buildInfo.Properties = env
 	}
 
-	buildInfo.VcsList = append(buildInfo.VcsList, vcsList...)
+	for _, vcs := range vcsList {
+		if !slices.Contains(buildInfo.VcsList, vcs) {
+			buildInfo.VcsList = append(buildInfo.VcsList, vcs)
+		}
+	}
 
 	// Check for Tracker as it must be set
 	if issues.Tracker != nil && issues.Tracker.Name != "" {
