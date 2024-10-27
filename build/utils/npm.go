@@ -99,20 +99,11 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmListP
 	if err != nil {
 		return nil, err
 	}
-	nodeModulesExist, err := utils.IsDirExists(filepath.Join(srcPath, "node_modules"), false)
+	data, err := runNpmLsOnPackageLock(executablePath, srcPath, npmListParams, log, npmVersion, skipInstall)
 	if err != nil {
 		return nil, err
 	}
-	var data []byte
-	// If we don't have node_modules, the function will use the package-lock dependencies.
-	if nodeModulesExist && !npmListParams.IgnoreNodeModules {
-		data = runNpmLsWithNodeModules(executablePath, srcPath, npmListParams.Args, log)
-	} else {
-		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmListParams, log, npmVersion, skipInstall)
-		if err != nil {
-			return nil, err
-		}
-	}
+
 	parseFunc := parseNpmLsDependencyFunc(npmVersion)
 	// Parse the dependencies json object.
 	return dependenciesMap, jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
@@ -123,19 +114,7 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmListP
 	})
 }
 
-func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log) (data []byte) {
-	npmArgs = append(npmArgs, "--json", "--all", "--long")
-	data, errData, err := RunNpmCmd(executablePath, srcPath, AppendNpmCommand(npmArgs, "ls"), log)
-	if err != nil {
-		// It is optional for the function to return this error.
-		log.Warn(err.Error())
-	} else if len(errData) > 0 {
-		log.Warn("Encountered some issues while running 'npm ls' command:\n" + strings.TrimSpace(string(errData)))
-	}
-	return
-}
-
-func runNpmLsWithoutNodeModules(executablePath, srcPath string, npmListParams NpmTreeDepListParam, log utils.Log, npmVersion *version.Version, skipInstall bool) ([]byte, error) {
+func runNpmLsOnPackageLock(executablePath, srcPath string, npmListParams NpmTreeDepListParam, log utils.Log, npmVersion *version.Version, skipInstall bool) ([]byte, error) {
 	installRequired, err := isInstallRequired(srcPath, npmListParams, log, skipInstall)
 	if err != nil {
 		return nil, err
