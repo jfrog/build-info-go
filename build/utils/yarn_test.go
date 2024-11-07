@@ -53,7 +53,7 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 		Dependencies:    map[string]string{"react": "18.2.0", "xml": "1.0.1"},
 		DevDependencies: map[string]string{"json": "9.0.6"},
 	}
-	dependenciesMap, root, err := GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{})
+	dependenciesMap, root, err := GetYarnDependencies(executablePath, projectSrcPath, &pacInfo, &utils.NullLog{}, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, root)
 
@@ -100,6 +100,89 @@ func checkGetYarnDependencies(t *testing.T, versionDir string, expectedLocators 
 			}
 		default:
 			t.Error("package '" + dependencyName + "' should not be inside the dependencies map")
+		}
+	}
+}
+
+// This test checks the error handling of buildYarnV1DependencyMap with a response string that is missing a dependency, when allow-partial-results is set to true.
+// responseStr, which is an output of 'yarn list' should contain every dependency (direct and indirect) of the project at the first level, with the direct children of each dependency.
+// Sometimes the first level is lacking a dependency that appears as a child, or the child dependency is not found at the first level of the map, hence an error should be thrown.
+// When apply-partial-results is set to true we expect to provide a partial map instead of dropping the entire flow and return an error in such a case.
+func TestBuildYarnV1DependencyMapWithLackingDependencyInResponseString(t *testing.T) {
+	packageInfo := &PackageInfo{
+		Name:         "test-project",
+		Version:      "1.0.0",
+		Dependencies: map[string]string{"minimist": "1.2.5", "yarn-inner": "file:./yarn-inner"},
+	}
+
+	// This responseStr simulates should trigger an error since it is missing 'tough-cookie' at the "trees" first level, but this dependency appears as a child for another dependency (and hence should have been in the "trees" level as well)
+	responseStr := "{\"type\":\"tree\",\"data\":{\"type\":\"list\",\"trees\":[{\"name\":\"minimist@1.2.5\",\"children\":[],\"hint\":null,\"color\":\"bold\",\"depth\":0},{\"name\":\"yarn-inner@1.0.0\",\"children\":[{\"name\":\"tough-cookie@2.5.0\",\"color\":\"dim\",\"shadow\":true}],\"hint\":null,\"color\":\"bold\",\"depth\":0}]}}"
+
+	expectedRoot := YarnDependency{
+		Value: "test-project",
+		Details: YarnDepDetails{
+			Version: "1.0.0",
+			Dependencies: []YarnDependencyPointer{
+				{
+					Descriptor: "",
+					Locator:    "minimist@1.2.5",
+				},
+				{
+					Descriptor: "",
+					Locator:    "yarn-inner@1.0.0",
+				},
+			},
+		},
+	}
+
+	expectedDependenciesMap := map[string]*YarnDependency{
+		"minimist@1.2.5": {
+			Value: "minimist@1.2.5",
+			Details: YarnDepDetails{
+				Version:      "1.2.5",
+				Dependencies: nil,
+			},
+		},
+		"yarn-inner@1.0.0": {
+			Value: "yarn-inner@1.0.0",
+			Details: YarnDepDetails{
+				Version:      "1.0.0",
+				Dependencies: nil,
+			},
+		},
+		"test-project": {
+			Value: "test-project",
+			Details: YarnDepDetails{
+				Version: "1.0.0",
+				Dependencies: []YarnDependencyPointer{
+					{
+						Descriptor: "",
+						Locator:    "minimist@1.2.5",
+					},
+					{
+						Descriptor: "",
+						Locator:    "yarn-inner@1.0.0",
+					},
+				},
+			},
+		},
+	}
+
+	dependenciesMap, root, err := buildYarnV1DependencyMap(packageInfo, responseStr, true, &utils.NullLog{})
+	assert.NoError(t, err)
+	assert.EqualValues(t, expectedRoot, *root)
+
+	assert.Equal(t, len(expectedDependenciesMap), len(dependenciesMap))
+	for expectedKey, expectedValue := range expectedDependenciesMap {
+		value := dependenciesMap[expectedKey]
+		assert.NotNil(t, value)
+		assert.EqualValues(t, expectedValue.Value, value.Value)
+		assert.EqualValues(t, expectedValue.Details.Version, value.Details.Version)
+		if expectedValue.Details.Dependencies != nil {
+			assert.Equal(t, len(expectedValue.Details.Dependencies), len(value.Details.Dependencies))
+			for i, expectedDep := range expectedValue.Details.Dependencies {
+				assert.EqualValues(t, expectedDep, value.Details.Dependencies[i])
+			}
 		}
 	}
 }
