@@ -124,7 +124,6 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 	if isV2AndAbove {
 		dependenciesMap, root, err = buildYarnV2DependencyMap(packageInfo, responseStr)
 	} else {
-		responseStr = "{\"type\":\"tree\",\"data\":{\"type\":\"list\",\"trees\":[{\"name\":\"minimist@1.2.5\",\"children\":[],\"hint\":null,\"color\":\"bold\",\"depth\":0},{\"name\":\"yarn-inner@1.0.0\",\"children\":[{\"name\":\"tough-cookie@2.5.0\",\"color\":\"dim\",\"shadow\":true}],\"hint\":null,\"color\":\"bold\",\"depth\":0}]}}"
 		dependenciesMap, root, err = buildYarnV1DependencyMap(packageInfo, responseStr, allowPartialResults, log)
 	}
 	return
