@@ -104,10 +104,11 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmListP
 		return nil, err
 	}
 	var data []byte
-	// If we don't have node_modules, the function will use the package-lock dependencies.
-	if nodeModulesExist && !npmListParams.IgnoreNodeModules {
+	// When `skipInstall` is true, we aim to rely on the dependencies specified in the package-lock, so Frogbot will not execute 'npm ls' on modules that are unbuilt and lack lock files (which may still have incomplete node_modules that could cause errors).
+	if nodeModulesExist && !npmListParams.IgnoreNodeModules && !skipInstall {
 		data = runNpmLsWithNodeModules(executablePath, srcPath, npmListParams.Args, log)
 	} else {
+		// If we don't have node_modules, the function will use the package-lock dependencies.
 		data, err = runNpmLsWithoutNodeModules(executablePath, srcPath, npmListParams, log, npmVersion, skipInstall)
 		if err != nil {
 			return nil, err
