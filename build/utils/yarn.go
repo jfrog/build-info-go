@@ -94,10 +94,16 @@ func GetYarnExecutable() (string, error) {
 	return yarnExecPath, nil
 }
 
-// Returns a map of the dependencies of a Yarn project and the root package of the project.
-// The keys are the packages' values (Yarn's full identifiers of the packages), for example: '@scope/package-name@1.0.0'
-// (for yarn v < 2.0.0) or @scope/package-name@npm:1.0.0 (for yarn v >= 2.0.0).
-// Pay attention that a package's value won't necessarily contain its version. Use the version in package's details instead.
+// Returns a map of the dependencies of a Yarn project along with the root package of the project.
+// The map's keys are the full identifiers of the packages as used by Yarn; for example:
+// '@scope/package-name@1.0.0' (for Yarn versions < 2.0.0) or '@scope/package-name@npm:1.0.0' (for Yarn versions >= 2.0.0).
+// Note that a package's value may not necessarily contain its version; instead, use the version in the package's details.
+// Arguments:
+// executablePath - The path to the Yarn executable.
+// srcPath - The path to the project's source that we wish to work with.
+// packageInfo - The project's package information.
+// log - The logger.
+// allowPartialResults - If true, the function will allow some errors to occur without failing the flow and will generate partial results.
 func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInfo, log utils.Log, allowPartialResults bool) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
 	executableVersionStr, err := GetVersion(executablePath, srcPath)
 	if err != nil {
@@ -144,9 +150,14 @@ func GetVersion(executablePath, srcPath string) (string, error) {
 	return strings.TrimSpace(outBuffer.String()), err
 }
 
-// Builds a map of dependencies for Yarn versions < 2.0.0
-// Pay attention that in Yarn < 2.0.0 the project itself with its direct dependencies is not presented when running the
-// command 'yarn list' therefore the root is built manually.
+// Builds a map of dependencies for Yarn versions < 2.0.0.
+// Note that in Yarn < 2.0.0, the project itself, along with its direct dependencies, is not present when running the
+// command 'yarn list'; therefore, the root is built manually.
+// Arguments:
+// packageInfo - The project's package information.
+// responseStr - The response string from the 'yarn list' command.
+// allowPartialResults - If true, the function will allow some errors to occur without failing the flow and will generate partial results.
+// log - The logger.
 func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string, allowPartialResults bool, log utils.Log) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
 	dependenciesMap = make(map[string]*YarnDependency)
 	var depTree Yarn1Data
@@ -179,8 +190,7 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string, allo
 		}
 		packNameToFullName[packageCleanName] = curDependency.Name
 	}
-	log.Debug(fmt.Sprintf("package name to full name map content: %v", packNameToFullName))
-	log.Debug(fmt.Sprintf("'yarn list' output string: %s", responseStr))
+	log.Debug(fmt.Sprintf("'yarn list' output string: %s\n\nPackage name to full name map content: %v", responseStr, packNameToFullName))
 
 	// Adding child dependencies for each dependency
 	for _, curDependency := range depTree.Data.DepTree {
@@ -242,7 +252,7 @@ func buildYarnV2DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 	return
 }
 
-// Depends on the yarn version currently operating on the project, runs the command that gets the dependencies of the project
+// Depending on the Yarn version currently in use for the project, this function runs the command that retrieves the project's dependencies
 func runYarnInfoOrList(executablePath string, srcPath string, v2AndAbove bool) (outResult, errResult string, err error) {
 	var command *exec.Cmd
 	if v2AndAbove {
