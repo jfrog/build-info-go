@@ -82,7 +82,7 @@ func (ym *YarnModule) Build() error {
 }
 
 func (ym *YarnModule) getDependenciesMap() (map[string]*entities.Dependency, error) {
-	dependenciesMap, root, err := buildutils.GetYarnDependencies(ym.executablePath, ym.srcPath, ym.packageInfo, ym.containingBuild.logger)
+	dependenciesMap, root, err := buildutils.GetYarnDependencies(ym.executablePath, ym.srcPath, ym.packageInfo, ym.containingBuild.logger, false)
 	if err != nil {
 		return nil, err
 	}
