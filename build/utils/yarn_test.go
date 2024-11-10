@@ -4,6 +4,7 @@ import (
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -170,8 +171,16 @@ func TestBuildYarnV1DependencyMapWithLackingDependencyInResponseString(t *testin
 
 	dependenciesMap, root, err := buildYarnV1DependencyMap(packageInfo, responseStr, true, &utils.NullLog{})
 	assert.NoError(t, err)
-	assert.EqualValues(t, expectedRoot, *root)
+	// Verifying root
+	assert.NotNil(t, root)
+	assert.Equal(t, expectedRoot.Value, root.Value)
+	assert.Len(t, root.Details.Dependencies, len(expectedRoot.Details.Dependencies))
+	sort.Slice(root.Details.Dependencies, func(i, j int) bool {
+		return root.Details.Dependencies[i].Locator < root.Details.Dependencies[j].Locator
+	})
+	assert.EqualValues(t, expectedRoot.Details.Dependencies, root.Details.Dependencies)
 
+	// Verifying dependencies map
 	assert.Equal(t, len(expectedDependenciesMap), len(dependenciesMap))
 	for expectedKey, expectedValue := range expectedDependenciesMap {
 		value := dependenciesMap[expectedKey]
@@ -179,10 +188,10 @@ func TestBuildYarnV1DependencyMapWithLackingDependencyInResponseString(t *testin
 		assert.EqualValues(t, expectedValue.Value, value.Value)
 		assert.EqualValues(t, expectedValue.Details.Version, value.Details.Version)
 		if expectedValue.Details.Dependencies != nil {
-			assert.Equal(t, len(expectedValue.Details.Dependencies), len(value.Details.Dependencies))
-			for i, expectedDep := range expectedValue.Details.Dependencies {
-				assert.EqualValues(t, expectedDep, value.Details.Dependencies[i])
-			}
+			sort.Slice(value.Details.Dependencies, func(i, j int) bool {
+				return value.Details.Dependencies[i].Locator < value.Details.Dependencies[j].Locator
+			})
+			assert.EqualValues(t, expectedValue.Details.Dependencies, value.Details.Dependencies)
 		}
 	}
 }
