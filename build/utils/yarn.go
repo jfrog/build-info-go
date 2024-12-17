@@ -106,6 +106,7 @@ func GetYarnExecutable() (string, error) {
 // allowPartialResults - If true, the function will allow some errors to occur without failing the flow and will generate partial results.
 func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInfo, log utils.Log, allowPartialResults bool) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
 	executableVersionStr, err := GetVersion(executablePath, srcPath)
+	print("bla bla")
 	if err != nil {
 		return
 	}
