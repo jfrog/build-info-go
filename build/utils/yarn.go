@@ -367,14 +367,17 @@ type YarnDependency struct {
 	Details YarnDepDetails `json:"children,omitempty"`
 }
 
-func (yd *YarnDependency) Name() string {
+func (yd *YarnDependency) Name() (string, error) {
+	if yd.Value == "" || len(yd.Value) < 2 {
+		return "", errors.New(fmt.Sprintf("got an empty name yarn dependency: %+v", yd))
+	}
 	// Find the first index of '@', starting from position 1. In scoped dependencies (like '@jfrog/package-name@npm:1.2.3') we want to keep the first '@' as part of the name.
 	if strings.Contains(yd.Value[1:], "@") {
 		atSignIndex := strings.Index(yd.Value[1:], "@") + 1
-		return yd.Value[:atSignIndex]
+		return yd.Value[:atSignIndex], nil
 	}
 	// In some cases when using yarn V1 we encounter package names without their version (project's package name)
-	return yd.Value
+	return yd.Value, nil
 }
 
 type YarnDepDetails struct {

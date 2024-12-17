@@ -28,7 +28,9 @@ func TestYarnDependencyName(t *testing.T) {
 
 	for _, testCase := range testCases {
 		dependency := &buildutils.YarnDependency{Value: testCase.dependencyValue}
-		assert.Equal(t, testCase.expectedName, dependency.Name())
+		depName, err := dependency.Name()
+		assert.NoError(t, err)
+		assert.Equal(t, testCase.expectedName, depName)
 	}
 }
 
