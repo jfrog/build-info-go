@@ -132,6 +132,7 @@ func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInf
 	} else {
 		dependenciesMap, root, err = buildYarnV1DependencyMap(packageInfo, responseStr, allowPartialResults, log)
 	}
+	log.Debug(fmt.Sprintf("final dependencies map: %+v", dependenciesMap))
 	return
 }
 
