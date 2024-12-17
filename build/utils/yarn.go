@@ -183,6 +183,15 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string, allo
 		if err != nil {
 			return
 		}
+		if packageCleanName == "" || packageVersion == "" {
+			// If we enter this case it means we got an unexpected name for a dependency that might cause issues later on when constructing the tree
+			log.Debug(fmt.Sprintf("got an unexpected dependency name when building Yarn V1 dependency map.\nfull name: '%s' | clean name: '%s' | clean version: '%s'", curDependency.Name, packageCleanName, packageVersion))
+			if allowPartialResults {
+				log.Warn(fmt.Sprintf("got an unexpected package name during Yarn V1 dependencies map calculation: %s\nFinal rasults may be partial", curDependency.Name))
+				continue
+			}
+			err = fmt.Errorf("couldn't parse correctly the following dependency during Yarn V1 dependencies map calculation: %s", curDependency.Name)
+		}
 		// We insert to dependenciesMap dependencies with the resolved versions only. All dependencies at the responseStr first level contain resolved versions only (their children may contain caret version ranges).
 		dependenciesMap[curDependency.Name] = &YarnDependency{
 			Value:   curDependency.Name,
@@ -313,7 +322,7 @@ func buildYarn1Root(packageInfo *PackageInfo, packNameToFullName map[string]stri
 	return rootDependency
 }
 
-// splitNameAndVersion splits package name for package version for th following formats ONLY: package-name@version, package-name@npm:version
+// Splits package name for package version for th following formats ONLY: package-name@version, package-name@npm:version
 func splitNameAndVersion(packageFullName string) (packageCleanName string, packageVersion string, err error) {
 	packageFullName = strings.Replace(packageFullName, "npm:", "", 1)
 	indexOfLastAt := strings.LastIndex(packageFullName, "@")
@@ -368,8 +377,8 @@ type YarnDependency struct {
 }
 
 func (yd *YarnDependency) Name() (string, error) {
-	if yd.Value == "" || len(yd.Value) < 2 {
-		return "", errors.New(fmt.Sprintf("got an empty name yarn dependency: %+v", yd))
+	if yd.Value == "" {
+		return "", fmt.Errorf("got an empty name yarn dependency: %+v", yd)
 	}
 	// Find the first index of '@', starting from position 1. In scoped dependencies (like '@jfrog/package-name@npm:1.2.3') we want to keep the first '@' as part of the name.
 	if strings.Contains(yd.Value[1:], "@") {
