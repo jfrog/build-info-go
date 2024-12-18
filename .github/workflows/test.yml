@@ -55,7 +55,7 @@ jobs:
 
       # Install Mono on Ubuntu to run nuget.exe (due to this issue on Ubuntu 24 that hasn't been fixed yet - https://github.com/NuGet/setup-nuget/issues/168)
       - name: Install Mono on Ubuntu
-        if: matrix.os == 'ubuntu'
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y apt-transport-https dirmngr gnupg ca-certificates
