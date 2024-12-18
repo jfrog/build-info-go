@@ -3,7 +3,6 @@
 ![Introduction gif](images/dark.gif#gh-dark-mode-only)
 ![Introduction gif](images/light.gif#gh-light-mode-only)
 
-
 # Build Info Go
 
 [![Scanned by Frogbot](https://raw.github.com/jfrog/frogbot/master/images/frogbot-badge.svg)](https://github.com/jfrog/frogbot#readme)
