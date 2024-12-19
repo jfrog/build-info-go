@@ -192,6 +192,7 @@ func buildYarnV1DependencyMap(packageInfo *PackageInfo, responseStr string, allo
 				continue
 			}
 			err = fmt.Errorf("couldn't parse correctly the following dependency during Yarn V1 dependencies map calculation: %s", curDependency.Name)
+			return
 		}
 		// We insert to dependenciesMap dependencies with the resolved versions only. All dependencies at the responseStr first level contain resolved versions only (their children may contain caret version ranges).
 		dependenciesMap[curDependency.Name] = &YarnDependency{
@@ -323,7 +324,7 @@ func buildYarn1Root(packageInfo *PackageInfo, packNameToFullName map[string]stri
 	return rootDependency
 }
 
-// Splits package name for package version for th following formats ONLY: package-name@version, package-name@npm:version
+// Splits the package name and version for the following formats ONLY: package-name@version and package-name@npm:version
 func splitNameAndVersion(packageFullName string) (packageCleanName string, packageVersion string, err error) {
 	packageFullName = strings.Replace(packageFullName, "npm:", "", 1)
 	indexOfLastAt := strings.LastIndex(packageFullName, "@")
