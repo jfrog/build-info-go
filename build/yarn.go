@@ -93,7 +93,11 @@ func (ym *YarnModule) getDependenciesMap() (map[string]*entities.Dependency, err
 
 func (ym *YarnModule) appendDependencyRecursively(yarnDependency *buildutils.YarnDependency, pathToRoot []string, yarnDependenciesMap map[string]*buildutils.YarnDependency,
 	buildInfoDependencies map[string]*entities.Dependency) error {
-	id := yarnDependency.Name() + ":" + yarnDependency.Details.Version
+	depName, err := yarnDependency.Name()
+	if err != nil {
+		return err
+	}
+	id := depName + ":" + yarnDependency.Details.Version
 
 	// To avoid infinite loops in case of circular dependencies, the dependency won't be added if it's already in pathToRoot
 	if slices.Contains(pathToRoot, id) {
@@ -106,7 +110,7 @@ func (ym *YarnModule) appendDependencyRecursively(yarnDependency *buildutils.Yar
 		if !exist {
 			return fmt.Errorf("an error occurred while creating dependencies tree: dependency %s was not found", dependencyPtr.Locator)
 		}
-		err := ym.appendDependencyRecursively(innerYarnDep, append([]string{id}, pathToRoot...), yarnDependenciesMap,
+		err = ym.appendDependencyRecursively(innerYarnDep, append([]string{id}, pathToRoot...), yarnDependenciesMap,
 			buildInfoDependencies)
 		if err != nil {
 			return err
