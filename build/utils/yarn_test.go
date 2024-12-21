@@ -208,7 +208,9 @@ func TestYarnDependency_Name(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		yarnDep := YarnDependency{Value: testCase.packageFullName}
-		assert.Equal(t, testCase.packageExpectedName, yarnDep.Name())
+		depName, err := yarnDep.Name()
+		assert.NoError(t, err)
+		assert.Equal(t, testCase.packageExpectedName, depName)
 	}
 }
 
