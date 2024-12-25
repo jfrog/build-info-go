@@ -25,7 +25,6 @@ func getPipenvDependencies(srcPath string, logger utils.Log) (dependenciesGraph 
 	logger.Debug("pipenv graph --json output:\n" + string(output))
 	// Parse into array.
 	packages := make([]pythonDependencyPackage, 0)
-	// Sometimes, `pipenv graph --json` command returns output with new line characters in between (not valid json) So, we need to remove them before unmarshalling.
 	err = json.Unmarshal(cleanJsonOutput(output), &packages)
 	if err != nil {
 		err = fmt.Errorf("failed to parse pipenv graph --json output: %s", err.Error())
@@ -35,7 +34,7 @@ func getPipenvDependencies(srcPath string, logger utils.Log) (dependenciesGraph 
 	return
 }
 
-// Sometimes, `pipenv graph --json` command returns output with new line characters in between (not valid json) So, we need to remove them before unmarshalling.
+// Sometimes, `pipenv graph --json` command returns output with new line characters in between (not valid json) So, we need to remove them before unmarshaling.
 func cleanJsonOutput(output []byte) []byte {
 	// For Windows
 	out := strings.ReplaceAll(string(output), "\r\n", "")
