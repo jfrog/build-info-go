@@ -1,12 +1,18 @@
 package pythonutils
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/io"
+)
+
+var (
+	windowsReplaceBytes = []byte("\r\n")
+	unixReplaceBytes    = []byte("\n")
+	replacementBytes    = []byte("")
 )
 
 // Executes pipenv graph.
@@ -36,8 +42,5 @@ func getPipenvDependencies(srcPath string, logger utils.Log) (dependenciesGraph 
 
 // Sometimes, `pipenv graph --json` command returns output with new line characters in between (not valid json) So, we need to remove them before unmarshaling.
 func cleanJsonOutput(output []byte) []byte {
-	// For Windows
-	out := strings.ReplaceAll(string(output), "\r\n", "")
-	// For Unix
-	return []byte(strings.ReplaceAll(out, "\n", ""))
+	return bytes.ReplaceAll(bytes.ReplaceAll(output, windowsReplaceBytes, replacementBytes), unixReplaceBytes, replacementBytes)
 }
