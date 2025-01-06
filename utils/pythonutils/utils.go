@@ -86,12 +86,12 @@ func GetPythonDependenciesFiles(tool PythonTool, args []string, buildName, build
 	}
 }
 
-func GetPythonDependencies(tool PythonTool, srcPath, localDependenciesPath string) (dependenciesGraph map[string][]string, topLevelDependencies []string, err error) {
+func GetPythonDependencies(tool PythonTool, srcPath, localDependenciesPath string, logger utils.Log) (dependenciesGraph map[string][]string, topLevelDependencies []string, err error) {
 	switch tool {
 	case Pip:
 		return getPipDependencies(srcPath, localDependenciesPath)
 	case Pipenv:
-		return getPipenvDependencies(srcPath)
+		return getPipenvDependencies(srcPath, logger)
 	case Poetry:
 		return getPoetryDependencies(srcPath)
 	default:
