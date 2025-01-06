@@ -42,5 +42,8 @@ func getPipenvDependencies(srcPath string, logger utils.Log) (dependenciesGraph 
 
 // Sometimes, `pipenv graph --json` command returns output with new line characters in between (not valid json) So, we need to remove them before unmarshaling.
 func cleanJsonOutput(output []byte) []byte {
-	return bytes.ReplaceAll(bytes.ReplaceAll(output, windowsReplaceBytes, replacementBytes), unixReplaceBytes, replacementBytes)
+	// For Windows
+	output = bytes.ReplaceAll(output, windowsReplaceBytes, replacementBytes)
+	// For Unix
+	return bytes.ReplaceAll(output, unixReplaceBytes, replacementBytes)
 }
