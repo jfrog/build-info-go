@@ -33,7 +33,7 @@ func (pm *PythonModule) RunInstallAndCollectDependencies(commandArgs []string) e
 	if err != nil {
 		return err
 	}
-	dependenciesGraph, topLevelPackagesList, err := pythonutils.GetPythonDependencies(pm.tool, pm.srcPath, pm.localDependenciesPath)
+	dependenciesGraph, topLevelPackagesList, err := pythonutils.GetPythonDependencies(pm.tool, pm.srcPath, pm.localDependenciesPath, pm.containingBuild.logger)
 	if err != nil {
 		return fmt.Errorf("failed while attempting to get %s dependencies graph: %s", pm.tool, err.Error())
 	}
