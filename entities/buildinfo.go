@@ -343,6 +343,16 @@ type PublishedBuildInfo struct {
 	BuildInfo BuildInfo `json:"buildInfo,omitempty"`
 }
 
+type BuildRuns struct {
+	Uri           string     `json:"uri,omitempty"`
+	BuildsNumbers []BuildRun `json:"buildsNumbers,omitempty"`
+}
+
+type BuildRun struct {
+	Uri     string `json:"uri,omitempty"`
+	Started string `json:"started,omitempty"`
+}
+
 type Agent struct {
 	Name    string `json:"name,omitempty"`
 	Version string `json:"version,omitempty"`
