@@ -11,6 +11,7 @@ import (
 	"time"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
+	"github.com/jfrog/gofrog/datastructures"
 	"github.com/jfrog/gofrog/stringutils"
 )
 
@@ -123,6 +124,7 @@ func (targetBuildInfo *BuildInfo) IncludeEnv(patterns ...string) error {
 
 // ExcludeEnv gets one or more wildcard patterns and filters out environment variables that match at least one of them.
 func (targetBuildInfo *BuildInfo) ExcludeEnv(patterns ...string) error {
+	patterns = datastructures.MakeSetFromElements(patterns...).ToSlice()
 	for key := range targetBuildInfo.Properties {
 		if !strings.HasPrefix(key, BuildInfoEnvPrefix) {
 			continue
