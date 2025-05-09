@@ -25,12 +25,92 @@ func TwineUploadWithLogParsing(commandArgs []string, srcPath string) (artifactsP
 	commandArgs = addRequiredFlags(commandArgs)
 	uploadCmd := gofrogcmd.NewCommand(_twineExeName, _twineUploadCmdName, commandArgs)
 	uploadCmd.Dir = srcPath
-	log.Debug("Running twine command: '", _twineExeName, _twineUploadCmdName, strings.Join(commandArgs, " "), "'with build info collection")
-	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(uploadCmd, true, getArtifactsParser(&artifactsPaths))
-	if err != nil {
-		return nil, fmt.Errorf("failed running '%s %s %s' command with error: '%s - %s'", _twineExeName, _twineUploadCmdName, strings.Join(commandArgs, " "), err.Error(), errorOut)
+
+	log.Debug(fmt.Sprintf("Running twine command: '%s %s %s' with build info collection in dir '%s'",
+		_twineExeName, _twineUploadCmdName, strings.Join(commandArgs, " "), srcPath))
+
+	rawStdout, execErr := gofrogcmd.RunCmdOutput(uploadCmd)
+
+	if execErr != nil {
+		return nil, fmt.Errorf("failed running '%s %s %s': %w. Raw stdout (if any): %s",
+			_twineExeName, _twineUploadCmdName, strings.Join(commandArgs, " "), execErr, rawStdout)
 	}
-	return
+
+	if rawStdout != "" {
+		rawLinesForDebug := strings.Split(rawStdout, "\n")
+		for i, line := range rawLinesForDebug {
+			log.Debug(fmt.Sprintf("Raw STDOUT [%04d]: %s", i, line))
+		}
+	} else {
+		log.Debug("Twine command raw stdout was empty.")
+	}
+
+	lines := strings.Split(rawStdout, "\n")
+	mergedLines := mergeTwineWrappedLines(lines)
+
+	if len(mergedLines) > 0 {
+		for i, line := range mergedLines {
+			log.Debug(fmt.Sprintf("Merged Line [%04d]: %s", i, line))
+		}
+	} else {
+		log.Debug("No lines after merging (or raw stdout was empty).")
+	}
+
+	// Regexp to catch the paths in lines such as "INFO     dist/jfrog_python_example-1.0-py3-none-any.whl (1.6 KB)"
+	// First part ".+\s" is the line prefix.
+	// Second part "([^ \t]+)" is the artifact path as a group.
+	// Third part "\s+\([\d.]+\s+[A-Za-z]{2}\)" is the size and unit, surrounded by parentheses.
+	Regexp := regexp.MustCompile(`^.+\s([^ \t]+)\s+\([\d.]+\s+[A-Za-z]{2}\)`)
+
+	for _, line := range mergedLines {
+		matches := Regexp.FindStringSubmatch(line)
+		if len(matches) >= 2 {
+			path := strings.TrimSpace(matches[1])
+			if path != "" {
+				log.Debug(fmt.Sprintf("Extracted artifact path: '%s' from merged line: '%s'", path, line))
+				artifactsPaths = append(artifactsPaths, path)
+			} else {
+				log.Debug(fmt.Sprintf("Regex matched, but captured path is empty after trim from merged line: '%s'", line))
+			}
+		}
+	}
+
+	if len(artifactsPaths) == 0 && len(strings.TrimSpace(rawStdout)) > 0 {
+		log.Debug("No artifact paths extracted from Twine output. This might be expected or indicate a parsing issue with current logic/regex.")
+	}
+
+	return artifactsPaths, nil
+}
+
+func mergeTwineWrappedLines(lines []string) []string {
+	if len(lines) == 0 {
+		return []string{}
+	}
+
+	var mergedLines []string
+	var currentLineBuffer strings.Builder
+
+	currentLineBuffer.WriteString(lines[0])
+
+	for i := 1; i < len(lines); i++ {
+		line := lines[i]
+		if strings.HasPrefix(line, " ") && currentLineBuffer.Len() > 0 {
+			currentLineBuffer.WriteString(" ")
+			currentLineBuffer.WriteString(strings.TrimSpace(line))
+		} else {
+			if currentLineBuffer.Len() > 0 {
+				mergedLines = append(mergedLines, currentLineBuffer.String())
+			}
+			currentLineBuffer.Reset()
+			currentLineBuffer.WriteString(line)
+		}
+	}
+
+	if currentLineBuffer.Len() > 0 {
+		mergedLines = append(mergedLines, currentLineBuffer.String())
+	}
+
+	return mergedLines
 }
 
 // Enabling verbose and disabling progress bar are required for log parsing.
@@ -41,25 +121,6 @@ func addRequiredFlags(commandArgs []string) []string {
 		}
 	}
 	return commandArgs
-}
-
-func getArtifactsParser(artifactsPaths *[]string) (parser *gofrogcmd.CmdOutputPattern) {
-	return &gofrogcmd.CmdOutputPattern{
-		// Regexp to catch the paths in lines such as "INFO     dist/jfrog_python_example-1.0-py3-none-any.whl (1.6 KB)"
-		// First part ".+\s" is the line prefix.
-		// Second part "([^ \t]+)" is the artifact path as a group.
-		// Third part "\s+\([\d.]+\s+[A-Za-z]{2}\)" is the size and unit, surrounded by parentheses.
-		RegExp: regexp.MustCompile(`^.+\s([^ \t]+)\s+\([\d.]+\s+[A-Za-z]{2}\)`),
-		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
-			// Check for out of bound results.
-			if len(pattern.MatchedResults)-1 <= 0 {
-				log.Debug(fmt.Sprintf("Failed extracting artifact name from line: %s", pattern.Line))
-				return pattern.Line, nil
-			}
-			*artifactsPaths = append(*artifactsPaths, pattern.MatchedResults[1])
-			return pattern.Line, nil
-		},
-	}
 }
 
 // Create artifacts entities from the artifacts paths that were found during the upload.
