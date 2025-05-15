@@ -23,6 +23,10 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	// Get the executable path of the python interpreter (python3 or py fallback to python if needed)
 	pythonExecutable, _ := GetPython3Executable(false)
 	log.Debug("Getting pip dependencies using python executable: ", pythonExecutable)
+	if utils.IsWindows() && strings.Contains(pythonExecutable, "python3") {
+		log.Warn("Using python3 executable on Windows is not supported for getting pip dependencies. Please use 'python' instead.")
+		pythonExecutable = "python"
+	}
 	localPipdeptree := io.NewCommand(pythonExecutable, "", []string{localPipdeptreeScript, "--json"})
 	localPipdeptree.Dir = srcPath
 	output, err := localPipdeptree.RunWithOutput()
