@@ -19,7 +19,9 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	if err != nil {
 		return nil, nil, err
 	}
-	localPipdeptree := io.NewCommand("python", "", []string{localPipdeptreeScript, "--json"})
+	// Get the executable path of the python interpreter (python3 or py fallback to python if needed)
+	pythonExecutable, _ := GetPython3Executable(false)
+	localPipdeptree := io.NewCommand(pythonExecutable, "", []string{localPipdeptreeScript, "--json"})
 	localPipdeptree.Dir = srcPath
 	output, err := localPipdeptree.RunWithOutput()
 	if err != nil {
