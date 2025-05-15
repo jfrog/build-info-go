@@ -11,6 +11,7 @@ import (
 
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/io"
+	"github.com/jfrog/gofrog/log"
 )
 
 // Executes the pip-dependency-map script and returns a dependency map of all the installed pip packages in the current environment to and another list of the top level dependencies
@@ -20,15 +21,14 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 		return nil, nil, err
 	}
 	// Get the executable path of the python interpreter (python3 or py fallback to python if needed)
-	var args []string
-	pythonExecutable, windowsPyArg := GetPython3Executable()
-	if windowsPyArg != "" {
-		args = append(args, windowsPyArg)
+	pythonExecutable, _ := GetPython3Executable(false)
+	log.Debug("Getting pip dependencies using python executable: ", pythonExecutable)
+	if utils.IsWindows() && strings.Contains(pythonExecutable, "python3") {
+		// On Windows, python3 executing the script will fetch the global dependencies and not the local ones. investigation is needed.
+		log.Warn("Using python3 executable on Windows is not supported for getting pip dependencies. Please use 'python' instead.")
+		pythonExecutable = "python"
 	}
-	// Add the script path to the args
-	args = append(args, localPipdeptreeScript, "--json")
-
-	localPipdeptree := io.NewCommand(pythonExecutable, "", args)
+	localPipdeptree := io.NewCommand(pythonExecutable, "", []string{localPipdeptreeScript, "--json"})
 	localPipdeptree.Dir = srcPath
 	output, err := localPipdeptree.RunWithOutput()
 	if err != nil {
@@ -129,7 +129,7 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 
 	// Run python 'egg_info --egg-base <eggBase>' command.
 	var args []string
-	pythonExecutable, windowsPyArg := GetPython3Executable()
+	pythonExecutable, windowsPyArg := GetPython3Executable(true)
 	if windowsPyArg != "" {
 		args = append(args, windowsPyArg)
 	}
@@ -145,11 +145,11 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 	return extractPackageNameFromEggBase(eggBase)
 }
 
-func GetPython3Executable() (string, string) {
+func GetPython3Executable(useWinPyLauncher bool) (string, string) {
 	windowsPyArg := ""
 	pythonExecutable, _ := exec.LookPath("python3")
 	if pythonExecutable == "" {
-		if utils.IsWindows() {
+		if utils.IsWindows() && useWinPyLauncher {
 			// If the OS is Windows try using Py Launcher: 'py -3'
 			pythonExecutable, _ = exec.LookPath("py")
 			if pythonExecutable != "" {
