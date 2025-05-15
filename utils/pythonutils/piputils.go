@@ -24,6 +24,7 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	pythonExecutable, _ := GetPython3Executable(false)
 	log.Debug("Getting pip dependencies using python executable: ", pythonExecutable)
 	if utils.IsWindows() && strings.Contains(pythonExecutable, "python3") {
+		// On Windows, python3 executing the script will fetch the global dependencies and not the local ones. investigation is needed.
 		log.Warn("Using python3 executable on Windows is not supported for getting pip dependencies. Please use 'python' instead.")
 		pythonExecutable = "python"
 	}
