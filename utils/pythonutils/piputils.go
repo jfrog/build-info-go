@@ -21,7 +21,7 @@ func getPipDependencies(srcPath, dependenciesDirName string) (map[string][]strin
 	}
 	// Get the executable path of the python interpreter (python3 or py fallback to python if needed)
 	var args []string
-	pythonExecutable, windowsPyArg := GetPython3Executable()
+	pythonExecutable, windowsPyArg := GetPython3Executable(false)
 	if windowsPyArg != "" {
 		args = append(args, windowsPyArg)
 	}
@@ -129,7 +129,7 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 
 	// Run python 'egg_info --egg-base <eggBase>' command.
 	var args []string
-	pythonExecutable, windowsPyArg := GetPython3Executable()
+	pythonExecutable, windowsPyArg := GetPython3Executable(true)
 	if windowsPyArg != "" {
 		args = append(args, windowsPyArg)
 	}
@@ -145,11 +145,11 @@ func getEgginfoPkginfoContent(setuppyFilePath string) (output []byte, err error)
 	return extractPackageNameFromEggBase(eggBase)
 }
 
-func GetPython3Executable() (string, string) {
+func GetPython3Executable(useWinPyLauncher bool) (string, string) {
 	windowsPyArg := ""
 	pythonExecutable, _ := exec.LookPath("python3")
 	if pythonExecutable == "" {
-		if utils.IsWindows() {
+		if utils.IsWindows() && useWinPyLauncher {
 			// If the OS is Windows try using Py Launcher: 'py -3'
 			pythonExecutable, _ = exec.LookPath("py")
 			if pythonExecutable != "" {
