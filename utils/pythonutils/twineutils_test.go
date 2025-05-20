@@ -1,68 +1,45 @@
 package pythonutils
 
 import (
+	gofrogcmd "github.com/jfrog/gofrog/io"
 	"github.com/stretchr/testify/assert"
-	"regexp"
-	"strings"
 	"testing"
 )
 
-func TestMergeTwineWrappedLines(t *testing.T) {
+func TestTwineUploadCapture(t *testing.T) {
 	tests := []struct {
-		name              string
-		rawOutput         string
-		expectedArtifacts []string
+		name             string
+		text             string
+		expectedCaptures []string
 	}{
 		{
-			name: "wrapped artifact lines",
-			rawOutput: `
+			name: "verbose true",
+			text: `
+Uploading distributions to https://myplatform.jfrog.io/artifactory/api/pypi/twine-local/
 INFO     dist/jfrog_python_example-1.0-py3-none-any.whl (1.6 KB)
-INFO     dist/jfrog_python_example-1.0.tar.gz
-         (2.4 KB)
-INFO     some other non-matching line
-INFO     dist/another_package-2.0.whl (3.2 KB)`,
-			expectedArtifacts: []string{
-				"dist/jfrog_python_example-1.0-py3-none-any.whl",
-				"dist/jfrog_python_example-1.0.tar.gz",
-				"dist/another_package-2.0.whl",
-			},
-		},
-		{
-			name: "empty output",
-			rawOutput: `
-`,
-			expectedArtifacts: []string{},
-		},
-		{
-			name: "malformed output",
-			rawOutput: `
-INFO     dist/invalid_package
-INFO     dist/valid_package-1.2.3.tar.gz (1.5 MB)`,
-			expectedArtifacts: []string{
-				"dist/valid_package-1.2.3.tar.gz",
-			},
+INFO     dist/jfrog_python_example-1.0.tar.gz (2.4 KB)
+INFO     username set by command options
+INFO     password set by command options
+INFO     username: user
+INFO     password: <hidden>
+Uploading jfrog_python_example-1.0-py3-none-any.whl
+100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 kB • 00:00 • ?
+INFO     Response from https://myplatform.jfrog.io/artifactory/api/pypi/twine-local/:
+         200
+Uploading jfrog_python_example-1.0.tar.gz
+100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.3/5.3 kB • 00:00 • ?
+INFO     Response from https://myplatform.jfrog.io/artifactory/api/pypi/twine-local/:
+         200`,
+			expectedCaptures: []string{"dist/jfrog_python_example-1.0-py3-none-any.whl",
+				"dist/jfrog_python_example-1.0.tar.gz"},
 		},
 	}
 
-	artifactRegex := regexp.MustCompile(`^.+\s([^ \t]+)\s+\([\d.]+\s+[A-Za-z]{2}\)`)
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			lines := strings.Split(tc.rawOutput, "\n")
-			merged := mergeTwineWrappedLines(lines)
-
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
 			var artifacts []string
-			for _, line := range merged {
-				matches := artifactRegex.FindStringSubmatch(line)
-				if len(matches) >= 2 {
-					path := strings.TrimSpace(matches[1])
-					if path != "" {
-						artifacts = append(artifacts, path)
-					}
-				}
-			}
-
-			assert.ElementsMatch(t, artifacts, tc.expectedArtifacts)
+			runDummyTextStream(t, testCase.text, []*gofrogcmd.CmdOutputPattern{getArtifactsParser(&artifacts)})
+			assert.ElementsMatch(t, artifacts, testCase.expectedCaptures)
 		})
 	}
 }
