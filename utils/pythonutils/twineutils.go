@@ -6,6 +6,7 @@ import (
 	"github.com/jfrog/gofrog/crypto"
 	gofrogcmd "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/gofrog/log"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -25,6 +26,12 @@ func TwineUploadWithLogParsing(commandArgs []string, srcPath string) (artifactsP
 	commandArgs = addRequiredFlags(commandArgs)
 	uploadCmd := gofrogcmd.NewCommand(_twineExeName, _twineUploadCmdName, commandArgs)
 	uploadCmd.Dir = srcPath
+
+	if err = os.Setenv("COLUMNS", "300"); err != nil {
+		return nil, fmt.Errorf("failed adding columns env %v", err.Error())
+	}
+	defer os.Unsetenv("COLUMNS")
+
 	log.Debug("Running twine command: '", _twineExeName, _twineUploadCmdName, strings.Join(commandArgs, " "), "'with build info collection")
 	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(uploadCmd, true, getArtifactsParser(&artifactsPaths))
 	if err != nil {
