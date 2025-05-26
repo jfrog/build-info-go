@@ -15,10 +15,12 @@ import (
 )
 
 const (
-	_twineExeName        = "twine"
-	_twineUploadCmdName  = "upload"
-	_verboseFlag         = "--verbose"
-	_disableProgressFlag = "--disable-progress-bar"
+	_twineExeName                 = "twine"
+	_twineUploadCmdName           = "upload"
+	_verboseFlag                  = "--verbose"
+	_disableProgressFlag          = "--disable-progress-bar"
+	twineCommandMaxLogCharsEnvKey = "COLUMNS"
+	twineCommandMaxLogCharsLength = "300"
 )
 
 // Run a twine upload and parse artifacts paths from logs.
@@ -27,10 +29,16 @@ func TwineUploadWithLogParsing(commandArgs []string, srcPath string) (artifactsP
 	uploadCmd := gofrogcmd.NewCommand(_twineExeName, _twineUploadCmdName, commandArgs)
 	uploadCmd.Dir = srcPath
 
-	if err = os.Setenv("COLUMNS", "300"); err != nil {
-		return nil, fmt.Errorf("failed adding columns env %v", err.Error())
+	// Set the environment variable to define the maximum log line length
+	if err = os.Setenv(twineCommandMaxLogCharsEnvKey, twineCommandMaxLogCharsLength); err != nil {
+		return nil, fmt.Errorf("failed adding %s env %v", twineCommandMaxLogCharsEnvKey, err.Error())
 	}
-	defer os.Unsetenv("COLUMNS")
+	defer func() {
+		err := os.Unsetenv(twineCommandMaxLogCharsEnvKey)
+		if err != nil {
+			log.Warn("failed to unset %s env", twineCommandMaxLogCharsEnvKey)
+		}
+	}()
 
 	log.Debug("Running twine command: '", _twineExeName, _twineUploadCmdName, strings.Join(commandArgs, " "), "'with build info collection")
 	_, errorOut, _, err := gofrogcmd.RunCmdWithOutputParser(uploadCmd, true, getArtifactsParser(&artifactsPaths))
