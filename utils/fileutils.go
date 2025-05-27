@@ -394,6 +394,9 @@ func FindFileInDirAndParents(dirPath, fileName string) (string, error) {
 // includeDirs means to copy also the dirs if presented in the src folder.
 // excludeNames - Skip files/dirs in the src folder that match names in provided slice. ONLY excludes first layer (only in src folder).
 func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) error {
+	if fromPath == toPath {
+		return fmt.Errorf("can't copy directory when source and destination paths are the same: %s", fromPath)
+	}
 	err := CreateDirIfNotExist(toPath)
 	if err != nil {
 		return err
