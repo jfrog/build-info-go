@@ -36,7 +36,7 @@ func TwineUploadWithLogParsing(commandArgs []string, srcPath string) (artifactsP
 	defer func() {
 		err := os.Unsetenv(twineCommandMaxLogCharsEnvKey)
 		if err != nil {
-			log.Warn("failed to unset %s env", twineCommandMaxLogCharsEnvKey)
+			log.Warn(fmt.Sprintf("failed to unset %s env", twineCommandMaxLogCharsEnvKey))
 		}
 	}()
 
