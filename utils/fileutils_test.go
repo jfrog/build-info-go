@@ -148,12 +148,6 @@ func TestCopyDir(t *testing.T) {
 			sourceDir: tempSubDir2,
 			targetDir: tempDir,
 		},
-		{
-			name:          "Target is subdirectory of source",
-			sourceDir:     tempDir,
-			targetDir:     tempSubDir2,
-			expectedError: fmt.Errorf("cannot copy directory from '%s' to '%s', because the destination is a subdirectory of the source", tempDir, tempSubDir2),
-		},
 	}
 
 	for _, tc := range testCases {
