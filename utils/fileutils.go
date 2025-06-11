@@ -398,9 +398,6 @@ func CopyDir(fromPath, toPath string, includeDirs bool, excludeNames []string) e
 	if fromPath == toPath {
 		return fmt.Errorf("cannot copy directory from '%s' to '%s', because the source and destination are the same", fromPath, toPath)
 	}
-	if strings.HasPrefix(toPath, fromPath) {
-		return fmt.Errorf("cannot copy directory from '%s' to '%s', because the destination is a subdirectory of the source", fromPath, toPath)
-	}
 
 	err := CreateDirIfNotExist(toPath)
 	if err != nil {
