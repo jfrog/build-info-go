@@ -2,4 +2,5 @@
 - [ ] All [static analysis checks](https://github.com/jfrog/build-info-go/actions/workflows/analysis.yml) passed.
 - [ ] This pull request is on the dev branch.
 - [ ] I used gofmt for formatting the code before submitting the pull request.
+- [ ] Appropriate label is added to the PR for auto generate release notes.
 -----
