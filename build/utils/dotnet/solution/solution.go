@@ -239,7 +239,7 @@ func (solution *solution) loadSingleProject(project project.Project, log utils.L
 	for _, source := range solution.dependenciesSources {
 		isInRoot := projectRootPath == strings.ToLower(filepath.Dir(source))
 		isUnderObjDir := strings.Contains(strings.ToLower(source), projectPathPattern)
-		isUnderSubDirWithName := strings.HasSuffix(strings.ToLower(source), projectNamePattern)
+		isUnderSubDirWithName := strings.HasSuffix(strings.ToLower(filepath.Dir(source)), projectNamePattern)
 		if isInRoot || isUnderObjDir || isUnderSubDirWithName {
 			dependenciesSource = source
 			break
