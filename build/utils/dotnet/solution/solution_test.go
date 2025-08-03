@@ -213,17 +213,18 @@ func TestLoadMixed(t *testing.T) {
 	})
 
 	for _, project := range solutions.GetProjects() {
-		if project.Name() == "multi" {
+		switch project.Name() {
+		case "multi":
 			assert.Equal(t, filepath.Join(wd, "tmp", "multi", "multi"), project.RootPath())
 			direct, err := project.Extractor().DirectDependencies()
 			require.NoError(t, err)
 			assert.ElementsMatch(t, []string{"newtonsoft.json"}, direct)
-		} else if project.Name() == "core" {
+		case "core":
 			assert.Equal(t, filepath.Join(wd, "tmp", "multi", "core"), project.RootPath())
 			direct, err := project.Extractor().DirectDependencies()
 			require.NoError(t, err)
 			assert.ElementsMatch(t, []string{"newtonsoft.json"}, direct)
-		} else {
+		default:
 			t.Errorf("Unexpected project name: %s", project.Name())
 		}
 	}
