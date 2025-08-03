@@ -12,6 +12,7 @@ import (
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var logger = utils.NewDefaultLogger(utils.INFO)
@@ -141,7 +142,7 @@ func replaceCarriageSign(results []string) {
 	}
 }
 
-func TestLoad(t *testing.T) {
+func TestLoadNuget(t *testing.T) {
 	// Prepare
 	log := utils.NewDefaultLogger(utils.INFO)
 	wd, err := os.Getwd()
@@ -178,5 +179,52 @@ func TestLoad(t *testing.T) {
 			}
 			assert.Equal(t, testCase.expectedProjectCount, len(solutions.GetProjects()))
 		})
+	}
+}
+
+func TestLoadMixed(t *testing.T) {
+	// Prepare
+	log := utils.NewDefaultLogger(utils.INFO)
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	testdataDir := filepath.Join(wd, "testdata")
+
+	// Run 'nuget restore' (multi) / 'dotnet restore' (core) command before testing 'Load()' functionality.
+	assert.NoError(t, utils.CopyDir(filepath.Join(testdataDir, "multi"), filepath.Join(wd, "tmp", "multi"), true, nil))
+	defer func() {
+		assert.NoError(t, utils.RemoveTempDir(filepath.Join(wd, "tmp")))
+	}()
+	dotnetCmd := exec.Command("dotnet", "restore", filepath.Join(wd, "tmp", "multi", "core"))
+	assert.NoError(t, dotnetCmd.Run())
+	nugetCmd := exec.Command("nuget", "restore", filepath.Join(wd, "tmp", "multi", "multi.sln"))
+	assert.NoError(t, nugetCmd.Run())
+
+	solution := solution{path: filepath.Join(wd, "tmp", "multi"), slnFile: "multi.sln"}
+	solutions, err := Load(solution.path, solution.slnFile, "", log)
+	require.NoError(t, err)
+	// The solution contains 2 projects:
+	// 1. 'multi' - a .NET Framework project with 'packages.config'.
+	// 2. 'core' - a .NET Core project with 'project.json'.
+	assert.Equal(t, 2, len(solutions.GetProjects()))
+	// Check source dependencies paths in solution.
+	assert.ElementsMatch(t, solutions.GetDependenciesSources(), []string{
+		filepath.Join(wd, "tmp", "multi", "multi", "packages.config"),
+		filepath.Join(wd, "tmp", "multi", "core", "obj", "project.assets.json"),
+	})
+
+	for _, project := range solutions.GetProjects() {
+		if project.Name() == "multi" {
+			assert.Equal(t, filepath.Join(wd, "tmp", "multi", "multi"), project.RootPath())
+			direct, err := project.Extractor().DirectDependencies()
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []string{"newtonsoft.json"}, direct)
+		} else if project.Name() == "core" {
+			assert.Equal(t, filepath.Join(wd, "tmp", "multi", "core"), project.RootPath())
+			direct, err := project.Extractor().DirectDependencies()
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []string{"newtonsoft.json"}, direct)
+		} else {
+			t.Errorf("Unexpected project name: %s", project.Name())
+		}
 	}
 }
