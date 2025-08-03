@@ -194,8 +194,6 @@ func TestLoadMixed(t *testing.T) {
 	defer func() {
 		assert.NoError(t, utils.RemoveTempDir(filepath.Join(wd, "tmp")))
 	}()
-	dotnetCmd := exec.Command("dotnet", "restore", filepath.Join(wd, "tmp", "multi", "core"))
-	assert.NoError(t, dotnetCmd.Run())
 	nugetCmd := exec.Command("nuget", "restore", filepath.Join(wd, "tmp", "multi", "multi.sln"))
 	assert.NoError(t, nugetCmd.Run())
 
