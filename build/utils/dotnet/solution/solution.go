@@ -234,10 +234,13 @@ func (solution *solution) loadSingleProject(project project.Project, log utils.L
 	// or under obj directory (in case of assets.json file)
 	projectRootPath := strings.ToLower(project.RootPath())
 	projectPathPattern := strings.ToLower(filepath.Join(projectRootPath, dependencies.AssetDirName) + string(filepath.Separator))
-	projectNamePattern := strings.ToLower(string(filepath.Separator) + project.Name() + string(filepath.Separator))
+	projectNamePattern := strings.ToLower(string(filepath.Separator) + project.Name())
 	var dependenciesSource string
 	for _, source := range solution.dependenciesSources {
-		if projectRootPath == strings.ToLower(filepath.Dir(source)) || strings.Contains(strings.ToLower(source), projectPathPattern) || strings.Contains(strings.ToLower(source), projectNamePattern) {
+		isInRoot := projectRootPath == strings.ToLower(filepath.Dir(source))
+		isUnderObjDir := strings.Contains(strings.ToLower(source), projectPathPattern)
+		isUnderSubDirWithName := strings.HasSuffix(strings.ToLower(filepath.Dir(source)), projectNamePattern)
+		if isInRoot || isUnderObjDir || isUnderSubDirWithName {
 			dependenciesSource = source
 			break
 		}
