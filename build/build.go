@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	ioutils "github.com/jfrog/gofrog/io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	ioutils "github.com/jfrog/gofrog/io"
 
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 

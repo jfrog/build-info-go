@@ -10,8 +10,62 @@ import (
 )
 
 func TestNewPoetryFlexPack(t *testing.T) {
+	// Create a temporary directory with test files
+	tempDir := t.TempDir()
+
+	// Create a minimal pyproject.toml
+	pyprojectContent := `[tool.poetry]
+name = "test-project"
+version = "1.0.0"
+description = "A test project"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = "^2.25.0"
+`
+
+	err := os.WriteFile(filepath.Join(tempDir, "pyproject.toml"), []byte(pyprojectContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test pyproject.toml: %v", err)
+	}
+
+	// Create a minimal poetry.lock
+	poetryLockContent := `[[package]]
+name = "certifi"
+version = "2021.10.8"
+description = "Python package for providing Mozilla's CA Bundle."
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
+name = "requests"
+version = "2.25.1"
+description = "Python HTTP for Humans."
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+
+[package.dependencies]
+certifi = ">=2017.4.17"
+
+[metadata]
+lock-version = "1.1"
+python-versions = "^3.8"
+content-hash = "test-hash"
+
+[metadata.files]
+certifi = []
+requests = []
+`
+
+	err = os.WriteFile(filepath.Join(tempDir, "poetry.lock"), []byte(poetryLockContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test poetry.lock: %v", err)
+	}
+
 	config := PackageManagerConfig{
-		WorkingDirectory:       "test-dir",
+		WorkingDirectory:       tempDir,
 		IncludeDevDependencies: true,
 	}
 
@@ -20,12 +74,21 @@ func TestNewPoetryFlexPack(t *testing.T) {
 		t.Fatalf("Failed to create PoetryFlexPack: %v", err)
 	}
 
-	if poetryFlex.config.WorkingDirectory != "test-dir" {
-		t.Errorf("Expected working directory 'test-dir', got '%s'", poetryFlex.config.WorkingDirectory)
+	if poetryFlex.config.WorkingDirectory != tempDir {
+		t.Errorf("Expected working directory '%s', got '%s'", tempDir, poetryFlex.config.WorkingDirectory)
 	}
 
 	if !poetryFlex.config.IncludeDevDependencies {
 		t.Error("Expected IncludeDevDependencies to be true")
+	}
+
+	// Verify that the project was loaded correctly
+	if poetryFlex.projectName != "test-project" {
+		t.Errorf("Expected project name 'test-project', got '%s'", poetryFlex.projectName)
+	}
+
+	if poetryFlex.projectVersion != "1.0.0" {
+		t.Errorf("Expected project version '1.0.0', got '%s'", poetryFlex.projectVersion)
 	}
 }
 
@@ -115,6 +178,50 @@ pytest = "^7.0.0"
 		t.Fatalf("Failed to create pyproject.toml: %v", err)
 	}
 
+	// Create a minimal poetry.lock
+	poetryLockContent := `[[package]]
+name = "certifi"
+version = "2021.10.8"
+description = "Python package for providing Mozilla's CA Bundle."
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
+name = "requests"
+version = "2.25.1"
+description = "Python HTTP for Humans."
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+
+[package.dependencies]
+certifi = ">=2017.4.17"
+
+[[package]]
+name = "pytest"
+version = "7.0.0"
+description = "pytest: simple powerful testing with Python"
+category = "dev"
+optional = false
+python-versions = ">=3.6"
+
+[metadata]
+lock-version = "1.1"
+python-versions = "^3.8"
+content-hash = "test-hash"
+
+[metadata.files]
+certifi = []
+requests = []
+pytest = []
+`
+
+	err = os.WriteFile(filepath.Join(tempDir, "poetry.lock"), []byte(poetryLockContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test poetry.lock: %v", err)
+	}
+
 	config := PackageManagerConfig{
 		WorkingDirectory:       tempDir,
 		IncludeDevDependencies: true,
@@ -174,8 +281,47 @@ pytest = "^7.0.0"
 }
 
 func TestPoetryFlexPackInterface(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create minimal test files
+	pyprojectContent := `[tool.poetry]
+name = "test-project"
+version = "1.0.0"
+description = "Test project"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+`
+
+	err := os.WriteFile(filepath.Join(tempDir, "pyproject.toml"), []byte(pyprojectContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create pyproject.toml: %v", err)
+	}
+
+	poetryLockContent := `[[package]]
+name = "requests"
+version = "2.25.1"
+description = "Python HTTP for Humans."
+category = "main"
+optional = false
+python-versions = "*"
+
+[metadata]
+lock-version = "1.1"
+python-versions = "^3.8"
+content-hash = "test-hash"
+
+[metadata.files]
+requests = []
+`
+
+	err = os.WriteFile(filepath.Join(tempDir, "poetry.lock"), []byte(poetryLockContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create poetry.lock: %v", err)
+	}
+
 	config := PackageManagerConfig{
-		WorkingDirectory: t.TempDir(),
+		WorkingDirectory: tempDir,
 	}
 
 	poetryFlex, err := NewPoetryFlexPack(config)
@@ -257,24 +403,24 @@ func TestGetPoetryDependenciesCacheInfo(t *testing.T) {
 }
 
 func TestPoetryFlexPackErrorHandling(t *testing.T) {
-	// Test with non-existent directory
+	// Test with non-existent directory - should fail during creation
 	config := PackageManagerConfig{
 		WorkingDirectory: "/non/existent/directory",
 	}
 
-	poetryFlex, err := NewPoetryFlexPack(config)
-	if err != nil {
-		t.Fatalf("Failed to create PoetryFlexPack: %v", err)
+	_, err := NewPoetryFlexPack(config)
+	if err == nil {
+		t.Error("Expected error when creating PoetryFlexPack with non-existent directory")
 	}
 
-	// Should handle missing files gracefully
-	deps, err := poetryFlex.GetProjectDependencies()
-	if err != nil {
-		t.Fatalf("Should handle missing files gracefully: %v", err)
+	// Test with directory that exists but has no Poetry files
+	tempDir := t.TempDir()
+	config2 := PackageManagerConfig{
+		WorkingDirectory: tempDir,
 	}
 
-	// Should return empty dependencies for missing project
-	if len(deps) > 0 {
-		t.Error("Expected empty dependencies for non-existent project")
+	_, err = NewPoetryFlexPack(config2)
+	if err == nil {
+		t.Error("Expected error when creating PoetryFlexPack with no Poetry files")
 	}
 }
