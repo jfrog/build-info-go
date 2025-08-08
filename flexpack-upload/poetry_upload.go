@@ -857,17 +857,18 @@ func (p *PoetryUploadManager) setupAuthentication() error {
 	}
 
 	// Determine authentication strategy based on available credentials
-	if p.isJFrogRepository() {
+	switch {
+	case p.isJFrogRepository():
 		// Use JFrog authentication for JFrog repositories
 		p.authStrategy = &JFrogAuth{}
 		authConfig["base_url"] = p.extractBaseURL()
-	} else if authConfig["token"] != "" {
+	case authConfig["token"] != "":
 		// Use token authentication if token is available
 		p.authStrategy = &TokenAuth{}
-	} else if authConfig["username"] != "" && authConfig["password"] != "" {
+	case authConfig["username"] != "" && authConfig["password"] != "":
 		// Use basic authentication if username/password available
 		p.authStrategy = &BasicAuth{}
-	} else {
+	default:
 		// No authentication configured - this might be okay for some repositories
 		log.Debug("No authentication configured - proceeding without auth")
 		return nil

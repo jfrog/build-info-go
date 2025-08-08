@@ -569,19 +569,53 @@ func RunPoetryInstallWithBuildInfo(workingDir string, buildName, buildNumber str
 		// Convert checksums to build info dependencies
 		var dependencies []entities.Dependency
 		for _, checksumMap := range checksums {
+			// Check type assertions to avoid runtime panics
+			id, ok := checksumMap["id"].(string)
+			if !ok {
+				log.Warn("Invalid or missing 'id' field in checksum map, skipping dependency")
+				continue
+			}
+			depType, ok := checksumMap["type"].(string)
+			if !ok {
+				log.Warn("Invalid or missing 'type' field in checksum map, skipping dependency")
+				continue
+			}
+			sha1, ok := checksumMap["sha1"].(string)
+			if !ok {
+				log.Warn("Invalid or missing 'sha1' field in checksum map")
+				sha1 = ""
+			}
+			sha256, ok := checksumMap["sha256"].(string)
+			if !ok {
+				log.Warn("Invalid or missing 'sha256' field in checksum map")
+				sha256 = ""
+			}
+			md5, ok := checksumMap["md5"].(string)
+			if !ok {
+				log.Warn("Invalid or missing 'md5' field in checksum map")
+				md5 = ""
+			}
+			depName, ok := checksumMap["name"].(string)
+			if !ok {
+				log.Warn("Invalid or missing 'name' field in checksum map, skipping dependency")
+				continue
+			}
+			depVersion, ok := checksumMap["version"].(string)
+			if !ok {
+				log.Warn("Invalid or missing 'version' field in checksum map, skipping dependency")
+				continue
+			}
+
 			dep := entities.Dependency{
-				Id:   checksumMap["id"].(string),
-				Type: checksumMap["type"].(string),
+				Id:   id,
+				Type: depType,
 				Checksum: entities.Checksum{
-					Sha1:   checksumMap["sha1"].(string),
-					Sha256: checksumMap["sha256"].(string),
-					Md5:    checksumMap["md5"].(string),
+					Sha1:   sha1,
+					Sha256: sha256,
+					Md5:    md5,
 				},
 				Scopes: convertToStringSlice(checksumMap["scopes"]),
 			}
-			// Add requested by information if available
-			depName := checksumMap["name"].(string)
-			depVersion := checksumMap["version"].(string)
 			depKey := fmt.Sprintf("%s:%s", depName, depVersion)
 			if requesters, found := requestedBy[depKey]; found {
 				// Convert []string to [][]string format expected by RequestedBy
@@ -750,8 +784,8 @@ type PoetryDependenciesCache struct {
 // Returns cached dependencies map or nil if cache doesn't exist
 func GetPoetryDependenciesCache(projectPath string) (cache *PoetryDependenciesCache, err error) {
 	cache = new(PoetryDependenciesCache)
-	cacheFilePath, exists, err := getPoetryDependenciesCacheFilePath(projectPath)
-	if err != nil || !exists {
+	cacheFilePath, exists := getPoetryDependenciesCacheFilePath(projectPath)
+	if !exists {
 		log.Debug("Poetry dependencies cache not found: " + cacheFilePath)
 		return nil, err
 	}
@@ -793,10 +827,7 @@ func UpdatePoetryDependenciesCache(dependenciesMap map[string]entities.Dependenc
 		return fmt.Errorf("failed to marshal Poetry cache: %w", err)
 	}
 
-	cacheFilePath, _, err := getPoetryDependenciesCacheFilePath(projectPath)
-	if err != nil {
-		return fmt.Errorf("failed to get cache file path: %w", err)
-	}
+	cacheFilePath, _ := getPoetryDependenciesCacheFilePath(projectPath)
 
 	// Ensure cache directory exists
 	cacheDir := filepath.Dir(cacheFilePath)
@@ -855,18 +886,12 @@ func (cache *PoetryDependenciesCache) IsValid(maxAge time.Duration) bool {
 
 // getPoetryDependenciesCacheFilePath returns the path to Poetry dependencies cache file
 // Cache file location: ./.jfrog/projects/poetry-deps.cache.json
-func getPoetryDependenciesCacheFilePath(projectPath string) (cacheFilePath string, exists bool, err error) {
+func getPoetryDependenciesCacheFilePath(projectPath string) (cacheFilePath string, exists bool) {
 	projectsDirPath := filepath.Join(projectPath, ".jfrog", "projects")
 	cacheFilePath = filepath.Join(projectsDirPath, "poetry-deps.cache.json")
-	_, err = os.Stat(cacheFilePath)
+	_, err := os.Stat(cacheFilePath)
 	exists = !os.IsNotExist(err)
-	if exists {
-		err = nil
-	} else {
-		// File doesn't exist, that's fine - clear the error
-		err = nil
-	}
-	return cacheFilePath, exists, err
+	return cacheFilePath, exists
 }
 
 // UpdateDependenciesWithCache enhances dependencies with cached information
@@ -921,22 +946,32 @@ func (pf *PoetryFlexPack) UpdateDependenciesWithCache() error {
 			if len(checksums) > 0 && checksums[0] != nil {
 				checksum := checksums[0]
 				if sha1, ok := checksum["sha1"].(string); ok && sha1 != "" {
+					// Check other checksum type assertions
+					sha256, sha256Ok := checksum["sha256"].(string)
+					if !sha256Ok {
+						sha256 = ""
+					}
+					md5, md5Ok := checksum["md5"].(string)
+					if !md5Ok {
+						md5 = ""
+					}
+
 					entityDep := entities.Dependency{
 						Id:     depKey,
 						Type:   "pypi",
 						Scopes: dep.Scopes,
 						Checksum: entities.Checksum{
 							Sha1:   sha1,
-							Sha256: checksum["sha256"].(string),
-							Md5:    checksum["md5"].(string),
+							Sha256: sha256,
+							Md5:    md5,
 						},
 					}
 					dependenciesMap[depKey] = entityDep
 
 					// Update our internal dependency
 					pf.dependencies[i].SHA1 = sha1
-					pf.dependencies[i].SHA256 = checksum["sha256"].(string)
-					pf.dependencies[i].MD5 = checksum["md5"].(string)
+					pf.dependencies[i].SHA256 = sha256
+					pf.dependencies[i].MD5 = md5
 
 					log.Debug("Calculated new checksums for " + depKey)
 				} else {
@@ -1050,17 +1085,14 @@ func RunPoetryInstallWithBuildInfoAndCaching(workingDir string, buildName, build
 
 // ClearPoetryDependenciesCache clears the Poetry dependencies cache
 func ClearPoetryDependenciesCache(projectPath string) error {
-	cacheFilePath, exists, err := getPoetryDependenciesCacheFilePath(projectPath)
-	if err != nil {
-		return fmt.Errorf("failed to get cache file path: %w", err)
-	}
+	cacheFilePath, exists := getPoetryDependenciesCacheFilePath(projectPath)
 
 	if !exists {
 		log.Debug("Poetry dependencies cache does not exist: " + cacheFilePath)
 		return nil
 	}
 
-	err = os.Remove(cacheFilePath)
+	err := os.Remove(cacheFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to remove cache file: %w", err)
 	}
@@ -1085,7 +1117,7 @@ func GetPoetryDependenciesCacheInfo(projectPath string) (map[string]interface{},
 		}, nil
 	}
 
-	cacheFilePath, _, _ := getPoetryDependenciesCacheFilePath(projectPath)
+	cacheFilePath, _ := getPoetryDependenciesCacheFilePath(projectPath)
 
 	return map[string]interface{}{
 		"exists":       true,
