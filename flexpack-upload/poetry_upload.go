@@ -3,12 +3,10 @@ package flexpackupload
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -333,130 +331,6 @@ func (cb *CircuitBreaker) recordSuccess() {
 	cb.failures = 0
 }
 
-// classifyError categorizes errors for retry logic
-func classifyError(err error, statusCode int) *UploadError {
-	uploadErr := &UploadError{
-		Message:    err.Error(),
-		StatusCode: statusCode,
-	}
-
-	// Network errors
-	if netErr, ok := err.(net.Error); ok {
-		uploadErr.Type = ErrorTypeNetwork
-		uploadErr.Retryable = !netErr.Timeout()
-		if netErr.Timeout() {
-			uploadErr.Type = ErrorTypeTimeout
-			uploadErr.Retryable = true
-		}
-		return uploadErr
-	}
-
-	// HTTP status code based classification
-	switch {
-	case statusCode == 401 || statusCode == 403:
-		uploadErr.Type = ErrorTypeAuth
-		uploadErr.Retryable = false
-	case statusCode == 429:
-		uploadErr.Type = ErrorTypeQuota
-		uploadErr.Retryable = true
-		// Try to parse Retry-After header
-		uploadErr.RetryAfter = 60 * time.Second // Default
-	case statusCode >= 500 && statusCode < 600:
-		uploadErr.Type = ErrorTypeServer
-		uploadErr.Retryable = true
-	case statusCode >= 400 && statusCode < 500:
-		uploadErr.Type = ErrorTypeClient
-		uploadErr.Retryable = false
-	default:
-		uploadErr.Type = ErrorTypeClient
-		uploadErr.Retryable = false
-	}
-
-	return uploadErr
-}
-
-// executeWithRetry executes an operation with retry logic
-func (p *PoetryUploadManager) executeWithRetry(ctx context.Context, operation func() error, strategy *RetryStrategy) error {
-	var lastErr error
-	backoff := strategy.InitialBackoff
-
-	for attempt := 0; attempt <= strategy.MaxRetries; attempt++ {
-		err := operation()
-		if err == nil {
-			return nil
-		}
-
-		lastErr = err
-
-		// Don't retry on the last attempt
-		if attempt == strategy.MaxRetries {
-			break
-		}
-
-		// Check if error is retryable
-		if uploadErr, ok := err.(*UploadError); ok {
-			uploadErr.Attempt = attempt + 1
-			if !uploadErr.Retryable {
-				return uploadErr
-			}
-
-			// Use specific retry delay if provided
-			waitTime := backoff
-			if uploadErr.RetryAfter > 0 {
-				waitTime = uploadErr.RetryAfter
-			}
-
-			log.Debug("Retrying operation after %v (attempt %d/%d): %v",
-				waitTime, attempt+1, strategy.MaxRetries, uploadErr)
-
-			// Wait with context cancellation support
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(waitTime):
-				// Continue to next attempt
-			}
-
-			// Calculate next backoff with exponential backoff and jitter
-			backoff = time.Duration(float64(backoff) * strategy.Multiplier)
-			if backoff > strategy.MaxBackoff {
-				backoff = strategy.MaxBackoff
-			}
-
-			// Add jitter to prevent thundering herd
-			if strategy.Jitter {
-				jitterFactor := float64(2*time.Now().UnixNano()%2 - 1)
-				jitter := time.Duration(float64(backoff) * 0.1 * jitterFactor)
-				backoff += jitter
-			}
-		} else {
-			// Non-upload error, don't retry
-			return err
-		}
-	}
-
-	return fmt.Errorf("operation failed after %d attempts: %w", strategy.MaxRetries+1, lastErr)
-}
-
-// parseRetryAfter parses the Retry-After header
-func parseRetryAfter(retryAfter string) time.Duration {
-	if retryAfter == "" {
-		return 0
-	}
-
-	// Try to parse as seconds
-	if seconds, err := strconv.Atoi(retryAfter); err == nil {
-		return time.Duration(seconds) * time.Second
-	}
-
-	// Try to parse as HTTP date
-	if t, err := time.Parse(time.RFC1123, retryAfter); err == nil {
-		return time.Until(t)
-	}
-
-	return 0
-}
-
 // ===== Progress Tracking and Monitoring =====
 
 // ProgressTracker tracks upload progress
@@ -486,26 +360,26 @@ func (c *ConsoleProgressListener) OnProgress(uploaded, total int64, speed float6
 	if total > 0 {
 		percentage := float64(uploaded) / float64(total) * 100
 		speedMB := speed / (1024 * 1024) // Convert to MB/s
-		log.Info("Upload progress: %.1f%% (%d/%d bytes) - %.2f MB/s - %s",
-			percentage, uploaded, total, speedMB, currentFile)
+		log.Info(fmt.Sprintf("Upload progress: %.1f%% (%d/%d bytes) - %.2f MB/s - %s",
+			percentage, uploaded, total, speedMB, currentFile))
 	}
 }
 
 func (c *ConsoleProgressListener) OnFileStart(filename string, size int64) {
 	sizeMB := float64(size) / (1024 * 1024)
-	log.Info("Starting upload: %s (%.2f MB)", filename, sizeMB)
+	log.Info(fmt.Sprintf("Starting upload: %s (%.2f MB)", filename, sizeMB))
 }
 
 func (c *ConsoleProgressListener) OnFileComplete(filename string, duration time.Duration) {
-	log.Info("Completed upload: %s in %v", filename, duration)
+	log.Info(fmt.Sprintf("Completed upload: %s in %v", filename, duration))
 }
 
 func (c *ConsoleProgressListener) OnComplete(totalDuration time.Duration) {
-	log.Info("All uploads completed in %v", totalDuration)
+	log.Info(fmt.Sprintf("All uploads completed in %v", totalDuration))
 }
 
 func (c *ConsoleProgressListener) OnError(err error) {
-	log.Error("Upload error: %v", err)
+	log.Error("Upload error: " + err.Error())
 }
 
 // NewProgressTracker creates a new progress tracker
@@ -581,32 +455,6 @@ func (p *ProgressTracker) Error(err error) {
 	}
 }
 
-// progressReader wraps an io.Reader to track progress
-type progressReader struct {
-	reader  *os.File
-	tracker *ProgressTracker
-}
-
-func (pr *progressReader) Read(p []byte) (n int, err error) {
-	n, err = pr.reader.Read(p)
-	if n > 0 {
-		pr.tracker.AddProgress(int64(n))
-	}
-	return n, err
-}
-
-func (pr *progressReader) Close() error {
-	return pr.reader.Close()
-}
-
-// wrapWithProgressTracking wraps a file with progress tracking
-func (p *PoetryUploadManager) wrapWithProgressTracking(file *os.File, tracker *ProgressTracker) *progressReader {
-	return &progressReader{
-		reader:  file,
-		tracker: tracker,
-	}
-}
-
 // ===== Build Pipeline with Validation and Post-Processing =====
 
 // BuildPipeline manages the complete build and upload process
@@ -614,7 +462,6 @@ type BuildPipeline struct {
 	validator PackageValidator
 	builder   PackageBuilder
 	processor PostProcessor
-	uploader  PackageUploader
 }
 
 // PackageValidator validates project structure and configuration
@@ -782,7 +629,7 @@ func (b *PoetryBuilder) Build(projectPath string, config UploadConfig) (*BuildRe
 func (b *PoetryBuilder) Clean(projectPath string) error {
 	distPath := filepath.Join(projectPath, "dist")
 	if _, err := os.Stat(distPath); err == nil {
-		log.Debug("Cleaning build directory: %s", distPath)
+		log.Debug("Cleaning build directory: " + distPath)
 		return os.RemoveAll(distPath)
 	}
 	return nil
@@ -794,7 +641,7 @@ func (b *PoetryBuilder) scanArtifacts(projectPath string) []ArtifactInfo {
 
 	files, err := filepath.Glob(filepath.Join(distPath, "*"))
 	if err != nil {
-		log.Debug("Failed to scan artifacts: %v", err)
+		log.Debug("Failed to scan artifacts: " + err.Error())
 		return artifacts
 	}
 
@@ -830,12 +677,12 @@ func (b *PoetryBuilder) scanArtifacts(projectPath string) []ArtifactInfo {
 type PoetryPostProcessor struct{}
 
 func (p *PoetryPostProcessor) Process(artifacts []ArtifactInfo, config UploadConfig) error {
-	log.Debug("Post-processing %d artifacts", len(artifacts))
+	log.Debug(fmt.Sprintf("Post-processing %d artifacts", len(artifacts)))
 
 	for i := range artifacts {
 		// Calculate checksums
 		if err := p.calculateChecksums(&artifacts[i]); err != nil {
-			log.Warn("Failed to calculate checksums for %s: %v", artifacts[i].Name, err)
+			log.Warn(fmt.Sprintf("Failed to calculate checksums for %s: %v", artifacts[i].Name, err))
 		}
 
 		// Set publication timestamp
@@ -873,8 +720,8 @@ func (p *PoetryPostProcessor) ValidateArtifacts(artifacts []ArtifactInfo) error 
 		}
 	}
 
-	log.Debug("Validation passed: found %d artifacts (wheel: %v, sdist: %v)",
-		len(artifacts), hasWheel, hasSdist)
+	log.Debug(fmt.Sprintf("Validation passed: found %d artifacts (wheel: %v, sdist: %v)",
+		len(artifacts), hasWheel, hasSdist))
 
 	return nil
 }
@@ -917,7 +764,7 @@ func (bp *BuildPipeline) Execute(projectPath string, config UploadConfig) (*Buil
 	if !config.DryRun {
 		log.Debug("Phase 2: Cleaning previous builds")
 		if err := bp.builder.Clean(projectPath); err != nil {
-			log.Warn("Failed to clean previous builds: %v", err)
+			log.Warn("Failed to clean previous builds: " + err.Error())
 		}
 	}
 
@@ -938,7 +785,7 @@ func (bp *BuildPipeline) Execute(projectPath string, config UploadConfig) (*Buil
 		return result, fmt.Errorf("post-processing failed: %w", err)
 	}
 
-	log.Debug("Build pipeline completed successfully - %d artifacts ready", len(result.Artifacts))
+	log.Debug(fmt.Sprintf("Build pipeline completed successfully - %d artifacts ready", len(result.Artifacts)))
 	return result, nil
 }
 
@@ -980,7 +827,7 @@ func (p *PoetryUploadManager) loadProjectInfo() error {
 		return fmt.Errorf("failed to parse pyproject.toml: %w", err)
 	}
 
-	log.Debug("Loaded Poetry project: %s v%s", p.projectInfo.Tool.Poetry.Name, p.projectInfo.Tool.Poetry.Version)
+	log.Debug(fmt.Sprintf("Loaded Poetry project: %s v%s", p.projectInfo.Tool.Poetry.Name, p.projectInfo.Tool.Poetry.Version))
 	return nil
 }
 
@@ -1031,7 +878,7 @@ func (p *PoetryUploadManager) setupAuthentication() error {
 		if err := p.authStrategy.Configure(authConfig); err != nil {
 			return fmt.Errorf("failed to configure %s authentication: %w", p.authStrategy.GetAuthType(), err)
 		}
-		log.Debug("Configured %s authentication", p.authStrategy.GetAuthType())
+		log.Debug("Configured " + p.authStrategy.GetAuthType() + " authentication")
 	}
 
 	return nil
@@ -1075,13 +922,13 @@ func (p *PoetryUploadManager) scanBuildArtifacts() {
 	p.artifacts = []ArtifactInfo{}
 
 	if _, err := os.Stat(p.buildDir); os.IsNotExist(err) {
-		log.Debug("Build directory does not exist: %s", p.buildDir)
+		log.Debug("Build directory does not exist: " + p.buildDir)
 		return
 	}
 
 	files, err := filepath.Glob(filepath.Join(p.buildDir, "*"))
 	if err != nil {
-		log.Debug("Failed to scan build directory: %v", err)
+		log.Debug("Failed to scan build directory: " + err.Error())
 		return
 	}
 
@@ -1094,7 +941,7 @@ func (p *PoetryUploadManager) scanBuildArtifacts() {
 		}
 	}
 
-	log.Debug("Found %d build artifacts", len(p.artifacts))
+	log.Debug(fmt.Sprintf("Found %d build artifacts", len(p.artifacts)))
 }
 
 // createArtifactInfo creates an ArtifactInfo from a file path
@@ -1109,14 +956,14 @@ func (p *PoetryUploadManager) createArtifactInfo(filePath string, fileInfo os.Fi
 	case strings.HasSuffix(filename, ".tar.gz"):
 		artifactType = "sdist"
 	default:
-		log.Debug("Skipping unknown artifact type: %s", filename)
+		log.Debug("Skipping unknown artifact type: " + filename)
 		return nil
 	}
 
 	// Calculate checksums
 	checksums, err := crypto.GetFileDetails(filePath, true)
 	if err != nil {
-		log.Debug("Failed to calculate checksums for %s: %v", filename, err)
+		log.Debug(fmt.Sprintf("Failed to calculate checksums for %s: %v", filename, err))
 		return nil
 	}
 
@@ -1131,7 +978,7 @@ func (p *PoetryUploadManager) createArtifactInfo(filePath string, fileInfo os.Fi
 		Repository: p.config.RepositoryURL,
 	}
 
-	log.Debug("Created artifact info for %s (%s)", filename, artifactType)
+	log.Debug(fmt.Sprintf("Created artifact info for %s (%s)", filename, artifactType))
 	return artifact
 }
 
@@ -1282,7 +1129,7 @@ func (p *PoetryUploadManager) ValidateArtifacts() error {
 		}
 	}
 
-	log.Debug("Validation passed: %d artifacts ready for publication", len(artifacts))
+	log.Debug(fmt.Sprintf("Validation passed: %d artifacts ready for publication", len(artifacts)))
 	return nil
 }
 
@@ -1307,7 +1154,7 @@ func (p *PoetryUploadManager) GetPublishMetadata() map[string]interface{} {
 
 // BuildArtifacts builds Poetry packages using 'poetry build'
 func (p *PoetryUploadManager) BuildArtifacts() (*PublishResult, error) {
-	log.Debug("Building Poetry artifacts in %s", p.config.WorkingDirectory)
+	log.Debug("Building Poetry artifacts in " + p.config.WorkingDirectory)
 
 	cmd := exec.Command("poetry", "build")
 	cmd.Dir = p.config.WorkingDirectory
@@ -1340,7 +1187,7 @@ func (p *PoetryUploadManager) BuildArtifacts() (*PublishResult, error) {
 	p.scanBuildArtifacts()
 	result.Artifacts = p.artifacts
 
-	log.Debug("Poetry build completed successfully in %s", duration)
+	log.Debug(fmt.Sprintf("Poetry build completed successfully in %s", duration))
 	return result, nil
 }
 
@@ -1350,7 +1197,7 @@ func (p *PoetryUploadManager) PublishArtifacts() (*PublishResult, error) {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
-	log.Debug("Publishing Poetry artifacts to %s", p.GetArtifactRepository())
+	log.Debug("Publishing Poetry artifacts to " + p.GetArtifactRepository())
 
 	args := []string{"publish"}
 
@@ -1420,7 +1267,7 @@ func (p *PoetryUploadManager) PublishArtifacts() (*PublishResult, error) {
 	}
 
 	p.publishResult = result
-	log.Debug("Poetry publish completed successfully in %s", duration)
+	log.Debug(fmt.Sprintf("Poetry publish completed successfully in %s", duration))
 	return result, nil
 }
 
@@ -1464,25 +1311,24 @@ func NewChunkedUploader(chunkSize int64, maxRetries int) *ChunkedUploader {
 
 // FileStateStore implements file-based upload state persistence
 type FileStateStore struct {
-	stateDir string
 }
 
 func (f *FileStateStore) SaveState(state *ResumableUploadState) error {
 	// Basic implementation - would save state to file
-	log.Debug("Saving upload state for %s: %d/%d bytes",
-		state.FilePath, state.UploadedBytes, state.FileSize)
+	log.Debug(fmt.Sprintf("Saving upload state for %s: %d/%d bytes",
+		state.FilePath, state.UploadedBytes, state.FileSize))
 	return nil
 }
 
 func (f *FileStateStore) LoadState(uploadID string) (*ResumableUploadState, error) {
 	// Basic implementation - would load state from file
-	log.Debug("Loading upload state for %s", uploadID)
+	log.Debug("Loading upload state for " + uploadID)
 	return nil, fmt.Errorf("state not found")
 }
 
 func (f *FileStateStore) DeleteState(uploadID string) error {
 	// Basic implementation - would delete state file
-	log.Debug("Deleting upload state for %s", uploadID)
+	log.Debug("Deleting upload state for " + uploadID)
 	return nil
 }
 
@@ -1557,28 +1403,28 @@ func (m *MultiRepoPublisher) PublishToAll(ctx context.Context) (*MultiPublishRes
 
 	switch m.strategy {
 	case PublishParallel:
-		m.publishParallel(ctx, result)
+		m.publishParallel(result)
 	case PublishSequential:
-		m.publishSequential(ctx, result)
+		m.publishSequential(result)
 	case PublishFailFast:
-		if err := m.publishFailFast(ctx, result); err != nil {
+		if err := m.publishFailFast(result); err != nil {
 			return result, err
 		}
 	case PublishBestEffort:
-		m.publishBestEffort(ctx, result)
+		m.publishBestEffort(result)
 	}
 
 	result.TotalTime = time.Since(startTime)
 	result.Successful = len(result.Results)
 	result.Failed = len(result.Errors)
 
-	log.Info("Multi-repo publish completed: %d successful, %d failed in %v",
-		result.Successful, result.Failed, result.TotalTime)
+	log.Info(fmt.Sprintf("Multi-repo publish completed: %d successful, %d failed in %v",
+		result.Successful, result.Failed, result.TotalTime))
 
 	return result, nil
 }
 
-func (m *MultiRepoPublisher) publishParallel(ctx context.Context, result *MultiPublishResult) {
+func (m *MultiRepoPublisher) publishParallel(result *MultiPublishResult) {
 	var wg sync.WaitGroup
 	mu := sync.Mutex{}
 
@@ -1602,7 +1448,7 @@ func (m *MultiRepoPublisher) publishParallel(ctx context.Context, result *MultiP
 	wg.Wait()
 }
 
-func (m *MultiRepoPublisher) publishSequential(ctx context.Context, result *MultiPublishResult) {
+func (m *MultiRepoPublisher) publishSequential(result *MultiPublishResult) {
 	for _, repo := range m.managers {
 		publishResult, err := repo.Manager.PublishArtifacts()
 		if err != nil {
@@ -1613,7 +1459,7 @@ func (m *MultiRepoPublisher) publishSequential(ctx context.Context, result *Mult
 	}
 }
 
-func (m *MultiRepoPublisher) publishFailFast(ctx context.Context, result *MultiPublishResult) error {
+func (m *MultiRepoPublisher) publishFailFast(result *MultiPublishResult) error {
 	for _, repo := range m.managers {
 		publishResult, err := repo.Manager.PublishArtifacts()
 		if err != nil {
@@ -1625,7 +1471,7 @@ func (m *MultiRepoPublisher) publishFailFast(ctx context.Context, result *MultiP
 	return nil
 }
 
-func (m *MultiRepoPublisher) publishBestEffort(ctx context.Context, result *MultiPublishResult) {
+func (m *MultiRepoPublisher) publishBestEffort(result *MultiPublishResult) {
 	// Same as sequential but continues on errors
-	m.publishSequential(ctx, result)
+	m.publishSequential(result)
 }

@@ -437,8 +437,14 @@ func (cf *CargoFlexPack) calculateManifestChecksum(dep DependencyInfo) (string, 
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	tempFile.WriteString(manifest)
-	tempFile.Close()
+	_, err = tempFile.WriteString(manifest)
+	if err != nil {
+		return "", "", ""
+	}
+	err = tempFile.Close()
+	if err != nil {
+		return "", "", ""
+	}
 
 	sha1, sha256, md5, err := cf.calculateFileChecksum(tempFile.Name())
 	if err != nil {
@@ -574,9 +580,15 @@ func (cf *CargoFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
 	for i, dep := range cf.dependencies {
 		if i < len(checksums) {
 			checksum := checksums[i]
-			cf.dependencies[i].SHA1 = checksum["sha1"].(string)
-			cf.dependencies[i].SHA256 = checksum["sha256"].(string)
-			cf.dependencies[i].MD5 = checksum["md5"].(string)
+			if sha1, ok := checksum["sha1"].(string); ok {
+				cf.dependencies[i].SHA1 = sha1
+			}
+			if sha256, ok := checksum["sha256"].(string); ok {
+				cf.dependencies[i].SHA256 = sha256
+			}
+			if md5, ok := checksum["md5"].(string); ok {
+				cf.dependencies[i].MD5 = md5
+			}
 			if path, ok := checksum["path"].(string); ok {
 				cf.dependencies[i].Path = path
 			}

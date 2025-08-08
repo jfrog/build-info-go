@@ -240,7 +240,7 @@ func (pf *PoetryFlexPack) parseWithPoetryShow() error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		log.Debug("Failed to execute 'poetry show --tree': %s", err.Error())
+		log.Debug("Failed to execute 'poetry show --tree': " + err.Error())
 		return err
 	}
 
@@ -445,7 +445,8 @@ func (pf *PoetryFlexPack) findPackageFilePath(name, version string) string {
 	var foundPath string
 	_ = filepath.WalkDir(cacheDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil // Continue walking even if there's an error
+			// Continue walking even if there's an error
+			return err
 		}
 
 		if !d.IsDir() {
@@ -625,38 +626,6 @@ func convertToStringSlice(value interface{}) []string {
 	}
 }
 
-// Backward compatibility functions for the old Poetry implementation
-// getPoetryDependencies returns dependency graph and direct dependencies for backward compatibility
-func getPoetryDependencies(srcPath string) (map[string][]string, []string, error) {
-	config := PackageManagerConfig{
-		WorkingDirectory:       srcPath,
-		IncludeDevDependencies: false,
-	}
-	poetryFlex, err := NewPoetryFlexPack(config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create Poetry FlexPack: %w", err)
-	}
-	// Build dependency graph
-	poetryFlex.buildDependencyGraph()
-	// Extract direct dependencies (project dependencies only)
-	projectKey := fmt.Sprintf("%s:%s", poetryFlex.projectName, poetryFlex.projectVersion)
-	directDeps := poetryFlex.dependencyGraph[projectKey]
-	return poetryFlex.dependencyGraph, directDeps, nil
-}
-
-// getPoetryPackageFromPyProject returns package name and version from pyproject.toml for backward compatibility
-func getPoetryPackageFromPyProject(srcPath string) (string, string, error) {
-	config := PackageManagerConfig{
-		WorkingDirectory:       srcPath,
-		IncludeDevDependencies: false,
-	}
-	poetryFlex, err := NewPoetryFlexPack(config)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create Poetry FlexPack: %w", err)
-	}
-	return poetryFlex.projectName, poetryFlex.projectVersion, nil
-}
-
 // ===== BuildInfoCollector Interface Implementation =====
 
 // CollectBuildInfo collects complete build information including dependencies
@@ -722,7 +691,7 @@ func (pf *PoetryFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
 	// Use caching to enhance dependencies with checksums and metadata
 	err := pf.UpdateDependenciesWithCache()
 	if err != nil {
-		log.Warn("Failed to update dependencies with cache: %v", err)
+		log.Warn("Failed to update dependencies with cache: " + err.Error())
 		// Continue with fallback approach
 	}
 
@@ -753,7 +722,7 @@ func (pf *PoetryFlexPack) getPoetryVersion() string {
 	cmd := exec.Command("poetry", "--version")
 	output, err := cmd.Output()
 	if err != nil {
-		log.Debug("Failed to get Poetry version: %s", err.Error())
+		log.Debug("Failed to get Poetry version: " + err.Error())
 		return "unknown"
 	}
 
@@ -783,30 +752,30 @@ func GetPoetryDependenciesCache(projectPath string) (cache *PoetryDependenciesCa
 	cache = new(PoetryDependenciesCache)
 	cacheFilePath, exists, err := getPoetryDependenciesCacheFilePath(projectPath)
 	if err != nil || !exists {
-		log.Debug("Poetry dependencies cache not found: %s", cacheFilePath)
+		log.Debug("Poetry dependencies cache not found: " + cacheFilePath)
 		return nil, err
 	}
 
 	jsonFile, err := os.Open(cacheFilePath)
 	if err != nil {
-		log.Debug("Failed to open Poetry cache file: %v", err)
+		log.Debug("Failed to open Poetry cache file: " + err.Error())
 		return nil, err
 	}
 	defer jsonFile.Close()
 
 	byteValue, err := io.ReadAll(jsonFile)
 	if err != nil {
-		log.Debug("Failed to read Poetry cache file: %v", err)
+		log.Debug("Failed to read Poetry cache file: " + err.Error())
 		return nil, err
 	}
 
 	err = json.Unmarshal(byteValue, cache)
 	if err != nil {
-		log.Debug("Failed to parse Poetry cache file: %v", err)
+		log.Debug("Failed to parse Poetry cache file: " + err.Error())
 		return nil, err
 	}
 
-	log.Debug("Loaded Poetry dependencies cache with %d entries", len(cache.DepsMap))
+	log.Debug(fmt.Sprintf("Loaded Poetry dependencies cache with %d entries", len(cache.DepsMap)))
 	return cache, nil
 }
 
@@ -840,7 +809,7 @@ func UpdatePoetryDependenciesCache(dependenciesMap map[string]entities.Dependenc
 		return fmt.Errorf("failed to write Poetry cache file: %w", err)
 	}
 
-	log.Debug("Updated Poetry dependencies cache with %d entries at %s", len(dependenciesMap), cacheFilePath)
+	log.Debug(fmt.Sprintf("Updated Poetry dependencies cache with %d entries at %s", len(dependenciesMap), cacheFilePath))
 	return nil
 }
 
@@ -852,7 +821,7 @@ func (cache *PoetryDependenciesCache) GetDependency(dependencyName string) (depe
 
 	dependency, found = cache.DepsMap[dependencyName]
 	if found {
-		log.Debug("Found cached dependency: %s", dependencyName)
+		log.Debug("Found cached dependency: " + dependencyName)
 	}
 	return dependency, found
 }
@@ -871,13 +840,13 @@ func (cache *PoetryDependenciesCache) IsValid(maxAge time.Duration) bool {
 
 	// Check version compatibility
 	if cache.Version != poetryCacheLatestVersion {
-		log.Debug("Poetry cache version mismatch: expected %d, got %d", poetryCacheLatestVersion, cache.Version)
+		log.Debug(fmt.Sprintf("Poetry cache version mismatch: expected %d, got %d", poetryCacheLatestVersion, cache.Version))
 		return false
 	}
 
 	// Check if cache is too old
 	if maxAge > 0 && time.Since(cache.LastUpdated) > maxAge {
-		log.Debug("Poetry cache expired: last updated %v ago", time.Since(cache.LastUpdated))
+		log.Debug(fmt.Sprintf("Poetry cache expired: last updated %v ago", time.Since(cache.LastUpdated)))
 		return false
 	}
 
@@ -945,7 +914,7 @@ func (pf *PoetryFlexPack) UpdateDependenciesWithCache() error {
 			pf.dependencies[i].SHA256 = cachedDep.Checksum.Sha256
 			pf.dependencies[i].MD5 = cachedDep.Checksum.Md5
 
-			log.Debug("Using cached checksums for %s", depKey)
+			log.Debug("Using cached checksums for " + depKey)
 		} else {
 			// Need to calculate checksums for this dependency
 			checksums := pf.calculateDependencyChecksum(dep)
@@ -969,14 +938,14 @@ func (pf *PoetryFlexPack) UpdateDependenciesWithCache() error {
 					pf.dependencies[i].SHA256 = checksum["sha256"].(string)
 					pf.dependencies[i].MD5 = checksum["md5"].(string)
 
-					log.Debug("Calculated new checksums for %s", depKey)
+					log.Debug("Calculated new checksums for " + depKey)
 				} else {
 					missingDeps = append(missingDeps, depKey)
-					log.Debug("Could not calculate checksums for %s", depKey)
+					log.Debug("Could not calculate checksums for " + depKey)
 				}
 			} else {
 				missingDeps = append(missingDeps, depKey)
-				log.Debug("No checksum data available for %s", depKey)
+				log.Debug("No checksum data available for " + depKey)
 			}
 		}
 	}
@@ -985,7 +954,7 @@ func (pf *PoetryFlexPack) UpdateDependenciesWithCache() error {
 	if len(missingDeps) > 0 {
 		log.Warn("The following Poetry packages could not be found or checksums calculated:")
 		for _, dep := range missingDeps {
-			log.Warn("  - %s", dep)
+			log.Warn("  - " + dep)
 		}
 		log.Warn("This may happen if packages are not in Poetry cache or are virtual dependencies.")
 		log.Warn("Run 'poetry install' to populate the cache, or use 'poetry show --tree' to verify dependencies.")
@@ -995,7 +964,7 @@ func (pf *PoetryFlexPack) UpdateDependenciesWithCache() error {
 	if len(dependenciesMap) > 0 {
 		err = UpdatePoetryDependenciesCache(dependenciesMap, pf.config.WorkingDirectory)
 		if err != nil {
-			log.Warn("Failed to update Poetry dependencies cache: %v", err)
+			log.Warn("Failed to update Poetry dependencies cache: " + err.Error())
 		}
 	}
 
@@ -1057,7 +1026,7 @@ func RunPoetryInstallWithBuildInfoAndCaching(workingDir string, buildName, build
 	// Load existing cache before running install
 	existingCache, _ := GetPoetryDependenciesCache(workingDir)
 	if existingCache != nil && existingCache.IsValid(24*time.Hour) {
-		log.Info("Found valid Poetry dependencies cache with %d entries", len(existingCache.DepsMap))
+		log.Info(fmt.Sprintf("Found valid Poetry dependencies cache with %d entries", len(existingCache.DepsMap)))
 	}
 
 	// Run the standard Poetry install
@@ -1070,7 +1039,7 @@ func RunPoetryInstallWithBuildInfoAndCaching(workingDir string, buildName, build
 	log.Info("Updating Poetry dependencies cache...")
 	err = poetryFlex.UpdateDependenciesWithCache()
 	if err != nil {
-		log.Warn("Failed to update Poetry dependencies cache: %v", err)
+		log.Warn("Failed to update Poetry dependencies cache: " + err.Error())
 		// Don't fail the entire operation for caching issues
 	} else {
 		log.Info("Successfully updated Poetry dependencies cache")
@@ -1087,7 +1056,7 @@ func ClearPoetryDependenciesCache(projectPath string) error {
 	}
 
 	if !exists {
-		log.Debug("Poetry dependencies cache does not exist: %s", cacheFilePath)
+		log.Debug("Poetry dependencies cache does not exist: " + cacheFilePath)
 		return nil
 	}
 
@@ -1096,7 +1065,7 @@ func ClearPoetryDependenciesCache(projectPath string) error {
 		return fmt.Errorf("failed to remove cache file: %w", err)
 	}
 
-	log.Info("Cleared Poetry dependencies cache: %s", cacheFilePath)
+	log.Info("Cleared Poetry dependencies cache: " + cacheFilePath)
 	return nil
 }
 
@@ -1107,7 +1076,7 @@ func GetPoetryDependenciesCacheInfo(projectPath string) (map[string]interface{},
 		return map[string]interface{}{
 			"exists": false,
 			"error":  err.Error(),
-		}, nil
+		}, err
 	}
 
 	if cache == nil {
