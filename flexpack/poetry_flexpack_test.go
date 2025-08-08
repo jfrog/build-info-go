@@ -192,22 +192,22 @@ func TestPoetryFlexPackInterface(t *testing.T) {
 	// Test that all required methods exist
 	depStr := poetryFlex.GetDependency()
 	if depStr == "" {
-		depStr = "test-project:1.0.0"
+		t.Log("GetDependency returned empty string")
 	}
 
 	checksums := poetryFlex.CalculateChecksum()
 	if checksums == nil {
-		checksums = []map[string]interface{}{}
+		t.Log("CalculateChecksum returned nil")
 	}
 
 	scopes := poetryFlex.CalculateScopes()
 	if scopes == nil {
-		scopes = []string{}
+		t.Log("CalculateScopes returned nil")
 	}
 
 	requestedBy := poetryFlex.CalculateRequestedBy()
 	if requestedBy == nil {
-		requestedBy = map[string][]string{}
+		t.Log("CalculateRequestedBy returned nil")
 	}
 }
 
