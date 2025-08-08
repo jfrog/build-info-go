@@ -315,6 +315,33 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				}
 			},
 		},
+		{
+			Name:      "poetry",
+			Usage:     "Generate build-info for a Poetry project",
+			UsageText: "bi poetry",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("poetry-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					err = errors.Join(err, bld.Clean())
+				}()
+				pythonModule, err := bld.AddPythonModule("", pythonutils.Poetry)
+				if err != nil {
+					return
+				}
+				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
+				err = pythonModule.RunInstallAndCollectDependencies(filteredArgs)
+				if err != nil {
+					return err
+				}
+				return printBuild(bld, context.String(formatFlag))
+			},
+		},
 	}
 }
 
