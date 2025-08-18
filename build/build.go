@@ -506,7 +506,6 @@ func createModule(moduleId string, moduleType entities.ModuleType, checksum enti
 func createDefaultModule(moduleId string) *entities.Module {
 	return &entities.Module{
 		Id:           moduleId,
-		Properties:   map[string][]string{},
 		Artifacts:    []entities.Artifact{},
 		Dependencies: []entities.Dependency{},
 	}
