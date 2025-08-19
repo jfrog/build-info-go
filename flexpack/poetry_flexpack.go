@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/gofrog/crypto"
 	"github.com/jfrog/gofrog/log"
@@ -258,8 +259,8 @@ func (pf *PoetryFlexPack) parsePoetryShowOutput(output string) error {
 			continue
 		}
 
-		// Check if this is a top-level dependency (no indentation)
-		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "├") && !strings.HasPrefix(line, "└") {
+		// Check if this is a top-level dependency (no indentation or tree characters)
+		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "├") && !strings.HasPrefix(line, "└") && !strings.HasPrefix(line, "│") {
 			// Parse top-level dependency
 			parts := strings.Fields(line)
 			if len(parts) >= 2 {
@@ -279,7 +280,15 @@ func (pf *PoetryFlexPack) parsePoetryShowOutput(output string) error {
 			}
 		} else {
 			// Parse sub-dependency (transitive)
-			cleaned := strings.TrimLeft(line, " ├└─")
+			// Remove tree formatting characters: ├, └, ─, │, and spaces
+			cleaned := strings.TrimLeft(line, " ├└─│")
+			cleaned = strings.TrimSpace(cleaned)
+
+			// Skip lines that are only tree formatting or empty after cleaning
+			if cleaned == "" || strings.HasPrefix(cleaned, "└──") || strings.HasPrefix(cleaned, "├──") {
+				continue
+			}
+
 			parts := strings.Fields(cleaned)
 			if len(parts) >= 2 && currentParent != "" {
 				name := parts[0]
@@ -494,7 +503,7 @@ func (pf *PoetryFlexPack) getPoetryCacheDirectory() (string, error) {
 	}
 
 	// If no cache directory found, provide helpful information
-	return "", fmt.Errorf(`poetry artifacts directory not found. 
+	return "", fmt.Errorf(`poetry artifacts directory not found
 
 Poetry cache locations checked:
 %s
@@ -504,7 +513,7 @@ To use this tool:
 2. Run 'poetry install' in a project to populate the cache
 3. Or manually download packages to one of the cache directories above
 
-Note: Poetry stores downloaded packages in the artifacts directory. If you haven't used Poetry yet, this directory may not exist.`, strings.Join(possiblePaths, "\n"))
+Note: Poetry stores downloaded packages in the artifacts directory. If you haven't used Poetry yet, this directory may not exist`, strings.Join(possiblePaths, "\n"))
 }
 
 // calculateFileChecksums calculates SHA1, SHA256, and MD5 checksums for a file using crypto.GetFileDetails
@@ -550,91 +559,45 @@ func RunPoetryInstallWithBuildInfo(workingDir string, buildName, buildNumber str
 	// Collect build information if build name and number are provided
 	if buildName != "" && buildNumber != "" {
 		log.Info("Collecting build information...")
-		// Parse dependencies
-		depList := poetryFlex.ParseDependencyToList()
-		log.Debug(fmt.Sprintf("Found %d dependencies", len(depList)))
-		// Calculate checksums
-		checksums := poetryFlex.CalculateChecksum()
-		log.Debug(fmt.Sprintf("Calculated checksums for %d packages", len(checksums)))
-		// Get dependency graph
-		requestedBy := poetryFlex.CalculateRequestedBy()
-		log.Debug(fmt.Sprintf("Built dependency graph with %d relationships", len(requestedBy)))
-		// Save build info (placeholder - implement actual build info saving)
-		buildInfo := &entities.BuildInfo{
-			Name:    buildName,
-			Number:  buildNumber,
-			Started: "",
-		}
-		// Convert checksums to build info dependencies
-		var dependencies []entities.Dependency
-		for _, checksumMap := range checksums {
-			// Check type assertions to avoid runtime panics
-			id, ok := checksumMap["id"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'id' field in checksum map, skipping dependency")
-				continue
-			}
-			depType, ok := checksumMap["type"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'type' field in checksum map, skipping dependency")
-				continue
-			}
-			sha1, ok := checksumMap["sha1"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'sha1' field in checksum map")
-				sha1 = ""
-			}
-			sha256, ok := checksumMap["sha256"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'sha256' field in checksum map")
-				sha256 = ""
-			}
-			md5, ok := checksumMap["md5"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'md5' field in checksum map")
-				md5 = ""
-			}
-			depName, ok := checksumMap["name"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'name' field in checksum map, skipping dependency")
-				continue
-			}
-			depVersion, ok := checksumMap["version"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'version' field in checksum map, skipping dependency")
-				continue
-			}
 
-			dep := entities.Dependency{
-				Id:   id,
-				Type: depType,
-				Checksum: entities.Checksum{
-					Sha1:   sha1,
-					Sha256: sha256,
-					Md5:    md5,
-				},
-				Scopes: convertToStringSlice(checksumMap["scopes"]),
-			}
-			depKey := fmt.Sprintf("%s:%s", depName, depVersion)
-			if requesters, found := requestedBy[depKey]; found {
-				// Convert []string to [][]string format expected by RequestedBy
-				var requestedByPaths [][]string
-				for _, requester := range requesters {
-					requestedByPaths = append(requestedByPaths, []string{requester})
-				}
-				dep.RequestedBy = requestedByPaths
-			}
-			dependencies = append(dependencies, dep)
+		// Use the CollectBuildInfo method to get complete build info
+		buildInfo, err := poetryFlex.CollectBuildInfo(buildName, buildNumber)
+		if err != nil {
+			return fmt.Errorf("failed to collect build info: %w", err)
 		}
-		buildInfo.Modules = []entities.Module{
-			{
-				Id:           fmt.Sprintf("%s:%s", poetryFlex.projectName, poetryFlex.projectVersion),
-				Dependencies: dependencies,
-			},
+
+		// Save build info using build-info-go service for jfrog-cli compatibility
+		err = savePoetryBuildInfoForJfrogCli(buildInfo, workingDir)
+		if err != nil {
+			log.Warn("Failed to save build info for jfrog-cli compatibility: " + err.Error())
+			// Don't fail the entire operation, but warn the user
+		} else {
+			log.Info("Build info saved for jfrog-cli compatibility")
 		}
+
 		log.Info("Build information collection completed")
 		log.Debug(fmt.Sprintf("Build info: %+v", buildInfo))
 	}
+	return nil
+}
+
+// savePoetryBuildInfoForJfrogCli saves build info in a format compatible with jfrog-cli rt bp
+func savePoetryBuildInfoForJfrogCli(buildInfo *entities.BuildInfo, workingDir string) error {
+	// Create build-info service
+	service := build.NewBuildInfoService()
+
+	// Create or get build
+	bld, err := service.GetOrCreateBuildWithProject(buildInfo.Name, buildInfo.Number, "")
+	if err != nil {
+		return fmt.Errorf("failed to create build: %w", err)
+	}
+
+	// Save the complete build info (this will be loaded by rt bp)
+	err = bld.SaveBuildInfo(buildInfo)
+	if err != nil {
+		return fmt.Errorf("failed to save build info: %w", err)
+	}
+
 	return nil
 }
 

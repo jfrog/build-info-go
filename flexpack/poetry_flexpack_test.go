@@ -64,7 +64,7 @@ requests = []
 		t.Fatalf("Failed to create test poetry.lock: %v", err)
 	}
 
-	config := PackageManagerConfig{
+	config := PoetryConfig{
 		WorkingDirectory:       tempDir,
 		IncludeDevDependencies: true,
 	}
@@ -222,7 +222,7 @@ pytest = []
 		t.Fatalf("Failed to create test poetry.lock: %v", err)
 	}
 
-	config := PackageManagerConfig{
+	config := PoetryConfig{
 		WorkingDirectory:       tempDir,
 		IncludeDevDependencies: true,
 	}
@@ -320,7 +320,7 @@ requests = []
 		t.Fatalf("Failed to create poetry.lock: %v", err)
 	}
 
-	config := PackageManagerConfig{
+	config := PoetryConfig{
 		WorkingDirectory: tempDir,
 	}
 
@@ -404,7 +404,7 @@ func TestGetPoetryDependenciesCacheInfo(t *testing.T) {
 
 func TestPoetryFlexPackErrorHandling(t *testing.T) {
 	// Test with non-existent directory - should fail during creation
-	config := PackageManagerConfig{
+	config := PoetryConfig{
 		WorkingDirectory: "/non/existent/directory",
 	}
 
@@ -415,7 +415,7 @@ func TestPoetryFlexPackErrorHandling(t *testing.T) {
 
 	// Test with directory that exists but has no Poetry files
 	tempDir := t.TempDir()
-	config2 := PackageManagerConfig{
+	config2 := PoetryConfig{
 		WorkingDirectory: tempDir,
 	}
 
