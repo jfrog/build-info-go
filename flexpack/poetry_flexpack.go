@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/gofrog/crypto"
 	"github.com/jfrog/gofrog/log"
@@ -81,9 +82,10 @@ func NewPoetryFlexPack(config PoetryConfig) (*PoetryFlexPack, error) {
 	if err := pf.loadPyProjectToml(); err != nil {
 		return nil, fmt.Errorf("failed to load pyproject.toml: %w", err)
 	}
-	// Load poetry.lock
+	// Load poetry.lock (optional - can continue without it)
 	if err := pf.loadPoetryLock(); err != nil {
-		return nil, fmt.Errorf("failed to load poetry.lock: %w", err)
+		log.Debug("Failed to load poetry.lock, will use CLI-based dependency resolution: " + err.Error())
+		// Don't return error - we can still collect dependencies via CLI
 	}
 	return pf, nil
 }
@@ -132,7 +134,8 @@ func (pf *PoetryFlexPack) CalculateChecksum() []map[string]interface{} {
 			checksumMap["sha256"] = sha256Hash
 			checksumMap["md5"] = md5Hash
 			checksumMap["id"] = dep.ID
-			checksumMap["scopes"] = dep.Scopes
+			// Check if scopes are in sync with package manager scopes
+			checksumMap["scopes"] = pf.validateAndNormalizeScopes(dep.Scopes)
 			checksumMap["name"] = dep.Name
 			checksumMap["version"] = dep.Version
 			checksumMap["path"] = filePath
@@ -143,7 +146,8 @@ func (pf *PoetryFlexPack) CalculateChecksum() []map[string]interface{} {
 			checksumMap["sha256"] = ""
 			checksumMap["md5"] = ""
 			checksumMap["id"] = dep.ID
-			checksumMap["scopes"] = dep.Scopes
+			// Check if scopes are in sync with package manager scopes
+			checksumMap["scopes"] = pf.validateAndNormalizeScopes(dep.Scopes)
 			checksumMap["name"] = dep.Name
 			checksumMap["version"] = dep.Version
 			checksumMap["path"] = ""
@@ -210,6 +214,10 @@ func (pf *PoetryFlexPack) loadPoetryLock() error {
 	lockPath := filepath.Join(pf.config.WorkingDirectory, "poetry.lock")
 	data, err := os.ReadFile(lockPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Debug("poetry.lock not found at " + lockPath + ", continuing without lock file")
+			return nil
+		}
 		return fmt.Errorf("failed to read poetry.lock: %w", err)
 	}
 	pf.lockFileData = &PoetryLockFile{}
@@ -221,15 +229,23 @@ func (pf *PoetryFlexPack) loadPoetryLock() error {
 
 // parseDependencies parses dependencies using hybrid CLI + file parsing approach
 func (pf *PoetryFlexPack) parseDependencies() {
-	// Strategy 1: Try CLI-based resolution (most accurate)
+	// Strategy 1: Prefer lock file if it was loaded (deterministic)
+	if pf.lockFileData != nil && pf.pyprojectData != nil {
+		pf.parseFromFiles()
+		if len(pf.dependencies) > 0 {
+			log.Debug("Successfully parsed dependencies from poetry.lock")
+			return
+		}
+		log.Debug("poetry.lock parsing yielded no dependencies, falling back to CLI")
+	} else {
+		log.Debug("poetry.lock not loaded, trying CLI")
+	}
+	// Strategy 2: Try CLI-based resolution
 	if err := pf.parseWithPoetryShow(); err == nil {
 		log.Debug("Successfully parsed dependencies using 'poetry show'")
 		return
 	}
-
-	log.Debug("CLI resolution failed, falling back to file parsing")
-
-	// Strategy 2: Fallback to file parsing (more limited but reliable)
+	// Strategy 3: Fallback to file parsing (more limited but reliable)
 	pf.parseFromFiles()
 }
 
@@ -258,8 +274,8 @@ func (pf *PoetryFlexPack) parsePoetryShowOutput(output string) error {
 			continue
 		}
 
-		// Check if this is a top-level dependency (no indentation)
-		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "├") && !strings.HasPrefix(line, "└") {
+		// Check if this is a top-level dependency (no indentation or tree characters)
+		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "├") && !strings.HasPrefix(line, "└") && !strings.HasPrefix(line, "│") {
 			// Parse top-level dependency
 			parts := strings.Fields(line)
 			if len(parts) >= 2 {
@@ -279,7 +295,15 @@ func (pf *PoetryFlexPack) parsePoetryShowOutput(output string) error {
 			}
 		} else {
 			// Parse sub-dependency (transitive)
-			cleaned := strings.TrimLeft(line, " ├└─")
+			// Remove tree formatting characters: ├, └, ─, │, and spaces
+			cleaned := strings.TrimLeft(line, " ├└─│")
+			cleaned = strings.TrimSpace(cleaned)
+
+			// Skip lines that are only tree formatting or empty after cleaning
+			if cleaned == "" || strings.HasPrefix(cleaned, "└──") || strings.HasPrefix(cleaned, "├──") {
+				continue
+			}
+
 			parts := strings.Fields(cleaned)
 			if len(parts) >= 2 && currentParent != "" {
 				name := parts[0]
@@ -372,6 +396,44 @@ func (pf *PoetryFlexPack) determineScopes(depName string, directDeps, directDevD
 		scopes = append(scopes, "runtime")
 	}
 	return scopes
+}
+
+// validateAndNormalizeScopes validates and normalizes scopes to ensure they are in sync with package manager scopes
+func (pf *PoetryFlexPack) validateAndNormalizeScopes(scopes []string) []string {
+	if len(scopes) == 0 {
+		return []string{"runtime"}
+	}
+
+	// Normalize scope names to standard package manager scopes
+	normalizedScopes := make([]string, 0, len(scopes))
+	for _, scope := range scopes {
+		switch scope {
+		case "main", "runtime":
+			normalizedScopes = append(normalizedScopes, "runtime")
+		case "dev", "development":
+			normalizedScopes = append(normalizedScopes, "dev")
+		case "transitive", "dependency":
+			normalizedScopes = append(normalizedScopes, "transitive")
+		case "dev-transitive", "dev-dependency":
+			normalizedScopes = append(normalizedScopes, "dev-transitive")
+		default:
+			// Keep unknown scopes as-is but log for debugging
+			log.Debug("Unknown scope found: " + scope)
+			normalizedScopes = append(normalizedScopes, scope)
+		}
+	}
+
+	// Remove duplicates while preserving order
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(normalizedScopes))
+	for _, scope := range normalizedScopes {
+		if !seen[scope] {
+			seen[scope] = true
+			result = append(result, scope)
+		}
+	}
+
+	return result
 }
 
 // buildDependencyGraph builds the complete dependency graph
@@ -494,7 +556,7 @@ func (pf *PoetryFlexPack) getPoetryCacheDirectory() (string, error) {
 	}
 
 	// If no cache directory found, provide helpful information
-	return "", fmt.Errorf(`poetry artifacts directory not found. 
+	return "", fmt.Errorf(`poetry artifacts directory not found
 
 Poetry cache locations checked:
 %s
@@ -504,7 +566,7 @@ To use this tool:
 2. Run 'poetry install' in a project to populate the cache
 3. Or manually download packages to one of the cache directories above
 
-Note: Poetry stores downloaded packages in the artifacts directory. If you haven't used Poetry yet, this directory may not exist.`, strings.Join(possiblePaths, "\n"))
+Note: Poetry stores downloaded packages in the artifacts directory. If you haven't used Poetry yet, this directory may not exist`, strings.Join(possiblePaths, "\n"))
 }
 
 // calculateFileChecksums calculates SHA1, SHA256, and MD5 checksums for a file using crypto.GetFileDetails
@@ -550,113 +612,46 @@ func RunPoetryInstallWithBuildInfo(workingDir string, buildName, buildNumber str
 	// Collect build information if build name and number are provided
 	if buildName != "" && buildNumber != "" {
 		log.Info("Collecting build information...")
-		// Parse dependencies
-		depList := poetryFlex.ParseDependencyToList()
-		log.Debug(fmt.Sprintf("Found %d dependencies", len(depList)))
-		// Calculate checksums
-		checksums := poetryFlex.CalculateChecksum()
-		log.Debug(fmt.Sprintf("Calculated checksums for %d packages", len(checksums)))
-		// Get dependency graph
-		requestedBy := poetryFlex.CalculateRequestedBy()
-		log.Debug(fmt.Sprintf("Built dependency graph with %d relationships", len(requestedBy)))
-		// Save build info (placeholder - implement actual build info saving)
-		buildInfo := &entities.BuildInfo{
-			Name:    buildName,
-			Number:  buildNumber,
-			Started: "",
-		}
-		// Convert checksums to build info dependencies
-		var dependencies []entities.Dependency
-		for _, checksumMap := range checksums {
-			// Check type assertions to avoid runtime panics
-			id, ok := checksumMap["id"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'id' field in checksum map, skipping dependency")
-				continue
-			}
-			depType, ok := checksumMap["type"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'type' field in checksum map, skipping dependency")
-				continue
-			}
-			sha1, ok := checksumMap["sha1"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'sha1' field in checksum map")
-				sha1 = ""
-			}
-			sha256, ok := checksumMap["sha256"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'sha256' field in checksum map")
-				sha256 = ""
-			}
-			md5, ok := checksumMap["md5"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'md5' field in checksum map")
-				md5 = ""
-			}
-			depName, ok := checksumMap["name"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'name' field in checksum map, skipping dependency")
-				continue
-			}
-			depVersion, ok := checksumMap["version"].(string)
-			if !ok {
-				log.Warn("Invalid or missing 'version' field in checksum map, skipping dependency")
-				continue
-			}
 
-			dep := entities.Dependency{
-				Id:   id,
-				Type: depType,
-				Checksum: entities.Checksum{
-					Sha1:   sha1,
-					Sha256: sha256,
-					Md5:    md5,
-				},
-				Scopes: convertToStringSlice(checksumMap["scopes"]),
-			}
-			depKey := fmt.Sprintf("%s:%s", depName, depVersion)
-			if requesters, found := requestedBy[depKey]; found {
-				// Convert []string to [][]string format expected by RequestedBy
-				var requestedByPaths [][]string
-				for _, requester := range requesters {
-					requestedByPaths = append(requestedByPaths, []string{requester})
-				}
-				dep.RequestedBy = requestedByPaths
-			}
-			dependencies = append(dependencies, dep)
+		// Use the CollectBuildInfo method to get complete build info
+		buildInfo, err := poetryFlex.CollectBuildInfo(buildName, buildNumber)
+		if err != nil {
+			return fmt.Errorf("failed to collect build info: %w", err)
 		}
-		buildInfo.Modules = []entities.Module{
-			{
-				Id:           fmt.Sprintf("%s:%s", poetryFlex.projectName, poetryFlex.projectVersion),
-				Dependencies: dependencies,
-			},
+
+		// Save build info using build-info-go service for jfrog-cli compatibility
+		err = savePoetryBuildInfoForJfrogCli(buildInfo)
+		if err != nil {
+			log.Warn("Failed to save build info for jfrog-cli compatibility: " + err.Error())
+			// Don't fail the entire operation, but warn the user
+		} else {
+			log.Info("Build info saved for jfrog-cli compatibility")
 		}
+
 		log.Info("Build information collection completed")
 		log.Debug(fmt.Sprintf("Build info: %+v", buildInfo))
 	}
 	return nil
 }
 
-// convertToStringSlice converts interface{} to []string
-func convertToStringSlice(value interface{}) []string {
-	if value == nil {
-		return []string{}
+// savePoetryBuildInfoForJfrogCli saves build info in a format compatible with jfrog-cli rt bp
+func savePoetryBuildInfoForJfrogCli(buildInfo *entities.BuildInfo) error {
+	// Create build-info service
+	service := build.NewBuildInfoService()
+
+	// Create or get build
+	bld, err := service.GetOrCreateBuildWithProject(buildInfo.Name, buildInfo.Number, "")
+	if err != nil {
+		return fmt.Errorf("failed to create build: %w", err)
 	}
-	switch v := value.(type) {
-	case []string:
-		return v
-	case []interface{}:
-		result := make([]string, len(v))
-		for i, item := range v {
-			if str, ok := item.(string); ok {
-				result[i] = str
-			}
-		}
-		return result
-	default:
-		return []string{}
+
+	// Save the complete build info (this will be loaded by rt bp)
+	err = bld.SaveBuildInfo(buildInfo)
+	if err != nil {
+		return fmt.Errorf("failed to save build info: %w", err)
 	}
+
+	return nil
 }
 
 // ===== BuildInfoCollector Interface Implementation =====
