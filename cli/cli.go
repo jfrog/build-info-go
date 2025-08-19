@@ -324,7 +324,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
 				// Use FlexPack Poetry implementation for proper dependency collection
-				config := flexpack.PackageManagerConfig{
+				config := flexpack.PoetryConfig{
 					WorkingDirectory:       ".",
 					IncludeDevDependencies: false, // Can be made configurable later
 				}

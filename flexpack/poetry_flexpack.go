@@ -18,7 +18,7 @@ import (
 
 // PoetryFlexPack implements the FlexPackManager interface for Poetry package manager
 type PoetryFlexPack struct {
-	config          PackageManagerConfig
+	config          PoetryConfig
 	dependencies    []DependencyInfo
 	dependencyGraph map[string][]string
 	projectName     string
@@ -71,7 +71,7 @@ type PoetryShowOutput struct {
 }
 
 // NewPoetryFlexPack creates a new Poetry FlexPack instance
-func NewPoetryFlexPack(config PackageManagerConfig) (*PoetryFlexPack, error) {
+func NewPoetryFlexPack(config PoetryConfig) (*PoetryFlexPack, error) {
 	pf := &PoetryFlexPack{
 		config:          config,
 		dependencies:    []DependencyInfo{},
@@ -528,10 +528,9 @@ func (pf *PoetryFlexPack) calculateFileChecksums(filePath string) (sha1Hash, sha
 func RunPoetryInstallWithBuildInfo(workingDir string, buildName, buildNumber string, includeDevDeps bool, extraArgs []string) error {
 	log.Info("Running Poetry install with build info collection...")
 	// Create configuration
-	config := PackageManagerConfig{
+	config := PoetryConfig{
 		WorkingDirectory:       workingDir,
 		IncludeDevDependencies: includeDevDeps,
-		ExtraArgs:              extraArgs,
 	}
 	// Create Poetry FlexPack instance
 	poetryFlex, err := NewPoetryFlexPack(config)
@@ -1046,10 +1045,9 @@ func RunPoetryInstallWithBuildInfoAndCaching(workingDir string, buildName, build
 	log.Info("Running Poetry install with build-info caching support")
 
 	// Create Poetry FlexPack configuration
-	config := PackageManagerConfig{
+	config := PoetryConfig{
 		WorkingDirectory:       workingDir,
 		IncludeDevDependencies: includeDevDeps,
-		ExtraArgs:              extraArgs,
 	}
 
 	// Create Poetry FlexPack instance

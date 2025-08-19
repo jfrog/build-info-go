@@ -56,21 +56,11 @@ type BuildInfoCollector interface {
 	GetDependencyGraph() (map[string][]string, error)
 }
 
-// PackageManagerConfig holds configuration for package manager operations
-type PackageManagerConfig struct {
-	// WorkingDirectory is the directory where the package manager should operate
+// PoetryConfig holds configuration specific to Poetry operations
+type PoetryConfig struct {
+	// WorkingDirectory is the directory where Poetry should operate
 	WorkingDirectory string
 
 	// IncludeDevDependencies indicates whether to include development dependencies
 	IncludeDevDependencies bool
-
-	// RepositoryURL is the URL of the package repository (if applicable)
-	RepositoryURL string
-
-	// Credentials for accessing private repositories
-	Username string
-	Password string
-
-	// Additional arguments to pass to the package manager
-	ExtraArgs []string
 }
