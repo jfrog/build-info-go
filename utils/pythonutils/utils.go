@@ -310,14 +310,20 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			return pattern.Line, nil
 		}
 		// If this pattern matched before package-name was found, do not collect this path.
-		if !expectingPackageFilePath {
-			log.Debug(fmt.Sprintf("Could not resolve package name for download path: %s , continuing...", packageName))
+		if !expectingPackageFilePath || packageName == "" {
+			log.Debug(fmt.Sprintf("Could not resolve package name for download path: %s , continuing...", fileName))
 			return pattern.Line, nil
 		}
-		// Save dependency information.
-		dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: fileName}
-		expectingPackageFilePath = false
-		log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
+		// Only save if the filename matches the expected package name pattern
+		fileNameLower := strings.ToLower(fileName)
+		packageNameLower := strings.ToLower(packageName)
+		// Check if the wheel file name starts with the package name (with underscore or dash)
+		if strings.HasPrefix(fileNameLower, packageNameLower+"-") || strings.HasPrefix(fileNameLower, packageNameLower+"_") || strings.HasPrefix(fileNameLower, strings.ReplaceAll(packageNameLower, "-", "_")+"-") || strings.HasPrefix(fileNameLower, strings.ReplaceAll(packageNameLower, "_", "-")+"-") {
+			// Save dependency information.
+			dependenciesMap[packageNameLower] = entities.Dependency{Id: fileName}
+			expectingPackageFilePath = false
+			log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
+		}
 		return pattern.Line, nil
 	}
 
