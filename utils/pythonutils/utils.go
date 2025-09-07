@@ -77,9 +77,8 @@ func GetPythonDependenciesFiles(tool PythonTool, args []string, buildName, build
 	case Pip, Pipenv:
 		return InstallWithLogParsing(tool, args, log, srcPath)
 	case Poetry:
-		if buildName != "" && buildNumber != "" {
-			log.Warn("Poetry commands are not supporting collecting dependencies files")
-		}
+		// Poetry dependency collection is handled by FlexPack framework
+		// This legacy path returns empty dependencies
 		return make(map[string]entities.Dependency), nil
 	default:
 		return nil, errors.New(string(tool) + " commands are not supported.")
