@@ -12,9 +12,11 @@ const (
 	WARN
 	INFO
 	DEBUG
+	VERBOSE
 )
 
 type Log interface {
+	Verbose(a ...interface{})
 	Debug(a ...interface{})
 	Info(a ...interface{})
 	Warn(a ...interface{})
@@ -24,6 +26,9 @@ type Log interface {
 
 // NullLog is a logger that does nothing
 type NullLog struct {
+}
+
+func (nl *NullLog) Verbose(...interface{}) {
 }
 
 func (nl *NullLog) Debug(...interface{}) {
@@ -42,12 +47,13 @@ func (nl *NullLog) Output(...interface{}) {
 }
 
 type defaultLogger struct {
-	logLevel  LevelType
-	outputLog *log.Logger
-	debugLog  *log.Logger
-	infoLog   *log.Logger
-	warnLog   *log.Logger
-	errorLog  *log.Logger
+	logLevel   LevelType
+	outputLog  *log.Logger
+	verboseLog *log.Logger
+	debugLog   *log.Logger
+	infoLog    *log.Logger
+	warnLog    *log.Logger
+	errorLog   *log.Logger
 }
 
 // NewDefaultLogger creates a new logger with a given LogLevel.
@@ -56,11 +62,18 @@ func NewDefaultLogger(logLevel LevelType) *defaultLogger {
 	logger := new(defaultLogger)
 	logger.logLevel = logLevel
 	logger.outputLog = log.New(os.Stdout, "", 0)
+	logger.verboseLog = log.New(os.Stderr, "[Verbose] ", 0)
 	logger.debugLog = log.New(os.Stderr, "[Debug] ", 0)
 	logger.infoLog = log.New(os.Stderr, "[Info] ", 0)
 	logger.warnLog = log.New(os.Stderr, "[Warn] ", 0)
 	logger.errorLog = log.New(os.Stderr, "[Error] ", 0)
 	return logger
+}
+
+func (logger defaultLogger) Verbose(a ...interface{}) {
+	if logger.logLevel >= VERBOSE {
+		logger.verboseLog.Println(a...)
+	}
 }
 
 func (logger defaultLogger) Debug(a ...interface{}) {
