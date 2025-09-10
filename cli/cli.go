@@ -65,24 +65,26 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			UsageText: "bi mvn",
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
-				service := build.NewBuildInfoService()
-				service.SetLogger(logger)
-				bld, err := service.GetOrCreateBuild("mvn-build", "1")
-				if err != nil {
-					return
+				// Use Maven implementation for proper dependency collection
+				config := flexpack.MavenConfig{
+					WorkingDirectory:        ".",
+					IncludeTestDependencies: true, // Include test dependencies by default
 				}
-				defer func() {
-					err = errors.Join(err, bld.Clean())
-				}()
-				mavenModule, err := bld.AddMavenModule("")
+
+				// Create Maven instance
+				mavenFlex, err := flexpack.NewMavenFlexPack(config)
 				if err != nil {
-					return
+					return fmt.Errorf("failed to create Maven instance: %w", err)
 				}
-				err = mavenModule.CalcDependencies()
+
+				// Collect build info
+				buildInfo, err := mavenFlex.CollectBuildInfo("mvn-build", "1")
 				if err != nil {
-					return
+					return fmt.Errorf("failed to collect build info: %w", err)
 				}
-				return printBuild(bld, context.String(formatFlag))
+
+				// Print the build info
+				return printBuildInfo(buildInfo, context.String(formatFlag))
 			},
 		},
 		{
@@ -323,19 +325,19 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			UsageText: "bi poetry",
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
-				// Use FlexPack Poetry implementation for proper dependency collection
+				// Use Poetry implementation for proper dependency collection
 				config := flexpack.PoetryConfig{
 					WorkingDirectory:       ".",
 					IncludeDevDependencies: false, // Can be made configurable later
 				}
 
-				// Create Poetry FlexPack instance
+				// Create Poetry instance
 				poetryFlex, err := flexpack.NewPoetryFlexPack(config)
 				if err != nil {
-					return fmt.Errorf("failed to create Poetry FlexPack: %w", err)
+					return fmt.Errorf("failed to create Poetry instance: %w", err)
 				}
 
-				// Collect build info using FlexPack
+				// Collect build info
 				buildInfo, err := poetryFlex.CollectBuildInfo("poetry-build", "1")
 				if err != nil {
 					return fmt.Errorf("failed to collect build info: %w", err)
