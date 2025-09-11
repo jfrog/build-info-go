@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jfrog/gofrog/crypto"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/jfrog/gofrog/crypto"
 
 	"golang.org/x/exp/slices"
 
@@ -456,7 +457,12 @@ func RunNpmCmd(executablePath, srcPath string, npmArgs []string, log utils.Log) 
 		err = fmt.Errorf("error while running '%s %s': %s\n%s", executablePath, strings.Join(args, " "), err.Error(), strings.TrimSpace(string(errResult)))
 		return
 	}
-	log.Verbose("npm '" + strings.Join(args, " ") + "' standard output is:\n" + strings.TrimSpace(string(stdResult)))
+	// Call Verbose if available, otherwise fall back to Debug
+	if verboseLogger, ok := log.(interface{ Verbose(...interface{}) }); ok {
+		verboseLogger.Verbose("npm '" + strings.Join(args, " ") + "' standard output is:\n" + strings.TrimSpace(string(stdResult)))
+	} else {
+		log.Debug("npm '" + strings.Join(args, " ") + "' standard output is:\n" + strings.TrimSpace(string(stdResult)))
+	}
 	return
 }
 

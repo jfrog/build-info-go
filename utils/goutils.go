@@ -171,7 +171,12 @@ func runDependenciesCmd(projectDir string, commandArgs []string, log Log) (outpu
 		output, errorOut, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, false)
 	}
 	if len(output) != 0 {
-		log.Verbose(output)
+		// Call Verbose if available, otherwise fall back to Debug
+		if verboseLogger, ok := log.(interface{ Verbose(...interface{}) }); ok {
+			verboseLogger.Verbose(output)
+		} else {
+			log.Debug(output)
+		}
 	}
 	if executionError != nil {
 		// If the command fails, the mod stays the same, therefore, don't need to be restored.
