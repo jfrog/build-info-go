@@ -378,7 +378,7 @@ func (mf *MavenFlexPack) calculateTreeLevelFromLine(line string) int {
 			switch char {
 			case '+', '\\':
 				// This indicates a dependency at this level
-				break
+				return level
 			case '|':
 				// Vertical bar indicates we're going deeper
 				level++
@@ -388,8 +388,10 @@ func (mf *MavenFlexPack) calculateTreeLevelFromLine(line string) int {
 					i++
 				}
 			default:
-				break
+				return level
 			}
+		} else {
+			return level
 		}
 	}
 
