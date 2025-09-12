@@ -2,13 +2,14 @@ package entities
 
 import (
 	"errors"
-	"github.com/jfrog/build-info-go/utils/compareutils"
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jfrog/build-info-go/utils/compareutils"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/gofrog/stringutils"
@@ -364,6 +365,7 @@ type Module struct {
 	Type              ModuleType   `json:"type,omitempty"`
 	Properties        interface{}  `json:"properties,omitempty"`
 	Id                string       `json:"id,omitempty"`
+	Repository        string       `json:"repository,omitempty"`
 	Artifacts         []Artifact   `json:"artifacts,omitempty"`
 	ExcludedArtifacts []Artifact   `json:"excludedArtifacts,omitempty"`
 	Dependencies      []Dependency `json:"dependencies,omitempty"`

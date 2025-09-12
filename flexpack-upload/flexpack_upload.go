@@ -62,7 +62,7 @@ type PublishResult struct {
 	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// BuildArtifactsToBuildInfo converts FlexPack artifacts to build-info entities format
+// BuildArtifactsToBuildInfo converts native artifacts to build-info entities format
 func BuildArtifactsToBuildInfo(artifacts []ArtifactInfo, moduleName string, repositoryName string) []entities.Artifact {
 	var buildInfoArtifacts []entities.Artifact
 
