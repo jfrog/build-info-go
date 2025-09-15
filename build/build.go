@@ -467,6 +467,13 @@ func addArtifactToPartialModule(artifact entities.Artifact, moduleId string, par
 }
 
 func addDependencyToPartialModule(dependency entities.Dependency, moduleId string, partialModules map[string]*partialModule) {
+
+	if dependency.Id == "" || strings.TrimSpace(dependency.Id) == "" {
+		// Log this as it indicates a bug in dependency collection from cache
+		fmt.Printf("Warning: Skipping dependency with empty ID. This may indicate a cache issue. Dependency: %+v\n ModuleId: %s", dependency, moduleId)
+		return
+	}
+
 	// init map if needed
 	if partialModules[moduleId].dependencies == nil {
 		partialModules[moduleId].dependencies = make(map[string]entities.Dependency)

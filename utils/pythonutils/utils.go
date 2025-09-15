@@ -285,7 +285,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 				log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", packageName))
 
 				// Save package with empty file path.
-				dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: ""}
+				dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: strings.ToLower(packageName), Scopes: []string{"cached"}}
 			}
 
 			// Check for out of bound results.
@@ -344,7 +344,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			}
 
 			// Save dependency with empty file name.
-			dependenciesMap[strings.ToLower(pattern.MatchedResults[1])] = entities.Dependency{Id: ""}
+			dependenciesMap[strings.ToLower(pattern.MatchedResults[1])] = entities.Dependency{Id: strings.ToLower(pattern.MatchedResults[1]), Scopes: []string{"cached"}}
 			log.Debug(fmt.Sprintf("Found package: %s already installed", pattern.MatchedResults[1]))
 			return pattern.Line, nil
 		},
