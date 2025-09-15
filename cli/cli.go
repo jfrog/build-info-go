@@ -11,6 +11,8 @@ import (
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/build-info-go/build"
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 	clitool "github.com/urfave/cli/v2"
@@ -315,6 +317,34 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				}
 			},
 		},
+		{
+			Name:      "poetry",
+			Usage:     "Generate build-info for a Poetry project",
+			UsageText: "bi poetry",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				// Use FlexPack Poetry implementation for proper dependency collection
+				config := flexpack.PoetryConfig{
+					WorkingDirectory:       ".",
+					IncludeDevDependencies: false, // Can be made configurable later
+				}
+
+				// Create Poetry FlexPack instance
+				poetryFlex, err := flexpack.NewPoetryFlexPack(config)
+				if err != nil {
+					return fmt.Errorf("failed to create Poetry FlexPack: %w", err)
+				}
+
+				// Collect build info using FlexPack
+				buildInfo, err := poetryFlex.CollectBuildInfo("poetry-build", "1")
+				if err != nil {
+					return fmt.Errorf("failed to collect build info: %w", err)
+				}
+
+				// Print the build info
+				return printBuildInfo(buildInfo, context.String(formatFlag))
+			},
+		},
 	}
 }
 
@@ -380,6 +410,46 @@ func extractStringFlag(args []string, flagName string) (flagValue string, filter
 		}
 	}
 	return
+}
+
+func printBuildInfo(buildInfo *entities.BuildInfo, format string) error {
+	switch format {
+	case cycloneDxXml:
+		cdxBom, err := buildInfo.ToCycloneDxBom()
+		if err != nil {
+			return err
+		}
+		encoder := cdx.NewBOMEncoder(os.Stdout, cdx.BOMFileFormatXML)
+		encoder.SetPretty(true)
+		if err = encoder.Encode(cdxBom); err != nil {
+			return err
+		}
+	case cycloneDxJson:
+		cdxBom, err := buildInfo.ToCycloneDxBom()
+		if err != nil {
+			return err
+		}
+		encoder := cdx.NewBOMEncoder(os.Stdout, cdx.BOMFileFormatJSON)
+		encoder.SetPretty(true)
+		if err = encoder.Encode(cdxBom); err != nil {
+			return err
+		}
+	case "":
+		b, err := json.Marshal(buildInfo)
+		if err != nil {
+			return err
+		}
+		var content bytes.Buffer
+		err = json.Indent(&content, b, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(content.String())
+	default:
+		return fmt.Errorf("'%s' is not a valid value for '%s'", format, formatFlag)
+	}
+
+	return nil
 }
 
 func filterCliFlags(allArgs []string, cliFlags []clitool.Flag) []string {
