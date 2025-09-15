@@ -284,7 +284,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 				// Re-running pip-install with 'no-cache-dir' fixes this issue.
 				log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", packageName))
 
-				// Save package with empty file path.
+				// Adding dependency id with cached scope to make sure it is included in the build-info.
 				dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: strings.ToLower(packageName), Scopes: []string{"cached"}}
 			}
 
@@ -343,7 +343,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 				return pattern.Line, nil
 			}
 
-			// Save dependency with empty file name.
+			// Save dependency id with scope as cached to make sure it is available in the build-info.
 			dependenciesMap[strings.ToLower(pattern.MatchedResults[1])] = entities.Dependency{Id: strings.ToLower(pattern.MatchedResults[1]), Scopes: []string{"cached"}}
 			log.Debug(fmt.Sprintf("Found package: %s already installed", pattern.MatchedResults[1]))
 			return pattern.Line, nil
