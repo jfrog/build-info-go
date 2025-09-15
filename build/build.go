@@ -12,6 +12,7 @@ import (
 	"time"
 
 	ioutils "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/gofrog/log"
 
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 
@@ -470,7 +471,7 @@ func addDependencyToPartialModule(dependency entities.Dependency, moduleId strin
 
 	if dependency.Id == "" || strings.TrimSpace(dependency.Id) == "" {
 		// Log this as it indicates a bug in dependency collection from cache
-		fmt.Printf("Warning: Skipping dependency with empty ID. This may indicate a cache issue. Dependency: %+v\n ModuleId: %s", dependency, moduleId)
+		log.Debugf("Skipping dependency with empty ID. This may indicate a cache issue. Dependency SHA256: %s ModuleId: %s", dependency.Sha256, moduleId)
 		return
 	}
 
