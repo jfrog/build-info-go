@@ -178,17 +178,15 @@ func (mf *MavenFlexPack) loadPOM() error {
 	mf.projectVersion = mf.pomData.Version
 	mf.projectName = fmt.Sprintf("%s:%s", mf.groupId, mf.artifactId)
 
-	log.Debug(fmt.Sprintf("Loaded Maven project: %s:%s:%s", mf.groupId, mf.artifactId, mf.projectVersion))
+	// Project loaded successfully
 	return nil
 }
 
 // parseDependencies parses dependencies using hybrid strategy
 func (mf *MavenFlexPack) parseDependencies() {
-	log.Debug("Starting Maven dependency parsing...")
 
-	// Strategy 1: Try CLI-based resolution (most comprehensive)
 	if err := mf.parseWithMavenDependencyTree(); err == nil {
-		log.Debug("Successfully parsed dependencies using 'mvn dependency:tree'")
+		// Successfully parsed using Maven dependency tree
 		return
 	} else {
 		log.Debug("Maven dependency:tree parsing failed, falling back to POM parsing: " + err.Error())
@@ -196,7 +194,6 @@ func (mf *MavenFlexPack) parseDependencies() {
 
 	// Strategy 2: Fallback to POM parsing (more limited but reliable)
 	mf.parseFromPOM()
-	log.Debug("Used POM-based dependency parsing")
 }
 
 // parseWithMavenDependencyTree uses mvn dependency:tree to get complete dependency information
@@ -209,7 +206,6 @@ func (mf *MavenFlexPack) parseWithMavenDependencyTree() error {
 	cmd := exec.Command(mf.config.MavenExecutable, args...)
 	cmd.Dir = mf.config.WorkingDirectory
 
-	log.Debug(fmt.Sprintf("Executing: %s %s", mf.config.MavenExecutable, strings.Join(args, " ")))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("mvn dependency:tree failed: %w\nOutput: %s", err, string(output))
@@ -327,7 +323,6 @@ func (mf *MavenFlexPack) parseDependencyTreeOutput(output string) error {
 
 // parseFromPOM parses dependencies directly from pom.xml
 func (mf *MavenFlexPack) parseFromPOM() {
-	log.Debug("Parsing dependencies from pom.xml...")
 
 	for _, dep := range mf.pomData.Dependencies.Dependency {
 		dependencyId := fmt.Sprintf("%s:%s:%s", dep.GroupId, dep.ArtifactId, dep.Version)
@@ -348,7 +343,6 @@ func (mf *MavenFlexPack) parseFromPOM() {
 		mf.dependencies = append(mf.dependencies, depInfo)
 	}
 
-	log.Debug(fmt.Sprintf("Parsed %d dependencies from pom.xml", len(mf.dependencies)))
 }
 
 // calculateTreeLevelFromLine calculates the indentation level from the full dependency tree line
@@ -356,6 +350,11 @@ func (mf *MavenFlexPack) calculateTreeLevelFromLine(line string) int {
 	// Find the position after [INFO] and count the tree depth
 	infoPos := strings.Index(line, "[INFO]")
 	if infoPos == -1 {
+		return 0
+	}
+
+	// Check bounds before slicing to avoid out-of-bounds error
+	if infoPos+6 >= len(line) {
 		return 0
 	}
 
@@ -426,14 +425,12 @@ func (mf *MavenFlexPack) getDeploymentRepository() string {
 				if strings.HasPrefix(trimmed, "releaseRepo:") {
 					repo := strings.TrimSpace(strings.TrimPrefix(trimmed, "releaseRepo:"))
 					if repo != "" && !strings.Contains(mf.projectVersion, "SNAPSHOT") {
-						log.Debug("Using release repository from maven.yaml: " + repo)
 						return repo
 					}
 				}
 				if strings.HasPrefix(trimmed, "snapshotRepo:") {
 					repo := strings.TrimSpace(strings.TrimPrefix(trimmed, "snapshotRepo:"))
 					if repo != "" && strings.Contains(mf.projectVersion, "SNAPSHOT") {
-						log.Debug("Using snapshot repository from maven.yaml: " + repo)
 						return repo
 					}
 				}
@@ -653,7 +650,7 @@ func (mf *MavenFlexPack) buildRequestedByMap() {
 
 // CollectBuildInfo collects complete build information for Maven project
 func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities.BuildInfo, error) {
-	log.Info(fmt.Sprintf("Collecting Maven build info for %s #%s", buildName, buildNumber))
+	// Collecting Maven build info
 
 	// Parse dependencies
 	mf.parseDependencies()
@@ -727,13 +724,13 @@ func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 		},
 	}
 
-	log.Info(fmt.Sprintf("Collected build info with %d dependencies", len(dependencies)))
+	// Build info collection completed
 	return buildInfo, nil
 }
 
 // RunMavenInstallWithBuildInfo runs mvn install and collects build information
 func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber string, includeTestDeps bool, extraArgs []string) error {
-	log.Info("Running Maven install with build info collection...")
+	// Running Maven install with build info collection
 
 	// Create configuration
 	config := MavenConfig{
@@ -755,7 +752,6 @@ func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber stri
 
 	cmd := exec.Command(config.MavenExecutable, args...)
 	cmd.Dir = workingDir
-	log.Debug("Executing command:", cmd.String())
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -766,7 +762,6 @@ func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber stri
 
 	// Collect build information if build name and number are provided
 	if buildName != "" && buildNumber != "" {
-		log.Info("Collecting build information...")
 
 		// Use the CollectBuildInfo method to get complete build info
 		buildInfo, err := mavenFlex.CollectBuildInfo(buildName, buildNumber)
@@ -783,7 +778,6 @@ func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber stri
 			log.Info("Build info saved for jfrog-cli compatibility")
 		}
 
-		log.Info("Build information collection completed")
 		log.Debug(fmt.Sprintf("Build info: %+v", buildInfo))
 	}
 
@@ -823,7 +817,7 @@ func (mf *MavenFlexPack) getMavenVersion() string {
 	cmd := exec.Command(mf.config.MavenExecutable, "--version")
 	output, err := cmd.Output()
 	if err != nil {
-		log.Debug("Failed to get Maven version: " + err.Error())
+		// Failed to get Maven version
 		return "unknown"
 	}
 
@@ -841,7 +835,6 @@ func (mf *MavenFlexPack) getMavenVersion() string {
 
 // saveMavenBuildInfoForJfrogCli saves build info in a format compatible with jfrog-cli
 func saveMavenBuildInfoForJfrogCli(buildInfo *entities.BuildInfo) error {
-	log.Debug("Saving Maven build info for jfrog-cli compatibility")
 
 	// Use build-info-go's build service to save build info
 	buildInfoService := build.NewBuildInfoService()
