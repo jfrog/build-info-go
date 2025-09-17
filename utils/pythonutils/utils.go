@@ -274,6 +274,9 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 	var packageName string
 	expectingPackageFilePath := false
 
+	// Adding a scope for cached dependencies to differentiate them from installed ones.
+	const CachedScope = "cached"
+
 	// Extract downloaded package name.
 	parsers = append(parsers, &gofrogcmd.CmdOutputPattern{
 		RegExp: regexp.MustCompile(`^Collecting\s` + packageNameRegexp),
@@ -285,7 +288,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 				log.Debug(fmt.Sprintf("Could not resolve download path for package: %s, continuing...", packageName))
 
 				// Adding dependency id with cached scope to make sure it is included in the build-info.
-				dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: strings.ToLower(packageName), Scopes: []string{"cached"}}
+				dependenciesMap[strings.ToLower(packageName)] = entities.Dependency{Id: strings.ToLower(packageName), Scopes: []string{CachedScope}}
 			}
 
 			// Check for out of bound results.
@@ -344,7 +347,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			}
 
 			// Save dependency id with scope as cached to make sure it is available in the build-info.
-			dependenciesMap[strings.ToLower(pattern.MatchedResults[1])] = entities.Dependency{Id: strings.ToLower(pattern.MatchedResults[1]), Scopes: []string{"cached"}}
+			dependenciesMap[strings.ToLower(pattern.MatchedResults[1])] = entities.Dependency{Id: strings.ToLower(pattern.MatchedResults[1]), Scopes: []string{CachedScope}}
 			log.Debug(fmt.Sprintf("Found package: %s already installed", pattern.MatchedResults[1]))
 			return pattern.Line, nil
 		},
