@@ -65,26 +65,51 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			UsageText: "bi mvn",
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
-				// Use Maven implementation for proper dependency collection
-				config := flexpack.MavenConfig{
-					WorkingDirectory:        ".",
-					IncludeTestDependencies: true, // Include test dependencies by default
+				// Check if FlexPack implementation should be used
+				useFlexPack := os.Getenv("JFROG_RUN_NATIVE") == "true"
+
+				if useFlexPack {
+					// Use Maven FlexPack implementation for proper dependency collection
+					config := flexpack.MavenConfig{
+						WorkingDirectory:        ".",
+						IncludeTestDependencies: true, // Include test dependencies by default
+					}
+
+					// Create Maven instance
+					mavenFlex, err := flexpack.NewMavenFlexPack(config)
+					if err != nil {
+						return fmt.Errorf("failed to create Maven instance: %w", err)
+					}
+
+					// Collect build info
+					buildInfo, err := mavenFlex.CollectBuildInfo("mvn-build", "1")
+					if err != nil {
+						return fmt.Errorf("failed to collect build info: %w", err)
+					}
+
+					// Print the build info
+					return printBuildInfo(buildInfo, context.String(formatFlag))
 				}
 
-				// Create Maven instance
-				mavenFlex, err := flexpack.NewMavenFlexPack(config)
+				// Use traditional build-info-go implementation
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("mvn-build", "1")
 				if err != nil {
-					return fmt.Errorf("failed to create Maven instance: %w", err)
+					return
 				}
-
-				// Collect build info
-				buildInfo, err := mavenFlex.CollectBuildInfo("mvn-build", "1")
+				defer func() {
+					err = errors.Join(err, bld.Clean())
+				}()
+				mvnModule, err := bld.AddMavenModule("")
 				if err != nil {
-					return fmt.Errorf("failed to collect build info: %w", err)
+					return
 				}
-
-				// Print the build info
-				return printBuildInfo(buildInfo, context.String(formatFlag))
+				err = mvnModule.CalcDependencies()
+				if err != nil {
+					return
+				}
+				return printBuild(bld, context.String(formatFlag))
 			},
 		},
 		{
