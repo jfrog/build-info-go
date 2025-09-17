@@ -12,6 +12,7 @@ import (
 	"time"
 
 	ioutils "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/gofrog/log"
 
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 
@@ -467,6 +468,13 @@ func addArtifactToPartialModule(artifact entities.Artifact, moduleId string, par
 }
 
 func addDependencyToPartialModule(dependency entities.Dependency, moduleId string, partialModules map[string]*partialModule) {
+
+	if dependency.Id == "" || strings.TrimSpace(dependency.Id) == "" {
+		// Log this as it indicates a bug in dependency collection from cache
+		log.Debugf("Skipping dependency - empty ID detected (possible dependency found in cache). Dependency SHA256: %s ModuleId: %s", dependency.Sha256, moduleId)
+		return
+	}
+
 	// init map if needed
 	if partialModules[moduleId].dependencies == nil {
 		partialModules[moduleId].dependencies = make(map[string]entities.Dependency)
