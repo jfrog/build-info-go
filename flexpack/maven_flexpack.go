@@ -82,12 +82,9 @@ func NewMavenFlexPack(config MavenConfig) (*MavenFlexPack, error) {
 		requestedByMap:  make(map[string][]string),
 	}
 
-	// Set default Maven executable if not specified
 	if mf.config.MavenExecutable == "" {
 		mf.config.MavenExecutable = "mvn"
 	}
-
-	// Load pom.xml
 	if err := mf.loadPOM(); err != nil {
 		return nil, fmt.Errorf("failed to load pom.xml: %w", err)
 	}
@@ -95,11 +92,16 @@ func NewMavenFlexPack(config MavenConfig) (*MavenFlexPack, error) {
 	return mf, nil
 }
 
-// GetDependency returns dependency information along with name and version
-func (mf *MavenFlexPack) GetDependency() string {
+// ensureDependenciesParsed ensures dependencies are parsed only once
+func (mf *MavenFlexPack) ensureDependenciesParsed() {
 	if len(mf.dependencies) == 0 {
 		mf.parseDependencies()
 	}
+}
+
+// GetDependency fetches and parses dependencies, then returns dependency information
+func (mf *MavenFlexPack) GetDependency() string {
+	mf.ensureDependenciesParsed()
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("Project: %s:%s:%s\n", mf.groupId, mf.artifactId, mf.projectVersion))
 	result.WriteString("Dependencies:\n")
@@ -109,11 +111,8 @@ func (mf *MavenFlexPack) GetDependency() string {
 	return result.String()
 }
 
-// ParseDependencyToList parses and returns a list of dependencies with their name and version
+// ParseDependencyToList converts parsed dependencies to a list format
 func (mf *MavenFlexPack) ParseDependencyToList() []string {
-	if len(mf.dependencies) == 0 {
-		mf.parseDependencies()
-	}
 	var depList []string
 	for _, dep := range mf.dependencies {
 		depList = append(depList, fmt.Sprintf("%s:%s", dep.Name, dep.Version))
@@ -123,10 +122,6 @@ func (mf *MavenFlexPack) ParseDependencyToList() []string {
 
 // CalculateChecksum calculates checksums for dependencies
 func (mf *MavenFlexPack) CalculateChecksum() []map[string]interface{} {
-	if len(mf.dependencies) == 0 {
-		mf.parseDependencies()
-	}
-
 	var checksums []map[string]interface{}
 	for _, dep := range mf.dependencies {
 		checksumMap := mf.calculateChecksumWithFallback(dep)
@@ -172,13 +167,11 @@ func (mf *MavenFlexPack) loadPOM() error {
 		return fmt.Errorf("failed to parse pom.xml: %w", err)
 	}
 
-	// Extract project information
 	mf.groupId = mf.pomData.GroupId
 	mf.artifactId = mf.pomData.ArtifactId
 	mf.projectVersion = mf.pomData.Version
 	mf.projectName = fmt.Sprintf("%s:%s", mf.groupId, mf.artifactId)
 
-	// Project loaded successfully
 	return nil
 }
 
@@ -186,13 +179,10 @@ func (mf *MavenFlexPack) loadPOM() error {
 func (mf *MavenFlexPack) parseDependencies() {
 
 	if err := mf.parseWithMavenDependencyTree(); err == nil {
-		// Successfully parsed using Maven dependency tree
 		return
 	} else {
 		log.Debug("Maven dependency:tree parsing failed, falling back to POM parsing: " + err.Error())
 	}
-
-	// Strategy 2: Fallback to POM parsing (more limited but reliable)
 	mf.parseFromPOM()
 }
 
@@ -219,20 +209,13 @@ func (mf *MavenFlexPack) parseDependencyTreeOutput(output string) error {
 	lines := strings.Split(output, "\n")
 	var currentParent string
 	parentStack := []string{}
-	seenDependencies := make(map[string]bool) // Track to avoid duplicates
-
-	// Regex to parse dependency tree lines
-	// Format: [INFO] +- groupId:artifactId:type:version:scope
-	// Must have exactly 5 colon-separated parts after tree characters
+	seenDependencies := make(map[string]bool)
 	depRegex := regexp.MustCompile(`\[INFO\]\s*[+\\|\s-]*\s*([a-zA-Z0-9._-]+):([a-zA-Z0-9._-]+):([a-zA-Z0-9._-]+):([a-zA-Z0-9._-]+):([a-zA-Z0-9._-]+)\s*$`)
 
 	for _, line := range lines {
-		// Skip lines that contain "omitted for duplicate"
 		if strings.Contains(line, "omitted for duplicate") {
 			continue
 		}
-
-		// Skip lines that don't look like dependency declarations
 		if !strings.Contains(line, "[INFO]") ||
 			strings.Contains(line, "BUILD SUCCESS") ||
 			strings.Contains(line, "Total time") ||
@@ -257,23 +240,18 @@ func (mf *MavenFlexPack) parseDependencyTreeOutput(output string) error {
 		version := strings.TrimSpace(matches[4])
 		scope := strings.TrimSpace(matches[5])
 
-		// Skip if any field is empty or contains invalid characters
 		if groupId == "" || artifactId == "" || version == "" {
 			continue
 		}
 
 		dependencyId := fmt.Sprintf("%s:%s:%s", groupId, artifactId, version)
 
-		// Skip if we've already seen this dependency
 		if seenDependencies[dependencyId] {
 			continue
 		}
 		seenDependencies[dependencyId] = true
 
-		// Calculate dependency level based on line prefix
 		level := mf.calculateTreeLevelFromLine(line)
-
-		// Update parent stack based on level
 		if level <= len(parentStack) {
 			parentStack = parentStack[:level]
 		}
@@ -283,7 +261,6 @@ func (mf *MavenFlexPack) parseDependencyTreeOutput(output string) error {
 			currentParent = ""
 		}
 
-		// Create dependency info
 		dep := DependencyInfo{
 			ID:      dependencyId,
 			Name:    fmt.Sprintf("%s:%s", groupId, artifactId),
@@ -292,23 +269,17 @@ func (mf *MavenFlexPack) parseDependencyTreeOutput(output string) error {
 			Scopes:  mf.mapMavenScope(scope),
 		}
 
-		// Filter test dependencies if not included
 		if !mf.config.IncludeTestDependencies && mf.containsScope(dep.Scopes, "test") {
 			continue
 		}
 
-		// Add to dependencies list
 		mf.dependencies = append(mf.dependencies, dep)
-
-		// Build dependency graph
 		if currentParent != "" {
 			if mf.dependencyGraph[currentParent] == nil {
 				mf.dependencyGraph[currentParent] = []string{}
 			}
 			mf.dependencyGraph[currentParent] = append(mf.dependencyGraph[currentParent], dependencyId)
 		}
-
-		// Update parent stack for next iteration
 		if level < len(parentStack) {
 			parentStack = parentStack[:level+1]
 			parentStack[level] = dependencyId
@@ -335,7 +306,6 @@ func (mf *MavenFlexPack) parseFromPOM() {
 			Scopes:  mf.mapMavenScope(dep.Scope),
 		}
 
-		// Filter test dependencies if not included
 		if !mf.config.IncludeTestDependencies && mf.containsScope(depInfo.Scopes, "test") {
 			continue
 		}
@@ -650,18 +620,9 @@ func (mf *MavenFlexPack) buildRequestedByMap() {
 
 // CollectBuildInfo collects complete build information for Maven project
 func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities.BuildInfo, error) {
-	// Collecting Maven build info
-
-	// Parse dependencies
-	mf.parseDependencies()
-
-	// Calculate checksums
+	mf.ensureDependenciesParsed()
 	checksums := mf.CalculateChecksum()
-
-	// Build requested-by relationships
 	requestedByMap := mf.CalculateRequestedBy()
-
-	// Convert to entities format
 	var dependencies []entities.Dependency
 	for i, dep := range mf.dependencies {
 		var checksumMap map[string]interface{}
@@ -700,7 +661,7 @@ func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 		dependencies = append(dependencies, entity)
 	}
 
-	// Create build info (following Poetry FlexPack pattern - no artifacts, only dependencies)
+	// Create build info
 	buildInfo := &entities.BuildInfo{
 		Name:    buildName,
 		Number:  buildNumber,
@@ -719,32 +680,23 @@ func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 				Type:         "maven",
 				Repository:   mf.getDeploymentRepository(),
 				Dependencies: dependencies,
-				// No artifacts - let traditional Maven system handle them
 			},
 		},
 	}
 
-	// Build info collection completed
 	return buildInfo, nil
 }
 
 // RunMavenInstallWithBuildInfo runs mvn install and collects build information
 func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber string, includeTestDeps bool, extraArgs []string) error {
-	// Running Maven install with build info collection
-
-	// Create configuration
 	config := MavenConfig{
 		WorkingDirectory:        workingDir,
 		IncludeTestDependencies: includeTestDeps,
 	}
-
-	// Create Maven FlexPack instance
 	mavenFlex, err := NewMavenFlexPack(config)
 	if err != nil {
 		return fmt.Errorf("failed to create Maven instance: %w", err)
 	}
-
-	// Run mvn install command
 	args := append([]string{"install"}, extraArgs...)
 	if !includeTestDeps {
 		args = append(args, "-DskipTests")
@@ -760,20 +712,15 @@ func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber stri
 
 	log.Info("Maven install completed successfully")
 
-	// Collect build information if build name and number are provided
 	if buildName != "" && buildNumber != "" {
-
-		// Use the CollectBuildInfo method to get complete build info
 		buildInfo, err := mavenFlex.CollectBuildInfo(buildName, buildNumber)
 		if err != nil {
 			return fmt.Errorf("failed to collect build info: %w", err)
 		}
 
-		// Save build info using build-info-go service for jfrog-cli compatibility
 		err = saveMavenBuildInfoForJfrogCli(buildInfo)
 		if err != nil {
 			log.Warn("Failed to save build info for jfrog-cli compatibility: " + err.Error())
-			// Don't fail the entire operation, but warn the user
 		} else {
 			log.Info("Build info saved for jfrog-cli compatibility")
 		}
@@ -786,9 +733,7 @@ func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber stri
 
 // GetProjectDependencies returns all project dependencies with full details
 func (mf *MavenFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
-	if len(mf.dependencies) == 0 {
-		mf.parseDependencies()
-	}
+	mf.ensureDependenciesParsed()
 
 	// Calculate RequestedBy relationships
 	requestedBy := mf.CalculateRequestedBy()
@@ -805,10 +750,7 @@ func (mf *MavenFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
 
 // GetDependencyGraph returns the complete dependency graph
 func (mf *MavenFlexPack) GetDependencyGraph() (map[string][]string, error) {
-	if len(mf.dependencies) == 0 {
-		mf.parseDependencies()
-	}
-
+	mf.ensureDependenciesParsed()
 	return mf.dependencyGraph, nil
 }
 
@@ -817,17 +759,15 @@ func (mf *MavenFlexPack) getMavenVersion() string {
 	cmd := exec.Command(mf.config.MavenExecutable, "--version")
 	output, err := cmd.Output()
 	if err != nil {
-		// Failed to get Maven version
 		return "unknown"
 	}
 
 	version := strings.TrimSpace(string(output))
-	// Maven version output format: "Apache Maven 3.8.8 (4c87b05d9aedce574290d1acc98575ed5eb6cd39)"
 	lines := strings.Split(version, "\n")
 	if len(lines) > 0 {
 		firstLine := lines[0]
 		if parts := strings.Fields(firstLine); len(parts) >= 3 {
-			return parts[2] // Return the version number
+			return parts[2]
 		}
 	}
 	return "unknown"
@@ -835,21 +775,16 @@ func (mf *MavenFlexPack) getMavenVersion() string {
 
 // saveMavenBuildInfoForJfrogCli saves build info in a format compatible with jfrog-cli
 func saveMavenBuildInfoForJfrogCli(buildInfo *entities.BuildInfo) error {
-
-	// Use build-info-go's build service to save build info
 	buildInfoService := build.NewBuildInfoService()
-
-	// Get or create build instance
 	buildInstance, err := buildInfoService.GetOrCreateBuildWithProject(
 		buildInfo.Name,
 		buildInfo.Number,
-		"", // project key - can be empty for now
+		"",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to get or create build: %w", err)
 	}
 
-	// Save build info using the Build instance
 	err = buildInstance.SaveBuildInfo(buildInfo)
 	if err != nil {
 		return fmt.Errorf("failed to save build info: %w", err)
