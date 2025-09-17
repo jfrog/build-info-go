@@ -471,7 +471,7 @@ func addDependencyToPartialModule(dependency entities.Dependency, moduleId strin
 
 	if dependency.Id == "" || strings.TrimSpace(dependency.Id) == "" {
 		// Log this as it indicates a bug in dependency collection from cache
-		log.Debugf("Skipping dependency with empty ID. This may indicate a cache issue. Dependency SHA256: %s ModuleId: %s", dependency.Sha256, moduleId)
+		log.Debugf("Skipping dependency - empty ID detected (possible dependency found in cache). Dependency SHA256: %s ModuleId: %s", dependency.Sha256, moduleId)
 		return
 	}
 
