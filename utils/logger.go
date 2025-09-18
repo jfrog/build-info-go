@@ -21,6 +21,7 @@ type Log interface {
 	Warn(a ...interface{})
 	Error(a ...interface{})
 	Output(a ...interface{})
+	Verbose(a ...interface{})
 }
 
 // NullLog is a logger that does nothing
@@ -43,6 +44,54 @@ func (nl *NullLog) Error(...interface{}) {
 }
 
 func (nl *NullLog) Output(...interface{}) {
+}
+
+// LoggerAdapter adapts jfrog-client-go logger to build-info-go logger interface
+// by implementing the missing Verbose method
+type LoggerAdapter struct {
+	logger interface {
+		Debug(a ...interface{})
+		Info(a ...interface{})
+		Warn(a ...interface{})
+		Error(a ...interface{})
+		Output(a ...interface{})
+	}
+}
+
+// NewLoggerAdapter creates a new adapter for jfrog-client-go loggers
+func NewLoggerAdapter(logger interface {
+	Debug(a ...interface{})
+	Info(a ...interface{})
+	Warn(a ...interface{})
+	Error(a ...interface{})
+	Output(a ...interface{})
+}) *LoggerAdapter {
+	return &LoggerAdapter{logger: logger}
+}
+
+func (la *LoggerAdapter) Verbose(a ...interface{}) {
+	// Delegate Verbose calls to Debug to maintain log parsing compatibility
+	la.logger.Debug(a...)
+}
+
+func (la *LoggerAdapter) Debug(a ...interface{}) {
+	la.logger.Debug(a...)
+}
+
+func (la *LoggerAdapter) Info(a ...interface{}) {
+	la.logger.Info(a...)
+}
+
+func (la *LoggerAdapter) Warn(a ...interface{}) {
+	la.logger.Warn(a...)
+}
+
+func (la *LoggerAdapter) Error(a ...interface{}) {
+	la.logger.Error(a...)
+}
+
+func (la *LoggerAdapter) Output(a ...interface{}) {
+	la.logger.Output(a...)
 }
 
 type defaultLogger struct {

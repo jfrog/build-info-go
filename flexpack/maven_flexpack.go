@@ -131,18 +131,42 @@ func (mf *MavenFlexPack) CalculateChecksum() []map[string]interface{} {
 }
 
 // CalculateScopes calculates and returns the scopes for dependencies
+// For Maven, this returns meaningful scopes: "release"/"prod" for stable versions and "snapshot"/"dev" for development versions
 func (mf *MavenFlexPack) CalculateScopes() []string {
-	scopes := make(map[string]bool)
+	scopesMap := make(map[string]bool)
+
 	for _, dep := range mf.dependencies {
-		for _, scope := range dep.Scopes {
-			scopes[scope] = true
+		// Use the same logic as mapVersionToScope for consistency
+		scopes := mf.mapVersionToScope(dep.Version)
+		for _, scope := range scopes {
+			scopesMap[scope] = true
 		}
 	}
 
 	var scopeList []string
-	for scope := range scopes {
+	for scope := range scopesMap {
 		scopeList = append(scopeList, scope)
 	}
+
+	// Ensure consistent ordering: prod/release first, then dev/snapshot
+	var orderedScopes []string
+	if scopesMap["prod"] {
+		orderedScopes = append(orderedScopes, "prod")
+	}
+	if scopesMap["release"] {
+		orderedScopes = append(orderedScopes, "release")
+	}
+	if scopesMap["dev"] {
+		orderedScopes = append(orderedScopes, "dev")
+	}
+	if scopesMap["snapshot"] {
+		orderedScopes = append(orderedScopes, "snapshot")
+	}
+
+	if len(orderedScopes) > 0 {
+		return orderedScopes
+	}
+
 	return scopeList
 }
 
@@ -261,16 +285,18 @@ func (mf *MavenFlexPack) parseDependencyTreeOutput(output string) error {
 			currentParent = ""
 		}
 
+		// Check if this is a test dependency (for filtering purposes)
+		isTestDependency := strings.ToLower(scope) == "test"
+		if !mf.config.IncludeTestDependencies && isTestDependency {
+			continue
+		}
+
 		dep := DependencyInfo{
 			ID:      dependencyId,
 			Name:    fmt.Sprintf("%s:%s", groupId, artifactId),
 			Version: version,
 			Type:    mf.mapPackagingToType(packaging),
-			Scopes:  mf.mapMavenScope(scope),
-		}
-
-		if !mf.config.IncludeTestDependencies && mf.containsScope(dep.Scopes, "test") {
-			continue
+			Scopes:  mf.mapVersionToScope(version), // Use version-based scope (release/snapshot)
 		}
 
 		mf.dependencies = append(mf.dependencies, dep)
@@ -303,10 +329,12 @@ func (mf *MavenFlexPack) parseFromPOM() {
 			Name:    fmt.Sprintf("%s:%s", dep.GroupId, dep.ArtifactId),
 			Version: dep.Version,
 			Type:    mf.mapPackagingToType(dep.Type),
-			Scopes:  mf.mapMavenScope(dep.Scope),
+			Scopes:  mf.mapVersionToScope(dep.Version), // Use version-based scope (release/snapshot)
 		}
 
-		if !mf.config.IncludeTestDependencies && mf.containsScope(depInfo.Scopes, "test") {
+		// Check if this is a test dependency (for filtering purposes)
+		isTestDependency := strings.ToLower(dep.Scope) == "test"
+		if !mf.config.IncludeTestDependencies && isTestDependency {
 			continue
 		}
 
@@ -367,91 +395,144 @@ func (mf *MavenFlexPack) calculateTreeLevelFromLine(line string) int {
 	return level
 }
 
-// containsScope checks if a dependency contains a specific scope
-func (mf *MavenFlexPack) containsScope(scopes []string, targetScope string) bool {
-	for _, scope := range scopes {
-		if scope == targetScope {
-			return true
-		}
-	}
-	return false
-}
-
-// getDeploymentRepository extracts repository information from JFrog CLI config or POM
+// getDeploymentRepository extracts repository information natively from Maven POM and settings
+// This is a pure Maven implementation that doesn't depend on JFrog CLI configuration
 func (mf *MavenFlexPack) getDeploymentRepository() string {
-	// First, try to read from JFrog CLI Maven configuration
-	configPath := filepath.Join(mf.config.WorkingDirectory, ".jfrog", "projects", "maven.yaml")
-	if content, err := os.ReadFile(configPath); err == nil {
-		// Simple parsing for deployment repository
-		lines := strings.Split(string(content), "\n")
-		inDeployer := false
-		for _, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if trimmed == "deployer:" {
-				inDeployer = true
-				continue
-			}
-			if inDeployer {
-				if strings.HasPrefix(trimmed, "releaseRepo:") {
-					repo := strings.TrimSpace(strings.TrimPrefix(trimmed, "releaseRepo:"))
-					if repo != "" && !strings.Contains(mf.projectVersion, "SNAPSHOT") {
-						return repo
-					}
-				}
-				if strings.HasPrefix(trimmed, "snapshotRepo:") {
-					repo := strings.TrimSpace(strings.TrimPrefix(trimmed, "snapshotRepo:"))
-					if repo != "" && strings.Contains(mf.projectVersion, "SNAPSHOT") {
-						return repo
-					}
-				}
-				// Stop when we hit another section
-				if strings.Contains(trimmed, ":") && !strings.HasPrefix(trimmed, "releaseRepo") && !strings.HasPrefix(trimmed, "snapshotRepo") && !strings.HasPrefix(trimmed, "serverId") {
-					break
-				}
-			}
-		}
-	}
-
-	// Fallback: Read POM content to look for distributionManagement
+	// Parse distributionManagement from pom.xml (native Maven approach)
 	pomPath := filepath.Join(mf.config.WorkingDirectory, "pom.xml")
 	content, err := os.ReadFile(pomPath)
 	if err != nil {
+		log.Debug("Could not read pom.xml for deployment repository extraction: " + err.Error())
 		return ""
 	}
 
 	pomContent := string(content)
 
-	// Look for repository ID in distributionManagement
-	if strings.Contains(pomContent, "maven-flexpack-local") {
-		return "maven-flexpack-local"
+	// Extract repository ID from distributionManagement section
+	repoId := mf.extractRepositoryFromDistributionManagement(pomContent)
+	if repoId != "" {
+		log.Debug("Found deployment repository in pom.xml distributionManagement: " + repoId)
+		return repoId
 	}
 
-	// Default fallback
+	// Try to extract from Maven settings.xml (native Maven approach)
+	settingsRepo := mf.extractRepositoryFromSettings()
+	if settingsRepo != "" {
+		log.Debug("Found deployment repository in Maven settings.xml: " + settingsRepo)
+		return settingsRepo
+	}
+
+	log.Debug("No deployment repository found in native Maven configuration")
 	return ""
 }
 
-// mapMavenScope maps Maven scopes to standardized scopes
-func (mf *MavenFlexPack) mapMavenScope(scope string) []string {
-	if scope == "" {
-		scope = "compile" // Maven default scope
+// extractRepositoryFromDistributionManagement parses distributionManagement section from pom.xml
+func (mf *MavenFlexPack) extractRepositoryFromDistributionManagement(pomContent string) string {
+	// Look for distributionManagement section
+	distMgmtRegex := regexp.MustCompile(`(?s)<distributionManagement>(.*?)</distributionManagement>`)
+	distMgmtMatch := distMgmtRegex.FindStringSubmatch(pomContent)
+	if len(distMgmtMatch) < 2 {
+		return ""
 	}
 
-	switch strings.ToLower(scope) {
-	case "compile":
-		return []string{"compile", "runtime"}
-	case "runtime":
-		return []string{"runtime"}
-	case "test":
-		return []string{"test"}
-	case "provided":
-		return []string{"provided"}
-	case "system":
-		return []string{"system"}
-	case "import":
-		return []string{"import"}
-	default:
-		return []string{scope}
+	distMgmtSection := distMgmtMatch[1]
+
+	// Determine if this is a SNAPSHOT version to choose appropriate repository
+	isSnapshot := strings.Contains(strings.ToUpper(mf.projectVersion), "SNAPSHOT")
+
+	var repoPattern string
+	if isSnapshot {
+		// Look for snapshotRepository first for SNAPSHOT versions
+		repoPattern = `(?s)<snapshotRepository>(.*?)</snapshotRepository>`
+	} else {
+		// Look for repository for release versions
+		repoPattern = `(?s)<repository>(.*?)</repository>`
 	}
+
+	repoRegex := regexp.MustCompile(repoPattern)
+	repoMatch := repoRegex.FindStringSubmatch(distMgmtSection)
+	if len(repoMatch) < 2 {
+		// Fallback: try the other repository type
+		if isSnapshot {
+			repoPattern = `(?s)<repository>(.*?)</repository>`
+		} else {
+			repoPattern = `(?s)<snapshotRepository>(.*?)</snapshotRepository>`
+		}
+		repoRegex = regexp.MustCompile(repoPattern)
+		repoMatch = repoRegex.FindStringSubmatch(distMgmtSection)
+		if len(repoMatch) < 2 {
+			return ""
+		}
+	}
+
+	repoSection := repoMatch[1]
+
+	// Extract repository ID
+	idRegex := regexp.MustCompile(`<id>(.*?)</id>`)
+	idMatch := idRegex.FindStringSubmatch(repoSection)
+	if len(idMatch) >= 2 {
+		repoId := strings.TrimSpace(idMatch[1])
+		if repoId != "" {
+			return repoId
+		}
+	}
+
+	return ""
+}
+
+// extractRepositoryFromSettings parses deployment repository from Maven settings.xml
+func (mf *MavenFlexPack) extractRepositoryFromSettings() string {
+	// Try multiple common locations for settings.xml
+	settingsPaths := []string{
+		filepath.Join(mf.config.WorkingDirectory, "settings.xml"),
+		filepath.Join(os.Getenv("HOME"), ".m2", "settings.xml"),
+		"/usr/local/share/maven/conf/settings.xml",
+		"/opt/maven/conf/settings.xml",
+	}
+
+	for _, settingsPath := range settingsPaths {
+		if content, err := os.ReadFile(settingsPath); err == nil {
+			settingsContent := string(content)
+
+			// Look for activeProfiles and profiles with repository configuration
+			// This is a simplified approach - full Maven settings parsing would be more complex
+			if strings.Contains(settingsContent, "<repository>") || strings.Contains(settingsContent, "<repositories>") {
+				// Extract first repository ID found (simplified)
+				idRegex := regexp.MustCompile(`<repository>.*?<id>(.*?)</id>`)
+				idMatch := idRegex.FindStringSubmatch(settingsContent)
+				if len(idMatch) >= 2 {
+					repoId := strings.TrimSpace(idMatch[1])
+					if repoId != "" {
+						log.Debug("Found repository in settings.xml: " + settingsPath)
+						return repoId
+					}
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// mapVersionToScope determines scope based on Maven version and common dev/prod indicators
+// Returns both terminologies for compatibility: ["release", "prod"] or ["snapshot", "dev"]
+func (mf *MavenFlexPack) mapVersionToScope(version string) []string {
+	versionUpper := strings.ToUpper(version)
+
+	// Check for development indicators (prioritize explicit dev markers)
+	if strings.Contains(versionUpper, "SNAPSHOT") ||
+		strings.Contains(versionUpper, "DEV") ||
+		strings.Contains(versionUpper, "ALPHA") ||
+		strings.Contains(versionUpper, "BETA") ||
+		strings.Contains(versionUpper, "RC") ||
+		strings.Contains(versionUpper, "MILESTONE") ||
+		strings.Contains(versionUpper, "M") && (strings.Contains(versionUpper, "M1") || strings.Contains(versionUpper, "M2")) {
+		// Support both terminologies: snapshot/dev
+		return []string{"snapshot", "dev"}
+	}
+
+	// Stable release versions
+	return []string{"release", "prod"}
 }
 
 // mapPackagingToType maps Maven packaging types to artifact types
@@ -661,33 +742,34 @@ func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 		dependencies = append(dependencies, entity)
 	}
 
-	// Create build info
-	buildInfo := &entities.BuildInfo{
-		Name:    buildName,
-		Number:  buildNumber,
-		Started: time.Now().Format(entities.TimeFormat),
-		Agent: &entities.Agent{
-			Name:    "build-info-go",
-			Version: "1.0.0",
-		},
-		BuildAgent: &entities.Agent{
-			Name:    "Maven",
-			Version: mf.getMavenVersion(),
-		},
-		Modules: []entities.Module{
-			{
-				Id:           fmt.Sprintf("%s:%s:%s", mf.groupId, mf.artifactId, mf.projectVersion),
-				Type:         "maven",
-				Repository:   mf.getDeploymentRepository(),
-				Dependencies: dependencies,
-			},
-		},
+	// Create build info using existing factory function
+	buildInfo := entities.New()
+	buildInfo.Name = buildName
+	buildInfo.Number = buildNumber
+	buildInfo.Started = time.Now().Format(entities.TimeFormat)
+	buildInfo.SetAgentName("build-info-go")
+	buildInfo.SetAgentVersion("1.0.0")
+	buildInfo.BuildAgent.Name = "Maven"
+	buildInfo.BuildAgent.Version = mf.getMavenVersion()
+
+	// Add Maven module
+	module := entities.Module{
+		Id:           fmt.Sprintf("%s:%s:%s", mf.groupId, mf.artifactId, mf.projectVersion),
+		Type:         "maven",
+		Repository:   mf.getDeploymentRepository(),
+		Dependencies: dependencies,
 	}
+	buildInfo.Modules = append(buildInfo.Modules, module)
 
 	return buildInfo, nil
 }
 
 // RunMavenInstallWithBuildInfo runs mvn install and collects build information
+// Parameters:
+//   - workingDir: Maven project directory
+//   - buildName, buildNumber: Build info identifiers
+//   - includeTestDeps: Whether to include test dependencies in build info (does NOT affect test execution)
+//   - extraArgs: Additional Maven arguments (use "-DskipTests" here to skip test execution)
 func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber string, includeTestDeps bool, extraArgs []string) error {
 	config := MavenConfig{
 		WorkingDirectory:        workingDir,
@@ -698,9 +780,8 @@ func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber stri
 		return fmt.Errorf("failed to create Maven instance: %w", err)
 	}
 	args := append([]string{"install"}, extraArgs...)
-	if !includeTestDeps {
-		args = append(args, "-DskipTests")
-	}
+	// Note: Test execution control should be managed by the user via extraArgs
+	// The includeTestDeps parameter only affects build info dependency collection
 
 	cmd := exec.Command(config.MavenExecutable, args...)
 	cmd.Dir = workingDir
