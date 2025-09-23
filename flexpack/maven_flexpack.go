@@ -83,7 +83,7 @@ func NewMavenFlexPack(config MavenConfig) (*MavenFlexPack, error) {
 	}
 
 	if mf.config.MavenExecutable == "" {
-		mf.config.MavenExecutable = "mvn"
+		mf.config.MavenExecutable = mf.getMavenExecutablePath()
 	}
 	if err := mf.loadPOM(); err != nil {
 		return nil, fmt.Errorf("failed to load pom.xml: %w", err)
@@ -92,16 +92,11 @@ func NewMavenFlexPack(config MavenConfig) (*MavenFlexPack, error) {
 	return mf, nil
 }
 
-// ensureDependenciesParsed ensures dependencies are parsed only once
-func (mf *MavenFlexPack) ensureDependenciesParsed() {
+// GetDependency fetches and parses dependencies, then returns dependency information
+func (mf *MavenFlexPack) GetDependency() string {
 	if len(mf.dependencies) == 0 {
 		mf.parseDependencies()
 	}
-}
-
-// GetDependency fetches and parses dependencies, then returns dependency information
-func (mf *MavenFlexPack) GetDependency() string {
-	mf.ensureDependenciesParsed()
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("Project: %s:%s:%s\n", mf.groupId, mf.artifactId, mf.projectVersion))
 	result.WriteString("Dependencies:\n")
@@ -125,49 +120,40 @@ func (mf *MavenFlexPack) CalculateChecksum() []map[string]interface{} {
 	var checksums []map[string]interface{}
 	for _, dep := range mf.dependencies {
 		checksumMap := mf.calculateChecksumWithFallback(dep)
-		checksums = append(checksums, checksumMap)
+		if checksumMap != nil {
+			checksums = append(checksums, checksumMap)
+		}
+	}
+	// Always return a non-nil slice, even if empty
+	if checksums == nil {
+		checksums = []map[string]interface{}{}
 	}
 	return checksums
 }
 
 // CalculateScopes calculates and returns the scopes for dependencies
-// For Maven, this returns meaningful scopes: "release"/"prod" for stable versions and "snapshot"/"dev" for development versions
+// For Maven, this returns the official Maven dependency scopes in consistent order: compile, runtime, test, provided, system, import
 func (mf *MavenFlexPack) CalculateScopes() []string {
 	scopesMap := make(map[string]bool)
 
+	// Collect all unique scopes from dependencies
 	for _, dep := range mf.dependencies {
-		// Use the same logic as mapVersionToScope for consistency
-		scopes := mf.mapVersionToScope(dep.Version)
-		for _, scope := range scopes {
+		for _, scope := range dep.Scopes {
 			scopesMap[scope] = true
 		}
 	}
 
-	var scopeList []string
-	for scope := range scopesMap {
-		scopeList = append(scopeList, scope)
-	}
-
-	// Ensure consistent ordering: prod/release first, then dev/snapshot
+	// Return scopes in Maven standard order
 	var orderedScopes []string
-	if scopesMap["prod"] {
-		orderedScopes = append(orderedScopes, "prod")
-	}
-	if scopesMap["release"] {
-		orderedScopes = append(orderedScopes, "release")
-	}
-	if scopesMap["dev"] {
-		orderedScopes = append(orderedScopes, "dev")
-	}
-	if scopesMap["snapshot"] {
-		orderedScopes = append(orderedScopes, "snapshot")
+	mavenScopeOrder := []string{"compile", "runtime", "test", "provided", "system", "import"}
+
+	for _, scope := range mavenScopeOrder {
+		if scopesMap[scope] {
+			orderedScopes = append(orderedScopes, scope)
+		}
 	}
 
-	if len(orderedScopes) > 0 {
-		return orderedScopes
-	}
-
-	return scopeList
+	return orderedScopes
 }
 
 // CalculateRequestedBy determines which dependencies requested a particular package
@@ -296,7 +282,7 @@ func (mf *MavenFlexPack) parseDependencyTreeOutput(output string) error {
 			Name:    fmt.Sprintf("%s:%s", groupId, artifactId),
 			Version: version,
 			Type:    mf.mapPackagingToType(packaging),
-			Scopes:  mf.mapVersionToScope(version), // Use version-based scope (release/snapshot)
+			Scopes:  mf.mapMavenScopeToScopes(scope), // Use actual Maven scope from dependency tree
 		}
 
 		mf.dependencies = append(mf.dependencies, dep)
@@ -329,7 +315,7 @@ func (mf *MavenFlexPack) parseFromPOM() {
 			Name:    fmt.Sprintf("%s:%s", dep.GroupId, dep.ArtifactId),
 			Version: dep.Version,
 			Type:    mf.mapPackagingToType(dep.Type),
-			Scopes:  mf.mapVersionToScope(dep.Version), // Use version-based scope (release/snapshot)
+			Scopes:  mf.mapMavenScopeToScopes(dep.Scope), // Use actual Maven scope from POM
 		}
 
 		// Check if this is a test dependency (for filtering purposes)
@@ -395,9 +381,24 @@ func (mf *MavenFlexPack) calculateTreeLevelFromLine(line string) int {
 	return level
 }
 
+// wasDeployGoalExecuted checks if the deploy goal was part of the Maven command
+func (mf *MavenFlexPack) wasDeployGoalExecuted() bool {
+	// Check os.Args for Maven goals
+	for _, arg := range os.Args {
+		if strings.Contains(arg, "deploy") {
+			return true
+		}
+	}
+	return false
+}
+
 // getDeploymentRepository extracts repository information natively from Maven POM and settings
-// This is a pure Maven implementation that doesn't depend on JFrog CLI configuration
+// Returns empty string if deploy goal was not executed (e.g., for verify, install without deploy)
 func (mf *MavenFlexPack) getDeploymentRepository() string {
+	// If deploy goal was not executed, don't set repository
+	if !mf.wasDeployGoalExecuted() {
+		return ""
+	}
 	// Parse distributionManagement from pom.xml (native Maven approach)
 	pomPath := filepath.Join(mf.config.WorkingDirectory, "pom.xml")
 	content, err := os.ReadFile(pomPath)
@@ -514,25 +515,31 @@ func (mf *MavenFlexPack) extractRepositoryFromSettings() string {
 	return ""
 }
 
-// mapVersionToScope determines scope based on Maven version and common dev/prod indicators
-// Returns both terminologies for compatibility: ["release", "prod"] or ["snapshot", "dev"]
-func (mf *MavenFlexPack) mapVersionToScope(version string) []string {
-	versionUpper := strings.ToUpper(version)
-
-	// Check for development indicators (prioritize explicit dev markers)
-	if strings.Contains(versionUpper, "SNAPSHOT") ||
-		strings.Contains(versionUpper, "DEV") ||
-		strings.Contains(versionUpper, "ALPHA") ||
-		strings.Contains(versionUpper, "BETA") ||
-		strings.Contains(versionUpper, "RC") ||
-		strings.Contains(versionUpper, "MILESTONE") ||
-		strings.Contains(versionUpper, "M") && (strings.Contains(versionUpper, "M1") || strings.Contains(versionUpper, "M2")) {
-		// Support both terminologies: snapshot/dev
-		return []string{"snapshot", "dev"}
+// mapMavenScopeToScopes maps Maven dependency scope to build-info scopes
+func (mf *MavenFlexPack) mapMavenScopeToScopes(scope string) []string {
+	// Handle empty scope (Maven default is compile)
+	if scope == "" {
+		scope = "compile"
 	}
 
-	// Stable release versions
-	return []string{"release", "prod"}
+	// Maven scopes map directly to build-info scopes
+	switch strings.ToLower(scope) {
+	case "compile":
+		return []string{"compile"}
+	case "runtime":
+		return []string{"runtime"}
+	case "test":
+		return []string{"test"}
+	case "provided":
+		return []string{"provided"}
+	case "system":
+		return []string{"system"}
+	case "import":
+		return []string{"import"}
+	default:
+		// Unknown scope, default to compile
+		return []string{"compile"}
+	}
 }
 
 // mapPackagingToType maps Maven packaging types to artifact types
@@ -576,25 +583,16 @@ func (mf *MavenFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[s
 			checksumMap["path"] = artifactPath
 			return checksumMap
 		}
-		log.Debug(fmt.Sprintf("Failed to calculate checksum for artifact: %s", artifactPath))
+		log.Warn(fmt.Sprintf("Failed to calculate checksum for artifact: %s", artifactPath))
 	}
 
-	// Strategy 2: Generate manifest-based checksum
-	if sha1, sha256, md5, err := mf.calculateManifestChecksum(dep); err == nil {
-		checksumMap["sha1"] = sha1
-		checksumMap["sha256"] = sha256
-		checksumMap["md5"] = md5
-		checksumMap["path"] = "manifest"
-		return checksumMap
-	}
+	// Strategy 2: Future enhancement - could call Artifactory API to get real checksums
+	// Example: GET /api/storage/{repo}/{path}?checksums=sha1,sha256,md5
+	// This would provide authentic checksums from the repository
 
-	// Strategy 3: Return empty checksums (graceful degradation)
-	checksumMap["sha1"] = ""
-	checksumMap["sha256"] = ""
-	checksumMap["md5"] = ""
-	checksumMap["path"] = ""
-
-	return checksumMap
+	// Strategy 3: Warn and return nil to exclude dependency with missing checksums
+	log.Warn(fmt.Sprintf("Failed to calculate checksums for dependency: %s:%s", dep.Name, dep.Version))
+	return nil
 }
 
 // findMavenArtifact locates a Maven artifact in the local repository
@@ -608,8 +606,12 @@ func (mf *MavenFlexPack) findMavenArtifact(dep DependencyInfo) string {
 	groupId := parts[0]
 	artifactId := parts[1]
 
-	// Build path to Maven local repository
-	homeDir, _ := os.UserHomeDir()
+	// Build path to Maven local repository (Windows and Unix compatible)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Debug("Failed to get user home directory: " + err.Error())
+		return ""
+	}
 	localRepo := filepath.Join(homeDir, ".m2", "repository")
 
 	// Convert groupId to path (e.g., com.example -> com/example)
@@ -634,31 +636,15 @@ func (mf *MavenFlexPack) calculateFileChecksum(filePath string) (string, string,
 		return "", "", "", err
 	}
 
+	// Verify fileDetails and checksum are not nil before accessing
+	if fileDetails == nil {
+		return "", "", "", fmt.Errorf("fileDetails is nil for file: %s", filePath)
+	}
+
 	return fileDetails.Checksum.Sha1,
 		fileDetails.Checksum.Sha256,
 		fileDetails.Checksum.Md5,
 		nil
-}
-
-// calculateManifestChecksum generates a deterministic checksum from dependency metadata
-func (mf *MavenFlexPack) calculateManifestChecksum(dep DependencyInfo) (string, string, string, error) {
-	// Create deterministic manifest content
-	manifest := fmt.Sprintf("id:%s\nname:%s\nversion:%s\ntype:%s\nscopes:%s\n",
-		dep.ID, dep.Name, dep.Version, dep.Type, strings.Join(dep.Scopes, ","))
-
-	// Use crypto utility to calculate checksums
-	tempFile, err := os.CreateTemp("", "maven-checksum-*.txt")
-	if err != nil {
-		return "", "", "", err
-	}
-	defer os.Remove(tempFile.Name())
-	defer tempFile.Close()
-
-	if _, err := tempFile.WriteString(manifest); err != nil {
-		return "", "", "", err
-	}
-
-	return mf.calculateFileChecksum(tempFile.Name())
 }
 
 // validateAndNormalizeScopes ensures scopes are valid and normalized
@@ -701,31 +687,29 @@ func (mf *MavenFlexPack) buildRequestedByMap() {
 
 // CollectBuildInfo collects complete build information for Maven project
 func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities.BuildInfo, error) {
-	mf.ensureDependenciesParsed()
-	checksums := mf.CalculateChecksum()
+	if len(mf.dependencies) == 0 {
+		mf.parseDependencies()
+	}
 	requestedByMap := mf.CalculateRequestedBy()
 	var dependencies []entities.Dependency
-	for i, dep := range mf.dependencies {
-		var checksumMap map[string]interface{}
-		if i < len(checksums) {
-			checksumMap = checksums[i]
-		} else {
-			checksumMap = map[string]interface{}{
-				"sha1": "", "sha256": "", "md5": "",
-			}
-		}
-
+	for _, dep := range mf.dependencies {
+		// Try to calculate checksum for this specific dependency
+		checksumMap := mf.calculateChecksumWithFallback(dep)
+		
 		// Convert checksum map to entities.Checksum struct
 		checksum := entities.Checksum{}
-		if sha1, ok := checksumMap["sha1"].(string); ok {
-			checksum.Sha1 = sha1
+		if checksumMap != nil {
+			if sha1, ok := checksumMap["sha1"].(string); ok {
+				checksum.Sha1 = sha1
+			}
+			if sha256, ok := checksumMap["sha256"].(string); ok {
+				checksum.Sha256 = sha256
+			}
+			if md5, ok := checksumMap["md5"].(string); ok {
+				checksum.Md5 = md5
+			}
 		}
-		if sha256, ok := checksumMap["sha256"].(string); ok {
-			checksum.Sha256 = sha256
-		}
-		if md5, ok := checksumMap["md5"].(string); ok {
-			checksum.Md5 = md5
-		}
+		// If checksumMap is nil, checksum will have empty values, which is fine
 
 		entity := entities.Dependency{
 			Id:       dep.ID,
@@ -742,15 +726,21 @@ func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 		dependencies = append(dependencies, entity)
 	}
 
-	// Create build info using existing factory function
-	buildInfo := entities.New()
-	buildInfo.Name = buildName
-	buildInfo.Number = buildNumber
-	buildInfo.Started = time.Now().Format(entities.TimeFormat)
-	buildInfo.SetAgentName("build-info-go")
-	buildInfo.SetAgentVersion("1.0.0")
-	buildInfo.BuildAgent.Name = "Maven"
-	buildInfo.BuildAgent.Version = mf.getMavenVersion()
+	// Create build info using existing factory method (following Poetry FlexPack pattern)
+	buildInfo := &entities.BuildInfo{
+		Name:    buildName,
+		Number:  buildNumber,
+		Started: time.Now().Format(entities.TimeFormat),
+		Agent: &entities.Agent{
+			Name:    "build-info-go",
+			Version: "1.0.0",
+		},
+		BuildAgent: &entities.Agent{
+			Name:    "Maven",
+			Version: mf.getMavenVersion(),
+		},
+		Modules: []entities.Module{},
+	}
 
 	// Add Maven module
 	module := entities.Module{
@@ -814,7 +804,6 @@ func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber stri
 
 // GetProjectDependencies returns all project dependencies with full details
 func (mf *MavenFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
-	mf.ensureDependenciesParsed()
 
 	// Calculate RequestedBy relationships
 	requestedBy := mf.CalculateRequestedBy()
@@ -831,11 +820,29 @@ func (mf *MavenFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
 
 // GetDependencyGraph returns the complete dependency graph
 func (mf *MavenFlexPack) GetDependencyGraph() (map[string][]string, error) {
-	mf.ensureDependenciesParsed()
 	return mf.dependencyGraph, nil
 }
 
-// getMavenVersion gets the Maven version for build info
+// getMavenExecutablePath gets the Maven executable path with proper detection
+func (mf *MavenFlexPack) getMavenExecutablePath() string {
+	// Check for Maven wrapper first (following existing pattern from build/maven.go)
+	wrapperPath := filepath.Join(mf.config.WorkingDirectory, "mvnw")
+	if _, err := os.Stat(wrapperPath); err == nil {
+		return "./mvnw"
+	}
+	wrapperCmdPath := filepath.Join(mf.config.WorkingDirectory, "mvnw.cmd")
+	if _, err := os.Stat(wrapperCmdPath); err == nil {
+		return "mvnw.cmd"
+	}
+	// Default to system Maven
+	return "mvn"
+}
+
+// getMavenVersion executes 'mvn --version' and extracts the Maven version number.
+// It parses the first line of output which typically looks like:
+// "Apache Maven 3.9.4 (dfbb324ad4a7c8fb0bf182e6d91b0ae20e3d2dd9)"
+// Returns "unknown" if the command fails or version cannot be parsed.
+// This version is used in build-info metadata to track the build tool version.
 func (mf *MavenFlexPack) getMavenVersion() string {
 	cmd := exec.Command(mf.config.MavenExecutable, "--version")
 	output, err := cmd.Output()

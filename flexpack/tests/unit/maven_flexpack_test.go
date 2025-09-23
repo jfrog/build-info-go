@@ -239,14 +239,14 @@ func TestMavenScopeValidation(t *testing.T) {
 		dep := buildInfo.Modules[0].Dependencies[0]
 		assert.NotEmpty(t, dep.Scopes, "Dependencies should have scopes")
 
-		// Verify scopes contain valid FlexPack scope values (release/snapshot/prod/dev)
-		validFlexPackScopes := map[string]bool{
-			"release": true, "snapshot": true, "prod": true, "dev": true,
+		// Verify scopes contain valid Maven scope values
+		validMavenScopes := map[string]bool{
+			"compile": true, "runtime": true, "test": true, "provided": true, "system": true, "import": true,
 		}
 
 		for _, scope := range dep.Scopes {
 			if scope != "main" && scope != "transitive" { // Skip FlexPack-specific scopes
-				assert.True(t, validFlexPackScopes[scope], "Scope should be valid FlexPack scope: %s", scope)
+				assert.True(t, validMavenScopes[scope], "Scope should be valid Maven scope: %s", scope)
 			}
 		}
 	}
