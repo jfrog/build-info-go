@@ -16,12 +16,12 @@ const (
 )
 
 type Log interface {
-	Verbose(a ...interface{})
 	Debug(a ...interface{})
 	Info(a ...interface{})
 	Warn(a ...interface{})
 	Error(a ...interface{})
 	Output(a ...interface{})
+	Verbose(a ...interface{})
 }
 
 // NullLog is a logger that does nothing

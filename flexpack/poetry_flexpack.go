@@ -597,7 +597,7 @@ func RunPoetryInstallWithBuildInfo(workingDir string, buildName, buildNumber str
 	// Create Poetry FlexPack instance
 	poetryFlex, err := NewPoetryFlexPack(config)
 	if err != nil {
-		return fmt.Errorf("failed to create Poetry FlexPack: %w", err)
+		return fmt.Errorf("failed to create Poetry instance: %w", err)
 	}
 	// Run poetry install command
 	args := append([]string{"install"}, extraArgs...)
@@ -1048,7 +1048,7 @@ func RunPoetryInstallWithBuildInfoAndCaching(workingDir string, buildName, build
 	// Create Poetry FlexPack instance
 	poetryFlex, err := NewPoetryFlexPack(config)
 	if err != nil {
-		return fmt.Errorf("failed to create Poetry FlexPack: %w", err)
+		return fmt.Errorf("failed to create Poetry instance: %w", err)
 	}
 
 	// Load existing cache before running install
