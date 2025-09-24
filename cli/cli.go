@@ -66,13 +66,11 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
 				// Check if FlexPack implementation should be used
-				useFlexPack := os.Getenv("JFROG_RUN_NATIVE") == "true"
-
-				if useFlexPack {
+				if flexpack.IsFlexPackEnabled() {
 					// Use Maven FlexPack implementation for proper dependency collection
 					config := flexpack.MavenConfig{
 						WorkingDirectory:        ".",
-						IncludeTestDependencies: true, // Include test dependencies by default
+						IncludeTestDependencies: true,
 					}
 
 					// Create Maven instance

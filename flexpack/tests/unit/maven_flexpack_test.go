@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -280,11 +281,11 @@ deployer:
 	buildInfo, err := mavenFlex.CollectBuildInfo("repo-test", "1")
 	require.NoError(t, err)
 
-	// Verify that modules have repository information
+	// Verify that modules exist
 	if len(buildInfo.Modules) > 0 {
 		module := buildInfo.Modules[0]
-		// Repository field should exist (may be empty)
-		assert.NotNil(t, module.Repository, "Module should have repository field")
+		assert.NotEmpty(t, module.Id, "Module should have an ID")
+		assert.Equal(t, entities.Maven, module.Type, "Module should be Maven type")
 	}
 }
 
