@@ -1,12 +1,12 @@
 package flexpack
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -187,18 +187,22 @@ func (mf *MavenFlexPack) loadPOM() error {
 
 // parseDependencies parses dependencies using hybrid strategy
 func (mf *MavenFlexPack) parseDependencies() {
-
 	if err := mf.parseWithMavenDependencyTree(); err == nil {
 		return
 	} else {
-		log.Debug("Maven dependency:tree parsing failed, falling back to POM parsing: " + err.Error())
+		log.Warn("Maven dependency:tree parsing failed, falling back to POM parsing: " + err.Error())
 	}
 	mf.parseFromPOM()
 }
 
 // parseWithMavenDependencyTree uses mvn dependency:tree to get complete dependency information
 func (mf *MavenFlexPack) parseWithMavenDependencyTree() error {
-	args := []string{"dependency:tree", "-DoutputType=text", "-Dverbose"}
+	// Generate dependency tree as JSON
+	depsJsonPath := filepath.Join(mf.config.WorkingDirectory, "maven-deps.json")
+	// Clean up any existing dependency JSON file
+	defer os.Remove(depsJsonPath)
+
+	args := []string{"dependency:tree", "-DoutputType=json", "-DoutputFile=maven-deps.json"}
 	if mf.config.SkipTests {
 		args = append(args, "-DskipTests")
 	}
@@ -211,105 +215,94 @@ func (mf *MavenFlexPack) parseWithMavenDependencyTree() error {
 		return fmt.Errorf("mvn dependency:tree failed: %w\nOutput: %s", err, string(output))
 	}
 
-	return mf.parseDependencyTreeOutput(string(output))
+	// Read and parse the generated JSON file
+	content, err := os.ReadFile(depsJsonPath)
+	if err != nil {
+		return fmt.Errorf("failed to read dependency JSON: %w", err)
+	}
+	return mf.parseDependencyTreeJSON(content)
 }
 
-// parseDependencyTreeOutput parses the output of mvn dependency:tree
-func (mf *MavenFlexPack) parseDependencyTreeOutput(output string) error {
-	lines := strings.Split(output, "\n")
-	var currentParent string
-	parentStack := []string{}
-	seenDependencies := make(map[string]bool)
-	depRegex := regexp.MustCompile(`\[INFO\]\s*[+\\|\s-]*\s*([a-zA-Z0-9._-]+):([a-zA-Z0-9._-]+):([a-zA-Z0-9._-]+):([a-zA-Z0-9._-]+):([a-zA-Z0-9._-]+)\s*$`)
+// MavenDependencyJSON represents a dependency in Maven's JSON dependency tree
+type MavenDependencyJSON struct {
+	GroupID    string                `json:"groupId"`
+	ArtifactID string                `json:"artifactId"`
+	Version    string                `json:"version"`
+	Type       string                `json:"type"`
+	Scope      string                `json:"scope"`
+	Classifier string                `json:"classifier"`
+	Optional   string                `json:"optional"`
+	Children   []MavenDependencyJSON `json:"children,omitempty"`
+}
 
-	for _, line := range lines {
-		if strings.Contains(line, "omitted for duplicate") {
-			continue
-		}
-		if !strings.Contains(line, "[INFO]") ||
-			strings.Contains(line, "BUILD SUCCESS") ||
-			strings.Contains(line, "Total time") ||
-			strings.Contains(line, "Finished at") ||
-			strings.Contains(line, "Scanning for projects") ||
-			strings.Contains(line, "Building ") ||
-			strings.Contains(line, "Downloaded from") ||
-			strings.Contains(line, "Downloading from") ||
-			strings.Contains(line, "maven-") ||
-			strings.Contains(line, "---") {
-			continue
-		}
-
-		matches := depRegex.FindStringSubmatch(line)
-		if len(matches) != 6 {
-			continue
-		}
-
-		groupId := strings.TrimSpace(matches[1])
-		artifactId := strings.TrimSpace(matches[2])
-		packaging := strings.TrimSpace(matches[3])
-		version := strings.TrimSpace(matches[4])
-		scope := strings.TrimSpace(matches[5])
-
-		if groupId == "" || artifactId == "" || version == "" {
-			continue
-		}
-
-		dependencyId := fmt.Sprintf("%s:%s:%s", groupId, artifactId, version)
-
-		if seenDependencies[dependencyId] {
-			continue
-		}
-		seenDependencies[dependencyId] = true
-
-		level := mf.calculateTreeLevelFromLine(line)
-		if level <= len(parentStack) {
-			parentStack = parentStack[:level]
-		}
-		if level > 0 && len(parentStack) > 0 {
-			currentParent = parentStack[len(parentStack)-1]
-		} else {
-			currentParent = ""
-		}
-
-		// Check if this is a test dependency (for filtering purposes)
-		isTestDependency := strings.ToLower(scope) == "test"
-		if !mf.config.IncludeTestDependencies && isTestDependency {
-			continue
-		}
-
-		dep := DependencyInfo{
-			ID:      dependencyId,
-			Name:    fmt.Sprintf("%s:%s", groupId, artifactId),
-			Version: version,
-			Type:    mf.mapPackagingToType(packaging),
-			Scopes:  mf.mapMavenScopeToScopes(scope), // Use actual Maven scope from dependency tree
-		}
-
-		mf.dependencies = append(mf.dependencies, dep)
-		if currentParent != "" {
-			if mf.dependencyGraph[currentParent] == nil {
-				mf.dependencyGraph[currentParent] = []string{}
-			}
-			mf.dependencyGraph[currentParent] = append(mf.dependencyGraph[currentParent], dependencyId)
-		}
-		if level < len(parentStack) {
-			parentStack = parentStack[:level+1]
-			parentStack[level] = dependencyId
-		} else {
-			parentStack = append(parentStack, dependencyId)
-		}
+// parseDependencyTreeJSON parses Maven's JSON dependency tree output
+func (mf *MavenFlexPack) parseDependencyTreeJSON(content []byte) error {
+	var rootDep MavenDependencyJSON
+	if err := json.Unmarshal(content, &rootDep); err != nil {
+		return fmt.Errorf("failed to parse dependency JSON: %w", err)
 	}
 
-	log.Debug(fmt.Sprintf("Parsed %d unique dependencies from Maven dependency tree", len(mf.dependencies)))
+	// Process all dependencies recursively
+	seenDependencies := make(map[string]bool)
+	mf.processDependencyNode(rootDep, "", seenDependencies)
+	log.Debug(fmt.Sprintf("Collected %d dependencies", len(mf.dependencies)))
 	return nil
+}
+
+// processDependencyNode recursively processes a dependency node and its children
+func (mf *MavenFlexPack) processDependencyNode(dep MavenDependencyJSON, parent string, seen map[string]bool) {
+	// Skip empty or invalid dependencies
+	if dep.GroupID == "" || dep.ArtifactID == "" || dep.Version == "" {
+		return
+	}
+
+	dependencyId := fmt.Sprintf("%s:%s:%s", dep.GroupID, dep.ArtifactID, dep.Version)
+
+	// Skip the root project itself - it's not a dependency
+	// Compare groupId and artifactId only (version should match but let's be safe)
+	if dep.GroupID == mf.groupId && dep.ArtifactID == mf.artifactId {
+		for _, child := range dep.Children {
+			mf.processDependencyNode(child, dependencyId, seen)
+		}
+		return
+	}
+
+	// Skip duplicates
+	if seen[dependencyId] {
+		return
+	}
+	seen[dependencyId] = true
+	// Check if this is a test dependency (for filtering purposes)
+	isTestDependency := strings.ToLower(dep.Scope) == "test"
+	if !mf.config.IncludeTestDependencies && isTestDependency {
+		return
+	}
+	// Create dependency info
+	depInfo := DependencyInfo{
+		ID:      dependencyId,
+		Name:    fmt.Sprintf("%s:%s", dep.GroupID, dep.ArtifactID),
+		Version: dep.Version,
+		Type:    mf.mapPackagingToType(dep.Type),
+		Scopes:  mf.mapMavenScopeToScopes(dep.Scope),
+	}
+	mf.dependencies = append(mf.dependencies, depInfo)
+	// Build dependency graph
+	if parent != "" {
+		if mf.dependencyGraph[parent] == nil {
+			mf.dependencyGraph[parent] = []string{}
+		}
+		mf.dependencyGraph[parent] = append(mf.dependencyGraph[parent], dependencyId)
+	}
+	// Process children recursively
+	for _, child := range dep.Children {
+		mf.processDependencyNode(child, dependencyId, seen)
+	}
 }
 
 // parseFromPOM parses dependencies directly from pom.xml
 func (mf *MavenFlexPack) parseFromPOM() {
-
 	for _, dep := range mf.pomData.Dependencies.Dependency {
 		dependencyId := fmt.Sprintf("%s:%s:%s", dep.GroupId, dep.ArtifactId, dep.Version)
-
 		depInfo := DependencyInfo{
 			ID:      dependencyId,
 			Name:    fmt.Sprintf("%s:%s", dep.GroupId, dep.ArtifactId),
@@ -317,202 +310,13 @@ func (mf *MavenFlexPack) parseFromPOM() {
 			Type:    mf.mapPackagingToType(dep.Type),
 			Scopes:  mf.mapMavenScopeToScopes(dep.Scope), // Use actual Maven scope from POM
 		}
-
 		// Check if this is a test dependency (for filtering purposes)
 		isTestDependency := strings.ToLower(dep.Scope) == "test"
 		if !mf.config.IncludeTestDependencies && isTestDependency {
 			continue
 		}
-
 		mf.dependencies = append(mf.dependencies, depInfo)
 	}
-
-}
-
-// calculateTreeLevelFromLine calculates the indentation level from the full dependency tree line
-func (mf *MavenFlexPack) calculateTreeLevelFromLine(line string) int {
-	// Find the position after [INFO] and count the tree depth
-	infoPos := strings.Index(line, "[INFO]")
-	if infoPos == -1 {
-		return 0
-	}
-
-	// Check bounds before slicing to avoid out-of-bounds error
-	if infoPos+6 >= len(line) {
-		return 0
-	}
-
-	// Look for the dependency part after [INFO]
-	afterInfo := line[infoPos+6:] // Skip "[INFO]"
-
-	// Count the number of tree indentation groups
-	// Maven tree format: "   +- " or "   |  +- " or "   |  |  +- "
-	level := 0
-	i := 0
-	for i < len(afterInfo) {
-		// Skip initial spaces
-		for i < len(afterInfo) && afterInfo[i] == ' ' {
-			i++
-		}
-
-		// Check for tree characters
-		if i < len(afterInfo) {
-			char := afterInfo[i]
-			switch char {
-			case '+', '\\':
-				// This indicates a dependency at this level
-				return level
-			case '|':
-				// Vertical bar indicates we're going deeper
-				level++
-				i++
-				// Skip spaces after |
-				for i < len(afterInfo) && afterInfo[i] == ' ' {
-					i++
-				}
-			default:
-				return level
-			}
-		} else {
-			return level
-		}
-	}
-
-	return level
-}
-
-// wasDeployGoalExecuted checks if the deploy goal was part of the Maven command
-func (mf *MavenFlexPack) wasDeployGoalExecuted() bool {
-	// Check os.Args for Maven goals
-	for _, arg := range os.Args {
-		if strings.Contains(arg, "deploy") {
-			return true
-		}
-	}
-	return false
-}
-
-// getDeploymentRepository extracts repository information natively from Maven POM and settings
-// Returns empty string if deploy goal was not executed (e.g., for verify, install without deploy)
-func (mf *MavenFlexPack) getDeploymentRepository() string {
-	// If deploy goal was not executed, don't set repository
-	if !mf.wasDeployGoalExecuted() {
-		return ""
-	}
-	// Parse distributionManagement from pom.xml (native Maven approach)
-	pomPath := filepath.Join(mf.config.WorkingDirectory, "pom.xml")
-	content, err := os.ReadFile(pomPath)
-	if err != nil {
-		log.Debug("Could not read pom.xml for deployment repository extraction: " + err.Error())
-		return ""
-	}
-
-	pomContent := string(content)
-
-	// Extract repository ID from distributionManagement section
-	repoId := mf.extractRepositoryFromDistributionManagement(pomContent)
-	if repoId != "" {
-		log.Debug("Found deployment repository in pom.xml distributionManagement: " + repoId)
-		return repoId
-	}
-
-	// Try to extract from Maven settings.xml (native Maven approach)
-	settingsRepo := mf.extractRepositoryFromSettings()
-	if settingsRepo != "" {
-		log.Debug("Found deployment repository in Maven settings.xml: " + settingsRepo)
-		return settingsRepo
-	}
-
-	log.Debug("No deployment repository found in native Maven configuration")
-	return ""
-}
-
-// extractRepositoryFromDistributionManagement parses distributionManagement section from pom.xml
-func (mf *MavenFlexPack) extractRepositoryFromDistributionManagement(pomContent string) string {
-	// Look for distributionManagement section
-	distMgmtRegex := regexp.MustCompile(`(?s)<distributionManagement>(.*?)</distributionManagement>`)
-	distMgmtMatch := distMgmtRegex.FindStringSubmatch(pomContent)
-	if len(distMgmtMatch) < 2 {
-		return ""
-	}
-
-	distMgmtSection := distMgmtMatch[1]
-
-	// Determine if this is a SNAPSHOT version to choose appropriate repository
-	isSnapshot := strings.Contains(strings.ToUpper(mf.projectVersion), "SNAPSHOT")
-
-	var repoPattern string
-	if isSnapshot {
-		// Look for snapshotRepository first for SNAPSHOT versions
-		repoPattern = `(?s)<snapshotRepository>(.*?)</snapshotRepository>`
-	} else {
-		// Look for repository for release versions
-		repoPattern = `(?s)<repository>(.*?)</repository>`
-	}
-
-	repoRegex := regexp.MustCompile(repoPattern)
-	repoMatch := repoRegex.FindStringSubmatch(distMgmtSection)
-	if len(repoMatch) < 2 {
-		// Fallback: try the other repository type
-		if isSnapshot {
-			repoPattern = `(?s)<repository>(.*?)</repository>`
-		} else {
-			repoPattern = `(?s)<snapshotRepository>(.*?)</snapshotRepository>`
-		}
-		repoRegex = regexp.MustCompile(repoPattern)
-		repoMatch = repoRegex.FindStringSubmatch(distMgmtSection)
-		if len(repoMatch) < 2 {
-			return ""
-		}
-	}
-
-	repoSection := repoMatch[1]
-
-	// Extract repository ID
-	idRegex := regexp.MustCompile(`<id>(.*?)</id>`)
-	idMatch := idRegex.FindStringSubmatch(repoSection)
-	if len(idMatch) >= 2 {
-		repoId := strings.TrimSpace(idMatch[1])
-		if repoId != "" {
-			return repoId
-		}
-	}
-
-	return ""
-}
-
-// extractRepositoryFromSettings parses deployment repository from Maven settings.xml
-func (mf *MavenFlexPack) extractRepositoryFromSettings() string {
-	// Try multiple common locations for settings.xml
-	settingsPaths := []string{
-		filepath.Join(mf.config.WorkingDirectory, "settings.xml"),
-		filepath.Join(os.Getenv("HOME"), ".m2", "settings.xml"),
-		"/usr/local/share/maven/conf/settings.xml",
-		"/opt/maven/conf/settings.xml",
-	}
-
-	for _, settingsPath := range settingsPaths {
-		if content, err := os.ReadFile(settingsPath); err == nil {
-			settingsContent := string(content)
-
-			// Look for activeProfiles and profiles with repository configuration
-			// This is a simplified approach - full Maven settings parsing would be more complex
-			if strings.Contains(settingsContent, "<repository>") || strings.Contains(settingsContent, "<repositories>") {
-				// Extract first repository ID found (simplified)
-				idRegex := regexp.MustCompile(`<repository>.*?<id>(.*?)</id>`)
-				idMatch := idRegex.FindStringSubmatch(settingsContent)
-				if len(idMatch) >= 2 {
-					repoId := strings.TrimSpace(idMatch[1])
-					if repoId != "" {
-						log.Debug("Found repository in settings.xml: " + settingsPath)
-						return repoId
-					}
-				}
-			}
-		}
-	}
-
-	return ""
 }
 
 // mapMavenScopeToScopes maps Maven dependency scope to build-info scopes
@@ -521,25 +325,16 @@ func (mf *MavenFlexPack) mapMavenScopeToScopes(scope string) []string {
 	if scope == "" {
 		scope = "compile"
 	}
-
-	// Maven scopes map directly to build-info scopes
-	switch strings.ToLower(scope) {
-	case "compile":
-		return []string{"compile"}
-	case "runtime":
-		return []string{"runtime"}
-	case "test":
-		return []string{"test"}
-	case "provided":
-		return []string{"provided"}
-	case "system":
-		return []string{"system"}
-	case "import":
-		return []string{"import"}
-	default:
-		// Unknown scope, default to compile
-		return []string{"compile"}
+	normalizedScope := strings.ToLower(scope)
+	// Validate against known Maven scopes
+	validScopes := []string{"compile", "runtime", "test", "provided", "system", "import"}
+	for _, validScope := range validScopes {
+		if normalizedScope == validScope {
+			return []string{normalizedScope}
+		}
 	}
+	// Unknown scope, default to compile
+	return []string{"compile"}
 }
 
 // mapPackagingToType maps Maven packaging types to artifact types
@@ -590,8 +385,21 @@ func (mf *MavenFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[s
 	// Example: GET /api/storage/{repo}/{path}?checksums=sha1,sha256,md5
 	// This would provide authentic checksums from the repository
 
-	// Strategy 3: Warn and return nil to exclude dependency with missing checksums
-	log.Warn(fmt.Sprintf("Failed to calculate checksums for dependency: %s:%s", dep.Name, dep.Version))
+	// Strategy 3: Handle missing checksums gracefully
+	// For test dependencies during compile phase, this is expected behavior
+	isTestDependency := false
+	for _, scope := range dep.Scopes {
+		if strings.ToLower(scope) == "test" {
+			isTestDependency = true
+			break
+		}
+	}
+
+	if isTestDependency {
+		log.Debug(fmt.Sprintf("Skipping checksum calculation for test dependency: %s:%s (not downloaded during compile)", dep.Name, dep.Version))
+	} else {
+		log.Warn(fmt.Sprintf("Failed to calculate checksums for dependency: %s:%s", dep.Name, dep.Version))
+	}
 	return nil
 }
 
@@ -695,7 +503,7 @@ func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 	for _, dep := range mf.dependencies {
 		// Try to calculate checksum for this specific dependency
 		checksumMap := mf.calculateChecksumWithFallback(dep)
-		
+
 		// Convert checksum map to entities.Checksum struct
 		checksum := entities.Checksum{}
 		if checksumMap != nil {
@@ -746,7 +554,6 @@ func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 	module := entities.Module{
 		Id:           fmt.Sprintf("%s:%s:%s", mf.groupId, mf.artifactId, mf.projectVersion),
 		Type:         "maven",
-		Repository:   mf.getDeploymentRepository(),
 		Dependencies: dependencies,
 	}
 	buildInfo.Modules = append(buildInfo.Modules, module)
@@ -793,10 +600,8 @@ func RunMavenInstallWithBuildInfo(workingDir string, buildName, buildNumber stri
 		if err != nil {
 			log.Warn("Failed to save build info for jfrog-cli compatibility: " + err.Error())
 		} else {
-			log.Info("Build info saved for jfrog-cli compatibility")
+			log.Debug("Build info saved for jfrog-cli compatibility")
 		}
-
-		log.Debug(fmt.Sprintf("Build info: %+v", buildInfo))
 	}
 
 	return nil

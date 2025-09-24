@@ -365,7 +365,6 @@ type Module struct {
 	Type              ModuleType   `json:"type,omitempty"`
 	Properties        interface{}  `json:"properties,omitempty"`
 	Id                string       `json:"id,omitempty"`
-	Repository        string       `json:"repository,omitempty"`
 	Artifacts         []Artifact   `json:"artifacts,omitempty"`
 	ExcludedArtifacts []Artifact   `json:"excludedArtifacts,omitempty"`
 	Dependencies      []Dependency `json:"dependencies,omitempty"`
