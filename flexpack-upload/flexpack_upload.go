@@ -1,8 +1,6 @@
 package flexpackupload
 
-import (
-	"github.com/jfrog/build-info-go/entities"
-)
+// Package flexpackupload provides interfaces and types for package manager upload operations
 
 // FlexPackUploadManager defines the interface for package manager upload/publish operations
 type FlexPackUploadManager interface {
@@ -60,26 +58,4 @@ type PublishResult struct {
 	Repository string                 `json:"repository"`
 	Duration   string                 `json:"duration"`
 	Metadata   map[string]interface{} `json:"metadata,omitempty"`
-}
-
-// BuildArtifactsToBuildInfo converts FlexPack artifacts to build-info entities format
-func BuildArtifactsToBuildInfo(artifacts []ArtifactInfo, moduleName string, repositoryName string) []entities.Artifact {
-	var buildInfoArtifacts []entities.Artifact
-
-	for _, artifact := range artifacts {
-		buildInfoArtifact := entities.Artifact{
-			Name:                   artifact.Name,
-			Type:                   artifact.Type,
-			Path:                   artifact.Path,
-			OriginalDeploymentRepo: repositoryName,
-			Checksum: entities.Checksum{
-				Sha1:   artifact.SHA1,
-				Sha256: artifact.SHA256,
-				Md5:    artifact.MD5,
-			},
-		}
-		buildInfoArtifacts = append(buildInfoArtifacts, buildInfoArtifact)
-	}
-
-	return buildInfoArtifacts
 }
