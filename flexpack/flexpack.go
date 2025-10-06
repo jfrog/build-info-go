@@ -1,6 +1,8 @@
 package flexpack
 
 import (
+	"os"
+
 	"github.com/jfrog/build-info-go/entities"
 )
 
@@ -63,4 +65,10 @@ type PoetryConfig struct {
 
 	// IncludeDevDependencies indicates whether to include development dependencies
 	IncludeDevDependencies bool
+}
+
+// IsFlexPackEnabled checks if the FlexPack (native) implementation should be used
+// Returns true if JFROG_RUN_NATIVE environment variable is set to "true"
+func IsFlexPackEnabled() bool {
+	return os.Getenv("JFROG_RUN_NATIVE") == "true"
 }
