@@ -283,6 +283,7 @@ func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInf
 			npmLsDependency: &npmLsDependency{
 				Name:      "underscore",
 				Version:   "1.13.6",
+				Resolved:  "https://registry.npmjs.org/underscore/-/underscore-1.13.6.tgz",
 				Integrity: "sha512-+A5Sja4HP1M08MaXya7p5LvjuM7K6q/2EaC0+iovj/wOcMsTzMvDFbasi/oSapiwOlt252IqsKqPjCl7huKS0A==",
 			},
 		},
@@ -296,6 +297,7 @@ func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInf
 			npmLsDependency: &npmLsDependency{
 				Name:      "cors.js",
 				Version:   "0.0.1-security",
+				Resolved:  "https://registry.npmjs.org/cors.js/-/cors.js-0.0.1-security.tgz",
 				Integrity: "sha512-Cu4D8imt82jd/AuMBwTpjrXiULhaMdig2MD2NBhRKbbcuCTWeyN2070SCEDaJuI/4kA1J9Nnvj6/cBe/zfnrrw==",
 			},
 		},
@@ -309,6 +311,7 @@ func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInf
 			npmLsDependency: &npmLsDependency{
 				Name:      "lightweight",
 				Version:   "0.1.0",
+				Resolved:  "https://registry.npmjs.org/lightweight/-/lightweight-0.1.0.tgz",
 				Integrity: "sha512-10pYSQA9EJqZZnXDR0urhg8Z0Y1XnRfi41ZFj3ZFTKJ5PjRq82HzT7LKlPyxewy3w2WA2POfi3jQQn7Y53oPcQ==",
 			},
 		},
@@ -322,6 +325,7 @@ func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInf
 			npmLsDependency: &npmLsDependency{
 				Name:      "minimist",
 				Version:   "0.1.0",
+				Resolved:  "https://registry.npmjs.org/minimist/-/minimist-0.1.0.tgz",
 				Integrity: "sha512-wR5Ipl99t0mTGwLjQJnBjrP/O7zBbLZqvA3aw32DmLx+nXHfWctUjzDjnDx09pX1Po86WFQazF9xUzfMea3Cnw==",
 			},
 		},
