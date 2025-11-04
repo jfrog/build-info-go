@@ -329,6 +329,14 @@ func extractVersionFromGitUrl(gitUrl string) string {
 }
 
 // extracts a Git URL from npm problems array
+// example:
+//
+//	problems := []string{
+//	    "missing: my-private-package@git+ssh://git@github.com/my-org/my-private-package.git#v1.0.0, required by root",
+//	    "peer dependency missing: react@^17.0.0",
+//	}
+//
+// output:- "git+ssh://git@github.com/my-org/my-private-package.git#v1.0.0"
 func extractUrlFromProblems(problems []string, packageName string) string {
 	for _, problem := range problems {
 		// Look for pattern: "missing: packageName@URL"
@@ -396,14 +404,15 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 				resolvedUrl = extractUrlFromProblems(npmLsDependency.Problems, npmLsDependency.Name)
 			}
 			if resolvedUrl != "" {
-				if version := extractVersionFromGitUrl(resolvedUrl); version != "" {
+				// To create a consistent version identifier, we hash the entire resolved URL.
+				checksums, err := crypto.CalcChecksums(strings.NewReader(resolvedUrl), crypto.SHA1)
+				if err != nil {
+					return err
+				}
+				switch version := extractVersionFromGitUrl(resolvedUrl); {
+				case version != "":
 					npmLsDependency.Version = version
-				} else {
-					// To create a consistent version identifier, we hash the entire resolved URL.
-					checksums, err := crypto.CalcChecksums(strings.NewReader(resolvedUrl), crypto.SHA1)
-					if err != nil {
-						return err
-					}
+				default:
 					npmLsDependency.Version = checksums[crypto.SHA1]
 				}
 			} else if npmLsDependency.Missing || npmLsDependency.Problems != nil {
