@@ -322,9 +322,8 @@ func isGitDependency(resolved string) bool {
 }
 
 func extractVersionFromGitUrl(gitUrl string) string {
-	parts := strings.Split(gitUrl, "#")
-	if len(parts) > 1 {
-		return parts[1]
+	if _, commit, ok := strings.Cut(gitUrl, "#"); ok {
+		return commit
 	}
 	return ""
 }
