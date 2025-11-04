@@ -403,7 +403,8 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 			if resolvedUrl == "" && npmLsDependency.Problems != nil && len(npmLsDependency.Problems) > 0 {
 				resolvedUrl = extractUrlFromProblems(npmLsDependency.Problems, npmLsDependency.Name)
 			}
-			if resolvedUrl != "" {
+			switch {
+			case resolvedUrl != "":
 				// To create a consistent version identifier, we hash the entire resolved URL.
 				checksums, err := crypto.CalcChecksums(strings.NewReader(resolvedUrl), crypto.SHA1)
 				if err != nil {
@@ -415,11 +416,11 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 				default:
 					npmLsDependency.Version = checksums[crypto.SHA1]
 				}
-			} else if npmLsDependency.Missing || npmLsDependency.Problems != nil {
+			case npmLsDependency.Missing || npmLsDependency.Problems != nil:
 				// Skip missing peer dependency.
 				log.Debug(fmt.Sprintf("%s is missing, this may be the result of an peer dependency.", key))
 				return nil
-			} else {
+			default:
 				return errors.New("failed to parse '" + string(value) + "' from npm ls output.")
 			}
 		}
