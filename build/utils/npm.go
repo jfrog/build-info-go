@@ -258,6 +258,7 @@ type NpmTreeDepListParam struct {
 type npmLsDependency struct {
 	Name      string
 	Version   string
+	Resolved  string
 	Integrity string
 	InBundle  bool
 	Dev       bool
@@ -275,6 +276,7 @@ type npmLsDependency struct {
 type legacyNpmLsDependency struct {
 	Name          string
 	Version       string
+	Resolved      string
 	Missing       bool
 	Integrity     string `json:"_integrity,omitempty"`
 	InBundle      bool   `json:"_inBundle,omitempty"`
@@ -295,6 +297,7 @@ func (lnld *legacyNpmLsDependency) toNpmLsDependency() *npmLsDependency {
 	return &npmLsDependency{
 		Name:        lnld.Name,
 		Version:     lnld.Version,
+		Resolved:    lnld.Resolved,
 		Integrity:   lnld.Integrity,
 		InBundle:    lnld.InBundle,
 		Dev:         lnld.Dev,
@@ -307,6 +310,46 @@ func (lnld *legacyNpmLsDependency) toNpmLsDependency() *npmLsDependency {
 // Return name:version of a dependency
 func (nld *npmLsDependency) id() string {
 	return nld.Name + ":" + nld.Version
+}
+
+// isGitDependency checks if the resolved URL is a Git dependency
+func isGitDependency(resolved string) bool {
+	return strings.HasPrefix(resolved, "git+") ||
+		strings.HasPrefix(resolved, "git://") ||
+		strings.HasPrefix(resolved, "https://github.com") ||
+		strings.HasPrefix(resolved, "http://github.com") ||
+		strings.Contains(resolved, ".git")
+}
+
+func extractVersionFromGitUrl(gitUrl string) string {
+	if _, commit, ok := strings.Cut(gitUrl, "#"); ok {
+		return commit
+	}
+	return ""
+}
+
+// extracts a Git URL from npm problems array
+// example:
+//
+//	problems := []string{
+//	    "missing: my-private-package@git+ssh://git@github.com/my-org/my-private-package.git#v1.0.0, required by root",
+//	    "peer dependency missing: react@^17.0.0",
+//	}
+//
+// output:- "git+ssh://git@github.com/my-org/my-private-package.git#v1.0.0"
+func extractUrlFromProblems(problems []string, packageName string) string {
+	for _, problem := range problems {
+		// Look for pattern: "missing: packageName@URL"
+		prefix := "missing: " + packageName + "@"
+		if strings.HasPrefix(problem, prefix) {
+			url := strings.TrimPrefix(problem, prefix)
+			if idx := strings.Index(url, ","); idx > 0 {
+				url = url[:idx]
+			}
+			return strings.TrimSpace(url)
+		}
+	}
+	return ""
 }
 
 func (nld *npmLsDependency) getScopes() (scopes []string) {
@@ -336,13 +379,50 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 		if err != nil {
 			return err
 		}
+		// The dependency name is a key in the object, which is not always available inside the value.
+		npmLsDependency.Name = string(key)
+
+		// Some old npm versions store the git hash in the version field. We'll extract it to be used as the version.
+		if isGitDependency(npmLsDependency.Version) {
+			if hash := extractVersionFromGitUrl(npmLsDependency.Version); hash != "" {
+				npmLsDependency.Version = hash
+			} else {
+				// No hash present – encode the full URL to avoid ':'
+				checksums, err := crypto.CalcChecksums(strings.NewReader(npmLsDependency.Version), crypto.SHA1)
+				if err != nil {
+					return err
+				}
+				npmLsDependency.Version = checksums[crypto.SHA1]
+			}
+		}
+
 		if npmLsDependency.Version == "" {
-			if npmLsDependency.Missing || npmLsDependency.Problems != nil {
+			// Check if this is a non-registry dependency with a resolved field (e.g. git, file etc.)
+			resolvedUrl := npmLsDependency.Resolved
+			// If there's no resolved field, try to extract it from the problems array
+			if resolvedUrl == "" && npmLsDependency.Problems != nil && len(npmLsDependency.Problems) > 0 {
+				resolvedUrl = extractUrlFromProblems(npmLsDependency.Problems, npmLsDependency.Name)
+			}
+			switch {
+			case resolvedUrl != "":
+				// To create a consistent version identifier, we hash the entire resolved URL.
+				checksums, err := crypto.CalcChecksums(strings.NewReader(resolvedUrl), crypto.SHA1)
+				if err != nil {
+					return err
+				}
+				switch version := extractVersionFromGitUrl(resolvedUrl); {
+				case version != "":
+					npmLsDependency.Version = version
+				default:
+					npmLsDependency.Version = checksums[crypto.SHA1]
+				}
+			case npmLsDependency.Missing || npmLsDependency.Problems != nil:
 				// Skip missing peer dependency.
 				log.Debug(fmt.Sprintf("%s is missing, this may be the result of an peer dependency.", key))
 				return nil
+			default:
+				return errors.New("failed to parse '" + string(value) + "' from npm ls output.")
 			}
-			return errors.New("failed to parse '" + string(value) + "' from npm ls output.")
 		}
 		appendDependency(dependencies, npmLsDependency, pathToRoot)
 		transitive, _, _, err := jsonparser.Get(value, "dependencies")
