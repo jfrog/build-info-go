@@ -265,7 +265,6 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 			jvmProp = fmt.Sprintf("-D%s='%s'", extractorPropsDir, config.extractorPropsFile)
 		}
 		cmd = append(cmd, jvmProp)
-		config.logger.Debug("Passing extractor properties file via system property: ", jvmProp)
 	}
 	cmd = append(cmd, formatCommandProperties(config.tasks)...)
 	config.logger.Info("Running gradle command:", strings.Join(cmd, " "))
