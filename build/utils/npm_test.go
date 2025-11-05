@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jfrog/gofrog/crypto"
+
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/stretchr/testify/require"
 
@@ -281,6 +283,7 @@ func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInf
 			npmLsDependency: &npmLsDependency{
 				Name:      "underscore",
 				Version:   "1.13.6",
+				Resolved:  "https://registry.npmjs.org/underscore/-/underscore-1.13.6.tgz",
 				Integrity: "sha512-+A5Sja4HP1M08MaXya7p5LvjuM7K6q/2EaC0+iovj/wOcMsTzMvDFbasi/oSapiwOlt252IqsKqPjCl7huKS0A==",
 			},
 		},
@@ -294,6 +297,7 @@ func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInf
 			npmLsDependency: &npmLsDependency{
 				Name:      "cors.js",
 				Version:   "0.0.1-security",
+				Resolved:  "https://registry.npmjs.org/cors.js/-/cors.js-0.0.1-security.tgz",
 				Integrity: "sha512-Cu4D8imt82jd/AuMBwTpjrXiULhaMdig2MD2NBhRKbbcuCTWeyN2070SCEDaJuI/4kA1J9Nnvj6/cBe/zfnrrw==",
 			},
 		},
@@ -307,6 +311,7 @@ func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInf
 			npmLsDependency: &npmLsDependency{
 				Name:      "lightweight",
 				Version:   "0.1.0",
+				Resolved:  "https://registry.npmjs.org/lightweight/-/lightweight-0.1.0.tgz",
 				Integrity: "sha512-10pYSQA9EJqZZnXDR0urhg8Z0Y1XnRfi41ZFj3ZFTKJ5PjRq82HzT7LKlPyxewy3w2WA2POfi3jQQn7Y53oPcQ==",
 			},
 		},
@@ -320,6 +325,7 @@ func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInf
 			npmLsDependency: &npmLsDependency{
 				Name:      "minimist",
 				Version:   "0.1.0",
+				Resolved:  "https://registry.npmjs.org/minimist/-/minimist-0.1.0.tgz",
 				Integrity: "sha512-wR5Ipl99t0mTGwLjQJnBjrP/O7zBbLZqvA3aw32DmLx+nXHfWctUjzDjnDx09pX1Po86WFQazF9xUzfMea3Cnw==",
 			},
 		},
@@ -475,5 +481,105 @@ func TestFilterUniqueArgs(t *testing.T) {
 
 	for _, testcase := range testcases {
 		assert.Equal(t, testcase.expectedResult, filterUniqueArgs(testcase.argsToFilter, testcase.alreadyExists))
+	}
+}
+
+func TestParseDependenciesEdgeCases(t *testing.T) {
+	testcases := []struct {
+		name                string
+		inputJson           string
+		expectedId          string
+		shouldBeSkipped     bool
+		expectParseError    bool
+		expectedRequestedBy [][]string
+	}{
+		{
+			name:             "Git URL with hash in resolved",
+			inputJson:        `{"@angular/dev-infra-private":{"resolved": "git+ssh://git@github.com/angular/dev-infra-private-builds.git#e4a13cfd135ec766dc9148ba4fe4d3ac76d94137"}}`,
+			expectedId:       "@angular/dev-infra-private:e4a13cfd135ec766dc9148ba4fe4d3ac76d94137",
+			shouldBeSkipped:  false,
+			expectParseError: false,
+		},
+		{
+			name:      "Git URL without hash in resolved",
+			inputJson: `{"my-pkg":{"resolved": "git+https://github.com/user/repo.git"}}`,
+			expectedId: func() string {
+				checksums, _ := crypto.CalcChecksums(strings.NewReader("git+https://github.com/user/repo.git"), crypto.SHA1)
+				return "my-pkg:" + checksums[crypto.SHA1]
+			}(),
+			shouldBeSkipped:  false,
+			expectParseError: false,
+		},
+		{
+			name:      "Local file path in resolved",
+			inputJson: `{"my-local-pkg":{"resolved": "file:../shared/my-local-pkg"}}`,
+			expectedId: func() string {
+				checksums, _ := crypto.CalcChecksums(strings.NewReader("file:../shared/my-local-pkg"), crypto.SHA1)
+				return "my-local-pkg:" + checksums[crypto.SHA1]
+			}(),
+			shouldBeSkipped:  false,
+			expectParseError: false,
+		},
+		{
+			name:      "Direct tarball URL in resolved",
+			inputJson: `{"my-tarball-pkg":{"resolved": "https://example.com/pkg-1.0.0.tgz"}}`,
+			expectedId: func() string {
+				checksums, _ := crypto.CalcChecksums(strings.NewReader("https://example.com/pkg-1.0.0.tgz"), crypto.SHA1)
+				return "my-tarball-pkg:" + checksums[crypto.SHA1]
+			}(),
+			shouldBeSkipped:  false,
+			expectParseError: false,
+		},
+		{
+			name:             "No version and no resolved, but missing",
+			inputJson:        `{"bad-pkg":{"missing": true}}`,
+			shouldBeSkipped:  true,
+			expectParseError: false,
+		},
+		{
+			name:             "No version and no resolved, not missing",
+			inputJson:        `{"bad-pkg":{"dev": true}}`,
+			shouldBeSkipped:  false,
+			expectParseError: true,
+		},
+		{
+			name:             "Missing peer dependency",
+			inputJson:        `{"peer-pkg":{"missing": true}}`,
+			shouldBeSkipped:  true,
+			expectParseError: false,
+		},
+		{
+			name:             "Regular dependency is not affected",
+			inputJson:        `{"react":{"version": "18.2.0", "integrity": "sha512-..."}}`,
+			expectedId:       "react:18.2.0",
+			shouldBeSkipped:  false,
+			expectParseError: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			depsMap := make(map[string]*dependencyInfo)
+			parseFunc := npmLsDependencyParser
+			err := parseDependencies([]byte(tc.inputJson), []string{"root"}, depsMap, parseFunc, &utils.NullLog{})
+
+			if tc.expectParseError {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+
+			if tc.shouldBeSkipped {
+				assert.Empty(t, depsMap, "Expected dependency to be skipped, but it was added")
+			} else {
+				assert.Len(t, depsMap, 1, "Expected exactly one dependency")
+				// Check if the key exists
+				depInfo, ok := depsMap[tc.expectedId]
+				assert.True(t, ok, "Expected dependency ID '%s' not found in map", tc.expectedId)
+				if ok {
+					assert.Equal(t, tc.expectedId, depInfo.Id, "Dependency ID mismatch")
+				}
+			}
+		})
 	}
 }
