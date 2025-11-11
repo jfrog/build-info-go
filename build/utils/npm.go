@@ -44,11 +44,11 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 	var dependenciesList []entities.Dependency
 	var missingPeerDeps, missingBundledDeps, missingOptionalDeps, otherMissingDeps []string
 	for _, dep := range dependenciesMap {
-		if dep.npmLsDependency.Integrity == "" && dep.npmLsDependency.InBundle {
+		if dep.Integrity == "" && dep.InBundle {
 			missingBundledDeps = append(missingBundledDeps, dep.Id)
 			continue
 		}
-		if dep.npmLsDependency.Integrity == "" && dep.PeerMissing != nil {
+		if dep.Integrity == "" && dep.PeerMissing != nil {
 			missingPeerDeps = append(missingPeerDeps, dep.Id)
 			continue
 		}

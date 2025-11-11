@@ -789,7 +789,11 @@ func GetPoetryDependenciesCache(projectPath string) (cache *PoetryDependenciesCa
 		log.Debug("Failed to open Poetry cache file: " + err.Error())
 		return nil, err
 	}
-	defer jsonFile.Close()
+	defer func() {
+		if err := jsonFile.Close(); err != nil {
+			log.Debug("Failed to close Poetry cache file: " + err.Error())
+		}
+	}()
 
 	byteValue, err := io.ReadAll(jsonFile)
 	if err != nil {
@@ -918,7 +922,7 @@ func (pf *PoetryFlexPack) UpdateDependenciesWithCache() error {
 			cachedDep, found = cache.GetDependency(depKey)
 		}
 
-		if found && !cachedDep.Checksum.IsEmpty() {
+		if found && !cachedDep.IsEmpty() {
 			// Use cached dependency info
 			entityDep := entities.Dependency{
 				Id:       depKey,
@@ -929,9 +933,9 @@ func (pf *PoetryFlexPack) UpdateDependenciesWithCache() error {
 			dependenciesMap[depKey] = entityDep
 
 			// Update our internal dependency with cached checksums
-			pf.dependencies[i].SHA1 = cachedDep.Checksum.Sha1
-			pf.dependencies[i].SHA256 = cachedDep.Checksum.Sha256
-			pf.dependencies[i].MD5 = cachedDep.Checksum.Md5
+			pf.dependencies[i].SHA1 = cachedDep.Sha1
+			pf.dependencies[i].SHA256 = cachedDep.Sha256
+			pf.dependencies[i].MD5 = cachedDep.Md5
 
 			log.Debug("Using cached checksums for " + depKey)
 		} else {
