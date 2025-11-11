@@ -10,7 +10,6 @@ import (
 
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
-	"github.com/jfrog/gofrog/io"
 	gofrogcmd "github.com/jfrog/gofrog/io"
 )
 
@@ -265,7 +264,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 		// Add verbosity flag to pipenv commands to collect necessary data
 		commandArgs = append(commandArgs, "-v")
 	}
-	installCmd := io.NewCommand(string(tool), "install", commandArgs)
+	installCmd := gofrogcmd.NewCommand(string(tool), "install", commandArgs)
 	installCmd.Dir = srcPath
 
 	dependenciesMap := map[string]entities.Dependency{}
