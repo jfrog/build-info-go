@@ -60,6 +60,36 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			},
 		},
 		{
+			Name:      "cargo",
+			Usage:     "Generate build-info for a Cargo project",
+			UsageText: "bi cargo",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("cargo-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					e := bld.Clean()
+					if err == nil {
+						err = e
+					}
+				}()
+				cargoModule, err := bld.AddCargoModule("")
+				if err != nil {
+					return
+				}
+
+				err = cargoModule.CalcDependencies()
+				if err != nil {
+					return
+				}
+				return printBuild(bld, context.String(formatFlag))
+			},
+		},
+		{
 			Name:      "mvn",
 			Usage:     "Generate build-info for a Maven project",
 			UsageText: "bi mvn",

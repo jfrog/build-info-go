@@ -413,6 +413,12 @@ bi dotnet [Dotnet command] [command options]
 bi nuget [Nuget command] [command options]
 ```
 
+#### Cargo
+
+```shell
+bi cargo [Cargo command] [command options]
+```
+
 #### Conversion to CycloneDX
 
 You can generate build-info and have it converted into the CycloneDX format by adding to the
@@ -531,6 +537,15 @@ err = dotnetModule.CalcDependencies()
 nugetModule, err := bld.AddNugetModules(nugetProjectPath)
 // Calculate the dependencies used by this module, and store them in the module struct.
 err = nugetModule.CalcDependencies()
+```
+
+#### Cargo
+
+```go
+// You can pass an empty string as an argument, if the root of the Cargo project is the working directory.
+cargoModule, err := bld.AddCargoModules(cargoProjectPath)
+// Calculate the dependencies used by this module, and store them in the module struct.
+err = cargoModule.CalcDependencies()
 ```
 
 ### Collecting Environment Variables
