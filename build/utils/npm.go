@@ -660,7 +660,8 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 		// Some warnings and messages of npm are printed to stderr. They don't cause the command to fail, but we'd want to show them to the user.
 		log.Warn("Encountered some issues while running 'npm get cache' command:\n" + string(errData))
 	}
-	cachePath := filepath.Join(strings.Trim(string(data), "\n"), "_cacache")
+	cachePath := filepath.Join(strings.TrimSpace(string(data)), "_cacache")
+	cachePath = filepath.Clean(cachePath)
 	found, err := utils.IsDirExists(cachePath, true)
 	if err != nil {
 		return "", err
