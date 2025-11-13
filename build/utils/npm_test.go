@@ -413,8 +413,7 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 
 	configCache, err := GetNpmConfigCache(projectPath, "npm", npmArgs, innerLogger)
 	assert.NoError(t, err)
-	expectedCache := filepath.Clean(filepath.Join(cachePath, "_cacache"))
-	assert.Equal(t, expectedCache, configCache)
+	assert.Equal(t, filepath.Join(cachePath, "_cacache"), configCache)
 
 	oldCache := os.Getenv("npm_config_cache")
 	if oldCache != "" {
@@ -425,8 +424,7 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	assert.NoError(t, os.Setenv("npm_config_cache", cachePath))
 	configCache, err = GetNpmConfigCache(projectPath, "npm", []string{}, innerLogger)
 	assert.NoError(t, err)
-	expectedCache = filepath.Clean(filepath.Join(cachePath, "_cacache"))
-	assert.Equal(t, expectedCache, configCache)
+	assert.Equal(t, filepath.Join(cachePath, "_cacache"), configCache)
 }
 
 // This function executes Ci, then validate generating dependencies in two possible scenarios:
