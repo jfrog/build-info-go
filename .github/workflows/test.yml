@@ -74,6 +74,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mono-complete
 
+      - name: Install Mono on macOS
+        if: startsWith(matrix.os, 'macos')
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+        run: |
+          set -e
+          brew install mono || brew install --cask mono-mdk
+          if [ -x "/Library/Frameworks/Mono.framework/Versions/Current/Commands/mono" ]; then
+            echo "/Library/Frameworks/Mono.framework/Versions/Current/Commands" >> "$GITHUB_PATH"
+          fi
+          mono --version
+
       - name: Lint
         run: go vet ./...
 
