@@ -21,7 +21,7 @@ const (
 	gradleExtractorFileName           = "build-info-extractor-gradle-%s-uber.jar"
 	gradleInitScriptTemplate          = "gradle.init"
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
-	gradleExtractor4DependencyVersion = "4.35.3"
+	gradleExtractor4DependencyVersion = "4.35.4"
 	gradleExtractor5DependencyVersion = "5.2.5"
 	projectPropertiesFlag             = "-P"
 	systemPropertiesFlag              = "-D"
@@ -185,6 +185,7 @@ func (gm *GradleModule) createGradleRunConfig(gradleExecPath string) (*gradleRun
 	if err != nil {
 		return nil, err
 	}
+	gm.containingBuild.logger.Debug("Created extractor properties file at: ", extractorPropsFile)
 	return &gradleRunConfig{
 		env:                gm.gradleExtractorDetails.props,
 		gradle:             gradleExecPath,
@@ -257,6 +258,14 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 	if config.initScript != "" {
 		cmd = append(cmd, "--init-script", config.initScript)
 	}
+	// Add BUILDINFO_PROPFILE system property if extractor properties file exists
+	if config.extractorPropsFile != "" {
+		jvmProp := fmt.Sprintf("-D%s=%s", extractorPropsDir, config.extractorPropsFile)
+		if strings.Contains(config.extractorPropsFile, " ") {
+			jvmProp = fmt.Sprintf("-D%s='%s'", extractorPropsDir, config.extractorPropsFile)
+		}
+		cmd = append(cmd, jvmProp)
+	}
 	cmd = append(cmd, formatCommandProperties(config.tasks)...)
 	config.logger.Info("Running gradle command:", strings.Join(cmd, " "))
 	return exec.Command(cmd[0], cmd[1:]...)
@@ -294,7 +303,6 @@ func (config *gradleRunConfig) runCmd(stdout, stderr io.Writer) error {
 	for k, v := range config.env {
 		command.Env = append(command.Env, k+"="+v)
 	}
-	command.Env = append(command.Env, extractorPropsDir+"="+config.extractorPropsFile)
 	command.Stderr = stderr
 	command.Stdout = stdout
 	return command.Run()

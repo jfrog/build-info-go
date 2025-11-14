@@ -200,7 +200,11 @@ func (mf *MavenFlexPack) parseWithMavenDependencyTree() error {
 	// Generate dependency tree as JSON
 	depsJsonPath := filepath.Join(mf.config.WorkingDirectory, "maven-deps.json")
 	// Clean up any existing dependency JSON file
-	defer os.Remove(depsJsonPath)
+	defer func() {
+		if err := os.Remove(depsJsonPath); err != nil && !os.IsNotExist(err) {
+			log.Debug("Failed to remove temporary maven-deps.json file: " + err.Error())
+		}
+	}()
 
 	args := []string{"dependency:tree", "-DoutputType=json", "-DoutputFile=maven-deps.json"}
 	if mf.config.SkipTests {
