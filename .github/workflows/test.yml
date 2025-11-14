@@ -53,12 +53,6 @@ jobs:
       - name: Setup Go with cache
         uses: jfrog/.github/actions/install-go-with-cache@main
 
-      - name: Clean Go cache
-        run: go clean -cache -modcache
-
-      - name: Configure Go toolchain
-        run: echo "GOTOOLCHAIN=auto" >> $GITHUB_ENV
-
       - name: Install NuGet
         uses: nuget/setup-nuget@v2
         with:
