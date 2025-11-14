@@ -53,13 +53,8 @@ jobs:
       - name: Setup Go with cache
         uses: jfrog/.github/actions/install-go-with-cache@main
 
-      - name: Setup Go 1.25.4
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.4'
-
-      - name: Lock toolchain
-        run: echo "GOTOOLCHAIN=local" >> $GITHUB_ENV
+      - name: Clean Go cache
+        run: go clean -cache -modcache
 
       - name: Install NuGet
         uses: nuget/setup-nuget@v2
