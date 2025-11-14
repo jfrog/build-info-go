@@ -15,6 +15,8 @@ jobs:
   unit-test:
     name: ${{ matrix.os }}, node ${{ matrix.node }}, python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}
+    env:
+      GOTOOLCHAIN: 'go1.25.4' # Force specific Go version
     strategy:
       fail-fast: false
       matrix:
@@ -93,4 +95,7 @@ jobs:
         run: go vet ./...
 
       - name: Tests
-        run: go test -v -race -timeout 0 -cover ./...
+        run: |
+          set -e
+          go env
+          go test -v -race -timeout 0 -cover ./...
