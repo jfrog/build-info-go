@@ -51,7 +51,10 @@ jobs:
           check-latest: true
 
       - name: Setup Go with cache
-        uses: jfrog/.github/actions/install-go-with-cache@main
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
 
       - name: Install NuGet
         uses: nuget/setup-nuget@v2
