@@ -53,9 +53,6 @@ jobs:
       - name: Setup Go with cache
         uses: jfrog/.github/actions/install-go-with-cache@main
 
-      - name: Clean Go cache
-        run: go clean -cache -modcache
-
       - name: Install NuGet
         uses: nuget/setup-nuget@v2
         with:
@@ -94,4 +91,4 @@ jobs:
         run: go vet ./...
 
       - name: Tests
-        run: go test -v -race -timeout 0 -cover ./...
+        run: go test -v -timeout 0 -cover ./...
