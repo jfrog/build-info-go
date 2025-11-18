@@ -21,7 +21,7 @@ const (
 	gradleExtractorFileName           = "build-info-extractor-gradle-%s-uber.jar"
 	gradleInitScriptTemplate          = "gradle.init"
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
-	gradleExtractor4DependencyVersion = "4.35.4"
+	gradleExtractor4DependencyVersion = "4.35.5"
 	gradleExtractor5DependencyVersion = "5.2.5"
 	projectPropertiesFlag             = "-P"
 	systemPropertiesFlag              = "-D"
@@ -303,6 +303,7 @@ func (config *gradleRunConfig) runCmd(stdout, stderr io.Writer) error {
 	for k, v := range config.env {
 		command.Env = append(command.Env, k+"="+v)
 	}
+	command.Env = append(command.Env, extractorPropsDir+"="+config.extractorPropsFile)
 	command.Stderr = stderr
 	command.Stdout = stdout
 	return command.Run()
