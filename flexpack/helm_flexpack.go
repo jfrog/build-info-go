@@ -479,7 +479,7 @@ func (hf *HelmFlexPack) buildDependencyGraphForDep(depName, depVersion string, v
 		return // Chart not in cache, can't build transitive graph
 	}
 	// Read dependencies from cached chart
-		childDeps, err := hf.getDependenciesFromCachedChart(cachedChartPath, depName)
+		childDeps, err := hf.getDependenciesFromCachedChart(cachedChartPath)
 	if err != nil {
 		return // Failed to read dependencies
 	}
@@ -498,7 +498,7 @@ type extractResult struct {
 }
 
 // getDependenciesFromCachedChart reads dependencies from a cached chart file by extracting and parsing Chart.yaml/Chart.lock
-func (hf *HelmFlexPack) getDependenciesFromCachedChart(chartPath, chartName string) ([]DependencyInfo, error) {
+func (hf *HelmFlexPack) getDependenciesFromCachedChart(chartPath string) ([]DependencyInfo, error) {
 	result, err := hf.extractChartToTemp(chartPath)
 	if err != nil {
 		return nil, errors.Join(err, result.removeErr)
