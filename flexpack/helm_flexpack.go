@@ -4,8 +4,8 @@ import (
 	"archive/tar"
 	"bufio"
 	"compress/gzip"
-	"crypto/md5"  //nolint:gosec // MD5 required for Artifactory build info compatibility
-	"crypto/sha1" //nolint:gosec // SHA1 required for Artifactory build info compatibility
+	"crypto/md5"  // #nosec G501 // MD5 required for Artifactory build info compatibility
+	"crypto/sha1" // #nosec G505 // SHA1 required for Artifactory build info compatibility
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -499,7 +499,7 @@ type extractResult struct {
 
 // getDependenciesFromCachedChart reads dependencies from a cached chart file by extracting and parsing Chart.yaml/Chart.lock
 func (hf *HelmFlexPack) getDependenciesFromCachedChart(chartPath, chartName string) ([]DependencyInfo, error) {
-	result, err := hf.extractChartToTemp(chartPath, chartName)
+	result, err := hf.extractChartToTemp(chartPath)
 	if err != nil {
 		return nil, errors.Join(err, result.removeErr)
 	}
@@ -518,7 +518,7 @@ func (hf *HelmFlexPack) getDependenciesFromCachedChart(chartPath, chartName stri
 }
 
 // extractChartToTemp extracts a chart archive to a temporary directory and returns the chart directory path
-func (hf *HelmFlexPack) extractChartToTemp(chartPath, chartName string) (*extractResult, error) {
+func (hf *HelmFlexPack) extractChartToTemp(chartPath string) (*extractResult, error) {
 	tempDir, err := os.MkdirTemp("", "helm-chart-*")
 	if err != nil {
 		return &extractResult{}, fmt.Errorf("failed to create temp directory: %w", err)
@@ -672,10 +672,13 @@ func (hf *HelmFlexPack) extractTarEntry(header *tar.Header, tarReader *tar.Reade
 func (hf *HelmFlexPack) createDirectory(path string, mode int64) error {
 	// Validate mode to prevent integer overflow (os.FileMode is uint32)
 	const maxFileMode = 0777
+	var fileMode os.FileMode
 	if mode < 0 || mode > maxFileMode {
-		mode = 0755 // Use safe default
+		fileMode = 0755 // Use safe default
+	} else {
+		fileMode = os.FileMode(mode) // #nosec G115 // Mode is validated to be within uint32 range
 	}
-	if err := os.MkdirAll(path, os.FileMode(mode)); err != nil {
+	if err := os.MkdirAll(path, fileMode); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 	return nil
@@ -689,10 +692,13 @@ func (hf *HelmFlexPack) extractRegularFile(targetPath string, header *tar.Header
 	// Validate mode to prevent integer overflow (os.FileMode is uint32)
 	mode := header.Mode
 	const maxFileMode = 0777
+	var fileMode os.FileMode
 	if mode < 0 || mode > maxFileMode {
-		mode = 0644 // Use safe default
+		fileMode = 0644 // Use safe default
+	} else {
+		fileMode = os.FileMode(mode) // #nosec G115 // Mode is validated to be within uint32 range
 	}
-	outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(mode))
+	outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, fileMode)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -967,9 +973,9 @@ func (hf *HelmFlexPack) calculateManifestChecksum(dep DependencyInfo) (string, s
 		dep.Name, dep.Version, dep.Type)
 	// Calculate checksums
 	// Note: MD5 and SHA1 are weak cryptographic primitives but required for Artifactory build info compatibility
-	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest)))   //nolint:gosec // Required for Artifactory compatibility
+	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest)))   // #nosec G401 // Required for Artifactory compatibility
 	sha256Sum := fmt.Sprintf("%x", sha256.Sum256([]byte(manifest)))
-	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest))) //nolint:gosec // Required for Artifactory compatibility
+	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest))) // #nosec G401 // Required for Artifactory compatibility
 	return sha1Sum, sha256Sum, md5Sum
 }
 
