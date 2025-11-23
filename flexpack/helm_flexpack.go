@@ -4,8 +4,8 @@ import (
 	"archive/tar"
 	"bufio"
 	"compress/gzip"
-	"crypto/md5"
-	"crypto/sha1"
+	"crypto/md5"  //nolint:gosec // MD5 required for Artifactory build info compatibility
+	"crypto/sha1" //nolint:gosec // SHA1 required for Artifactory build info compatibility
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -461,10 +461,6 @@ func (hf *HelmFlexPack) buildDependencyGraphRecursively() {
 		// Recursively build graph for this dependency
 		hf.buildDependencyGraphForDep(dep.Name, dep.Version, visited, 10)
 	}
-	// Debug: log the graph if it has transitive dependencies
-	if len(hf.dependencyGraph) > 1 {
-		// We have more than just the parent chart, so we found transitive dependencies
-	}
 }
 
 // buildDependencyGraphForDep recursively builds dependency graph for a specific dependency
@@ -483,7 +479,7 @@ func (hf *HelmFlexPack) buildDependencyGraphForDep(depName, depVersion string, v
 		return // Chart not in cache, can't build transitive graph
 	}
 	// Read dependencies from cached chart
-	childDeps, err := hf.getDependenciesFromCachedChart(cachedChartPath, depName, depVersion)
+		childDeps, err := hf.getDependenciesFromCachedChart(cachedChartPath, depName)
 	if err != nil {
 		return // Failed to read dependencies
 	}
@@ -502,7 +498,7 @@ type extractResult struct {
 }
 
 // getDependenciesFromCachedChart reads dependencies from a cached chart file by extracting and parsing Chart.yaml/Chart.lock
-func (hf *HelmFlexPack) getDependenciesFromCachedChart(chartPath, chartName, chartVersion string) ([]DependencyInfo, error) {
+func (hf *HelmFlexPack) getDependenciesFromCachedChart(chartPath, chartName string) ([]DependencyInfo, error) {
 	result, err := hf.extractChartToTemp(chartPath, chartName)
 	if err != nil {
 		return nil, errors.Join(err, result.removeErr)
@@ -536,7 +532,7 @@ func (hf *HelmFlexPack) extractChartToTemp(chartPath, chartName string) (*extrac
 	if err := hf.extractTgz(chartPath, tempDir); err != nil {
 		return result, fmt.Errorf("failed to extract chart archive: %w", err)
 	}
-	chartDir := hf.findChartDirectoryInExtracted(tempDir, chartName)
+	chartDir := hf.findChartDirectoryInExtracted(tempDir)
 	if chartDir == "" {
 		return result, fmt.Errorf("could not find chart directory in extracted archive")
 	}
@@ -650,7 +646,17 @@ func (hf *HelmFlexPack) extractTarEntries(tarReader *tar.Reader, destDir string)
 
 // extractTarEntry extracts a single entry from a tar archive
 func (hf *HelmFlexPack) extractTarEntry(header *tar.Header, tarReader *tar.Reader, destDir string) error {
-	targetPath := filepath.Join(destDir, header.Name)
+	// Validate path to prevent directory traversal attacks
+	cleanName := filepath.Clean(header.Name)
+	if cleanName == ".." || len(cleanName) >= 3 && cleanName[0:3] == "../" {
+		return fmt.Errorf("invalid path in archive: %s", header.Name)
+	}
+	// Ensure the cleaned path is still within destDir
+	targetPath := filepath.Join(destDir, cleanName)
+	destDirClean := filepath.Clean(destDir)
+	if !strings.HasPrefix(targetPath, destDirClean+string(os.PathSeparator)) && targetPath != destDirClean {
+		return fmt.Errorf("path traversal detected: %s", header.Name)
+	}
 	switch header.Typeflag {
 	case tar.TypeDir:
 		return hf.createDirectory(targetPath, header.Mode)
@@ -664,6 +670,11 @@ func (hf *HelmFlexPack) extractTarEntry(header *tar.Header, tarReader *tar.Reade
 
 // createDirectory creates a directory with the specified mode
 func (hf *HelmFlexPack) createDirectory(path string, mode int64) error {
+	// Validate mode to prevent integer overflow (os.FileMode is uint32)
+	const maxFileMode = 0777
+	if mode < 0 || mode > maxFileMode {
+		mode = 0755 // Use safe default
+	}
 	if err := os.MkdirAll(path, os.FileMode(mode)); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
@@ -675,7 +686,13 @@ func (hf *HelmFlexPack) extractRegularFile(targetPath string, header *tar.Header
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
-	outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+	// Validate mode to prevent integer overflow (os.FileMode is uint32)
+	mode := header.Mode
+	const maxFileMode = 0777
+	if mode < 0 || mode > maxFileMode {
+		mode = 0644 // Use safe default
+	}
+	outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(mode))
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -689,11 +706,11 @@ func (hf *HelmFlexPack) extractRegularFile(targetPath string, header *tar.Header
 }
 
 // findChartDirectoryInExtracted finds the chart directory inside an extracted archive
-func (hf *HelmFlexPack) findChartDirectoryInExtracted(extractedDir, chartName string) string {
+func (hf *HelmFlexPack) findChartDirectoryInExtracted(extractedDir string) string {
 	var chartDir string
 	err := filepath.WalkDir(extractedDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return err // Stop walking on error
 		}
 		if d.IsDir() {
 			// Check if this directory contains Chart.yaml
@@ -746,14 +763,13 @@ func (hf *HelmFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[st
 	}
 
 	// Strategy 3: Generate manifest-based checksum
-	if Sha1, Sha256, Md5, err := hf.calculateManifestChecksum(dep); err == nil {
-		checksumMap["sha1"] = Sha1
-		checksumMap["sha256"] = Sha256
-		checksumMap["md5"] = Md5
-		checksumMap["path"] = "manifest"
-		checksumMap["source"] = "manifest"
-		return checksumMap
-	}
+	Sha1, Sha256, Md5 := hf.calculateManifestChecksum(dep)
+	checksumMap["sha1"] = Sha1
+	checksumMap["sha256"] = Sha256
+	checksumMap["md5"] = Md5
+	checksumMap["path"] = "manifest"
+	checksumMap["source"] = "manifest"
+	return checksumMap
 
 	// Strategy 4: Empty checksums (graceful degradation)
 	checksumMap["sha1"] = ""
@@ -813,7 +829,7 @@ func (hf *HelmFlexPack) buildCacheIndex() {
 	for _, cacheDir := range cacheDirs {
 		err := filepath.WalkDir(cacheDir, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
-				return nil // Continue on errors
+				return err // Stop walking on error
 			}
 			if !d.IsDir() && strings.HasSuffix(path, ".tgz") {
 				// Format: chart-name-version.tgz
@@ -876,7 +892,7 @@ func (hf *HelmFlexPack) findFileInDirectory(dir, pattern string) string {
 	var foundPath string
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return err // Stop walking on error
 		}
 		if !d.IsDir() && filepath.Base(path) == pattern {
 			foundPath = path
@@ -943,17 +959,18 @@ func (hf *HelmFlexPack) calculateFileChecksum(filePath string) (string, string, 
 }
 
 // calculateManifestChecksum generates checksum from dependency metadata
-func (hf *HelmFlexPack) calculateManifestChecksum(dep DependencyInfo) (string, string, string, error) {
+func (hf *HelmFlexPack) calculateManifestChecksum(dep DependencyInfo) (string, string, string) {
 	// Create deterministic manifest content using only basic dependency info
 	// Metadata (repository, condition, tags) is not included in build info output,
 	// so we don't need it for checksum calculation either
 	manifest := fmt.Sprintf("name:%s\nversion:%s\ntype:%s\n",
 		dep.Name, dep.Version, dep.Type)
 	// Calculate checksums
-	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest)))
+	// Note: MD5 and SHA1 are weak cryptographic primitives but required for Artifactory build info compatibility
+	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest)))   //nolint:gosec // Required for Artifactory compatibility
 	sha256Sum := fmt.Sprintf("%x", sha256.Sum256([]byte(manifest)))
-	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest)))
-	return sha1Sum, sha256Sum, md5Sum, nil
+	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest))) //nolint:gosec // Required for Artifactory compatibility
+	return sha1Sum, sha256Sum, md5Sum
 }
 
 // deduplicateAndSort removes duplicates and sorts a string slice
