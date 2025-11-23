@@ -118,7 +118,6 @@ func (b *Build) AddDotnetModules(srcPath string) (*DotnetModule, error) {
 	return newDotnetModule(srcPath, b)
 }
 
-
 func (b *Build) CollectEnv() error {
 	if !b.buildNameAndNumberProvided() {
 		return errors.New("a build name must be provided in order to collect environment variables")
