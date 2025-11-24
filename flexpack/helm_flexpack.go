@@ -822,14 +822,54 @@ func (hf *HelmFlexPack) findDependencyInChartsDir(name, version string) string {
 }
 
 // buildCacheIndex builds an index of cached chart files
+// Validates cache directories to prevent path traversal attacks
 func (hf *HelmFlexPack) buildCacheIndex() {
 	cacheDirs := hf.getCacheDirectories()
 	for _, cacheDir := range cacheDirs {
-		err := filepath.WalkDir(cacheDir, func(path string, d os.DirEntry, err error) error {
+		// Additional validation at point of use to prevent path traversal
+		// Even though getCacheDirectories() sanitizes paths, we validate again here
+		cleanDir := filepath.Clean(cacheDir)
+		if cleanDir == "" || cleanDir == "." || cleanDir == ".." {
+			continue
+		}
+
+		// Ensure directory is absolute
+		absDir, err := filepath.Abs(cleanDir)
+		if err != nil {
+			continue
+		}
+
+		// Validate that the absolute path doesn't contain traversal sequences
+		if strings.Contains(absDir, "..") {
+			continue
+		}
+
+		// Validate that the directory exists and is actually a directory
+		dirInfo, err := os.Stat(absDir)
+		if err != nil || !dirInfo.IsDir() {
+			continue
+		}
+
+		err = filepath.WalkDir(absDir, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err // Stop walking on error
 			}
 			if !d.IsDir() && strings.HasSuffix(path, ".tgz") {
+				// Validate that the found path is within the cache directory
+				absPath, err := filepath.Abs(path)
+				if err != nil {
+					return err
+				}
+				// Ensure the path is within the directory (prevent symlink attacks)
+				relPath, err := filepath.Rel(absDir, absPath)
+				if err != nil {
+					return err
+				}
+				// Check for path traversal in relative path
+				if strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
+					return fmt.Errorf("path traversal detected: %s", relPath)
+				}
+
 				// Format: chart-name-version.tgz
 				baseName := filepath.Base(path)
 				baseName = strings.TrimSuffix(baseName, ".tgz")
@@ -842,7 +882,7 @@ func (hf *HelmFlexPack) buildCacheIndex() {
 					name := strings.Join(parts[:len(parts)-1], "-")
 
 					key := fmt.Sprintf("%s-%s", name, version)
-					hf.cacheIndex[key] = path
+					hf.cacheIndex[key] = absPath
 				}
 			}
 			return nil
@@ -886,14 +926,64 @@ func (hf *HelmFlexPack) searchCacheDirectory(cacheDir, name string, versionCandi
 }
 
 // findFileInDirectory searches for a file matching the pattern in a directory
+// Validates inputs to prevent path traversal attacks
 func (hf *HelmFlexPack) findFileInDirectory(dir, pattern string) string {
+	// Sanitize and validate directory path to prevent path traversal
+	cleanDir := filepath.Clean(dir)
+	if cleanDir == "" || cleanDir == "." {
+		return ""
+	}
+
+	// Ensure directory is absolute to prevent relative path issues
+	absDir, err := filepath.Abs(cleanDir)
+	if err != nil {
+		return ""
+	}
+
+	// Validate that the directory exists and is actually a directory
+	dirInfo, err := os.Stat(absDir)
+	if err != nil || !dirInfo.IsDir() {
+		return ""
+	}
+
+	// Validate pattern to prevent path traversal
+	// Pattern should only be a filename, not a path
+	cleanPattern := filepath.Clean(pattern)
+	if cleanPattern == "" || cleanPattern == "." || cleanPattern == ".." {
+		return ""
+	}
+
+	// Ensure pattern doesn't contain path separators (should be filename only)
+	if strings.Contains(cleanPattern, string(os.PathSeparator)) {
+		return ""
+	}
+
+	// Prevent patterns that could be used for traversal
+	if strings.HasPrefix(cleanPattern, "..") {
+		return ""
+	}
+
 	var foundPath string
-	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(absDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return err // Stop walking on error
+			return err
 		}
-		if !d.IsDir() && filepath.Base(path) == pattern {
-			foundPath = path
+		if !d.IsDir() && filepath.Base(path) == cleanPattern {
+			// Validate that the found path is within the original directory
+			absPath, err := filepath.Abs(path)
+			if err != nil {
+				return err
+			}
+			// Ensure the path is within the directory (prevent symlink attacks)
+			relPath, err := filepath.Rel(absDir, absPath)
+			if err != nil {
+				return err
+			}
+			// Check for path traversal in relative path
+			if strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
+				return fmt.Errorf("path traversal detected: %s", relPath)
+			}
+			foundPath = absPath
 			return filepath.SkipAll
 		}
 		return nil
@@ -905,13 +995,29 @@ func (hf *HelmFlexPack) findFileInDirectory(dir, pattern string) string {
 }
 
 // getCacheDirectories returns Helm cache directory paths
+// Validates and sanitizes paths to prevent path traversal attacks
 func (hf *HelmFlexPack) getCacheDirectories() []string {
 	var paths []string
+	
 	// Environment variable override (highest priority)
+	// Validate and sanitize environment variable path to prevent path traversal
 	if envPath := os.Getenv("HELM_REPOSITORY_CACHE"); envPath != "" {
-		paths = append(paths, envPath)
+		// Sanitize the path
+		cleanPath := filepath.Clean(envPath)
+		if cleanPath != "" && cleanPath != "." && cleanPath != ".." {
+			// Convert to absolute path to prevent relative path issues
+			absPath, err := filepath.Abs(cleanPath)
+			if err == nil && absPath != "" {
+				// Additional validation: ensure path doesn't contain traversal sequences
+				// Even after Clean(), check for any remaining ".." components
+				if !strings.Contains(absPath, "..") {
+					paths = append(paths, absPath)
+				}
+			}
+		}
 	}
-	// Platform-specific paths
+	
+	// Platform-specific paths (these are safe as they're constructed from trusted sources)
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
 		switch runtime.GOOS {
@@ -931,11 +1037,31 @@ func (hf *HelmFlexPack) getCacheDirectories() []string {
 			)
 		}
 	}
-	// Filter to only existing paths
+	
+	// Filter to only existing paths and validate each path
 	var existingPaths []string
 	for _, path := range paths {
-		if _, err := os.Stat(path); err == nil {
-			existingPaths = append(existingPaths, path)
+		// Sanitize each path before checking
+		cleanPath := filepath.Clean(path)
+		if cleanPath == "" || cleanPath == "." || cleanPath == ".." {
+			continue
+		}
+		
+		// Convert to absolute path
+		absPath, err := filepath.Abs(cleanPath)
+		if err != nil {
+			continue
+		}
+		
+		// Validate that the absolute path doesn't contain traversal sequences
+		if strings.Contains(absPath, "..") {
+			continue
+		}
+		
+		// Check if path exists and is a directory
+		pathInfo, err := os.Stat(absPath)
+		if err == nil && pathInfo.IsDir() {
+			existingPaths = append(existingPaths, absPath)
 		}
 	}
 	return existingPaths
