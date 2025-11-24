@@ -479,7 +479,7 @@ func (hf *HelmFlexPack) buildDependencyGraphForDep(depName, depVersion string, v
 		return // Chart not in cache, can't build transitive graph
 	}
 	// Read dependencies from cached chart
-		childDeps, err := hf.getDependenciesFromCachedChart(cachedChartPath)
+	childDeps, err := hf.getDependenciesFromCachedChart(cachedChartPath)
 	if err != nil {
 		return // Failed to read dependencies
 	}
@@ -777,14 +777,6 @@ func (hf *HelmFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[st
 	checksumMap["source"] = "manifest"
 	return checksumMap
 
-	// Strategy 4: Empty checksums (graceful degradation)
-	checksumMap["sha1"] = ""
-	checksumMap["sha256"] = ""
-	checksumMap["md5"] = ""
-	checksumMap["path"] = ""
-	checksumMap["source"] = "unavailable"
-
-	return checksumMap
 }
 
 // findChartFile searches for chart archive in Helm cache
@@ -973,7 +965,7 @@ func (hf *HelmFlexPack) calculateManifestChecksum(dep DependencyInfo) (string, s
 		dep.Name, dep.Version, dep.Type)
 	// Calculate checksums
 	// Note: MD5 and SHA1 are weak cryptographic primitives but required for Artifactory build info compatibility
-	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest)))   // #nosec G401 // Required for Artifactory compatibility
+	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest))) // #nosec G401 // Required for Artifactory compatibility
 	sha256Sum := fmt.Sprintf("%x", sha256.Sum256([]byte(manifest)))
 	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest))) // #nosec G401 // Required for Artifactory compatibility
 	return sha1Sum, sha256Sum, md5Sum
