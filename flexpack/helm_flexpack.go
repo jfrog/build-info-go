@@ -409,9 +409,10 @@ func (hf *HelmFlexPack) parseDependenciesFromFiles() {
 	// Process dependencies from Chart.yaml
 	for _, chartDep := range hf.chartData.Dependencies {
 		dep := DependencyInfo{
-			Name:    chartDep.Name,
-			Version: chartDep.Version,
-			Type:    "helm",
+			Name:       chartDep.Name,
+			Version:    chartDep.Version,
+			Type:       "helm",
+			Repository: chartDep.Repository,
 		}
 
 		// Use resolved version from Chart.lock if available
@@ -598,10 +599,11 @@ func (hf *HelmFlexPack) buildDependenciesFromChartYAML(chartYAML *chartYAMLData,
 			version = resolvedVersion
 		}
 		deps = append(deps, DependencyInfo{
-			ID:      fmt.Sprintf("%s:%s", dep.Name, version),
-			Name:    dep.Name,
-			Version: version,
-			Type:    "helm",
+			ID:         fmt.Sprintf("%s:%s", dep.Name, version),
+			Name:       dep.Name,
+			Version:    version,
+			Type:       "helm",
+			Repository: dep.Repository,
 		})
 	}
 	return deps
@@ -998,7 +1000,7 @@ func (hf *HelmFlexPack) findFileInDirectory(dir, pattern string) string {
 // Validates and sanitizes paths to prevent path traversal attacks
 func (hf *HelmFlexPack) getCacheDirectories() []string {
 	var paths []string
-	
+
 	// Environment variable override (highest priority)
 	// Validate and sanitize environment variable path to prevent path traversal
 	if envPath := os.Getenv("HELM_REPOSITORY_CACHE"); envPath != "" {
@@ -1016,7 +1018,7 @@ func (hf *HelmFlexPack) getCacheDirectories() []string {
 			}
 		}
 	}
-	
+
 	// Platform-specific paths (these are safe as they're constructed from trusted sources)
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
@@ -1037,7 +1039,7 @@ func (hf *HelmFlexPack) getCacheDirectories() []string {
 			)
 		}
 	}
-	
+
 	// Filter to only existing paths and validate each path
 	var existingPaths []string
 	for _, path := range paths {
@@ -1046,18 +1048,18 @@ func (hf *HelmFlexPack) getCacheDirectories() []string {
 		if cleanPath == "" || cleanPath == "." || cleanPath == ".." {
 			continue
 		}
-		
+
 		// Convert to absolute path
 		absPath, err := filepath.Abs(cleanPath)
 		if err != nil {
 			continue
 		}
-		
+
 		// Validate that the absolute path doesn't contain traversal sequences
 		if strings.Contains(absPath, "..") {
 			continue
 		}
-		
+
 		// Check if path exists and is a directory
 		pathInfo, err := os.Stat(absPath)
 		if err == nil && pathInfo.IsDir() {
@@ -1145,13 +1147,7 @@ func (hf *HelmFlexPack) createDependencyEntity(dep DependencyInfo) entities.Depe
 
 	entity := entities.Dependency{
 		Id:       dep.ID,
-		Type:     dep.Type,
 		Checksum: checksum,
-	}
-
-	// Add requested-by relationships from DependencyInfo.RequestedBy field
-	if len(dep.RequestedBy) > 0 {
-		entity.RequestedBy = [][]string{dep.RequestedBy}
 	}
 
 	return entity
