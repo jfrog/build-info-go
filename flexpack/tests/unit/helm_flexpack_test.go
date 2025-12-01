@@ -23,10 +23,12 @@ func TestNewHelmFlexPack_HelmCLINotFound(t *testing.T) {
 
 	// Save original PATH
 	originalPath := os.Getenv("PATH")
-	defer os.Setenv("PATH", originalPath)
+	defer func() {
+		_ = os.Setenv("PATH", originalPath)
+	}()
 
 	// Set PATH to empty to ensure helm is not found
-	os.Setenv("PATH", "")
+	_ = os.Setenv("PATH", "")
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -204,13 +206,13 @@ func TestCalculateChecksum(t *testing.T) {
 		assert.Contains(t, checksumMap, "type")
 		// Should have at least one checksum (sha1, sha256, or md5)
 		hasChecksum := false
-		if _, ok := checksumMap["sha1"].(string); ok && checksumMap["sha1"].(string) != "" {
+		if sha1Val, ok := checksumMap["sha1"].(string); ok && sha1Val != "" {
 			hasChecksum = true
 		}
-		if _, ok := checksumMap["sha256"].(string); ok && checksumMap["sha256"].(string) != "" {
+		if sha256Val, ok := checksumMap["sha256"].(string); ok && sha256Val != "" {
 			hasChecksum = true
 		}
-		if _, ok := checksumMap["md5"].(string); ok && checksumMap["md5"].(string) != "" {
+		if md5Val, ok := checksumMap["md5"].(string); ok && md5Val != "" {
 			hasChecksum = true
 		}
 		assert.True(t, hasChecksum, "At least one checksum should be present")
@@ -355,8 +357,10 @@ func TestExtractTgz_PathTraversal(t *testing.T) {
 
 	// Set cache directory
 	originalCache := os.Getenv("HELM_REPOSITORY_CACHE")
-	defer os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
-	os.Setenv("HELM_REPOSITORY_CACHE", cacheDir)
+	defer func() {
+		_ = os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
+	}()
+	_ = os.Setenv("HELM_REPOSITORY_CACHE", cacheDir)
 
 	// Rebuild to get new cache index
 	hf2, err := flexpack.NewHelmFlexPack(config)
@@ -396,8 +400,10 @@ func TestFindChartDirectoryInExtracted(t *testing.T) {
 
 	// Set cache directory
 	originalCache := os.Getenv("HELM_REPOSITORY_CACHE")
-	defer os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
-	os.Setenv("HELM_REPOSITORY_CACHE", cacheDir)
+	defer func() {
+		_ = os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
+	}()
+	_ = os.Setenv("HELM_REPOSITORY_CACHE", cacheDir)
 
 	// Rebuild to get new cache index
 	hf, err := flexpack.NewHelmFlexPack(config)
@@ -434,8 +440,10 @@ func TestCalculateChecksumWithFallback(t *testing.T) {
 
 	// Set cache directory via environment variable
 	originalCache := os.Getenv("HELM_REPOSITORY_CACHE")
-	defer os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
-	os.Setenv("HELM_REPOSITORY_CACHE", cacheDir)
+	defer func() {
+		_ = os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
+	}()
+	_ = os.Setenv("HELM_REPOSITORY_CACHE", cacheDir)
 
 	// Rebuild cache index
 	hf2, err := flexpack.NewHelmFlexPack(config)
@@ -483,8 +491,10 @@ func TestFindChartFile(t *testing.T) {
 
 	// Set cache directory
 	originalCache := os.Getenv("HELM_REPOSITORY_CACHE")
-	defer os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
-	os.Setenv("HELM_REPOSITORY_CACHE", cacheDir)
+	defer func() {
+		_ = os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
+	}()
+	_ = os.Setenv("HELM_REPOSITORY_CACHE", cacheDir)
 
 	// Rebuild to get new cache index
 	hf2, err := flexpack.NewHelmFlexPack(config)
@@ -513,8 +523,10 @@ func TestGetCacheDirectories(t *testing.T) {
 	require.NoError(t, err)
 
 	originalCache := os.Getenv("HELM_REPOSITORY_CACHE")
-	defer os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
-	os.Setenv("HELM_REPOSITORY_CACHE", testCacheDir)
+	defer func() {
+		_ = os.Setenv("HELM_REPOSITORY_CACHE", originalCache)
+	}()
+	_ = os.Setenv("HELM_REPOSITORY_CACHE", testCacheDir)
 
 	// Rebuild to use new cache directory
 	hf2, err := flexpack.NewHelmFlexPack(config)
@@ -525,7 +537,7 @@ func TestGetCacheDirectories(t *testing.T) {
 	assert.NotNil(t, checksums)
 
 	// Test with path traversal attempt
-	os.Setenv("HELM_REPOSITORY_CACHE", "../../../etc")
+	_ = os.Setenv("HELM_REPOSITORY_CACHE", "../../../etc")
 	hf3, err := flexpack.NewHelmFlexPack(config)
 	// Should not crash, but may not use the malicious path
 	assert.NoError(t, err)
@@ -675,13 +687,19 @@ dependencies:
 func createValidChartTgz(t *testing.T, tgzPath, chartName string) {
 	file, err := os.Create(tgzPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	gzWriter := gzip.NewWriter(file)
-	defer gzWriter.Close()
+	defer func() {
+		_ = gzWriter.Close()
+	}()
 
 	tarWriter := tar.NewWriter(gzWriter)
-	defer tarWriter.Close()
+	defer func() {
+		_ = tarWriter.Close()
+	}()
 
 	// Create Chart.yaml in archive
 	chartYAML := `apiVersion: v2
@@ -702,13 +720,19 @@ version: 1.0.0
 func createMaliciousTgz(t *testing.T, tgzPath string) {
 	file, err := os.Create(tgzPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	gzWriter := gzip.NewWriter(file)
-	defer gzWriter.Close()
+	defer func() {
+		_ = gzWriter.Close()
+	}()
 
 	tarWriter := tar.NewWriter(gzWriter)
-	defer tarWriter.Close()
+	defer func() {
+		_ = tarWriter.Close()
+	}()
 
 	// Create a file with path traversal
 	content := "malicious content"
