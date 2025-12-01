@@ -1,20 +1,15 @@
 package flexpack
 
 import (
-	"archive/tar"
 	"bufio"
-	"compress/gzip"
 	"crypto/md5"  // #nosec G501 // MD5 required for Artifactory build info compatibility
 	"crypto/sha1" // #nosec G505 // SHA1 required for Artifactory build info compatibility
 	"crypto/sha256"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -44,9 +39,8 @@ type HelmFlexPack struct {
 
 // HelmConfig represents configuration for Helm FlexPack
 type HelmConfig struct {
-	WorkingDirectory        string
-	IncludeTestDependencies bool // Helm doesn't have test deps, but kept for interface consistency
-	HelmExecutable          string
+	WorkingDirectory string
+	HelmExecutable   string
 }
 
 // HelmChartYAML represents Chart.yaml structure
@@ -191,105 +185,6 @@ func (hf *HelmFlexPack) loadChartLock() error {
 	return nil
 }
 
-// GetDependency returns a human-readable summary of dependencies
-func (hf *HelmFlexPack) GetDependency() string {
-	deps := hf.getDependencies()
-	if len(deps) == 0 {
-		return "No dependencies"
-	}
-
-	var parts []string
-	for _, dep := range deps {
-		parts = append(parts, fmt.Sprintf("%s:%s", dep.Name, dep.Version))
-	}
-	return strings.Join(parts, ", ")
-}
-
-// ParseDependencyToList returns a simple list of dependency IDs
-func (hf *HelmFlexPack) ParseDependencyToList() []string {
-	deps := hf.getDependencies()
-	result := make([]string, 0, len(deps))
-	for _, dep := range deps {
-		result = append(result, dep.ID)
-	}
-	return result
-}
-
-// CalculateChecksum calculates checksums for all dependencies
-func (hf *HelmFlexPack) CalculateChecksum() []map[string]interface{} {
-	deps := hf.getDependencies()
-	result := make([]map[string]interface{}, 0, len(deps))
-
-	for _, dep := range deps {
-		checksumMap := hf.calculateChecksumWithFallback(dep)
-		if checksumMap != nil {
-			result = append(result, checksumMap)
-		}
-	}
-
-	return result
-}
-
-// CalculateScopes returns available scopes for dependencies
-func (hf *HelmFlexPack) CalculateScopes() []string {
-	scopes := make(map[string]bool)
-
-	deps := hf.getDependencies()
-	for _, dep := range deps {
-		for _, scope := range dep.Scopes {
-			scopes[scope] = true
-		}
-	}
-
-	result := make([]string, 0, len(scopes))
-	for scope := range scopes {
-		result = append(result, scope)
-	}
-
-	// Default to runtime if no scopes found
-	if len(result) == 0 {
-		result = append(result, "runtime")
-	}
-
-	return result
-}
-
-// CalculateRequestedBy calculates the dependency graph (which dependencies request which)
-// It also populates the RequestedBy field directly on DependencyInfo structs
-func (hf *HelmFlexPack) CalculateRequestedBy() map[string][]string {
-	hf.buildDependencyGraph()
-	requestedBy := make(map[string][]string)
-	// Invert the dependency graph
-	for parent, children := range hf.dependencyGraph {
-		for _, child := range children {
-			// Prevent self-references (A->A is not allowed)
-			if parent == child {
-				continue
-			}
-			if requestedBy[child] == nil {
-				requestedBy[child] = []string{}
-			}
-			requestedBy[child] = append(requestedBy[child], parent)
-		}
-	}
-	// Deduplicate and sort
-	for child, requesters := range requestedBy {
-		requestedBy[child] = hf.deduplicateAndSort(requesters)
-	}
-	// Populate RequestedBy field directly on DependencyInfo structs
-	hf.populateRequestedByOnDependencies(requestedBy)
-	return requestedBy
-}
-
-// populateRequestedByOnDependencies populates the RequestedBy field on DependencyInfo structs
-func (hf *HelmFlexPack) populateRequestedByOnDependencies(requestedByMap map[string][]string) {
-	for i := range hf.dependencies {
-		if requesters, exists := requestedByMap[hf.dependencies[i].ID]; exists && len(requesters) > 0 {
-			hf.dependencies[i].RequestedBy = requesters
-		}
-	}
-}
-
 // getDependencies returns all dependencies (lazy loading)
 func (hf *HelmFlexPack) getDependencies() []DependencyInfo {
 	hf.mu.RLock()
@@ -308,7 +203,7 @@ func (hf *HelmFlexPack) getDependencies() []DependencyInfo {
 	// Resolve dependencies using hybrid approach
 	if err := hf.resolveDependencies(); err != nil {
 		// Fallback to file-based parsing if helm dependency list fails
-		hf.parseDependenciesFromFiles()
+		hf.parseDependenciesFromChartYamlAndLockfile()
 	}
 	return hf.dependencies
 }
@@ -393,7 +288,7 @@ func (hf *HelmFlexPack) parseDependencyLine(line string) *DependencyInfo {
 }
 
 // parseDependenciesFromFiles parses dependencies from Chart.yaml and Chart.lock (fallback)
-func (hf *HelmFlexPack) parseDependenciesFromFiles() {
+func (hf *HelmFlexPack) parseDependenciesFromChartYamlAndLockfile() {
 	if hf.chartData == nil {
 		return
 	}
@@ -424,316 +319,6 @@ func (hf *HelmFlexPack) parseDependenciesFromFiles() {
 
 		hf.dependencies = append(hf.dependencies, dep)
 	}
-}
-
-// buildDependencyGraph constructs the dependency graph
-func (hf *HelmFlexPack) buildDependencyGraph() {
-	if len(hf.dependencyGraph) > 0 {
-		return
-	}
-	// Try to recursively build graph from cached charts first
-	// This captures transitive dependencies by reading Chart.yaml/Chart.lock from cached .tgz files
-	hf.buildDependencyGraphRecursively()
-	// Final fallback: build flat graph from Chart.yaml (only direct dependencies)
-	if len(hf.dependencyGraph) == 0 {
-		chartName := hf.chartData.Name
-		if chartName == "" {
-			chartName = "root"
-		}
-		for _, dep := range hf.dependencies {
-			hf.dependencyGraph[chartName] = append(hf.dependencyGraph[chartName], dep.ID)
-		}
-	}
-}
-
-// buildDependencyGraphRecursively builds a dependency graph by recursively parsing Chart.yaml/Chart.lock
-// from cached charts. This captures transitive dependencies.
-func (hf *HelmFlexPack) buildDependencyGraphRecursively() {
-	if hf.chartData == nil {
-		return
-	}
-	parentChartID := fmt.Sprintf("%s:%s", hf.chartData.Name, hf.chartData.Version)
-	visited := make(map[string]bool)
-	visited[parentChartID] = true
-	// For each direct dependency, recursively build its dependency graph
-	for _, dep := range hf.dependencies {
-		// Add as direct dependency of parent chart
-		hf.dependencyGraph[parentChartID] = append(hf.dependencyGraph[parentChartID], dep.ID)
-		// Recursively build graph for this dependency
-		hf.buildDependencyGraphForDep(dep.Name, dep.Version, visited, 10)
-	}
-}
-
-// buildDependencyGraphForDep recursively builds dependency graph for a specific dependency
-func (hf *HelmFlexPack) buildDependencyGraphForDep(depName, depVersion string, visited map[string]bool, maxDepth int) {
-	if maxDepth <= 0 {
-		return
-	}
-	depID := fmt.Sprintf("%s:%s", depName, depVersion)
-	if visited[depID] {
-		return // Already visited, avoid infinite loops
-	}
-	visited[depID] = true
-	// Find cached chart
-	cachedChartPath := hf.findChartFile(depName, depVersion)
-	if cachedChartPath == "" {
-		return // Chart not in cache, can't build transitive graph
-	}
-	// Read dependencies from cached chart
-	childDeps, err := hf.getDependenciesFromCachedChart(cachedChartPath)
-	if err != nil {
-		return // Failed to read dependencies
-	}
-	// Add child dependencies to graph
-	for _, childDep := range childDeps {
-		hf.dependencyGraph[depID] = append(hf.dependencyGraph[depID], childDep.ID)
-		// Recursively build graph for child dependencies
-		hf.buildDependencyGraphForDep(childDep.Name, childDep.Version, visited, maxDepth-1)
-	}
-}
-
-// extractResult holds the result of chart extraction including the chart directory and cleanup error
-type extractResult struct {
-	chartDir  string
-	removeErr error
-}
-
-// getDependenciesFromCachedChart reads dependencies from a cached chart file by extracting and parsing Chart.yaml/Chart.lock
-func (hf *HelmFlexPack) getDependenciesFromCachedChart(chartPath string) ([]DependencyInfo, error) {
-	result, err := hf.extractChartToTemp(chartPath)
-	if err != nil {
-		return nil, errors.Join(err, result.removeErr)
-	}
-	chartYAML, err := hf.readChartYAMLFromDir(result.chartDir)
-	if err != nil {
-		return nil, errors.Join(err, result.removeErr)
-	}
-
-	lockVersions := hf.readLockVersionsFromDir(result.chartDir)
-	deps := hf.buildDependenciesFromChartYAML(chartYAML, lockVersions)
-
-	if result.removeErr != nil {
-		return deps, result.removeErr
-	}
-	return deps, nil
-}
-
-// extractChartToTemp extracts a chart archive to a temporary directory and returns the chart directory path
-func (hf *HelmFlexPack) extractChartToTemp(chartPath string) (*extractResult, error) {
-	tempDir, err := os.MkdirTemp("", "helm-chart-*")
-	if err != nil {
-		return &extractResult{}, fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	result := &extractResult{}
-	defer func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			result.removeErr = fmt.Errorf("failed to remove temp directory: %w", err)
-		}
-	}()
-	if err := hf.extractTgz(chartPath, tempDir); err != nil {
-		return result, fmt.Errorf("failed to extract chart archive: %w", err)
-	}
-	chartDir := hf.findChartDirectoryInExtracted(tempDir)
-	if chartDir == "" {
-		return result, fmt.Errorf("could not find chart directory in extracted archive")
-	}
-	result.chartDir = chartDir
-	return result, nil
-}
-
-// chartYAMLData represents the structure of Chart.yaml dependencies
-type chartYAMLData struct {
-	Dependencies []struct {
-		Name       string   `yaml:"name"`
-		Version    string   `yaml:"version"`
-		Repository string   `yaml:"repository"`
-		Condition  string   `yaml:"condition,omitempty"`
-		Tags       []string `yaml:"tags,omitempty"`
-	} `yaml:"dependencies"`
-}
-
-// readChartYAMLFromDir reads and parses Chart.yaml from a directory
-func (hf *HelmFlexPack) readChartYAMLFromDir(chartDir string) (*chartYAMLData, error) {
-	chartYamlPath := filepath.Join(chartDir, ChartYaml)
-	chartYamlData, err := os.ReadFile(chartYamlPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read Chart.yaml: %w", err)
-	}
-	var chartYAML chartYAMLData
-	if err := yaml.Unmarshal(chartYamlData, &chartYAML); err != nil {
-		return nil, fmt.Errorf("failed to parse Chart.yaml: %w", err)
-	}
-	return &chartYAML, nil
-}
-
-// readLockVersionsFromDir reads Chart.lock and returns a map of dependency names to resolved versions
-func (hf *HelmFlexPack) readLockVersionsFromDir(chartDir string) map[string]string {
-	lockVersions := make(map[string]string)
-	chartLockPath := filepath.Join(chartDir, ChartLock)
-	lockData, err := os.ReadFile(chartLockPath)
-	if err != nil {
-		return lockVersions // Chart.lock is optional
-	}
-	var chartLock struct {
-		Dependencies []struct {
-			Name    string `yaml:"name"`
-			Version string `yaml:"version"`
-		} `yaml:"dependencies"`
-	}
-	if err := yaml.Unmarshal(lockData, &chartLock); err != nil {
-		return lockVersions // Ignore parse errors for Chart.lock
-	}
-	for _, lockDep := range chartLock.Dependencies {
-		lockVersions[lockDep.Name] = lockDep.Version
-	}
-	return lockVersions
-}
-
-// buildDependenciesFromChartYAML builds a list of DependencyInfo from Chart.yaml data and lock versions
-func (hf *HelmFlexPack) buildDependenciesFromChartYAML(chartYAML *chartYAMLData, lockVersions map[string]string) []DependencyInfo {
-	deps := make([]DependencyInfo, 0, len(chartYAML.Dependencies))
-	for _, dep := range chartYAML.Dependencies {
-		version := dep.Version
-		// Use resolved version from Chart.lock if available
-		if resolvedVersion, found := lockVersions[dep.Name]; found {
-			version = resolvedVersion
-		}
-		deps = append(deps, DependencyInfo{
-			ID:         fmt.Sprintf("%s:%s", dep.Name, version),
-			Name:       dep.Name,
-			Version:    version,
-			Type:       "helm",
-			Repository: dep.Repository,
-		})
-	}
-	return deps
-}
-
-// extractTgz extracts a .tgz file to a destination directory
-func (hf *HelmFlexPack) extractTgz(tgzPath, destDir string) (err error) {
-	file, err := os.Open(tgzPath)
-	if err != nil {
-		return fmt.Errorf("failed to open .tgz file: %w", err)
-	}
-	defer func() {
-		err = errors.Join(err, file.Close())
-	}()
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer func() {
-		err = errors.Join(err, gzReader.Close())
-	}()
-	tarReader := tar.NewReader(gzReader)
-	return hf.extractTarEntries(tarReader, destDir)
-}
-
-// extractTarEntries extracts all entries from a tar reader to the destination directory
-func (hf *HelmFlexPack) extractTarEntries(tarReader *tar.Reader, destDir string) error {
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("failed to read tar header: %w", err)
-		}
-		if err := hf.extractTarEntry(header, tarReader, destDir); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// extractTarEntry extracts a single entry from a tar archive
-func (hf *HelmFlexPack) extractTarEntry(header *tar.Header, tarReader *tar.Reader, destDir string) error {
-	// Validate path to prevent directory traversal attacks
-	cleanName := filepath.Clean(header.Name)
-	if cleanName == ".." || len(cleanName) >= 3 && cleanName[0:3] == "../" {
-		return fmt.Errorf("invalid path in archive: %s", header.Name)
-	}
-	// Ensure the cleaned path is still within destDir
-	targetPath := filepath.Join(destDir, cleanName)
-	destDirClean := filepath.Clean(destDir)
-	if !strings.HasPrefix(targetPath, destDirClean+string(os.PathSeparator)) && targetPath != destDirClean {
-		return fmt.Errorf("path traversal detected: %s", header.Name)
-	}
-	switch header.Typeflag {
-	case tar.TypeDir:
-		return hf.createDirectory(targetPath, header.Mode)
-	case tar.TypeReg:
-		return hf.extractRegularFile(targetPath, header, tarReader)
-	default:
-		// Skip unsupported entry types (symlinks, etc.)
-		return nil
-	}
-}
-
-// createDirectory creates a directory with the specified mode
-func (hf *HelmFlexPack) createDirectory(path string, mode int64) error {
-	// Validate mode to prevent integer overflow (os.FileMode is uint32)
-	const maxFileMode = 0777
-	var fileMode os.FileMode
-	if mode < 0 || mode > maxFileMode {
-		fileMode = 0755 // Use safe default
-	} else {
-		fileMode = os.FileMode(mode) // #nosec G115 // Mode is validated to be within uint32 range
-	}
-	if err := os.MkdirAll(path, fileMode); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-	return nil
-}
-
-// extractRegularFile extracts a regular file from tar archive
-func (hf *HelmFlexPack) extractRegularFile(targetPath string, header *tar.Header, tarReader *tar.Reader) (err error) {
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		return fmt.Errorf("failed to create parent directory: %w", err)
-	}
-	// Validate mode to prevent integer overflow (os.FileMode is uint32)
-	mode := header.Mode
-	const maxFileMode = 0777
-	var fileMode os.FileMode
-	if mode < 0 || mode > maxFileMode {
-		fileMode = 0644 // Use safe default
-	} else {
-		fileMode = os.FileMode(mode) // #nosec G115 // Mode is validated to be within uint32 range
-	}
-	outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, fileMode)
-	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
-	}
-	defer func() {
-		err = errors.Join(err, outFile.Close())
-	}()
-	if _, err := io.Copy(outFile, tarReader); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-	return nil
-}
-
-// findChartDirectoryInExtracted finds the chart directory inside an extracted archive
-func (hf *HelmFlexPack) findChartDirectoryInExtracted(extractedDir string) string {
-	var chartDir string
-	err := filepath.WalkDir(extractedDir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err // Stop walking on error
-		}
-		if d.IsDir() {
-			// Check if this directory contains Chart.yaml
-			chartYamlPath := filepath.Join(path, ChartYaml)
-			if _, err := os.Stat(chartYamlPath); err == nil {
-				chartDir = path
-				return filepath.SkipAll
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return ""
-	}
-	return chartDir
 }
 
 // calculateChecksumWithFallback calculates checksums with multiple fallback strategies
@@ -1086,34 +671,12 @@ func (hf *HelmFlexPack) calculateFileChecksum(filePath string) (string, string, 
 
 // calculateManifestChecksum generates checksum from dependency metadata
 func (hf *HelmFlexPack) calculateManifestChecksum(dep DependencyInfo) (string, string, string) {
-	// Create deterministic manifest content using only basic dependency info
-	// Metadata (repository, condition, tags) is not included in build info output,
-	// so we don't need it for checksum calculation either
 	manifest := fmt.Sprintf("name:%s\nversion:%s\ntype:%s\n",
 		dep.Name, dep.Version, dep.Type)
-	// Calculate checksums
-	// Note: MD5 and SHA1 are weak cryptographic primitives but required for Artifactory build info compatibility
-	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest))) // #nosec G401 // Required for Artifactory compatibility
+	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest)))
 	sha256Sum := fmt.Sprintf("%x", sha256.Sum256([]byte(manifest)))
-	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest))) // #nosec G401 // Required for Artifactory compatibility
+	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest)))
 	return sha1Sum, sha256Sum, md5Sum
-}
-
-// deduplicateAndSort removes duplicates and sorts a string slice
-func (hf *HelmFlexPack) deduplicateAndSort(items []string) []string {
-	if len(items) == 0 {
-		return items
-	}
-	seen := make(map[string]bool)
-	result := make([]string, 0, len(items))
-	for _, item := range items {
-		if !seen[item] {
-			seen[item] = true
-			result = append(result, item)
-		}
-	}
-	sort.Strings(result)
-	return result
 }
 
 // CollectBuildInfo collects complete build information for Helm chart
@@ -1121,60 +684,7 @@ func (hf *HelmFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entiti
 	if len(hf.dependencies) == 0 {
 		hf.getDependencies()
 	}
-
-	// Calculate and populate RequestedBy on dependencies
-	hf.CalculateRequestedBy()
-
-	dependencies := hf.convertDependenciesToEntities()
-	buildInfo := hf.createBuildInfo(buildName, buildNumber, dependencies)
-
-	return buildInfo, nil
-}
-
-// convertDependenciesToEntities converts DependencyInfo slice to entities.Dependency slice
-func (hf *HelmFlexPack) convertDependenciesToEntities() []entities.Dependency {
-	dependencies := make([]entities.Dependency, 0, len(hf.dependencies))
-	for _, dep := range hf.dependencies {
-		entity := hf.createDependencyEntity(dep)
-		dependencies = append(dependencies, entity)
-	}
-	return dependencies
-}
-
-// createDependencyEntity creates an entities.Dependency from DependencyInfo
-func (hf *HelmFlexPack) createDependencyEntity(dep DependencyInfo) entities.Dependency {
-	checksum := hf.convertChecksumMapToEntity(hf.calculateChecksumWithFallback(dep))
-
-	entity := entities.Dependency{
-		Id:       dep.ID,
-		Checksum: checksum,
-	}
-
-	return entity
-}
-
-// convertChecksumMapToEntity converts checksum map to entities.Checksum struct
-func (hf *HelmFlexPack) convertChecksumMapToEntity(checksumMap map[string]interface{}) entities.Checksum {
-	checksum := entities.Checksum{}
-	if checksumMap == nil {
-		return checksum
-	}
-	if Sha1, ok := checksumMap["sha1"].(string); ok && Sha1 != "" {
-		checksum.Sha1 = Sha1
-	}
-	if Sha256, ok := checksumMap["sha256"].(string); ok && Sha256 != "" {
-		checksum.Sha256 = Sha256
-	}
-	if Md5, ok := checksumMap["md5"].(string); ok && Md5 != "" {
-		checksum.Md5 = Md5
-	}
-	return checksum
-}
-
-// createBuildInfo creates the build info structure with module
-func (hf *HelmFlexPack) createBuildInfo(buildName, buildNumber string, dependencies []entities.Dependency) *entities.BuildInfo {
 	properties := make(map[string]string)
-	// Add chart metadata from Chart.yaml if available
 	if hf.chartData != nil {
 		if hf.chartData.Type != "" {
 			properties["helm.chart.type"] = hf.chartData.Type
@@ -1185,6 +695,11 @@ func (hf *HelmFlexPack) createBuildInfo(buildName, buildNumber string, dependenc
 		if hf.chartData.Description != "" {
 			properties["helm.chart.description"] = hf.chartData.Description
 		}
+	}
+	dependencies := make([]entities.Dependency, 0, len(hf.dependencies))
+	for _, dep := range hf.dependencies {
+		dependency := hf.createDependencyChecksum(dep)
+		dependencies = append(dependencies, dependency)
 	}
 	module := entities.Module{
 		Id:           fmt.Sprintf("%s:%s", hf.chartData.Name, hf.chartData.Version),
@@ -1205,7 +720,29 @@ func (hf *HelmFlexPack) createBuildInfo(buildName, buildNumber string, dependenc
 			Version: hf.getHelmVersion(),
 		},
 		Modules: []entities.Module{module},
+	}, nil
+}
+
+// createDependencyEntity creates an entities.Dependency from DependencyInfo
+func (hf *HelmFlexPack) createDependencyChecksum(dep DependencyInfo) entities.Dependency {
+	checksumMap := hf.calculateChecksumWithFallback(dep)
+	checksum := entities.Checksum{}
+	dependency := entities.Dependency{}
+	if checksumMap == nil {
+		return dependency
 	}
+	if Sha1, ok := checksumMap["sha1"].(string); ok && Sha1 != "" {
+		checksum.Sha1 = Sha1
+	}
+	if Sha256, ok := checksumMap["sha256"].(string); ok && Sha256 != "" {
+		checksum.Sha256 = Sha256
+	}
+	if Md5, ok := checksumMap["md5"].(string); ok && Md5 != "" {
+		checksum.Md5 = Md5
+	}
+	dependency.Id = dep.ID
+	dependency.Checksum = checksum
+	return dependency
 }
 
 // getHelmVersion gets the Helm version

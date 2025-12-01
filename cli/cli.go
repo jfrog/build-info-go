@@ -226,8 +226,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			SkipFlagParsing: true,
 			Action: func(context *clitool.Context) (err error) {
 				config := flexpack.HelmConfig{
-					WorkingDirectory:        ".",
-					IncludeTestDependencies: false, // Helm doesn't have test deps
+					WorkingDirectory: ".",
 				}
 				helmFlex, err := flexpack.NewHelmFlexPack(config)
 				if err != nil {
