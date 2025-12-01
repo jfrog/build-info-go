@@ -211,13 +211,9 @@ func TestCalculateChecksum(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, buildInfo)
 
-	// Verify checksums are present in dependencies
 	if len(buildInfo.Modules) > 0 {
 		for _, dep := range buildInfo.Modules[0].Dependencies {
-			// Each dependency should have checksum information
-			assert.NotNil(t, dep.Checksum)
-			// Should have at least one checksum (sha1, sha256, or md5)
-			hasChecksum := dep.Checksum.Sha1 != "" || dep.Checksum.Sha256 != "" || dep.Checksum.Md5 != ""
+			hasChecksum := dep.Sha1 != "" || dep.Sha256 != "" || dep.Md5 != ""
 			assert.True(t, hasChecksum, "At least one checksum should be present")
 		}
 	}
@@ -485,17 +481,13 @@ func TestCalculateChecksumWithFallback(t *testing.T) {
 
 	// Verify checksums are present in dependencies
 	if len(buildInfo.Modules) > 0 && len(buildInfo.Modules[0].Dependencies) > 0 {
-		// At least one dependency should have checksums
 		for _, dep := range buildInfo.Modules[0].Dependencies {
-			hasChecksum := dep.Checksum.Sha1 != "" || dep.Checksum.Sha256 != "" || dep.Checksum.Md5 != ""
+			hasChecksum := dep.Sha1 != "" || dep.Sha256 != "" || dep.Md5 != ""
 			if hasChecksum {
-				// Found a checksum, test passes
 				break
 			}
 		}
 	}
-	// Note: This may not always find a file source if dependencies aren't in cache
-	// but the test verifies the fallback mechanism works
 }
 
 // TestFindChartFile tests that findChartFile locates chart in Helm cache using all version candidate formats

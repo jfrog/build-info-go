@@ -673,9 +673,9 @@ func (hf *HelmFlexPack) calculateFileChecksum(filePath string) (string, string, 
 func (hf *HelmFlexPack) calculateManifestChecksum(dep DependencyInfo) (string, string, string) {
 	manifest := fmt.Sprintf("name:%s\nversion:%s\ntype:%s\n",
 		dep.Name, dep.Version, dep.Type)
-	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest)))
-	sha256Sum := fmt.Sprintf("%x", sha256.Sum256([]byte(manifest)))
-	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest)))
+	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest)))        // #nosec G401 // Required for Artifactory compatibility
+	sha256Sum := fmt.Sprintf("%x", sha256.Sum256([]byte(manifest))) // #nosec G401 // Required for Artifactory compatibility
+	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest)))          // #nosec G401 // Required for Artifactory compatibility
 	return sha1Sum, sha256Sum, md5Sum
 }
 
