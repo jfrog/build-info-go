@@ -3,6 +3,7 @@ package unit
 import (
 	"archive/tar"
 	"compress/gzip"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -620,10 +621,44 @@ func TestCollectBuildInfo_Performance(t *testing.T) {
 	hf, err := flexpack.NewHelmFlexPack(config)
 	require.NoError(t, err)
 
+	// Suppress expected warnings about missing dependencies by filtering stderr
+	// The warnings are expected since the test dependencies don't exist
+	originalStderr := os.Stderr
+	defer func() {
+		os.Stderr = originalStderr
+	}()
+
+	// Create a pipe to filter stderr output
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	defer func() {
+		_ = reader.Close()
+		_ = writer.Close()
+	}()
+
+	// Redirect stderr to our pipe
+	os.Stderr = writer
+
+	// Start goroutine to filter and forward output
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		filterWriter := &warningFilterWriter{original: originalStderr}
+		_, _ = io.Copy(filterWriter, reader)
+	}()
+
 	// Measure time to collect build info
 	start := time.Now()
 	buildInfo, err := hf.CollectBuildInfo("perf-test", "1")
 	duration := time.Since(start)
+
+	// Close writer to signal end of output
+	_ = writer.Close()
+	// Wait for filter goroutine to finish
+	<-done
+
+	// Restore stderr before assertions to see any real errors
+	os.Stderr = originalStderr
 
 	require.NoError(t, err)
 	assert.NotNil(t, buildInfo)
@@ -634,6 +669,49 @@ func TestCollectBuildInfo_Performance(t *testing.T) {
 
 	// Performance assertion: should complete within reasonable time (e.g., 30 seconds)
 	assert.Less(t, duration, 30*time.Second, "Dependency resolution should complete within 30 seconds")
+}
+
+// warningFilterWriter filters out expected warning messages about missing dependencies
+type warningFilterWriter struct {
+	original io.Writer
+	buffer   []byte
+}
+
+func (w *warningFilterWriter) Write(p []byte) (n int, err error) {
+	// Buffer the data to check for complete lines
+	w.buffer = append(w.buffer, p...)
+	
+	// Process complete lines
+	for {
+		newlineIndex := -1
+		for i, b := range w.buffer {
+			if b == '\n' {
+				newlineIndex = i
+				break
+			}
+		}
+		
+		if newlineIndex == -1 {
+			// No complete line yet, wait for more data
+			return len(p), nil
+		}
+		
+		// Extract line
+		line := string(w.buffer[:newlineIndex+1])
+		w.buffer = w.buffer[newlineIndex+1:]
+		
+		// Filter out expected warnings about missing dependencies
+		if strings.Contains(line, "[Warn]") && strings.Contains(line, "Could not find dependency") {
+			// Skip this warning line
+			continue
+		}
+		
+		// Write non-filtered lines to original stderr
+		_, writeErr := w.original.Write([]byte(line))
+		if writeErr != nil {
+			return len(p), writeErr
+		}
+	}
 }
 
 // Helper functions

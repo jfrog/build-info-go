@@ -2,10 +2,8 @@ package flexpack
 
 import (
 	"bufio"
-	"crypto/md5"  // #nosec G501 // MD5 required for Artifactory build info compatibility
-	"crypto/sha1" // #nosec G505 // SHA1 required for Artifactory build info compatibility
-	"crypto/sha256"
 	"fmt"
+	"github.com/jfrog/gofrog/log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -355,13 +353,7 @@ func (hf *HelmFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[st
 		}
 	}
 
-	// Strategy 3: Generate manifest-based checksum
-	Sha1, Sha256, Md5 := hf.calculateManifestChecksum(dep)
-	checksumMap["sha1"] = Sha1
-	checksumMap["sha256"] = Sha256
-	checksumMap["md5"] = Md5
-	checksumMap["path"] = "manifest"
-	checksumMap["source"] = "manifest"
+	log.Warn(fmt.Sprintf("Could not find dependency: %s, version: %s, either in charts directory or cache", dep.Name, dep.Version))
 	return checksumMap
 
 }
@@ -373,19 +365,11 @@ func (hf *HelmFlexPack) findChartFile(name, version string) string {
 		hf.buildCacheIndex()
 		hf.cacheIndexBuilt = true
 	}
-
-	// Try multiple version formats
-	versionCandidates := hf.generateVersionCandidates(version)
-
-	for _, v := range versionCandidates {
-		key := fmt.Sprintf("%s-%s", name, v)
-		if path, found := hf.cacheIndex[key]; found {
-			return path
-		}
+	key := fmt.Sprintf("%s-%s", name, version)
+	if path, found := hf.cacheIndex[key]; found {
+		return path
 	}
-
-	// Fallback: recursive search
-	return hf.recursiveSearchCache(name, version)
+	return hf.searchCache(name, version)
 }
 
 // findDependencyInChartsDir searches for a dependency chart in the charts/ subdirectory
@@ -396,13 +380,9 @@ func (hf *HelmFlexPack) findDependencyInChartsDir(name, version string) string {
 		return "" // charts/ directory doesn't exist
 	}
 
-	// Try multiple version formats
-	versionCandidates := hf.generateVersionCandidates(version)
-	for _, v := range versionCandidates {
-		pattern := fmt.Sprintf("%s-%s.tgz", name, v)
-		if foundPath := hf.findFileInDirectory(chartsDir, pattern); foundPath != "" {
-			return foundPath
-		}
+	pattern := fmt.Sprintf("%s-%s.tgz", name, version)
+	if foundPath := hf.findFileInDirectory(chartsDir, pattern); foundPath != "" {
+		return foundPath
 	}
 
 	return ""
@@ -481,33 +461,21 @@ func (hf *HelmFlexPack) buildCacheIndex() {
 }
 
 // recursiveSearchCache performs recursive search for chart files
-func (hf *HelmFlexPack) recursiveSearchCache(name, version string) string {
+func (hf *HelmFlexPack) searchCache(name, version string) string {
 	cacheDirs := hf.getCacheDirectories()
-	versionCandidates := hf.generateVersionCandidates(version)
 	for _, cacheDir := range cacheDirs {
-		if foundPath := hf.searchCacheDirectory(cacheDir, name, versionCandidates); foundPath != "" {
+		if foundPath := hf.searchCacheDirectory(cacheDir, name, version); foundPath != "" {
 			return foundPath
 		}
 	}
 	return ""
 }
 
-// generateVersionCandidates generates all possible version format variations
-func (hf *HelmFlexPack) generateVersionCandidates(version string) []string {
-	return []string{
-		strings.TrimPrefix(version, "v"),       // "1.2.3" from "v1.2.3"
-		version,                                // "v1.2.3" as-is
-		"v" + strings.TrimPrefix(version, "v"), // Ensure "v" prefix
-	}
-}
-
 // searchCacheDirectory searches for a chart file in a specific cache directory using version candidates
-func (hf *HelmFlexPack) searchCacheDirectory(cacheDir, name string, versionCandidates []string) string {
-	for _, v := range versionCandidates {
-		pattern := fmt.Sprintf("%s-%s.tgz", name, v)
-		if foundPath := hf.findFileInDirectory(cacheDir, pattern); foundPath != "" {
-			return foundPath
-		}
+func (hf *HelmFlexPack) searchCacheDirectory(cacheDir, name string, version string) string {
+	pattern := fmt.Sprintf("%s-%s.tgz", name, version)
+	if foundPath := hf.findFileInDirectory(cacheDir, pattern); foundPath != "" {
+		return foundPath
 	}
 	return ""
 }
@@ -667,16 +635,6 @@ func (hf *HelmFlexPack) calculateFileChecksum(filePath string) (string, string, 
 		fileDetails.Checksum.Sha256,
 		fileDetails.Checksum.Md5,
 		nil
-}
-
-// calculateManifestChecksum generates checksum from dependency metadata
-func (hf *HelmFlexPack) calculateManifestChecksum(dep DependencyInfo) (string, string, string) {
-	manifest := fmt.Sprintf("name:%s\nversion:%s\ntype:%s\n",
-		dep.Name, dep.Version, dep.Type)
-	sha1Sum := fmt.Sprintf("%x", sha1.Sum([]byte(manifest)))        // #nosec G401 // Required for Artifactory compatibility
-	sha256Sum := fmt.Sprintf("%x", sha256.Sum256([]byte(manifest))) // #nosec G401 // Required for Artifactory compatibility
-	md5Sum := fmt.Sprintf("%x", md5.Sum([]byte(manifest)))          // #nosec G401 // Required for Artifactory compatibility
-	return sha1Sum, sha256Sum, md5Sum
 }
 
 // CollectBuildInfo collects complete build information for Helm chart
