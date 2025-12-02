@@ -69,6 +69,18 @@ type PoetryConfig struct {
 	IncludeDevDependencies bool
 }
 
+// GradleConfig holds configuration specific to Gradle operations
+type GradleConfig struct {
+	// WorkingDirectory is the directory where Gradle should operate
+	WorkingDirectory string
+
+	// IncludeTestDependencies indicates whether to include test dependencies
+	IncludeTestDependencies bool
+
+	// GradleExecutable is the path to the Gradle executable (optional, will be auto-detected)
+	GradleExecutable string
+}
+
 // IsFlexPackEnabled checks if the FlexPack (native) implementation should be used
 // Returns true if JFROG_RUN_NATIVE environment variable is set to "true"
 func IsFlexPackEnabled() bool {
