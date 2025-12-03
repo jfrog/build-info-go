@@ -131,13 +131,19 @@ func NewHelmFlexPack(config HelmConfig) (*HelmFlexPack, error) {
 
 // findHelmExecutable locates the helm CLI executable
 func (hf *HelmFlexPack) findHelmExecutable() (string, error) {
-	candidates := []string{"helm"}
 	if runtime.GOOS == "windows" {
-		candidates = append(candidates, "helm.exe")
-	}
-
-	for _, candidate := range candidates {
-		path, err := exec.LookPath(candidate)
+		path, err := exec.LookPath("helm.exe")
+		if err == nil {
+			return path, nil
+		}
+		// Fallback to helm (in case it's a symlink or wrapper)
+		path, err = exec.LookPath("helm")
+		if err == nil {
+			return path, nil
+		}
+	} else {
+		// On Unix-like systems, try helm
+		path, err := exec.LookPath("helm")
 		if err == nil {
 			return path, nil
 		}
@@ -213,6 +219,10 @@ func (hf *HelmFlexPack) resolveDependencies() error {
 	cmd.Dir = hf.config.WorkingDirectory
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		outputStr := strings.TrimSpace(string(output))
+		if outputStr != "" {
+			return fmt.Errorf("helm dependency list failed: %w\nOutput: %s", err, outputStr)
+		}
 		return fmt.Errorf("helm dependency list failed: %w", err)
 	}
 	return hf.parseHelmDependencyList(string(output))
