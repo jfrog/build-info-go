@@ -43,6 +43,7 @@ type DependencyInfo struct {
 	Version      string           `json:"version"`
 	Name         string           `json:"name"`
 	Path         string           `json:"path,omitempty"`
+	Repository   string           `json:"-"`
 	Dependencies []DependencyInfo `json:"dependencies,omitempty"`
 }
 
