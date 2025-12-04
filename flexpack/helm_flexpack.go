@@ -3,13 +3,14 @@ package flexpack
 import (
 	"bufio"
 	"fmt"
-	"github.com/jfrog/gofrog/log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/jfrog/gofrog/log"
 
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/gofrog/crypto"
@@ -608,7 +609,6 @@ func (hf *HelmFlexPack) loadCacheDirectories() []string {
 			existingPaths = append(existingPaths, absPath)
 		}
 	}
-
 	return existingPaths
 }
 
