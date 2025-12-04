@@ -32,6 +32,7 @@ type HelmFlexPack struct {
 	cliPath         string
 	cacheIndex      map[string]string
 	cacheIndexBuilt bool
+	repoAliases     map[string]string // Maps repository alias (without @) to URL
 	mu              sync.RWMutex
 }
 
@@ -96,6 +97,7 @@ func NewHelmFlexPack(config HelmConfig) (*HelmFlexPack, error) {
 		dependencies:    []DependencyInfo{},
 		dependencyGraph: make(map[string][]string),
 		cacheIndex:      make(map[string]string),
+		repoAliases:     make(map[string]string),
 	}
 
 	// Auto-detect helm CLI path if not provided
@@ -250,6 +252,8 @@ func (hf *HelmFlexPack) parseHelmDependencyList(output string) error {
 			if !hf.isValidDependency(dep.Name, validDependencyNames) {
 				continue
 			}
+			// Resolve repository alias if needed
+			hf.resolveRepositoryAlias(dep)
 			hf.dependencies = append(hf.dependencies, *dep)
 		}
 	}
@@ -288,10 +292,88 @@ func (hf *HelmFlexPack) parseDependencyLine(line string) *DependencyInfo {
 		return nil
 	}
 	return &DependencyInfo{
-		Name:    fields[0],
-		Version: fields[1],
-		Type:    "helm",
-		ID:      fmt.Sprintf("%s:%s", fields[0], fields[1]),
+		Name:       fields[0],
+		Version:    fields[1],
+		Repository: fields[2],
+		Type:       "helm",
+		ID:         fmt.Sprintf("%s:%s", fields[0], fields[1]),
+	}
+}
+
+// getHelmRepoList gets and parses the output of 'helm repo list' command
+// Returns a map of repository alias (without @) to URL
+func (hf *HelmFlexPack) getHelmRepoList() (map[string]string, error) {
+	cmd := exec.Command(hf.cliPath, "repo", "list")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("helm repo list failed: %w", err)
+	}
+
+	repoMap := make(map[string]string)
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	headerSkipped := false
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		// Skip header line
+		if !headerSkipped && strings.Contains(strings.ToUpper(line), "NAME") {
+			headerSkipped = true
+			continue
+		}
+		headerSkipped = true
+
+		// Parse repo line: NAME    URL
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			alias := fields[0]
+			url := fields[1]
+			repoMap[alias] = url
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to parse helm repo list: %w", err)
+	}
+
+	return repoMap, nil
+}
+
+// resolveRepositoryAlias resolves repository alias (e.g., @redisLocation) to actual URL
+func (hf *HelmFlexPack) resolveRepositoryAlias(dep *DependencyInfo) {
+	if dep.Repository == "" {
+		return
+	}
+
+	// Check if repository is an alias (starts with @)
+	if !strings.HasPrefix(dep.Repository, "@") {
+		return // Not an alias, already a URL
+	}
+
+	// Extract alias name (remove @ prefix)
+	alias := strings.TrimPrefix(dep.Repository, "@")
+
+	// Load repo list if not already loaded
+	hf.mu.Lock()
+	if len(hf.repoAliases) == 0 {
+		repoMap, err := hf.getHelmRepoList()
+		if err != nil {
+			log.Warn(fmt.Sprintf("Failed to get helm repo list: %v", err))
+			hf.mu.Unlock()
+			return
+		}
+		hf.repoAliases = repoMap
+	}
+	hf.mu.Unlock()
+
+	// Resolve alias to URL
+	if url, found := hf.repoAliases[alias]; found {
+		dep.Repository = url
+	} else {
+		log.Warn(fmt.Sprintf("Repository alias '%s' not found in helm repo list", alias))
 	}
 }
 
@@ -301,11 +383,15 @@ func (hf *HelmFlexPack) parseDependenciesFromChartYamlAndLockfile() {
 		return
 	}
 
-	// Build a map of resolved versions from Chart.lock
+	// Build maps of resolved versions and repositories from Chart.lock
 	lockVersions := make(map[string]string)
+	lockRepositories := make(map[string]string)
 	if hf.lockData != nil {
 		for _, lockDep := range hf.lockData.Dependencies {
 			lockVersions[lockDep.Name] = lockDep.Version
+			if lockDep.Repository != "" {
+				lockRepositories[lockDep.Name] = lockDep.Repository
+			}
 		}
 	}
 
@@ -323,7 +409,15 @@ func (hf *HelmFlexPack) parseDependenciesFromChartYamlAndLockfile() {
 			dep.Version = resolvedVersion
 		}
 
+		// Use resolved repository from Chart.lock if available (more accurate)
+		if resolvedRepo, found := lockRepositories[chartDep.Name]; found {
+			dep.Repository = resolvedRepo
+		}
+
 		dep.ID = fmt.Sprintf("%s:%s", dep.Name, dep.Version)
+
+		// Resolve repository alias if needed
+		hf.resolveRepositoryAlias(&dep)
 
 		hf.dependencies = append(hf.dependencies, dep)
 	}
@@ -697,6 +791,9 @@ func (hf *HelmFlexPack) createDependencyChecksum(dep DependencyInfo) entities.De
 	checksum := entities.Checksum{}
 	dependency := entities.Dependency{}
 	if checksumMap == nil {
+		// Even if checksum is nil, we should still set ID and Repository
+		dependency.Id = dep.ID
+		dependency.Repository = dep.Repository
 		return dependency
 	}
 	if Sha1, ok := checksumMap["sha1"].(string); ok && Sha1 != "" {
@@ -709,6 +806,7 @@ func (hf *HelmFlexPack) createDependencyChecksum(dep DependencyInfo) entities.De
 		checksum.Md5 = Md5
 	}
 	dependency.Id = dep.ID
+	dependency.Repository = dep.Repository
 	dependency.Checksum = checksum
 	return dependency
 }
