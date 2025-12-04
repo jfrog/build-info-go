@@ -35,6 +35,7 @@ const (
 	Go        ModuleType = "go"
 	Python    ModuleType = "python"
 	Terraform ModuleType = "terraform"
+	Helm      ModuleType = "helm"
 )
 
 type BuildInfo struct {
