@@ -219,6 +219,31 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			},
 		},
 		{
+			Name:            "helm",
+			Usage:           "Generate build-info for a Helm project",
+			UsageText:       "bi helm",
+			Flags:           flags,
+			SkipFlagParsing: true,
+			Action: func(context *clitool.Context) (err error) {
+				config := flexpack.HelmConfig{
+					WorkingDirectory: ".",
+				}
+				helmFlex, err := flexpack.NewHelmFlexPack(config)
+				if err != nil {
+					return fmt.Errorf("failed to create Helm instance: %w", err)
+				}
+				buildInfo, err := helmFlex.CollectBuildInfo("helm-build", "1")
+				if err != nil {
+					return fmt.Errorf("failed to collect build info: %w", err)
+				}
+				formatValue, _, err := extractStringFlag(context.Args().Slice(), formatFlag)
+				if err != nil {
+					return err
+				}
+				return printBuildInfo(buildInfo, formatValue)
+			},
+		},
+		{
 			Name:            "yarn",
 			Usage:           "Build a Yarn project and generate build-info for it",
 			UsageText:       "bi yarn [yarn command] [command options]",
