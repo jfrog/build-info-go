@@ -22,6 +22,7 @@ var agentVersion = "1.0.0"
 
 const defaultGradleCommandTimeout = 1 * time.Minute
 
+//go:embed init-artifact-extractor.gradle
 var initScriptContent string
 
 var (
@@ -31,6 +32,8 @@ var (
 	rootProjectRegex   = regexp.MustCompile(`rootProject\.name\s*[=:]\s*['"]([^'"]+)['"]`)
 	includeRegex       = regexp.MustCompile(`['"]([^'"]+)['"]`)
 	depRegex           = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*[\(\s]['"]([^'"]+)['"]`)
+	depMapRegex        = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*group\s*[:=]\s*['"]([^'"]+)['"]\s*,\s*name\s*[:=]\s*['"]([^'"]+)['"](?:,\s*version\s*[:=]\s*['"]([^'"]+)['"])?`)
+	depProjectRegex    = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*project\s*(?:(?:\(\s*path\s*:\s*)|\(?\s*)['"]([^'"]+)['"]`)
 	gradleVersionRegex = regexp.MustCompile(`Gradle\s+(\d+\.\d+(?:\.\d+)?)`)
 )
 
@@ -91,6 +94,13 @@ func NewGradleFlexPack(config GradleConfig) (*GradleFlexPack, error) {
 }
 
 func NewGradleFlexPackWithContext(ctx context.Context, config GradleConfig) (*GradleFlexPack, error) {
+	if config.WorkingDirectory == "" {
+		return nil, fmt.Errorf("working directory cannot be empty")
+	}
+	if _, err := os.Stat(config.WorkingDirectory); os.IsNotExist(err) {
+		return nil, fmt.Errorf("working directory does not exist: %s", config.WorkingDirectory)
+	}
+
 	if config.CommandTimeout == 0 {
 		config.CommandTimeout = defaultGradleCommandTimeout
 	}
@@ -271,7 +281,7 @@ func (gf *GradleFlexPack) getModules() ([]string, error) {
 	lines := strings.Split(string(content), "\n")
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "include") {
+		if strings.HasPrefix(trimmed, "include") && !strings.HasPrefix(trimmed, "includeBuild") {
 			matches := includeRegex.FindAllStringSubmatch(trimmed, -1)
 			for _, match := range matches {
 				if len(match) > 1 {
@@ -313,6 +323,9 @@ func (gf *GradleFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 	}
 
 	for _, moduleName := range gf.modulesList {
+		if gf.ctx.Err() != nil {
+			return nil, fmt.Errorf("context cancelled: %w", gf.ctx.Err())
+		}
 		module, err := gf.processModule(moduleName)
 		if err != nil {
 			log.Warn(fmt.Sprintf("Failed to process module %s: %s", moduleName, err.Error()))
@@ -362,14 +375,15 @@ func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {
 
 func (gf *GradleFlexPack) isGradleVersionCompatible(version string) bool {
 	parts := strings.Split(version, ".")
-	if len(parts) < 2 {
+	if len(parts) < 1 {
 		return false
 	}
-	major, _ := strconv.Atoi(parts[0])
-	if major < 5 {
+	major, err := strconv.Atoi(parts[0])
+	if err != nil {
+		log.Debug("Failed to parse Gradle major version: " + err.Error())
 		return false
 	}
-	return true
+	return major >= 5
 }
 
 func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Artifact, error) {
@@ -378,20 +392,16 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 		return nil, fmt.Errorf("failed to create init script: %w", err)
 	}
 	initScriptPath := initScriptFile.Name()
-
-	if _, err := initScriptFile.WriteString(initScriptContent); err != nil {
-		initScriptFile.Close()
-		os.Remove(initScriptPath)
-		return nil, fmt.Errorf("failed to write init script: %w", err)
-	}
-	initScriptFile.Close()
-
-	// Remove the script after execution
+	defer initScriptFile.Close()
 	defer func() {
 		if err := os.Remove(initScriptPath); err != nil {
 			log.Debug("Failed to remove init script: " + err.Error())
 		}
 	}()
+
+	if _, err := initScriptFile.WriteString(initScriptContent); err != nil {
+		return nil, fmt.Errorf("failed to write init script: %w", err)
+	}
 
 	tasks := []string{"publishToMavenLocal", "generateCiManifest", "-I", initScriptPath}
 	if output, err := gf.runGradleCommand(tasks...); err != nil {
@@ -438,6 +448,7 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 	return result, nil
 }
 
+// We might need to process modules parallelly for better performance
 func (gf *GradleFlexPack) processModule(moduleName string) (entities.Module, error) {
 	// Determine module identity early using pre-calculated map
 	groupId := gf.groupId
@@ -820,6 +831,15 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) {
 		buildGradlePath := filepath.Join(gf.config.WorkingDirectory, subPath, "build.gradle")
 		buildGradleKtsPath := filepath.Join(gf.config.WorkingDirectory, subPath, "build.gradle.kts")
 
+		if !gf.validatePathWithinWorkingDir(buildGradlePath) {
+			log.Debug(fmt.Sprintf("Path traversal attempt detected for module %s (build.gradle)", moduleName))
+			return
+		}
+		if !gf.validatePathWithinWorkingDir(buildGradleKtsPath) {
+			log.Debug(fmt.Sprintf("Path traversal attempt detected for module %s (build.gradle.kts)", moduleName))
+			return
+		}
+
 		if _, err := os.Stat(buildGradlePath); err == nil {
 			path = buildGradlePath
 		} else if _, err := os.Stat(buildGradleKtsPath); err == nil {
@@ -844,8 +864,10 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) {
 		log.Debug("No dependencies block found in build.gradle")
 		return
 	}
-	matches := depRegex.FindAllStringSubmatch(depsContent, -1)
+	allDeps := make(map[string]DependencyInfo)
 
+	// 1. String notation: "group:artifact:version"
+	matches := depRegex.FindAllStringSubmatch(depsContent, -1)
 	for _, match := range matches {
 		if len(match) < 3 {
 			continue
@@ -867,23 +889,81 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) {
 			classifier = parts[3]
 		}
 
-		var dependencyId string
-		if classifier != "" {
-			dependencyId = fmt.Sprintf("%s:%s:%s:%s", groupId, artifactId, version, classifier)
-		} else {
-			dependencyId = fmt.Sprintf("%s:%s:%s", groupId, artifactId, version)
-		}
-		scopes := gf.mapGradleConfigurationToScopes(configType)
-
-		depInfo := DependencyInfo{
-			ID:      dependencyId,
-			Name:    fmt.Sprintf("%s:%s", groupId, artifactId),
-			Version: version,
-			Type:    "jar",
-			Scopes:  scopes,
-		}
-		gf.dependencies = append(gf.dependencies, depInfo)
+		gf.addDependency(configType, groupId, artifactId, version, classifier, allDeps)
 	}
+
+	// 2. Map notation: group: '...', name: '...', version: '...'
+	mapMatches := depMapRegex.FindAllStringSubmatch(depsContent, -1)
+	for _, match := range mapMatches {
+		if len(match) < 4 {
+			continue
+		}
+		configType := match[1]
+		groupId := match[2]
+		artifactId := match[3]
+		version := ""
+		if len(match) >= 5 {
+			version = match[4]
+		}
+		gf.addDependency(configType, groupId, artifactId, version, "", allDeps)
+	}
+
+	// 3. Project notation: project(':path')
+	projMatches := depProjectRegex.FindAllStringSubmatch(depsContent, -1)
+	for _, match := range projMatches {
+		if len(match) < 3 {
+			continue
+		}
+		configType := match[1]
+		// e.g. :utils or :libs:utils
+		projectPath := match[2]
+		projectPath = strings.TrimPrefix(projectPath, ":")
+
+		// Default to project structure if not found
+		parts := strings.Split(projectPath, ":")
+		artifactId := parts[len(parts)-1]
+		groupId := gf.groupId
+		version := gf.projectVersion
+
+		if meta, ok := gf.modulesMap[projectPath]; ok {
+			groupId = meta.Group
+			version = meta.Version
+			artifactId = meta.Artifact
+		}
+
+		gf.addDependency(configType, groupId, artifactId, version, "", allDeps)
+	}
+	for _, dep := range allDeps {
+		gf.dependencies = append(gf.dependencies, dep)
+	}
+}
+
+func (gf *GradleFlexPack) validatePathWithinWorkingDir(resolvedPath string) bool {
+	cleanWorkingDir := filepath.Clean(gf.config.WorkingDirectory)
+	cleanResolvedPath := filepath.Clean(resolvedPath)
+
+	absWorkingDir, err := filepath.Abs(cleanWorkingDir)
+	if err != nil {
+		log.Debug(fmt.Sprintf("Failed to get absolute path for working directory: %s", err.Error()))
+		return false
+	}
+	absResolvedPath, err := filepath.Abs(cleanResolvedPath)
+	if err != nil {
+		log.Debug(fmt.Sprintf("Failed to get absolute path for resolved path: %s", err.Error()))
+		return false
+	}
+	absWorkingDir = filepath.Clean(absWorkingDir)
+	absResolvedPath = filepath.Clean(absResolvedPath)
+	if absResolvedPath == absWorkingDir {
+		return true
+	}
+	separator := string(filepath.Separator)
+	expectedPrefix := absWorkingDir + separator
+	if !strings.HasPrefix(absResolvedPath, expectedPrefix) {
+		return false
+	}
+
+	return true
 }
 
 func (gf *GradleFlexPack) extractDependenciesBlock(content string) string {
@@ -975,6 +1055,38 @@ func (gf *GradleFlexPack) extractDependenciesBlock(content string) string {
 	return content[start:end]
 }
 
+func (gf *GradleFlexPack) addDependency(configType, groupId, artifactId, version, classifier string, allDeps map[string]DependencyInfo) {
+	var dependencyId string
+	if classifier != "" {
+		dependencyId = fmt.Sprintf("%s:%s:%s:%s", groupId, artifactId, version, classifier)
+	} else {
+		dependencyId = fmt.Sprintf("%s:%s:%s", groupId, artifactId, version)
+	}
+	scopes := gf.mapGradleConfigurationToScopes(configType)
+
+	if existing, ok := allDeps[dependencyId]; ok {
+		existingScopes := make(map[string]bool)
+		for _, s := range existing.Scopes {
+			existingScopes[s] = true
+		}
+		for _, s := range scopes {
+			if !existingScopes[s] {
+				existing.Scopes = append(existing.Scopes, s)
+			}
+		}
+		allDeps[dependencyId] = existing
+	} else {
+		depInfo := DependencyInfo{
+			ID:      dependencyId,
+			Name:    fmt.Sprintf("%s:%s", groupId, artifactId),
+			Version: version,
+			Type:    "jar",
+			Scopes:  scopes,
+		}
+		allDeps[dependencyId] = depInfo
+	}
+}
+
 func (gf *GradleFlexPack) CalculateRequestedBy() map[string][]string {
 	if len(gf.requestedByMap) == 0 {
 		gf.buildRequestedByMap()
@@ -993,6 +1105,7 @@ func (gf *GradleFlexPack) buildRequestedByMap() {
 	}
 }
 
+// We will only try to find in local build only if it is a publish command
 func (gf *GradleFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[string]interface{} {
 	checksumMap := map[string]interface{}{
 		"id":      dep.ID,
@@ -1007,9 +1120,7 @@ func (gf *GradleFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[
 		parts := strings.Split(dep.Name, ":")
 		if len(parts) == 2 {
 			artifactId := parts[1]
-			// Expected format: artifact-version.type (e.g. mylib-1.0.0.jar)
 			expectedName := fmt.Sprintf("%s-%s.%s", artifactId, dep.Version, dep.Type)
-
 			for _, artifacts := range gf.deployedArtifacts {
 				for _, art := range artifacts {
 					if art.Name == expectedName {
@@ -1082,8 +1193,7 @@ func (gf *GradleFlexPack) findGradleArtifact(dep DependencyInfo) string {
 
 	// Gradle cache structure: ~/.gradle/caches/modules-2/files-2.1/group/module/version/hash/filename
 	cacheBase := filepath.Join(gradleUserHome, "caches", "modules-2", "files-2.1")
-	groupPath := strings.ReplaceAll(group, ".", string(filepath.Separator))
-	modulePath := filepath.Join(cacheBase, groupPath, module, dep.Version)
+	modulePath := filepath.Join(cacheBase, group, module, dep.Version)
 
 	if _, err := os.Stat(modulePath); os.IsNotExist(err) {
 		return ""
@@ -1131,6 +1241,15 @@ func (gf *GradleFlexPack) getModuleMetadata(moduleName string) (groupId, artifac
 	subPath := strings.ReplaceAll(moduleName, ":", string(filepath.Separator))
 	buildGradlePath := filepath.Join(gf.config.WorkingDirectory, subPath, "build.gradle")
 	buildGradleKtsPath := filepath.Join(gf.config.WorkingDirectory, subPath, "build.gradle.kts")
+
+	if !gf.validatePathWithinWorkingDir(buildGradlePath) {
+		log.Debug(fmt.Sprintf("Path traversal attempt detected for module %s (build.gradle)", moduleName))
+		return "", "", ""
+	}
+	if !gf.validatePathWithinWorkingDir(buildGradleKtsPath) {
+		log.Debug(fmt.Sprintf("Path traversal attempt detected for module %s (build.gradle.kts)", moduleName))
+		return "", "", ""
+	}
 
 	var content []byte
 	var err error

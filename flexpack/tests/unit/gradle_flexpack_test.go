@@ -413,8 +413,20 @@ func TestGradleFlexPackChecksumCalculation(t *testing.T) {
 
 // TestGradleFlexPackVersion tests that version variable is accessible
 func TestGradleFlexPackVersion(t *testing.T) {
-	// Verify the version variable is accessible and set
-	assert.NotEmpty(t, flexpack.GradleFlexPackVersion, "GradleFlexPackVersion should be set")
+	// Note: Version is internal to the package, so we test through the build info agent version
+	tempDir := t.TempDir()
+	setupMinimalGradleProject(t, tempDir)
+
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gradleFlex.CollectBuildInfo("version-test", "1")
+	require.NoError(t, err)
+
+	// Verify agent version is set
+	require.NotNil(t, buildInfo.Agent, "Agent should not be nil")
+	assert.NotEmpty(t, buildInfo.Agent.Version, "Agent version should be set")
 }
 
 // TestGradleFlexPackNoGroupVersion tests handling of projects without group/version
@@ -485,6 +497,100 @@ dependencies {
 	for _, dep := range deps {
 		t.Logf("Found dependency: %s", dep.Id)
 	}
+}
+
+// TestGradleFlexPackPathTraversal tests path traversal attack prevention
+func TestGradleFlexPackPathTraversal(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create root build.gradle
+	rootBuildGradle := `plugins {
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+`
+	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(rootBuildGradle), 0644)
+	require.NoError(t, err)
+
+	// Create a legitimate submodule
+	legitDir := filepath.Join(tempDir, "legit")
+	err = os.MkdirAll(legitDir, 0755)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(legitDir, "build.gradle"), []byte(rootBuildGradle), 0644)
+	require.NoError(t, err)
+
+	// Create settings.gradle with malicious module names attempting path traversal
+	maliciousSettings := `rootProject.name = 'test'
+include 'legit'
+include '..:..:etc:passwd'
+include '..:..:..:..:..:etc:passwd'
+include '..\\..\\etc\\passwd'
+include '..:..:..:windows:system32'
+`
+	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(maliciousSettings), 0644)
+	require.NoError(t, err)
+
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gradleFlex.CollectBuildInfo("path-traversal-test", "1")
+	require.NoError(t, err)
+
+	// Should only process legitimate modules, malicious ones should be rejected
+	// Root module + legit module = at least 2 modules
+	assert.GreaterOrEqual(t, len(buildInfo.Modules), 1, "Should have at least root module")
+
+	// Verify that no modules were processed for malicious paths
+	// The path traversal attempts should be logged but not cause crashes
+	for _, module := range buildInfo.Modules {
+		// Module IDs should not contain path traversal indicators
+		assert.NotContains(t, module.Id, "..", "Module ID should not contain path traversal")
+		assert.NotContains(t, module.Id, "etc", "Module ID should not contain system paths")
+		assert.NotContains(t, module.Id, "passwd", "Module ID should not contain sensitive file names")
+	}
+}
+
+// TestGradleFlexPackPathTraversalWithValidNestedModules tests that valid nested modules work correctly
+func TestGradleFlexPackPathTraversalWithValidNestedModules(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create root build.gradle
+	rootBuildGradle := `plugins {
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+`
+	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(rootBuildGradle), 0644)
+	require.NoError(t, err)
+
+	// Create valid nested module structure
+	nestedDir := filepath.Join(tempDir, "libs", "utils")
+	err = os.MkdirAll(nestedDir, 0755)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(nestedDir, "build.gradle"), []byte(rootBuildGradle), 0644)
+	require.NoError(t, err)
+
+	// Create settings.gradle with valid nested module
+	settings := `rootProject.name = 'test'
+include 'libs:utils'
+`
+	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(settings), 0644)
+	require.NoError(t, err)
+
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gradleFlex.CollectBuildInfo("nested-test", "1")
+	require.NoError(t, err)
+
+	// Should successfully process nested modules
+	assert.GreaterOrEqual(t, len(buildInfo.Modules), 1, "Should have at least root module")
 }
 
 // Helper functions
