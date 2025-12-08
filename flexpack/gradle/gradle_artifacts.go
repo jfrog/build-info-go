@@ -85,6 +85,7 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 	return result, nil
 }
 
+// if a module is a dependency, the checksum calculation depends if the artifact is published or not
 func (gf *GradleFlexPack) calculateChecksumWithFallback(dep flexpack.DependencyInfo) map[string]interface{} {
 	checksumMap := map[string]interface{}{
 		"id":      dep.ID,
