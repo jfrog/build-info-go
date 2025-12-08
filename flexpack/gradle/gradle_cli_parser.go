@@ -64,7 +64,6 @@ func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) error {
 		}
 	}
 
-	// Convert map to slice
 	for _, dep := range allDeps {
 		gf.dependencies = append(gf.dependencies, dep)
 	}
@@ -323,7 +322,6 @@ func (gf *GradleFlexPack) processGradleDependency(dep gradleDepNode, parent stri
 		allDeps[dependencyId] = depInfo
 	}
 
-	// Build dependency graph
 	if parent != "" {
 		if gf.dependencyGraph[parent] == nil {
 			gf.dependencyGraph[parent] = []string{}
@@ -334,4 +332,3 @@ func (gf *GradleFlexPack) processGradleDependency(dep gradleDepNode, parent stri
 		gf.processGradleDependency(child, dependencyId, scopes, allDeps)
 	}
 }
-

@@ -89,12 +89,10 @@ func (gf *GradleFlexPack) validatePathWithinWorkingDir(resolvedPath string) bool
 	if !strings.HasPrefix(absResolvedPath, expectedPrefix) {
 		return false
 	}
-
 	return true
 }
 
 // getBuildFileContent reads the build.gradle or build.gradle.kts file for a module.
-// It returns the content, the path of the file found, and an error if neither exists or if path traversal is detected.
 func (gf *GradleFlexPack) getBuildFileContent(moduleName string) ([]byte, string, error) {
 	subPath := ""
 	if moduleName != "" {
@@ -105,7 +103,6 @@ func (gf *GradleFlexPack) getBuildFileContent(moduleName string) ([]byte, string
 	buildGradlePath := filepath.Join(gf.config.WorkingDirectory, subPath, "build.gradle")
 	buildGradleKtsPath := filepath.Join(gf.config.WorkingDirectory, subPath, "build.gradle.kts")
 
-	// Validate paths
 	if !gf.validatePathWithinWorkingDir(buildGradlePath) {
 		return nil, "", fmt.Errorf("path traversal attempt detected for module %s (build.gradle)", moduleName)
 	}
@@ -122,12 +119,9 @@ func (gf *GradleFlexPack) getBuildFileContent(moduleName string) ([]byte, string
 		content, err := os.ReadFile(buildGradleKtsPath)
 		return content, buildGradleKtsPath, err
 	}
-
 	return nil, "", fmt.Errorf("neither build.gradle nor build.gradle.kts found")
 }
 
-// readSettingsFile reads the settings.gradle or settings.gradle.kts file.
-// Returns the content if found, or empty string and nil error if not found.
 func (gf *GradleFlexPack) readSettingsFile() (string, error) {
 	settingsPath := filepath.Join(gf.config.WorkingDirectory, "settings.gradle")
 	settingsKtsPath := filepath.Join(gf.config.WorkingDirectory, "settings.gradle.kts")
