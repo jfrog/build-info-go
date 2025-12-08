@@ -48,13 +48,11 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 		return nil, fmt.Errorf("gradle command failed: %s - %w", string(output), err)
 	}
 
-	// Read manifest
 	manifestPath := filepath.Join(gf.config.WorkingDirectory, "build", "ci-artifacts-manifest.json")
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read manifest: %w", err)
 	}
-	// Delete manifest file
 	if err := os.Remove(manifestPath); err != nil {
 		log.Warn("Failed to delete manifest file: " + err.Error())
 	}
@@ -66,7 +64,6 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 
 	result := make(map[string][]entities.Artifact)
 	for _, art := range artifacts {
-		// Normalize module name (strip leading colon from :app)
 		moduleName := strings.TrimPrefix(art.ModuleName, ":")
 		// Handle root project if it returns just "::"
 		if moduleName == ":" {
@@ -88,7 +85,6 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 	return result, nil
 }
 
-// We will only try to find in local build only if it is a publish command
 func (gf *GradleFlexPack) calculateChecksumWithFallback(dep flexpack.DependencyInfo) map[string]interface{} {
 	checksumMap := map[string]interface{}{
 		"id":      dep.ID,
@@ -129,8 +125,5 @@ func (gf *GradleFlexPack) calculateChecksumWithFallback(dep flexpack.DependencyI
 		}
 		log.Debug(fmt.Sprintf("Failed to calculate checksum for artifact: %s", artifactPath))
 	}
-
-	// Failed to find checksums
 	return nil
 }
-

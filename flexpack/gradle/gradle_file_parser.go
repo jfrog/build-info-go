@@ -21,7 +21,6 @@ var (
 )
 
 func (gf *GradleFlexPack) parseBuildGradleMetadata(content string) (groupId, artifactId, version string) {
-	// Extract group (groupId)
 	groupMatch := groupRegex.FindStringSubmatch(content)
 	if len(groupMatch) > 1 {
 		groupId = groupMatch[1]
@@ -49,7 +48,6 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) {
 	contentBytes, _, err := gf.getBuildFileContent(moduleName)
 	if err != nil {
 		if moduleName == "" && gf.buildGradlePath == "" {
-			// Silent return if root build.gradle is missing/not set yet (though it should be)
 			return
 		}
 		log.Warn("Failed to read build.gradle for dependency parsing: " + err.Error())
@@ -113,11 +111,9 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) {
 			continue
 		}
 		configType := match[1]
-		// e.g. :utils or :libs:utils
 		projectPath := match[2]
 		projectPath = strings.TrimPrefix(projectPath, ":")
 
-		// Default to project structure if not found
 		parts := strings.Split(projectPath, ":")
 		artifactId := parts[len(parts)-1]
 		groupId := gf.groupId
@@ -128,7 +124,6 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) {
 			version = meta.Version
 			artifactId = meta.Artifact
 		}
-
 		gf.addDependency(configType, groupId, artifactId, version, "", allDeps)
 	}
 	for _, dep := range allDeps {
@@ -322,17 +317,14 @@ func (gf *GradleFlexPack) stripComments(content string) string {
 			}
 			continue
 		}
-
 		result.WriteByte(char)
 		i++
 	}
-
 	return result.String()
 }
 
 // parseSettingsGradleModules parses the settings.gradle content to extract modules
 func (gf *GradleFlexPack) parseSettingsGradleModules(content string) []string {
-	// Strip comments before parsing
 	strippedContent := gf.stripComments(content)
 
 	var modules []string
@@ -345,7 +337,6 @@ func (gf *GradleFlexPack) parseSettingsGradleModules(content string) []string {
 			matches := includeRegex.FindAllStringSubmatch(trimmed, -1)
 			for _, match := range matches {
 				if len(match) > 1 {
-					// Clean up potential leading colons sometimes used in include ':app'
 					moduleName := strings.TrimPrefix(match[1], ":")
 					if moduleName != "" {
 						modules = append(modules, moduleName)

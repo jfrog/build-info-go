@@ -11,13 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ============================================================================
-// Tests for gradle_cli_parser.go
-// - Configuration to scope mapping
-// - Dependency tree parsing
-// - Gradle CLI output parsing
-// ============================================================================
-
 // TestConfigurationToScopeMapping tests scope mapping for Gradle configurations
 func TestConfigurationToScopeMapping(t *testing.T) {
 	tempDir := t.TempDir()
@@ -209,4 +202,3 @@ dependencies {
 	require.NoError(t, err)
 	assert.NotNil(t, buildInfo)
 }
-
