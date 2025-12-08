@@ -11,13 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ============================================================================
-// Tests for gradle_artifacts.go
-// - Deployed artifact extraction
-// - Checksum calculation with fallback
-// - Artifact name normalization
-// ============================================================================
-
 // TestBuildInfoDependencyChecksums tests checksum fields on dependencies
 func TestBuildInfoDependencyChecksums(t *testing.T) {
 	tempDir := t.TempDir()
@@ -121,4 +114,3 @@ dependencies {
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradleContent), 0644)
 	require.NoError(t, err, "Should create minimal build.gradle")
 }
-

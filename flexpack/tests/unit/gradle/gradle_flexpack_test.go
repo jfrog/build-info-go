@@ -13,17 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ============================================================================
-// Tests for gradle_flexpack.go
-// - NewGradleFlexPack initialization
-// - CollectBuildInfo functionality
-// - Module processing
-// - Build info structure
-// - Multi-module projects
-// ============================================================================
-
-// --- NewGradleFlexPack Tests ---
-
 // TestEmptyWorkingDirectory tests error handling for empty working directory
 func TestEmptyWorkingDirectory(t *testing.T) {
 	config := flexpack.GradleConfig{WorkingDirectory: ""}
@@ -52,8 +41,6 @@ func TestNoBuildFileGracefulHandling(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, buildInfo)
 }
-
-// --- CollectBuildInfo Tests ---
 
 // TestCollectBuildInfoBasic tests basic build info collection
 func TestCollectBuildInfoBasic(t *testing.T) {
@@ -165,8 +152,6 @@ func TestCollectBuildInfoWithDifferentInstances(t *testing.T) {
 		assert.Equal(t, buildInfo1.Modules[0].Id, buildInfo2.Modules[0].Id)
 	}
 }
-
-// --- Build Info Structure Tests ---
 
 // TestBuildInfoAgentInfo tests agent information in build info
 func TestBuildInfoAgentInfo(t *testing.T) {
@@ -326,8 +311,6 @@ version = '1.0.0'
 		assert.Equal(t, tc.number, buildInfo.Number)
 	}
 }
-
-// --- Multi-Module Project Tests ---
 
 // TestMultiModuleBuildInfoStructure tests build info structure for multi-module projects
 func TestMultiModuleBuildInfoStructure(t *testing.T) {
@@ -675,8 +658,6 @@ dependencies {
 	assert.NotNil(t, buildInfoWithoutTests)
 }
 
-// --- CalculateRequestedBy Tests ---
-
 // TestCalculateRequestedBy tests the CalculateRequestedBy method
 func TestCalculateRequestedBy(t *testing.T) {
 	tempDir := t.TempDir()
@@ -703,8 +684,6 @@ dependencies {
 	requestedBy := gf.CalculateRequestedBy()
 	assert.NotNil(t, requestedBy, "RequestedBy map should not be nil")
 }
-
-// --- Helper Functions ---
 
 func setupMinimalGradleProject(t *testing.T, tempDir string) {
 	buildGradleContent := `plugins {

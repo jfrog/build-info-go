@@ -85,7 +85,6 @@ func (gf *GradleFlexPack) loadBuildGradle() error {
 	gf.groupId, gf.artifactId, gf.projectVersion = gf.parseBuildGradleMetadata(content)
 
 	// Always check settings.gradle for rootProject.name as authoritative source
-	// (nameRegex in parseBuildGradleMetadata can have false positives from task definitions)
 	settingsContent, err := gf.readSettingsFile()
 	if err != nil {
 		log.Debug("Failed to read settings file: " + err.Error())
@@ -135,7 +134,6 @@ func (gf *GradleFlexPack) scanAllModules() {
 }
 
 func (gf *GradleFlexPack) resolveModuleInfo(moduleName string) (moduleMetadata, bool) {
-	// Validate module path to prevent path traversal attacks
 	if moduleName != "" {
 		subPath := strings.ReplaceAll(moduleName, ":", string(filepath.Separator))
 		modulePath := filepath.Join(gf.config.WorkingDirectory, subPath)
@@ -153,7 +151,6 @@ func (gf *GradleFlexPack) resolveModuleInfo(moduleName string) (moduleMetadata, 
 		finalArtifact = gf.artifactId
 		finalVersion = gf.projectVersion
 	} else {
-		// Submodule: parse from its build.gradle
 		g, a, v := gf.getModuleMetadata(moduleName)
 
 		finalGroup = gf.groupId
@@ -166,11 +163,9 @@ func (gf *GradleFlexPack) resolveModuleInfo(moduleName string) (moduleMetadata, 
 			finalVersion = v
 		}
 
-		// Use parsed artifact name or derive from full module path
 		if a != "" {
 			finalArtifact = a
 		} else {
-			// Use full module path with colons replaced by hyphens to ensure uniqueness
 			finalArtifact = strings.ReplaceAll(moduleName, ":", "-")
 		}
 	}
@@ -188,7 +183,6 @@ func (gf *GradleFlexPack) getModules() ([]string, error) {
 		return []string{""}, err
 	}
 	if content == "" {
-		// If no settings file, assume single root module
 		return []string{""}, nil
 	}
 
@@ -256,7 +250,6 @@ func (gf *GradleFlexPack) getGradleVersion() string {
 
 // We might need to process modules parallelly for better performance
 func (gf *GradleFlexPack) processModule(moduleName string) (entities.Module, error) {
-	// Determine module identity early using pre-calculated map
 	groupId := gf.groupId
 	version := gf.projectVersion
 	artifactId := gf.artifactId
@@ -273,7 +266,6 @@ func (gf *GradleFlexPack) processModule(moduleName string) (entities.Module, err
 
 	gf.parseModuleDependencies(moduleName)
 	requestedByMap := gf.CalculateRequestedBy()
-
 	dependencies := gf.createDependencyEntities(requestedByMap)
 
 	return entities.Module{
