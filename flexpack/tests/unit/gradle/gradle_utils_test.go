@@ -12,20 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ============================================================================
-// Tests for gradle_utils.go
-// - Gradle executable path detection (gradlew/gradlew.bat)
-// - Command execution and timeout
-// - Path validation and security
-// - Build file content reading
-// - Settings file reading
-// - Scope validation and normalization
-// - Gradle cache artifact finding
-// - Checksum calculation
-// ============================================================================
-
-// --- Gradle Executable Detection Tests ---
-
 // TestGradlewWrapperDetection tests that projects with gradlew wrapper are handled correctly
 func TestGradlewWrapperDetection(t *testing.T) {
 	tempDir := t.TempDir()
@@ -87,8 +73,6 @@ version = '1.0.0'
 	assert.NotNil(t, gf)
 }
 
-// --- Command Timeout Tests ---
-
 // TestDefaultCommandTimeout tests that default timeout is applied
 func TestDefaultCommandTimeout(t *testing.T) {
 	tempDir := t.TempDir()
@@ -125,8 +109,6 @@ version = '1.0.0'
 	require.NoError(t, err)
 	assert.NotNil(t, gf)
 }
-
-// --- Path Validation Tests ---
 
 // TestWorkingDirectoryWithSpacesInPath tests paths containing spaces
 func TestWorkingDirectoryWithSpacesInPath(t *testing.T) {
@@ -248,8 +230,6 @@ version = '1.0.0'
 	require.NoError(t, err)
 	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.symlink")
 }
-
-// --- Build File Reading Tests ---
 
 // TestBuildGradlePreferredOverKts tests that build.gradle is preferred when both exist
 func TestBuildGradlePreferredOverKts(t *testing.T) {

@@ -11,16 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ============================================================================
-// Tests for gradle_file_parser.go
-// - build.gradle metadata parsing (group, version, name)
-// - Dependency notation parsing (string, map, project)
-// - settings.gradle parsing (rootProject.name, include statements)
-// - Comment stripping
-// ============================================================================
-
-// --- Group/Version Parsing Tests ---
-
 // TestParseGroupIdWithSingleQuotes tests parsing group with single quotes
 func TestParseGroupIdWithSingleQuotes(t *testing.T) {
 	tempDir := t.TempDir()
@@ -132,8 +122,6 @@ group = 'com.example'
 	require.NoError(t, err)
 	assert.Contains(t, buildInfo.Modules[0].Id, "unspecified")
 }
-
-// --- Dependency Notation Parsing Tests ---
 
 // TestDependencyStringNotation tests parsing dependencies with string notation
 func TestDependencyStringNotation(t *testing.T) {
@@ -328,8 +316,6 @@ dependencies {
 	assert.NotNil(t, buildInfo)
 }
 
-// --- Kotlin DSL Parsing Tests ---
-
 // TestKotlinDSLDependencies tests parsing Kotlin DSL dependency declarations
 func TestKotlinDSLDependencies(t *testing.T) {
 	tempDir := t.TempDir()
@@ -358,8 +344,6 @@ dependencies {
 	require.NoError(t, err)
 	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.kotlin")
 }
-
-// --- Settings Parsing Tests ---
 
 // TestSettingsGradleParsing tests parsing of settings.gradle for project name
 func TestSettingsGradleParsing(t *testing.T) {
@@ -563,8 +547,6 @@ includeBuild("../another-project")
 	}
 }
 
-// --- Malformed/Edge Case Tests ---
-
 // TestMalformedBuildGradle tests handling of syntactically incorrect build files
 func TestMalformedBuildGradle(t *testing.T) {
 	tempDir := t.TempDir()
@@ -684,4 +666,3 @@ dependencies {
 	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.spring")
 	assert.Contains(t, buildInfo.Modules[0].Id, "1.0.0")
 }
-
