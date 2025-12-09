@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ import (
 func TestNewHelmFlexPack_HelmCLINotFound(t *testing.T) {
 	tempDir := t.TempDir()
 	createValidChartYAML(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	// Save original PATH
 	originalPath := os.Getenv("PATH")
@@ -47,6 +49,7 @@ func TestNewHelmFlexPack_LoadsChartYAML(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createValidChartYAML(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -100,6 +103,7 @@ invalid: [unclosed bracket
 `
 	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(invalidYAML), 0644)
 	require.NoError(t, err)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -116,6 +120,7 @@ func TestFindHelmExecutable(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createValidChartYAML(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -139,6 +144,7 @@ func TestGetDependency(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createChartYAMLWithDependencies(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -168,6 +174,7 @@ func TestParseDependencyToList(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createChartYAMLWithDependencies(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -199,6 +206,7 @@ func TestCalculateChecksum(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createChartYAMLWithDependencies(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -253,6 +261,7 @@ func TestCalculateScopes(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createValidChartYAML(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -281,6 +290,7 @@ func TestCalculateRequestedBy(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createChartYAMLWithDependencies(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -311,6 +321,7 @@ func TestParseHelmDependencyList(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createChartYAMLWithDependencies(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -360,6 +371,7 @@ func TestBuildDependencyGraph(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createChartYAMLWithDependencies(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -391,6 +403,7 @@ func TestExtractTgz_PathTraversal(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createValidChartYAML(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -436,6 +449,7 @@ func TestFindChartDirectoryInExtracted(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createChartYAMLWithDependencies(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -477,6 +491,7 @@ func TestCalculateChecksumWithFallback(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createChartYAMLWithDependencies(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -523,6 +538,7 @@ func TestFindChartFile(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createValidChartYAML(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -566,6 +582,7 @@ func TestGetCacheDirectories(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createValidChartYAML(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -605,6 +622,7 @@ func TestCollectBuildInfo(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createChartYAMLWithDependencies(t, tempDir)
+	createValidChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -639,6 +657,7 @@ func TestCollectBuildInfo_Performance(t *testing.T) {
 
 	tempDir := t.TempDir()
 	createLargeChartYAML(t, tempDir)
+	createLargeChartLock(t, tempDir)
 
 	config := flexpack.HelmConfig{
 		WorkingDirectory: tempDir,
@@ -706,7 +725,7 @@ type warningFilterWriter struct {
 func (w *warningFilterWriter) Write(p []byte) (n int, err error) {
 	// Buffer the data to check for complete lines
 	w.buffer = append(w.buffer, p...)
-	
+
 	// Process complete lines
 	for {
 		newlineIndex := -1
@@ -716,22 +735,22 @@ func (w *warningFilterWriter) Write(p []byte) (n int, err error) {
 				break
 			}
 		}
-		
+
 		if newlineIndex == -1 {
 			// No complete line yet, wait for more data
 			return len(p), nil
 		}
-		
+
 		// Extract line
 		line := string(w.buffer[:newlineIndex+1])
 		w.buffer = w.buffer[newlineIndex+1:]
-		
+
 		// Filter out expected warnings about missing dependencies
 		if strings.Contains(line, "[Warn]") && strings.Contains(line, "Could not find dependency") {
 			// Skip this warning line
 			continue
 		}
-		
+
 		// Write non-filtered lines to original stderr
 		_, writeErr := w.original.Write([]byte(line))
 		if writeErr != nil {
@@ -781,8 +800,8 @@ func createLargeChartYAML(t *testing.T, dir string) {
 	// Create a chart with many dependencies
 	var deps []string
 	for i := 0; i < 20; i++ {
-		depName := "dep" + string(rune('0'+i%10))
-		depVersion := "1.0." + string(rune('0'+i))
+		depName := "dep" + strconv.Itoa(i%10)
+		depVersion := "1.0." + strconv.Itoa(i)
 		deps = append(deps, `  - name: `+depName+`
     version: "`+depVersion+`"
     repository: "https://charts.example.com"`)
@@ -796,6 +815,26 @@ type: application
 dependencies:
 ` + strings.Join(deps, "\n")
 	err := os.WriteFile(filepath.Join(dir, "Chart.yaml"), []byte(chartYAML), 0644)
+	require.NoError(t, err)
+}
+
+func createLargeChartLock(t *testing.T, dir string) {
+	// Create a Chart.lock with many dependencies matching createLargeChartYAML
+	var deps []string
+	for i := 0; i < 20; i++ {
+		depName := "dep" + strconv.Itoa(i%10)
+		depVersion := "1.0." + strconv.Itoa(i)
+		deps = append(deps, `  - name: `+depName+`
+    version: "`+depVersion+`"
+    repository: "https://charts.example.com"
+    digest: sha256:`+depName+`-`+depVersion+`-digest`)
+	}
+
+	chartLock := `generated: "2024-01-01T00:00:00Z"
+digest: sha256:test-digest
+dependencies:
+` + strings.Join(deps, "\n")
+	err := os.WriteFile(filepath.Join(dir, "Chart.lock"), []byte(chartLock), 0644)
 	require.NoError(t, err)
 }
 
