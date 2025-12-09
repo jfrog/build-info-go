@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jfrog/build-info-go/entities"
@@ -24,16 +23,15 @@ const (
 
 // HelmFlexPack implements the FlexPackManager interface for Helm package manager
 type HelmFlexPack struct {
-	config          HelmConfig
-	dependencies    []DependencyInfo
-	dependencyGraph map[string][]string
-	chartData       *HelmChartYAML
-	lockData        *HelmChartLock
-	cliPath         string
-	cacheIndex      map[string]string
-	cacheIndexBuilt bool
-	repoAliases     map[string]string // Maps repository alias (without @) to URL
-	mu              sync.RWMutex
+	config           HelmConfig
+	dependencies     []DependencyInfo
+	dependencyGraph  map[string][]string
+	chartData        *HelmChartYAML
+	lockData         *HelmChartLock
+	cliPath          string
+	cacheIndex       map[string]string
+	repoAliases      map[string]string
+	cacheDirectories []string
 }
 
 // HelmConfig represents configuration for Helm FlexPack
@@ -125,8 +123,14 @@ func NewHelmFlexPack(config HelmConfig) (*HelmFlexPack, error) {
 		return nil, fmt.Errorf("failed to load Chart.yaml: %w", err)
 	}
 
-	// Load Chart.lock if it exists (optional)
-	_ = hf.loadChartLock() // Ignore error if lock file doesn't exist
+	// Load Chart.lock
+	if err := hf.loadChartLock(); err != nil {
+		return nil, fmt.Errorf("failed to load Chart.lock: %w", err)
+	}
+
+	// Load cache directories and build cache index during initialization
+	hf.cacheDirectories = hf.loadCacheDirectories()
+	hf.buildCacheIndex()
 
 	return hf, nil
 }
@@ -177,9 +181,6 @@ func (hf *HelmFlexPack) loadChartLock() error {
 
 	data, err := os.ReadFile(lockPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil // Chart.lock is optional
-		}
 		return fmt.Errorf("failed to read Chart.lock: %w", err)
 	}
 
@@ -193,115 +194,16 @@ func (hf *HelmFlexPack) loadChartLock() error {
 
 // getDependencies returns all dependencies (lazy loading)
 func (hf *HelmFlexPack) getDependencies() []DependencyInfo {
-	hf.mu.RLock()
 	if len(hf.dependencies) > 0 {
 		deps := hf.dependencies
-		hf.mu.RUnlock()
 		return deps
 	}
-	hf.mu.RUnlock()
-	hf.mu.Lock()
-	defer hf.mu.Unlock()
-	// Double-check after acquiring write lock
-	if len(hf.dependencies) > 0 {
-		return hf.dependencies
-	}
-	// Resolve dependencies using hybrid approach
-	if err := hf.resolveDependencies(); err != nil {
-		// Fallback to file-based parsing if helm dependency list fails
-		hf.parseDependenciesFromChartYamlAndLockfile()
-	}
+	// Parse dependencies directly from Chart.yaml and Chart.lock
+	hf.parseDependenciesFromChartYamlAndLockfile()
 	return hf.dependencies
 }
 
-// resolveDependencies uses CLI to resolve dependencies (primary strategy)
-func (hf *HelmFlexPack) resolveDependencies() error {
-	// Try using helm dependency list command
-	cmd := exec.Command(hf.cliPath, "dependency", "list")
-	cmd.Dir = hf.config.WorkingDirectory
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		outputStr := strings.TrimSpace(string(output))
-		if outputStr != "" {
-			return fmt.Errorf("helm dependency list failed: %w\nOutput: %s", err, outputStr)
-		}
-		return fmt.Errorf("helm dependency list failed: %w", err)
-	}
-	return hf.parseHelmDependencyList(string(output))
-}
-
-// parseHelmDependencyList parses output from `helm dependency list`
-// Only includes dependencies that are declared in the current chart's Chart.yaml
-func (hf *HelmFlexPack) parseHelmDependencyList(output string) error {
-	scanner := bufio.NewScanner(strings.NewReader(output))
-	headerSkipped := false
-	// Build a set of valid dependency names from Chart.yaml to filter out dependencies from other directories
-	validDependencyNames := hf.getValidDependencyNames()
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		if !headerSkipped && hf.isHeaderLine(line) {
-			headerSkipped = true
-			continue
-		}
-		headerSkipped = true
-		if dep := hf.parseDependencyLine(line); dep != nil {
-			// Only include dependencies that are declared in the current chart's Chart.yaml
-			if !hf.isValidDependency(dep.Name, validDependencyNames) {
-				continue
-			}
-			// Resolve repository alias if needed
-			hf.resolveRepositoryAlias(dep)
-			hf.dependencies = append(hf.dependencies, *dep)
-		}
-	}
-	return scanner.Err()
-}
-
-// getValidDependencyNames returns a set of dependency names declared in Chart.yaml
-func (hf *HelmFlexPack) getValidDependencyNames() map[string]bool {
-	validNames := make(map[string]bool)
-	if hf.chartData == nil {
-		return validNames
-	}
-	for _, dep := range hf.chartData.Dependencies {
-		validNames[dep.Name] = true
-	}
-	return validNames
-}
-
-// isValidDependency checks if a dependency name is declared in the current chart's Chart.yaml
-func (hf *HelmFlexPack) isValidDependency(depName string, validNames map[string]bool) bool {
-	// Only include dependencies that are explicitly declared in Chart.yaml
-	// This filters out dependencies from other directories that helm dependency list might return
-	return validNames[depName]
-}
-
-// isHeaderLine checks if a line is the header line
-func (hf *HelmFlexPack) isHeaderLine(line string) bool {
-	return strings.Contains(line, "NAME")
-}
-
-// parseDependencyLine parses a single dependency line from helm dependency list output
-// Format: NAME    VERSION    REPOSITORY    STATUS
-func (hf *HelmFlexPack) parseDependencyLine(line string) *DependencyInfo {
-	fields := strings.Fields(line)
-	if len(fields) < 3 {
-		return nil
-	}
-	return &DependencyInfo{
-		Name:       fields[0],
-		Version:    fields[1],
-		Repository: fields[2],
-		Type:       "helm",
-		ID:         fmt.Sprintf("%s:%s", fields[0], fields[1]),
-	}
-}
-
 // getHelmRepoList gets and parses the output of 'helm repo list' command
-// Returns a map of repository alias (without @) to URL
 func (hf *HelmFlexPack) getHelmRepoList() (map[string]string, error) {
 	cmd := exec.Command(hf.cliPath, "repo", "list")
 	output, err := cmd.CombinedOutput()
@@ -356,18 +258,14 @@ func (hf *HelmFlexPack) resolveRepositoryAlias(dep *DependencyInfo) {
 	// Extract alias name (remove @ prefix)
 	alias := strings.TrimPrefix(dep.Repository, "@")
 
-	// Load repo list if not already loaded
-	hf.mu.Lock()
 	if len(hf.repoAliases) == 0 {
 		repoMap, err := hf.getHelmRepoList()
 		if err != nil {
 			log.Warn(fmt.Sprintf("Failed to get helm repo list: %v", err))
-			hf.mu.Unlock()
 			return
 		}
 		hf.repoAliases = repoMap
 	}
-	hf.mu.Unlock()
 
 	// Resolve alias to URL
 	if url, found := hf.repoAliases[alias]; found {
@@ -445,7 +343,6 @@ func (hf *HelmFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[st
 	}
 
 	// Strategy 2: Try to find dependency chart in charts/ directory
-	// When helm dependency build/update is run, dependencies are stored in charts/ subdirectory
 	if chartFile := hf.findDependencyInChartsDir(dep.Name, dep.Version); chartFile != "" {
 		if Sha1, Sha256, Md5, err := hf.calculateFileChecksum(chartFile); err == nil {
 			checksumMap["sha1"] = Sha1
@@ -464,11 +361,6 @@ func (hf *HelmFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[st
 
 // findChartFile searches for chart archive in Helm cache
 func (hf *HelmFlexPack) findChartFile(name, version string) string {
-	// Build cache index if not already built
-	if !hf.cacheIndexBuilt {
-		hf.buildCacheIndex()
-		hf.cacheIndexBuilt = true
-	}
 	key := fmt.Sprintf("%s-%s", name, version)
 	if path, found := hf.cacheIndex[key]; found {
 		return path
@@ -493,12 +385,8 @@ func (hf *HelmFlexPack) findDependencyInChartsDir(name, version string) string {
 }
 
 // buildCacheIndex builds an index of cached chart files
-// Validates cache directories to prevent path traversal attacks
 func (hf *HelmFlexPack) buildCacheIndex() {
-	cacheDirs := hf.getCacheDirectories()
-	for _, cacheDir := range cacheDirs {
-		// Additional validation at point of use to prevent path traversal
-		// Even though getCacheDirectories() sanitizes paths, we validate again here
+	for _, cacheDir := range hf.cacheDirectories {
 		cleanDir := filepath.Clean(cacheDir)
 		if cleanDir == "" || cleanDir == "." || cleanDir == ".." {
 			continue
@@ -566,8 +454,7 @@ func (hf *HelmFlexPack) buildCacheIndex() {
 
 // recursiveSearchCache performs recursive search for chart files
 func (hf *HelmFlexPack) searchCache(name, version string) string {
-	cacheDirs := hf.getCacheDirectories()
-	for _, cacheDir := range cacheDirs {
+	for _, cacheDir := range hf.cacheDirectories {
 		if foundPath := hf.searchCacheDirectory(cacheDir, name, version); foundPath != "" {
 			return foundPath
 		}
@@ -653,13 +540,11 @@ func (hf *HelmFlexPack) findFileInDirectory(dir, pattern string) string {
 	return foundPath
 }
 
-// getCacheDirectories returns Helm cache directory paths
-// Validates and sanitizes paths to prevent path traversal attacks
-func (hf *HelmFlexPack) getCacheDirectories() []string {
+// loadCacheDirectories loads and returns Helm cache directory paths
+func (hf *HelmFlexPack) loadCacheDirectories() []string {
 	var paths []string
 
 	// Environment variable override (highest priority)
-	// Validate and sanitize environment variable path to prevent path traversal
 	if envPath := os.Getenv("HELM_REPOSITORY_CACHE"); envPath != "" {
 		// Sanitize the path
 		cleanPath := filepath.Clean(envPath)
@@ -723,6 +608,7 @@ func (hf *HelmFlexPack) getCacheDirectories() []string {
 			existingPaths = append(existingPaths, absPath)
 		}
 	}
+
 	return existingPaths
 }
 
