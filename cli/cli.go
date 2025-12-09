@@ -373,26 +373,60 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			UsageText: "bi poetry",
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
-				// Use Poetry implementation for proper dependency collection
-				config := flexpack.PoetryConfig{
-					WorkingDirectory:       ".",
-					IncludeDevDependencies: false, // Can be made configurable later
+				// Check if FlexPack implementation should be used
+				if flexpack.IsFlexPackEnabled() {
+					// Use Poetry FlexPack implementation for proper dependency collection
+					config := flexpack.PoetryConfig{
+						WorkingDirectory:       ".",
+						IncludeDevDependencies: false, // Can be made configurable later
+					}
+
+					// Create Poetry instance
+					poetryFlex, err := flexpack.NewPoetryFlexPack(config)
+					if err != nil {
+						return fmt.Errorf("failed to create Poetry instance: %w", err)
+					}
+
+					// Collect build info
+					buildInfo, err := poetryFlex.CollectBuildInfo("poetry-build", "1")
+					if err != nil {
+						return fmt.Errorf("failed to collect build info: %w", err)
+					}
+
+					// Print the build info
+					return printBuildInfo(buildInfo, context.String(formatFlag))
 				}
 
-				// Create Poetry instance
-				poetryFlex, err := flexpack.NewPoetryFlexPack(config)
+				// Use traditional build-info-go implementation
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("poetry-build", "1")
 				if err != nil {
-					return fmt.Errorf("failed to create Poetry instance: %w", err)
+					return
 				}
-
-				// Collect build info
-				buildInfo, err := poetryFlex.CollectBuildInfo("poetry-build", "1")
+				defer func() {
+					err = errors.Join(err, bld.Clean())
+				}()
+				pythonModule, err := bld.AddPythonModule("", pythonutils.Poetry)
 				if err != nil {
-					return fmt.Errorf("failed to collect build info: %w", err)
+					return
 				}
-
-				// Print the build info
-				return printBuildInfo(buildInfo, context.String(formatFlag))
+				filteredArgs := filterCliFlags(context.Args().Slice(), flags)
+				if len(filteredArgs) > 0 && (filteredArgs[0] == "install" || filteredArgs[0] == "publish") {
+					err = pythonModule.RunInstallAndCollectDependencies(filteredArgs[1:])
+					if err != nil {
+						return
+					}
+					return printBuild(bld, context.String(formatFlag))
+				} else if len(filteredArgs) > 0 {
+					return exec.Command("poetry", filteredArgs...).Run()
+				}
+				// If no args, just collect dependencies
+				err = pythonModule.RunInstallAndCollectDependencies([]string{})
+				if err != nil {
+					return
+				}
+				return printBuild(bld, context.String(formatFlag))
 			},
 		},
 	}
