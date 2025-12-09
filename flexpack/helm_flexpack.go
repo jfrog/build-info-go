@@ -609,6 +609,7 @@ func (hf *HelmFlexPack) loadCacheDirectories() []string {
 			existingPaths = append(existingPaths, absPath)
 		}
 	}
+
 	return existingPaths
 }
 
