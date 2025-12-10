@@ -36,6 +36,7 @@ const (
 	Python    ModuleType = "python"
 	Terraform ModuleType = "terraform"
 	Conan     ModuleType = "conan"
+	Helm      ModuleType = "helm"
 )
 
 type BuildInfo struct {
@@ -495,6 +496,7 @@ type Dependency struct {
 	Type        string     `json:"type,omitempty"`
 	Scopes      []string   `json:"scopes,omitempty"`
 	RequestedBy [][]string `json:"requestedBy,omitempty"`
+	Repository  string     `json:"repository,omitempty"`
 	Checksum
 }
 
@@ -510,10 +512,6 @@ func (d *Dependency) IsEqual(other Dependency) (bool, error) {
 		return false, err
 	}
 	return d.Type == other.Type && compareutils.IsEqualSlices(d.Scopes, other.Scopes) && compareutils.IsEqual2DSlices(d.RequestedBy, other.RequestedBy), nil
-}
-
-func IsEqualDependencySlices(actual, other []Dependency) (bool, error) {
-	return IsEqualModuleSlices([]Module{{Dependencies: actual}}, []Module{{Dependencies: other}})
 }
 
 func isEqualDependencySlices(actual, other []Dependency) (bool, error) {
