@@ -601,42 +601,34 @@ func (cf *ConanFlexPack) calculateFileChecksum(filePath string) (string, string,
 }
 
 // validateAndNormalizeScopes ensures scopes are valid and normalized
-// Similar to Maven's validateAndNormalizeScopes()
-// Supports all Conan dependency scopes
 func (cf *ConanFlexPack) validateAndNormalizeScopes(scopes []string) []string {
 	validScopes := map[string]bool{
-		"runtime": true, // Regular requires (host context)
-		"build":   true, // build_requires / tool_requires
-		"test":    true, // test_requires
-		"python":  true, // python_requires
+		"runtime": true,
+		"build":   true,
+		"test":    true,
+		"python":  true,
 	}
-
 	var normalized []string
 	for _, scope := range scopes {
 		if validScopes[scope] {
 			normalized = append(normalized, scope)
 		}
 	}
-
 	if len(normalized) == 0 {
-		normalized = []string{"runtime"} // Default Conan scope (like Maven's compile)
+		normalized = []string{"runtime"} // Default Conan scope
 	}
-
 	return normalized
 }
 
 // buildRequestedByMapFromGraph builds the requested-by relationship map from graph data
-// This is a fallback for when requestedBy wasn't built during graph parsing
 func (cf *ConanFlexPack) buildRequestedByMapFromGraph() {
 	if cf.graphData == nil {
 		return
 	}
-
 	if cf.requestedByMap == nil {
 		cf.requestedByMap = make(map[string][]string)
 	}
-
-	// Build from dependency graph if we have one
+	// Build from dependency graph
 	for parent, children := range cf.dependencyGraph {
 		for _, child := range children {
 			cf.addRequestedBy(child, parent)
@@ -645,20 +637,16 @@ func (cf *ConanFlexPack) buildRequestedByMapFromGraph() {
 }
 
 // CollectBuildInfo collects complete build information for Conan project
-// Mirrors Maven's CollectBuildInfo() exactly
 func (cf *ConanFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities.BuildInfo, error) {
 	if len(cf.dependencies) == 0 {
 		cf.parseDependencies()
 	}
-
 	requestedByMap := cf.CalculateRequestedBy()
 	var dependencies []entities.Dependency
-
 	for _, dep := range cf.dependencies {
-		// Try to calculate checksum for this specific dependency (like Maven)
+		// Try to calculate checksum for this specific dependency
 		checksumMap := cf.calculateChecksumWithFallback(dep)
-
-		// Convert checksum map to entities.Checksum struct (like Maven)
+		// Convert checksum map to entities.Checksum struct
 		checksum := entities.Checksum{}
 		if checksumMap != nil {
 			if sha1, ok := checksumMap["sha1"].(string); ok {
@@ -671,23 +659,18 @@ func (cf *ConanFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 				checksum.Md5 = md5
 			}
 		}
-
 		entity := entities.Dependency{
 			Id:       dep.ID,
 			Type:     dep.Type,
 			Scopes:   dep.Scopes,
 			Checksum: checksum,
 		}
-
-		// Add requested-by relationships (like Maven)
+		// Add requested-by relationships
 		if requesters, exists := requestedByMap[dep.ID]; exists && len(requesters) > 0 {
 			entity.RequestedBy = [][]string{requesters}
 		}
-
 		dependencies = append(dependencies, entity)
 	}
-
-	// Create build info using existing factory method (following Maven pattern)
 	buildInfo := &entities.BuildInfo{
 		Name:    buildName,
 		Number:  buildNumber,
@@ -702,39 +685,28 @@ func (cf *ConanFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 		},
 		Modules: []entities.Module{},
 	}
-
-	// Add Conan module (like Maven adds Maven module)
+	// Add Conan module
 	moduleId := fmt.Sprintf("%s:%s", cf.projectName, cf.projectVersion)
 	if cf.user != "_" && cf.channel != "_" {
 		moduleId = fmt.Sprintf("%s/%s@%s/%s", cf.projectName, cf.projectVersion, cf.user, cf.channel)
 	}
-
-	// NOTE: We do NOT collect local artifacts here because they won't exist in Artifactory
-	// until conan upload is run. Artifacts should only be collected from Artifactory
-	// after upload, where build properties can be set on them.
-	// The upload flow in ProcessUpload handles artifact collection from Artifactory.
-
 	module := entities.Module{
 		Id:           moduleId,
-		Type:         entities.Conan, // Use proper ModuleType constant
+		Type:         entities.Conan,
 		Dependencies: dependencies,
-		// Artifacts will be added later from Artifactory in the upload flow
 	}
 	buildInfo.Modules = append(buildInfo.Modules, module)
-
 	// Collect VCS (Git) information if available
 	vcsInfo := cf.collectVcsInfo()
 	if vcsInfo != nil {
 		buildInfo.VcsList = append(buildInfo.VcsList, *vcsInfo)
 	}
-
 	return buildInfo, nil
 }
 
 // collectVcsInfo collects Git VCS information from the project directory
 func (cf *ConanFlexPack) collectVcsInfo() *entities.Vcs {
 	workDir := cf.config.WorkingDirectory
-
 	// Check if this is a git repository
 	gitDir := filepath.Join(workDir, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
@@ -757,54 +729,44 @@ func (cf *ConanFlexPack) collectVcsInfo() *entities.Vcs {
 			return nil
 		}
 	}
-
 	vcs := &entities.Vcs{}
-
 	// Get remote URL
 	urlCmd := exec.Command("git", "config", "--get", "remote.origin.url")
 	urlCmd.Dir = workDir
 	if urlOutput, err := urlCmd.Output(); err == nil {
 		vcs.Url = strings.TrimSpace(string(urlOutput))
 	}
-
 	// Get current revision (commit hash)
 	revCmd := exec.Command("git", "rev-parse", "HEAD")
 	revCmd.Dir = workDir
 	if revOutput, err := revCmd.Output(); err == nil {
 		vcs.Revision = strings.TrimSpace(string(revOutput))
 	}
-
 	// Get current branch
 	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	branchCmd.Dir = workDir
 	if branchOutput, err := branchCmd.Output(); err == nil {
 		vcs.Branch = strings.TrimSpace(string(branchOutput))
 	}
-
 	// Get last commit message
 	msgCmd := exec.Command("git", "log", "-1", "--pretty=%B")
 	msgCmd.Dir = workDir
 	if msgOutput, err := msgCmd.Output(); err == nil {
 		vcs.Message = strings.TrimSpace(string(msgOutput))
 	}
-
 	// Only return VCS info if we have at least the revision
 	if vcs.Revision != "" {
 		log.Debug(fmt.Sprintf("Collected VCS info: url=%s, branch=%s, revision=%s", vcs.Url, vcs.Branch, vcs.Revision))
 		return vcs
 	}
-
 	return nil
 }
 
 // CollectArtifacts collects Conan artifacts from the local cache
-// Similar to Poetry's collectPoetryArtifacts() which collects from dist/
 func (cf *ConanFlexPack) CollectArtifacts() []entities.Artifact {
 	var artifacts []entities.Artifact
-
 	// Get the package reference for the current project
 	packageRef := fmt.Sprintf("%s/%s", cf.projectName, cf.projectVersion)
-
 	// Try to find the package in the local cache using 'conan cache path'
 	// First get the recipe path
 	recipeCmd := exec.Command(cf.config.ConanExecutable, "cache", "path", packageRef)
@@ -814,14 +776,12 @@ func (cf *ConanFlexPack) CollectArtifacts() []entities.Artifact {
 		log.Debug(fmt.Sprintf("Could not find recipe in cache for %s: %v", packageRef, err))
 		return artifacts
 	}
-
 	recipePath := strings.TrimSpace(string(recipeOutput))
 	if recipePath != "" {
 		// Collect recipe artifacts
 		recipeArtifacts := cf.collectRecipeArtifacts(recipePath, packageRef)
 		artifacts = append(artifacts, recipeArtifacts...)
 	}
-
 	// Try to find the package binary path
 	// List packages for this recipe
 	listCmd := exec.Command(cf.config.ConanExecutable, "list", packageRef+":*", "--format=json")
@@ -831,7 +791,6 @@ func (cf *ConanFlexPack) CollectArtifacts() []entities.Artifact {
 		log.Debug(fmt.Sprintf("Could not list packages for %s: %v", packageRef, err))
 		return artifacts
 	}
-
 	// Parse the package IDs from the list output
 	packageIds := cf.extractPackageIdsFromList(listOutput)
 	for _, pkgId := range packageIds {
@@ -844,7 +803,6 @@ func (cf *ConanFlexPack) CollectArtifacts() []entities.Artifact {
 			log.Debug(fmt.Sprintf("Could not find package in cache for %s: %v", pkgRef, err))
 			continue
 		}
-
 		pkgPath := strings.TrimSpace(string(pkgOutput))
 		if pkgPath != "" {
 			// Collect package artifacts
@@ -852,7 +810,6 @@ func (cf *ConanFlexPack) CollectArtifacts() []entities.Artifact {
 			artifacts = append(artifacts, pkgArtifacts...)
 		}
 	}
-
 	log.Info(fmt.Sprintf("Collected %d Conan artifacts from local cache", len(artifacts)))
 	return artifacts
 }
@@ -860,10 +817,8 @@ func (cf *ConanFlexPack) CollectArtifacts() []entities.Artifact {
 // collectRecipeArtifacts collects artifacts from the recipe export folder
 func (cf *ConanFlexPack) collectRecipeArtifacts(recipePath, packageRef string) []entities.Artifact {
 	var artifacts []entities.Artifact
-
 	// Recipe files to look for
 	recipeFiles := []string{"conanfile.py", "conandata.yml", "conanmanifest.txt"}
-
 	for _, filename := range recipeFiles {
 		filePath := filepath.Join(recipePath, filename)
 		if _, err := os.Stat(filePath); err == nil {
@@ -873,7 +828,6 @@ func (cf *ConanFlexPack) collectRecipeArtifacts(recipePath, packageRef string) [
 			}
 		}
 	}
-
 	// Check for conan_sources.tgz in the download folder
 	downloadPath := filepath.Join(filepath.Dir(recipePath), "d")
 	sourceTgz := filepath.Join(downloadPath, "conan_sources.tgz")
@@ -883,17 +837,14 @@ func (cf *ConanFlexPack) collectRecipeArtifacts(recipePath, packageRef string) [
 			artifacts = append(artifacts, *artifact)
 		}
 	}
-
 	return artifacts
 }
 
 // collectPackageArtifacts collects artifacts from the package binary folder
 func (cf *ConanFlexPack) collectPackageArtifacts(pkgPath, packageRef, packageId string) []entities.Artifact {
 	var artifacts []entities.Artifact
-
 	// Package files to look for
 	packageFiles := []string{"conaninfo.txt", "conanmanifest.txt"}
-
 	for _, filename := range packageFiles {
 		filePath := filepath.Join(pkgPath, filename)
 		if _, err := os.Stat(filePath); err == nil {
@@ -903,7 +854,6 @@ func (cf *ConanFlexPack) collectPackageArtifacts(pkgPath, packageRef, packageId 
 			}
 		}
 	}
-
 	// Check for conan_package.tgz in the build folder (parent of package folder)
 	buildPath := filepath.Dir(pkgPath)
 	packageTgz := filepath.Join(buildPath, "conan_package.tgz")
@@ -913,7 +863,6 @@ func (cf *ConanFlexPack) collectPackageArtifacts(pkgPath, packageRef, packageId 
 			artifacts = append(artifacts, *artifact)
 		}
 	}
-
 	return artifacts
 }
 
@@ -924,7 +873,6 @@ func (cf *ConanFlexPack) createArtifactFromFile(filePath, filename, packageRef, 
 		log.Debug(fmt.Sprintf("Failed to get file details for %s: %v", filePath, err))
 		return nil
 	}
-
 	return &entities.Artifact{
 		Name: filename,
 		Path: packageRef,
@@ -940,14 +888,11 @@ func (cf *ConanFlexPack) createArtifactFromFile(filePath, filename, packageRef, 
 // extractPackageIdsFromList extracts package IDs from 'conan list' JSON output
 func (cf *ConanFlexPack) extractPackageIdsFromList(listOutput []byte) []string {
 	var packageIds []string
-
-	// Parse the JSON output
 	var listData map[string]interface{}
 	if err := json.Unmarshal(listOutput, &listData); err != nil {
 		log.Debug("Failed to parse conan list output: " + err.Error())
 		return packageIds
 	}
-
 	// Navigate the nested structure to find package IDs
 	// Structure: {"Local Cache": {"<name>/<version>": {"revisions": {"<rrev>": {"packages": {"<pkg_id>": ...}}}}}}
 	for _, cache := range listData {
@@ -979,32 +924,26 @@ func (cf *ConanFlexPack) extractPackageIdsFromList(listOutput []byte) []string {
 			}
 		}
 	}
-
 	return packageIds
 }
 
 // GetProjectDependencies returns all project dependencies with full details
-// Implements BuildInfoCollector interface (like Maven)
 func (cf *ConanFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
 	if len(cf.dependencies) == 0 {
 		cf.parseDependencies()
 	}
-
 	// Calculate RequestedBy relationships
 	requestedBy := cf.CalculateRequestedBy()
-
 	// Add RequestedBy information to dependencies
 	for i, dep := range cf.dependencies {
 		if parents, exists := requestedBy[dep.ID]; exists {
 			cf.dependencies[i].RequestedBy = parents
 		}
 	}
-
 	return cf.dependencies, nil
 }
 
 // GetDependencyGraph returns the complete dependency graph
-// Implements BuildInfoCollector interface (like Maven)
 func (cf *ConanFlexPack) GetDependencyGraph() (map[string][]string, error) {
 	if len(cf.dependencies) == 0 {
 		cf.parseDependencies()
@@ -1012,8 +951,7 @@ func (cf *ConanFlexPack) GetDependencyGraph() (map[string][]string, error) {
 	return cf.dependencyGraph, nil
 }
 
-// getConanExecutablePath gets the Conan executable path with proper detection
-// Similar to Maven's getMavenExecutablePath()
+// getConanExecutablePath gets the Conan executable path
 func (cf *ConanFlexPack) getConanExecutablePath() string {
 	// Check for conan in PATH
 	if path, err := exec.LookPath("conan"); err == nil {
@@ -1023,14 +961,12 @@ func (cf *ConanFlexPack) getConanExecutablePath() string {
 }
 
 // getConanVersion gets the Conan version for build info
-// Mirrors Maven's getMavenVersion()
 func (cf *ConanFlexPack) getConanVersion() string {
 	cmd := exec.Command(cf.config.ConanExecutable, "--version")
 	output, err := cmd.Output()
 	if err != nil {
 		return "unknown"
 	}
-
 	version := strings.TrimSpace(string(output))
 	// Parse "Conan version 2.0.13" format
 	lines := strings.Split(version, "\n")
@@ -1044,39 +980,30 @@ func (cf *ConanFlexPack) getConanVersion() string {
 }
 
 // RunConanInstallWithBuildInfo runs conan install and collects build information
-// Mirrors Maven's RunMavenInstallWithBuildInfo() exactly
 // Collects ALL dependency types: requires, build_requires, tool_requires, python_requires
 func RunConanInstallWithBuildInfo(workingDir string, buildName, buildNumber string, extraArgs []string) error {
 	config := ConanConfig{
 		WorkingDirectory: workingDir,
 	}
-
 	conanFlex, err := NewConanFlexPack(config)
 	if err != nil {
 		return fmt.Errorf("failed to create Conan instance: %w", err)
 	}
-
-	// Build conan install command
 	args := append([]string{"install", "."}, extraArgs...)
-
 	cmd := exec.Command(config.ConanExecutable, args...)
 	cmd.Dir = workingDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("conan install failed: %w", err)
 	}
-
 	log.Info("Conan install completed successfully")
-
-	// Collect build info if build name and number provided (like Maven)
+	// Collect build info if build name and number provided
 	if buildName != "" && buildNumber != "" {
 		buildInfo, err := conanFlex.CollectBuildInfo(buildName, buildNumber)
 		if err != nil {
 			return fmt.Errorf("failed to collect build info: %w", err)
 		}
-
 		err = SaveConanBuildInfoForJfrogCli(buildInfo)
 		if err != nil {
 			log.Warn("Failed to save build info for jfrog-cli compatibility: " + err.Error())
@@ -1084,12 +1011,10 @@ func RunConanInstallWithBuildInfo(workingDir string, buildName, buildNumber stri
 			log.Debug("Build info saved for jfrog-cli compatibility")
 		}
 	}
-
 	return nil
 }
 
 // SaveConanBuildInfoForJfrogCli saves build info in a format compatible with jfrog-cli
-// Mirrors Maven's saveMavenBuildInfoForJfrogCli()
 func SaveConanBuildInfoForJfrogCli(buildInfo *entities.BuildInfo) error {
 	buildInfoService := build.NewBuildInfoService()
 	buildInstance, err := buildInfoService.GetOrCreateBuildWithProject(
@@ -1105,12 +1030,9 @@ func SaveConanBuildInfoForJfrogCli(buildInfo *entities.BuildInfo) error {
 	if err != nil {
 		return fmt.Errorf("failed to save build info: %w", err)
 	}
-
 	log.Debug("Successfully saved Conan build info for jfrog-cli")
 	return nil
 }
-
-// ===== Build-Info Dependencies Caching (like Poetry) =====
 
 const conanCacheLatestVersion = 1
 
@@ -1130,19 +1052,16 @@ func GetConanDependenciesCache(projectPath string) (cache *ConanDependenciesCach
 		log.Debug("Conan dependencies cache not found: " + cacheFilePath)
 		return nil, nil
 	}
-
 	data, err := os.ReadFile(cacheFilePath)
 	if err != nil {
 		log.Debug("Failed to read Conan cache file: " + err.Error())
 		return nil, err
 	}
-
 	err = json.Unmarshal(data, cache)
 	if err != nil {
 		log.Debug("Failed to parse Conan cache file: " + err.Error())
 		return nil, err
 	}
-
 	log.Debug(fmt.Sprintf("Loaded Conan dependencies cache with %d entries", len(cache.DepsMap)))
 	return cache, nil
 }
@@ -1155,25 +1074,20 @@ func UpdateConanDependenciesCache(dependenciesMap map[string]entities.Dependency
 		LastUpdated: time.Now(),
 		ProjectPath: projectPath,
 	}
-
 	content, err := json.MarshalIndent(&updatedCache, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal Conan cache: %w", err)
 	}
-
 	cacheFilePath, _ := getConanDependenciesCacheFilePath(projectPath)
-
 	// Ensure cache directory exists
 	cacheDir := filepath.Dir(cacheFilePath)
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
-
 	err = os.WriteFile(cacheFilePath, content, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write Conan cache file: %w", err)
 	}
-
 	log.Debug(fmt.Sprintf("Updated Conan dependencies cache with %d entries at %s", len(dependenciesMap), cacheFilePath))
 	return nil
 }
@@ -1183,7 +1097,6 @@ func (cache *ConanDependenciesCache) GetDependency(dependencyName string) (depen
 	if cache == nil || cache.DepsMap == nil {
 		return entities.Dependency{}, false
 	}
-
 	dependency, found = cache.DepsMap[dependencyName]
 	if found {
 		log.Debug("Found cached dependency: " + dependencyName)
@@ -1196,24 +1109,20 @@ func (cache *ConanDependenciesCache) IsValid(maxAge time.Duration) bool {
 	if cache == nil {
 		return false
 	}
-
 	// Check version compatibility
 	if cache.Version != conanCacheLatestVersion {
 		log.Debug(fmt.Sprintf("Conan cache version mismatch: expected %d, got %d", conanCacheLatestVersion, cache.Version))
 		return false
 	}
-
 	// Check if cache is too old
 	if maxAge > 0 && time.Since(cache.LastUpdated) > maxAge {
 		log.Debug(fmt.Sprintf("Conan cache expired: last updated %v ago", time.Since(cache.LastUpdated)))
 		return false
 	}
-
 	return true
 }
 
 // getConanDependenciesCacheFilePath returns the path to Conan dependencies cache file
-// Cache file location: ./.jfrog/projects/conan-deps.cache.json
 func getConanDependenciesCacheFilePath(projectPath string) (cacheFilePath string, exists bool) {
 	projectsDirPath := filepath.Join(projectPath, ".jfrog", "projects")
 	cacheFilePath = filepath.Join(projectsDirPath, "conan-deps.cache.json")
@@ -1230,28 +1139,23 @@ func (cf *ConanFlexPack) UpdateDependenciesWithCache() error {
 		log.Debug("No existing Conan cache found, will create new one")
 		cache = nil
 	}
-
-	// Check if cache is valid (max age: 24 hours)
+	// Check if cache is valid
 	maxCacheAge := 24 * time.Hour
 	if cache != nil && !cache.IsValid(maxCacheAge) {
 		log.Debug("Conan cache is invalid or expired, ignoring")
 		cache = nil
 	}
-
 	dependenciesMap := make(map[string]entities.Dependency)
 	var missingDeps []string
-
 	// Process each dependency
 	for i, dep := range cf.dependencies {
 		depKey := fmt.Sprintf("%s:%s", dep.Name, dep.Version)
-
 		// Try to get from cache first
 		var cachedDep entities.Dependency
 		var found bool
 		if cache != nil {
 			cachedDep, found = cache.GetDependency(depKey)
 		}
-
 		if found && !cachedDep.IsEmpty() {
 			// Use cached dependency info
 			entityDep := entities.Dependency{
@@ -1261,12 +1165,10 @@ func (cf *ConanFlexPack) UpdateDependenciesWithCache() error {
 				Checksum: cachedDep.Checksum,
 			}
 			dependenciesMap[depKey] = entityDep
-
 			// Update our internal dependency with cached checksums
 			cf.dependencies[i].SHA1 = cachedDep.Sha1
 			cf.dependencies[i].SHA256 = cachedDep.Sha256
 			cf.dependencies[i].MD5 = cachedDep.Md5
-
 			log.Debug("Using cached checksums for " + depKey)
 		} else {
 			// Need to calculate checksums for this dependency
@@ -1275,7 +1177,6 @@ func (cf *ConanFlexPack) UpdateDependenciesWithCache() error {
 				if sha1, ok := checksumMap["sha1"].(string); ok && sha1 != "" {
 					sha256, _ := checksumMap["sha256"].(string)
 					md5, _ := checksumMap["md5"].(string)
-
 					entityDep := entities.Dependency{
 						Id:     depKey,
 						Type:   "conan",
@@ -1287,12 +1188,10 @@ func (cf *ConanFlexPack) UpdateDependenciesWithCache() error {
 						},
 					}
 					dependenciesMap[depKey] = entityDep
-
 					// Update our internal dependency
 					cf.dependencies[i].SHA1 = sha1
 					cf.dependencies[i].SHA256 = sha256
 					cf.dependencies[i].MD5 = md5
-
 					log.Debug("Calculated new checksums for " + depKey)
 				} else {
 					missingDeps = append(missingDeps, depKey)
@@ -1302,7 +1201,6 @@ func (cf *ConanFlexPack) UpdateDependenciesWithCache() error {
 			}
 		}
 	}
-
 	// Report missing dependencies
 	if len(missingDeps) > 0 {
 		log.Warn("The following Conan packages could not be found or checksums calculated:")
@@ -1311,7 +1209,6 @@ func (cf *ConanFlexPack) UpdateDependenciesWithCache() error {
 		}
 		log.Warn("This may happen if packages are not in Conan cache. Run 'conan install' to populate the cache.")
 	}
-
 	// Update cache with new information
 	if len(dependenciesMap) > 0 {
 		err = UpdateConanDependenciesCache(dependenciesMap, cf.config.WorkingDirectory)
@@ -1319,45 +1216,5 @@ func (cf *ConanFlexPack) UpdateDependenciesWithCache() error {
 			log.Warn("Failed to update Conan dependencies cache: " + err.Error())
 		}
 	}
-
-	return nil
-}
-
-// RunConanInstallWithBuildInfoAndCaching runs conan install with build info and caching support
-func RunConanInstallWithBuildInfoAndCaching(workingDir string, buildName, buildNumber string, extraArgs []string) error {
-	log.Info("Running Conan install with build-info caching support")
-
-	config := ConanConfig{
-		WorkingDirectory: workingDir,
-	}
-
-	// Create Conan FlexPack instance
-	conanFlex, err := NewConanFlexPack(config)
-	if err != nil {
-		return fmt.Errorf("failed to create Conan instance: %w", err)
-	}
-
-	// Load existing cache before running install
-	existingCache, _ := GetConanDependenciesCache(workingDir)
-	if existingCache != nil && existingCache.IsValid(24*time.Hour) {
-		log.Info(fmt.Sprintf("Found valid Conan dependencies cache with %d entries", len(existingCache.DepsMap)))
-	}
-
-	// Run the standard Conan install
-	err = RunConanInstallWithBuildInfo(workingDir, buildName, buildNumber, extraArgs)
-	if err != nil {
-		return fmt.Errorf("conan install failed: %w", err)
-	}
-
-	// After successful install, update cache with new dependency information
-	log.Info("Updating Conan dependencies cache...")
-	err = conanFlex.UpdateDependenciesWithCache()
-	if err != nil {
-		log.Warn("Failed to update Conan dependencies cache: " + err.Error())
-		// Don't fail the entire operation for caching issues
-	} else {
-		log.Info("Successfully updated Conan dependencies cache")
-	}
-
 	return nil
 }
