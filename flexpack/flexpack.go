@@ -44,6 +44,7 @@ type DependencyInfo struct {
 	Name         string           `json:"name"`
 	Path         string           `json:"path,omitempty"`
 	Dependencies []DependencyInfo `json:"dependencies,omitempty"`
+	IsDirect     bool             `json:"isDirect,omitempty"`
 }
 
 // BuildInfoCollector defines methods for collecting build information
