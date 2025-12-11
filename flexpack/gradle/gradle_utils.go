@@ -86,10 +86,7 @@ func (gf *GradleFlexPack) validatePathWithinWorkingDir(resolvedPath string) bool
 	}
 	separator := string(filepath.Separator)
 	expectedPrefix := absWorkingDir + separator
-	if !strings.HasPrefix(absResolvedPath, expectedPrefix) {
-		return false
-	}
-	return true
+	return strings.HasPrefix(absResolvedPath, expectedPrefix)
 }
 
 // getBuildFileContent reads the build.gradle or build.gradle.kts file for a module.
@@ -192,7 +189,7 @@ func (gf *GradleFlexPack) findGradleArtifact(dep flexpack.DependencyInfo) string
 	for _, entry := range entries {
 		if entry.IsDir() {
 			hashDir := filepath.Join(modulePath, entry.Name())
-			//module-version.type
+			// module-version.type
 			jarFile := filepath.Join(hashDir, fmt.Sprintf("%s-%s.%s", module, dep.Version, dep.Type))
 			if _, err := os.Stat(jarFile); err == nil {
 				return jarFile
