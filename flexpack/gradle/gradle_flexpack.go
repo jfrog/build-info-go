@@ -218,11 +218,7 @@ func (gf *GradleFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 		if gf.ctx.Err() != nil {
 			return nil, fmt.Errorf("context cancelled: %w", gf.ctx.Err())
 		}
-		module, err := gf.processModule(moduleName)
-		if err != nil {
-			log.Warn(fmt.Sprintf("Failed to process module %s: %s", moduleName, err.Error()))
-			continue
-		}
+		module := gf.processModule(moduleName)
 		if artifacts, ok := gf.deployedArtifacts[moduleName]; ok {
 			module.Artifacts = artifacts
 		}
@@ -249,7 +245,7 @@ func (gf *GradleFlexPack) getGradleVersion() string {
 }
 
 // We might need to process modules parallelly for better performance
-func (gf *GradleFlexPack) processModule(moduleName string) (entities.Module, error) {
+func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 	groupId := gf.groupId
 	version := gf.projectVersion
 	artifactId := gf.artifactId
@@ -278,16 +274,11 @@ func (gf *GradleFlexPack) processModule(moduleName string) (entities.Module, err
 		Type:         entities.Gradle,
 		Properties:   props,
 		Dependencies: dependencies,
-	}, nil
+	}
 }
 
 func (gf *GradleFlexPack) parseModuleDependencies(moduleName string) {
-	if err := gf.parseWithGradleDependencies(moduleName); err == nil {
-		return
-	} else {
-		log.Warn(fmt.Sprintf("Gradle dependencies parsing failed for module %s, falling back to build.gradle parsing: %s", moduleName, err.Error()))
-	}
-	gf.parseFromBuildGradle(moduleName)
+	gf.parseWithGradleDependencies(moduleName)
 }
 
 func (gf *GradleFlexPack) createDependencyEntities(requestedByMap map[string][]string) []entities.Dependency {

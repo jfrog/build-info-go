@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	groupRegex      = regexp.MustCompile(`(?:group|groupId)\s*[=:]\s*['"]([^'"]+)['"]`)
-	nameRegex       = regexp.MustCompile(`(?:(?:rootProject\.)?name|artifactId)\s*[=:]\s*['"]([^'"]+)['"]`)
-	versionRegex    = regexp.MustCompile(`(?:version|versionName)\s*[=:]?\s*['"]([^'"]+)['"]`)
+	groupRegex      = regexp.MustCompile(`(?:group|groupId)\s*=\s*['"]([^'"]+)['"]`)
+	nameRegex       = regexp.MustCompile(`(?:(?:rootProject\.)?name|artifactId)\s*=\s*['"]([^'"]+)['"]`)
+	versionRegex    = regexp.MustCompile(`(?:version\s*=|versionName)\s*['"]([^'"]+)['"]`)
 	includeRegex    = regexp.MustCompile(`['"]([^'"]+)['"]`)
 	depRegex        = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*[\(\s]['"]([^'"]+)['"]`)
 	depMapRegex     = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*group\s*[:=]\s*['"]([^'"]+)['"]\s*,\s*name\s*[:=]\s*['"]([^'"]+)['"](?:,\s*version\s*[:=]\s*['"]([^'\"]+)['\"])?`)
