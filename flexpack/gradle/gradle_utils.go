@@ -116,7 +116,7 @@ func (gf *GradleFlexPack) getBuildFileContent(moduleName string) ([]byte, string
 		content, err := os.ReadFile(buildGradleKtsPath)
 		return content, buildGradleKtsPath, err
 	}
-	return nil, "", fmt.Errorf("neither build.gradle nor build.gradle.kts found")
+	return nil, "", fmt.Errorf("%w: neither build.gradle nor build.gradle.kts found", os.ErrNotExist)
 }
 
 func (gf *GradleFlexPack) readSettingsFile() (string, error) {

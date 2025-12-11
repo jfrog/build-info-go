@@ -2,6 +2,7 @@ package flexpack
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -78,6 +79,10 @@ func NewGradleFlexPackWithContext(ctx context.Context, config flexpack.GradleCon
 func (gf *GradleFlexPack) loadBuildGradle() error {
 	buildGradleData, path, err := gf.getBuildFileContent("")
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Debug("build.gradle not found, continuing without metadata")
+			return nil
+		}
 		return fmt.Errorf("failed to read build.gradle: %w", err)
 	}
 	gf.buildGradlePath = path
@@ -278,7 +283,16 @@ func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 }
 
 func (gf *GradleFlexPack) parseModuleDependencies(moduleName string) {
+	// Primary method: Use Gradle CLI to get resolved dependencies
 	gf.parseWithGradleDependencies(moduleName)
+
+	// Fallback: If CLI parsing didn't find any dependencies, try parsing build.gradle directly
+	if len(gf.dependencies) == 0 {
+		log.Debug("CLI-based dependency parsing found no dependencies, falling back to build.gradle parsing")
+		if gf.parseFromBuildGradle(moduleName) {
+			log.Debug("Successfully parsed dependencies from build.gradle file")
+		}
+	}
 }
 
 func (gf *GradleFlexPack) createDependencyEntities(requestedByMap map[string][]string) []entities.Dependency {

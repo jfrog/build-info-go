@@ -45,214 +45,6 @@ func (gf *GradleFlexPack) parseBuildGradleMetadata(content string) (groupId, art
 	return
 }
 
-func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) {
-	contentBytes, _, err := gf.getBuildFileContent(moduleName)
-	if err != nil {
-		if moduleName == "" && gf.buildGradlePath == "" {
-			return
-		}
-		log.Warn("Failed to read build.gradle for dependency parsing: " + err.Error())
-		return
-	}
-
-	content := string(contentBytes)
-	depsContent := gf.extractDependenciesBlock(content)
-	if depsContent == "" {
-		log.Debug("No dependencies block found in build.gradle")
-		return
-	}
-	allDeps := make(map[string]flexpack.DependencyInfo)
-
-	// 1. String notation: "group:artifact:version"
-	matches := depRegex.FindAllStringSubmatch(depsContent, -1)
-	for _, match := range matches {
-		if len(match) < 3 {
-			continue
-		}
-		configType := match[1]
-		depString := match[2]
-
-		// Parse dependency string (group:artifact:version[:classifier])
-		parts := strings.Split(depString, ":")
-		if len(parts) < 3 {
-			continue
-		}
-
-		groupId := parts[0]
-		artifactId := parts[1]
-		version := parts[2]
-		classifier := ""
-		if len(parts) >= 4 {
-			classifier = parts[3]
-		}
-
-		gf.addDependency(configType, groupId, artifactId, version, classifier, allDeps)
-	}
-
-	// 2. Map notation: group: '...', name: '...', version: '...'
-	mapMatches := depMapRegex.FindAllStringSubmatch(depsContent, -1)
-	for _, match := range mapMatches {
-		if len(match) < 4 {
-			continue
-		}
-		configType := match[1]
-		groupId := match[2]
-		artifactId := match[3]
-		version := ""
-		if len(match) >= 5 {
-			version = match[4]
-		}
-		gf.addDependency(configType, groupId, artifactId, version, "", allDeps)
-	}
-
-	// 3. Project notation: project(':path')
-	projMatches := depProjectRegex.FindAllStringSubmatch(depsContent, -1)
-	for _, match := range projMatches {
-		if len(match) < 3 {
-			continue
-		}
-		configType := match[1]
-		projectPath := match[2]
-		projectPath = strings.TrimPrefix(projectPath, ":")
-
-		parts := strings.Split(projectPath, ":")
-		artifactId := parts[len(parts)-1]
-		groupId := gf.groupId
-		version := gf.projectVersion
-
-		if meta, ok := gf.modulesMap[projectPath]; ok {
-			groupId = meta.Group
-			version = meta.Version
-			artifactId = meta.Artifact
-		}
-		gf.addDependency(configType, groupId, artifactId, version, "", allDeps)
-	}
-	for _, dep := range allDeps {
-		gf.dependencies = append(gf.dependencies, dep)
-	}
-}
-
-func (gf *GradleFlexPack) extractDependenciesBlock(content string) string {
-	// Find "dependencies {" or "dependencies{" pattern
-	idx := strings.Index(content, "dependencies")
-	if idx == -1 {
-		return ""
-	}
-	remaining := content[idx+len("dependencies"):]
-	braceIdx := strings.Index(remaining, "{")
-	if braceIdx == -1 {
-		return ""
-	}
-
-	start := idx + len("dependencies") + braceIdx + 1
-	if start >= len(content) {
-		return ""
-	}
-
-	braceCount := 1
-	end := start
-	inLineComment := false
-	inBlockComment := false
-	inString := false
-	stringChar := byte(0)
-
-	for i := start; i < len(content) && braceCount > 0; i++ {
-		char := content[i]
-
-		if inLineComment {
-			if char == '\n' {
-				inLineComment = false
-			}
-			continue
-		}
-
-		if inBlockComment {
-			if char == '*' && i+1 < len(content) && content[i+1] == '/' {
-				inBlockComment = false
-				i++
-			}
-			continue
-		}
-
-		if inString {
-			if char == '\\' {
-				i++
-				continue
-			}
-			if char == stringChar {
-				inString = false
-			}
-			continue
-		}
-
-		if char == '/' {
-			if i+1 < len(content) {
-				if content[i+1] == '/' {
-					inLineComment = true
-					i++
-					continue
-				} else if content[i+1] == '*' {
-					inBlockComment = true
-					i++
-					continue
-				}
-			}
-		}
-
-		if char == '"' || char == '\'' {
-			inString = true
-			stringChar = char
-			continue
-		}
-
-		switch char {
-		case '{':
-			braceCount++
-		case '}':
-			braceCount--
-		}
-		end = i
-	}
-
-	if braceCount != 0 {
-		log.Debug("Unbalanced braces in dependencies block")
-		return ""
-	}
-	return content[start:end]
-}
-
-func (gf *GradleFlexPack) addDependency(configType, groupId, artifactId, version, classifier string, allDeps map[string]flexpack.DependencyInfo) {
-	var dependencyId string
-	if classifier != "" {
-		dependencyId = fmt.Sprintf("%s:%s:%s:%s", groupId, artifactId, version, classifier)
-	} else {
-		dependencyId = fmt.Sprintf("%s:%s:%s", groupId, artifactId, version)
-	}
-	scopes := gf.MapGradleConfigurationToScopes(configType)
-
-	if existing, ok := allDeps[dependencyId]; ok {
-		existingScopes := make(map[string]bool)
-		for _, s := range existing.Scopes {
-			existingScopes[s] = true
-		}
-		for _, s := range scopes {
-			if !existingScopes[s] {
-				existing.Scopes = append(existing.Scopes, s)
-			}
-		}
-		allDeps[dependencyId] = existing
-	} else {
-		depInfo := flexpack.DependencyInfo{
-			ID:      dependencyId,
-			Name:    fmt.Sprintf("%s:%s", groupId, artifactId),
-			Version: version,
-			Type:    "jar",
-			Scopes:  scopes,
-		}
-		allDeps[dependencyId] = depInfo
-	}
-}
-
 // stripComments removes single-line (//) and multi-line (/* */) comments from content
 func (gf *GradleFlexPack) stripComments(content string) string {
 	var result strings.Builder
@@ -347,4 +139,219 @@ func (gf *GradleFlexPack) parseSettingsGradleModules(content string) []string {
 		}
 	}
 	return modules
+}
+
+// parseFromBuildGradle parses dependencies directly from build.gradle file using regex.
+// This is a fallback method when CLI-based parsing fails.
+func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) bool {
+	contentBytes, _, err := gf.getBuildFileContent(moduleName)
+	if err != nil {
+		if moduleName == "" && gf.buildGradlePath == "" {
+			return false
+		}
+		log.Debug("Failed to read build.gradle for dependency parsing: " + err.Error())
+		return false
+	}
+
+	content := string(contentBytes)
+	depsContent := gf.extractDependenciesBlock(content)
+	if depsContent == "" {
+		log.Debug("No dependencies block found in build.gradle")
+		return false
+	}
+	allDeps := make(map[string]flexpack.DependencyInfo)
+
+	// 1. String notation: "group:artifact:version"
+	matches := depRegex.FindAllStringSubmatch(depsContent, -1)
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+		configType := match[1]
+		depString := match[2]
+
+		// Parse dependency string (group:artifact:version[:classifier])
+		parts := strings.Split(depString, ":")
+		if len(parts) < 3 {
+			continue
+		}
+
+		groupID := parts[0]
+		artifactID := parts[1]
+		version := parts[2]
+		classifier := ""
+		if len(parts) >= 4 {
+			classifier = parts[3]
+		}
+
+		gf.addDependencyFromFile(configType, groupID, artifactID, version, classifier, allDeps)
+	}
+
+	// 2. Map notation: group: '...', name: '...', version: '...'
+	mapMatches := depMapRegex.FindAllStringSubmatch(depsContent, -1)
+	for _, match := range mapMatches {
+		if len(match) < 4 {
+			continue
+		}
+		configType := match[1]
+		groupID := match[2]
+		artifactID := match[3]
+		version := ""
+		if len(match) >= 5 {
+			version = match[4]
+		}
+		gf.addDependencyFromFile(configType, groupID, artifactID, version, "", allDeps)
+	}
+
+	// 3. Project notation: project(':path')
+	projMatches := depProjectRegex.FindAllStringSubmatch(depsContent, -1)
+	for _, match := range projMatches {
+		if len(match) < 3 {
+			continue
+		}
+		configType := match[1]
+		projectPath := match[2]
+		projectPath = strings.TrimPrefix(projectPath, ":")
+
+		parts := strings.Split(projectPath, ":")
+		artifactID := parts[len(parts)-1]
+		groupID := gf.groupId
+		version := gf.projectVersion
+
+		if meta, ok := gf.modulesMap[projectPath]; ok {
+			groupID = meta.Group
+			version = meta.Version
+			artifactID = meta.Artifact
+		}
+		gf.addDependencyFromFile(configType, groupID, artifactID, version, "", allDeps)
+	}
+
+	for _, dep := range allDeps {
+		gf.dependencies = append(gf.dependencies, dep)
+	}
+
+	return len(allDeps) > 0
+}
+
+// extractDependenciesBlock extracts the dependencies { } block from build.gradle content
+func (gf *GradleFlexPack) extractDependenciesBlock(content string) string {
+	// Find "dependencies {" or "dependencies{" pattern
+	idx := strings.Index(content, "dependencies")
+	if idx == -1 {
+		return ""
+	}
+	remaining := content[idx+len("dependencies"):]
+	braceIdx := strings.Index(remaining, "{")
+	if braceIdx == -1 {
+		return ""
+	}
+
+	start := idx + len("dependencies") + braceIdx + 1
+	if start >= len(content) {
+		return ""
+	}
+
+	braceCount := 1
+	end := start
+	inLineComment := false
+	inBlockComment := false
+	inString := false
+	stringChar := byte(0)
+
+	for i := start; i < len(content) && braceCount > 0; i++ {
+		char := content[i]
+
+		if inLineComment {
+			if char == '\n' {
+				inLineComment = false
+			}
+			continue
+		}
+
+		if inBlockComment {
+			if char == '*' && i+1 < len(content) && content[i+1] == '/' {
+				inBlockComment = false
+				i++
+			}
+			continue
+		}
+
+		if inString {
+			if char == '\\' {
+				i++
+				continue
+			}
+			if char == stringChar {
+				inString = false
+			}
+			continue
+		}
+
+		if char == '/' {
+			if i+1 < len(content) {
+				if content[i+1] == '/' {
+					inLineComment = true
+					i++
+					continue
+				} else if content[i+1] == '*' {
+					inBlockComment = true
+					i++
+					continue
+				}
+			}
+		}
+
+		if char == '"' || char == '\'' {
+			inString = true
+			stringChar = char
+			continue
+		}
+
+		switch char {
+		case '{':
+			braceCount++
+		case '}':
+			braceCount--
+		}
+		end = i
+	}
+
+	if braceCount != 0 {
+		log.Debug("Unbalanced braces in dependencies block")
+		return ""
+	}
+	return content[start:end]
+}
+
+// addDependencyFromFile adds a dependency parsed from build.gradle file to the collection
+func (gf *GradleFlexPack) addDependencyFromFile(configType, groupID, artifactID, version, classifier string, allDeps map[string]flexpack.DependencyInfo) {
+	var dependencyID string
+	if classifier != "" {
+		dependencyID = fmt.Sprintf("%s:%s:%s:%s", groupID, artifactID, version, classifier)
+	} else {
+		dependencyID = fmt.Sprintf("%s:%s:%s", groupID, artifactID, version)
+	}
+	scopes := gf.MapGradleConfigurationToScopes(configType)
+
+	if existing, ok := allDeps[dependencyID]; ok {
+		existingScopes := make(map[string]bool)
+		for _, s := range existing.Scopes {
+			existingScopes[s] = true
+		}
+		for _, s := range scopes {
+			if !existingScopes[s] {
+				existing.Scopes = append(existing.Scopes, s)
+			}
+		}
+		allDeps[dependencyID] = existing
+	} else {
+		depInfo := flexpack.DependencyInfo{
+			ID:      dependencyID,
+			Name:    fmt.Sprintf("%s:%s", groupID, artifactID),
+			Version: version,
+			Type:    "jar",
+			Scopes:  scopes,
+		}
+		allDeps[dependencyID] = depInfo
+	}
 }

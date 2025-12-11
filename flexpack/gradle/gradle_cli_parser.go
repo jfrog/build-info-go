@@ -193,9 +193,7 @@ func (gf *GradleFlexPack) calculateTreeDepth(line string) int {
 			continue
 		}
 
-		if strings.HasPrefix(remaining, "+--- ") {
-			break
-		}
+		// Found tree marker (+--- or \---) or unknown pattern, stop counting depth
 		break
 	}
 	return depth
