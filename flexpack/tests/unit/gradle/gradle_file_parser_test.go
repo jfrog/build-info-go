@@ -666,3 +666,64 @@ dependencies {
 	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.spring")
 	assert.Contains(t, buildInfo.Modules[0].Id, "1.0.0")
 }
+
+// TestAndroidPublishingConfiguration tests parsing of Android project with publishing configuration
+func TestAndroidPublishingConfiguration(t *testing.T) {
+	tempDir := t.TempDir()
+
+	buildGradle := `
+plugins {
+    id 'com.android.application'
+    id 'maven-publish'
+}
+
+android {
+    compileSdkVersion 30
+    buildToolsVersion "30.0.3"
+
+    defaultConfig {
+        applicationId "ch.datatrans.android.sample"
+        minSdkVersion 26
+        targetSdkVersion 30
+        versionCode 6
+        versionName "0.0.6"
+    }
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            debug(MavenPublication) {
+                groupId = 'ch.datatrans'
+                artifactId = 'android-sample-app'
+                version = android.defaultConfig.versionName
+            }
+        }
+        repositories {
+            maven {
+                // name = 'localRepo'
+                url = "https://ecosysjfrog.jfrog.io/artifactory/gradle"
+            }
+        }
+    }
+}
+`
+	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
+	require.NoError(t, err)
+
+	// settings.gradle is empty or default
+	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(""), 0644)
+	require.NoError(t, err)
+
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gf, err := gradleflexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gf.CollectBuildInfo("android-test", "1")
+	require.NoError(t, err)
+	
+	// Expect ch.datatrans:android-sample-app:0.0.6
+	assert.Contains(t, buildInfo.Modules[0].Id, "ch.datatrans")
+	assert.Contains(t, buildInfo.Modules[0].Id, "android-sample-app")
+	assert.Contains(t, buildInfo.Modules[0].Id, "0.0.6")
+}

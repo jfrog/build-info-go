@@ -685,6 +685,84 @@ dependencies {
 	assert.NotNil(t, requestedBy, "RequestedBy map should not be nil")
 }
 
+// TestMultiLevelDependencyTree tests parsing multi-level transitive dependencies
+func TestMultiLevelDependencyTree(t *testing.T) {
+	tempDir := t.TempDir()
+
+	buildGradle := `
+plugins { id 'java' }
+group = 'com.example'
+version = '1.0.0'
+
+dependencies {
+    implementation 'org.springframework:spring-webmvc:5.3.20'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.0'
+}
+`
+	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
+	require.NoError(t, err)
+
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gf, err := gradleflexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gf.CollectBuildInfo("tree-test", "1")
+	require.NoError(t, err)
+	require.Greater(t, len(buildInfo.Modules), 0)
+}
+
+// TestAnnotationProcessorDependencies tests kapt/annotationProcessor configurations
+func TestAnnotationProcessorDependencies(t *testing.T) {
+	tempDir := t.TempDir()
+
+	buildGradle := `
+plugins { id 'java' }
+group = 'com.example'
+version = '1.0.0'
+
+dependencies {
+    implementation 'org.slf4j:slf4j-api:2.0.0'
+    annotationProcessor 'org.projectlombok:lombok:1.18.24'
+}
+`
+	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
+	require.NoError(t, err)
+
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gf, err := gradleflexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gf.CollectBuildInfo("annotation-test", "1")
+	require.NoError(t, err)
+	assert.NotNil(t, buildInfo)
+}
+
+// TestApiConfiguration tests 'api' configuration for java-library plugin
+func TestApiConfiguration(t *testing.T) {
+	tempDir := t.TempDir()
+
+	buildGradle := `
+plugins { id 'java-library' }
+group = 'com.example'
+version = '1.0.0'
+
+dependencies {
+    api 'org.slf4j:slf4j-api:2.0.0'
+    implementation 'com.google.guava:guava:31.1-jre'
+}
+`
+	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
+	require.NoError(t, err)
+
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gf, err := gradleflexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gf.CollectBuildInfo("api-config-test", "1")
+	require.NoError(t, err)
+	assert.NotNil(t, buildInfo)
+}
+
 func setupMinimalGradleProject(t *testing.T, tempDir string) {
 	buildGradleContent := `plugins {
     id 'java'
