@@ -32,7 +32,7 @@ type gradleNodePtr struct {
 	Children   []*gradleNodePtr
 }
 
-func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) error {
+func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) {
 	isAndroid := false
 	if content, _, err := gf.getBuildFileContent(moduleName); err == nil {
 		isAndroid = strings.Contains(string(content), "com.android.application") ||
@@ -91,7 +91,6 @@ func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) error {
 		gf.dependencies = append(gf.dependencies, dep)
 	}
 	log.Debug(fmt.Sprintf("Collected %d dependencies", len(gf.dependencies)))
-	return nil
 }
 
 func (gf *GradleFlexPack) ParseGradleDependencyTree(output string) ([]GradleDepNode, error) {
@@ -194,7 +193,7 @@ func (gf *GradleFlexPack) calculateTreeDepth(line string) int {
 			continue
 		}
 
-		if strings.HasPrefix(remaining, "+--- ") || strings.HasPrefix(remaining, "\\--- ") {
+		if strings.HasPrefix(remaining, "+--- ") {
 			break
 		}
 		break
