@@ -91,7 +91,7 @@ func (gf *GradleFlexPack) loadBuildGradle() error {
 	}
 
 	if settingsContent != "" {
-		rootProjectMatch := rootProjectRegex.FindStringSubmatch(settingsContent)
+		rootProjectMatch := nameRegex.FindStringSubmatch(settingsContent)
 		if len(rootProjectMatch) > 1 {
 			// rootProject.name is the authoritative source for artifact ID
 			gf.artifactId = rootProjectMatch[1]
@@ -268,9 +268,15 @@ func (gf *GradleFlexPack) processModule(moduleName string) (entities.Module, err
 	requestedByMap := gf.CalculateRequestedBy()
 	dependencies := gf.createDependencyEntities(requestedByMap)
 
+	props := make(map[string]string)
+	subPath := strings.ReplaceAll(moduleName, ":", string(filepath.Separator))
+	subPath = strings.TrimPrefix(subPath, string(filepath.Separator))
+	props["module_path"] = subPath
+
 	return entities.Module{
 		Id:           fmt.Sprintf("%s:%s:%s", groupId, artifactId, version),
 		Type:         entities.Gradle,
+		Properties:   props,
 		Dependencies: dependencies,
 	}, nil
 }
@@ -335,7 +341,16 @@ func (gf *GradleFlexPack) buildRequestedByMap() {
 			if gf.requestedByMap[child] == nil {
 				gf.requestedByMap[child] = []string{}
 			}
-			gf.requestedByMap[child] = append(gf.requestedByMap[child], parent)
+			exists := false
+			for _, req := range gf.requestedByMap[child] {
+				if req == parent {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				gf.requestedByMap[child] = append(gf.requestedByMap[child], parent)
+			}
 		}
 	}
 }
