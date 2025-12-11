@@ -32,7 +32,7 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 		return nil, fmt.Errorf("failed to create init script: %w", err)
 	}
 	initScriptPath := initScriptFile.Name()
-	defer initScriptFile.Close()
+	defer func() { _ = initScriptFile.Close() }()
 	defer func() {
 		if err := os.Remove(initScriptPath); err != nil {
 			log.Debug("Failed to remove init script: " + err.Error())
