@@ -13,14 +13,14 @@ var (
 	gradleVersionRegex = regexp.MustCompile(`Gradle\s+(\d+\.\d+(?:\.\d+)?)`)
 )
 
-type gradleDepNode struct {
+type GradleDepNode struct {
 	Group      string
 	Module     string
 	Version    string
 	Classifier string
 	Type       string
 	Reason     string
-	Children   []gradleDepNode
+	Children   []GradleDepNode
 }
 
 type gradleNodePtr struct {
@@ -33,13 +33,36 @@ type gradleNodePtr struct {
 }
 
 func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) error {
-	configs := []string{"compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath"}
+	isAndroid := false
+	if content, _, err := gf.getBuildFileContent(moduleName); err == nil {
+		isAndroid = strings.Contains(string(content), "com.android.application") ||
+			strings.Contains(string(content), "com.android.library") ||
+			strings.Contains(string(content), "android") // Heuristic for 'android { ... }' block or plugin
+	}
+
+	var configs []string
+	if isAndroid {
+		configs = []string{
+			"debugCompileClasspath", "debugRuntimeClasspath",
+			"releaseCompileClasspath", "releaseRuntimeClasspath",
+		}
+		if gf.config.IncludeTestDependencies {
+			configs = append(configs,
+				"debugUnitTestCompileClasspath", "debugUnitTestRuntimeClasspath",
+				"releaseUnitTestCompileClasspath", "releaseUnitTestRuntimeClasspath",
+				"debugAndroidTestCompileClasspath", "debugAndroidTestRuntimeClasspath",
+			)
+		}
+	} else {
+		configs = []string{"compileClasspath", "runtimeClasspath"}
+		if gf.config.IncludeTestDependencies {
+			configs = append(configs, "testCompileClasspath", "testRuntimeClasspath")
+		}
+	}
+
 	allDeps := make(map[string]flexpack.DependencyInfo)
 
 	for _, config := range configs {
-		if !gf.config.IncludeTestDependencies && (config == "testCompileClasspath" || config == "testRuntimeClasspath") {
-			continue
-		}
 
 		taskPrefix := ""
 		if moduleName != "" {
@@ -52,13 +75,13 @@ func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) error {
 			continue
 		}
 
-		dependencies, err := gf.parseGradleDependencyTree(string(output))
+		dependencies, err := gf.ParseGradleDependencyTree(string(output))
 		if err != nil {
 			log.Debug(fmt.Sprintf("Failed to parse text output for configuration %s: %s", config, err.Error()))
 			continue
 		}
 
-		scopes := gf.mapGradleConfigurationToScopes(config)
+		scopes := gf.MapGradleConfigurationToScopes(config)
 		for _, dep := range dependencies {
 			gf.processGradleDependency(dep, "", scopes, allDeps)
 		}
@@ -71,10 +94,11 @@ func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) error {
 	return nil
 }
 
-func (gf *GradleFlexPack) parseGradleDependencyTree(output string) ([]gradleDepNode, error) {
+func (gf *GradleFlexPack) ParseGradleDependencyTree(output string) ([]GradleDepNode, error) {
 	lines := strings.Split(output, "\n")
 	var roots []*gradleNodePtr
 	var stack []*gradleNodePtr
+	skippedDepth := -1
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -83,7 +107,31 @@ func (gf *GradleFlexPack) parseGradleDependencyTree(output string) ([]gradleDepN
 		}
 
 		depth, content := gf.extractDepthAndContent(line)
+		content = strings.TrimSpace(content)
 		if content == "" {
+			continue
+		}
+
+		if skippedDepth != -1 {
+			if depth > skippedDepth {
+				continue
+			}
+			skippedDepth = -1
+		}
+
+		// Check if we should omit this dependency
+		shouldOmit := false
+		if strings.HasSuffix(content, " (c)") || strings.HasSuffix(content, " (n)") {
+			shouldOmit = true
+		} else if strings.HasSuffix(content, " (*)") {
+			withoutStar := strings.TrimSuffix(content, " (*)")
+			if strings.HasSuffix(withoutStar, " (c)") || strings.HasSuffix(withoutStar, " (n)") {
+				shouldOmit = true
+			}
+		}
+
+		if shouldOmit {
+			skippedDepth = depth
 			continue
 		}
 
@@ -154,12 +202,10 @@ func (gf *GradleFlexPack) calculateTreeDepth(line string) int {
 	return depth
 }
 
-func (gf *GradleFlexPack) parseGradleLine(content string) *gradleDepNode {
+func (gf *GradleFlexPack) parseGradleLine(content string) *GradleDepNode {
 	content = strings.TrimSpace(content)
-	// Remove constraint markers like (*), (c), (n)
+	// Remove constraint markers like (*). (c) and (n) are omitted before calling this function.
 	content = strings.TrimSuffix(content, " (*)")
-	content = strings.TrimSuffix(content, " (c)")
-	content = strings.TrimSuffix(content, " (n)")
 
 	// Extract type if specified with @type suffix (e.g., @aar, @jar)
 	depType := "jar"
@@ -195,7 +241,7 @@ func (gf *GradleFlexPack) parseGradleLine(content string) *gradleDepNode {
 			moduleName = meta.Artifact
 		}
 
-		return &gradleDepNode{
+		return &GradleDepNode{
 			Group:   group,
 			Module:  moduleName,
 			Version: version,
@@ -209,7 +255,7 @@ func (gf *GradleFlexPack) parseGradleLine(content string) *gradleDepNode {
 		return nil
 	}
 
-	node := &gradleDepNode{
+	node := &GradleDepNode{
 		Group:  parts[0],
 		Module: parts[1],
 		Type:   depType,
@@ -247,10 +293,10 @@ func (gf *GradleFlexPack) findParentForDepth(stack []*gradleNodePtr, depth int) 
 	return nil
 }
 
-func (gf *GradleFlexPack) convertNodes(ptrNodes []*gradleNodePtr) []gradleDepNode {
-	var nodes []gradleDepNode
+func (gf *GradleFlexPack) convertNodes(ptrNodes []*gradleNodePtr) []GradleDepNode {
+	var nodes []GradleDepNode
 	for _, ptr := range ptrNodes {
-		node := gradleDepNode{
+		node := GradleDepNode{
 			Group:      ptr.Group,
 			Module:     ptr.Module,
 			Version:    ptr.Version,
@@ -263,18 +309,19 @@ func (gf *GradleFlexPack) convertNodes(ptrNodes []*gradleNodePtr) []gradleDepNod
 	return nodes
 }
 
-func (gf *GradleFlexPack) mapGradleConfigurationToScopes(config string) []string {
+func (gf *GradleFlexPack) MapGradleConfigurationToScopes(config string) []string {
 	configLower := strings.ToLower(config)
 
 	switch {
+	case strings.Contains(configLower, "testcompileclasspath") || strings.Contains(configLower, "testcompileonly") || strings.Contains(configLower, "testimplementation") ||
+		strings.Contains(configLower, "androidtest") || strings.Contains(configLower, "unittest"):
+		return []string{"test"}
+	case strings.Contains(configLower, "testruntimeclasspath") || strings.Contains(configLower, "testruntimeonly"):
+		return []string{"test"}
 	case strings.Contains(configLower, "compileclasspath") || strings.Contains(configLower, "compileonly") || configLower == "api" || configLower == "compile":
 		return []string{"compile"}
 	case strings.Contains(configLower, "runtimeclasspath") || strings.Contains(configLower, "runtimeonly") || configLower == "runtime":
 		return []string{"runtime"}
-	case strings.Contains(configLower, "testcompileclasspath") || strings.Contains(configLower, "testcompileonly") || strings.Contains(configLower, "testimplementation"):
-		return []string{"test"}
-	case strings.Contains(configLower, "testruntimeclasspath") || strings.Contains(configLower, "testruntimeonly"):
-		return []string{"test"}
 	case strings.Contains(configLower, "provided"):
 		return []string{"provided"}
 	default:
@@ -282,7 +329,7 @@ func (gf *GradleFlexPack) mapGradleConfigurationToScopes(config string) []string
 	}
 }
 
-func (gf *GradleFlexPack) processGradleDependency(dep gradleDepNode, parent string, scopes []string, allDeps map[string]flexpack.DependencyInfo) {
+func (gf *GradleFlexPack) processGradleDependency(dep GradleDepNode, parent string, scopes []string, allDeps map[string]flexpack.DependencyInfo) {
 	if dep.Group == "" || dep.Module == "" || dep.Version == "" {
 		return
 	}

@@ -10,17 +10,18 @@ import (
 )
 
 var (
-	groupRegex       = regexp.MustCompile(`group\s*[=:]\s*['"]([^'"]+)['"]`)
-	nameRegex        = regexp.MustCompile(`(?:rootProject\.)?name\s*[=:]\s*['"]([^'"]+)['"]`)
-	versionRegex     = regexp.MustCompile(`version\s*[=:]\s*['"]([^'"]+)['"]`)
-	rootProjectRegex = regexp.MustCompile(`rootProject\.name\s*[=:]\s*['"]([^'"]+)['"]`)
-	includeRegex     = regexp.MustCompile(`['"]([^'"]+)['"]`)
-	depRegex         = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*[\(\s]['"]([^'"]+)['"]`)
-	depMapRegex      = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*group\s*[:=]\s*['"]([^'"]+)['"]\s*,\s*name\s*[:=]\s*['"]([^'"]+)['"](?:,\s*version\s*[:=]\s*['"]([^'\"]+)['\"])?`)
-	depProjectRegex  = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*project\s*(?:(?:(?:\(\s*path\s*:\s*))|(?:\(?\s*))['"]([^'"]+)['"]`)
+	groupRegex      = regexp.MustCompile(`(?:group|groupId)\s*[=:]\s*['"]([^'"]+)['"]`)
+	nameRegex       = regexp.MustCompile(`(?:(?:rootProject\.)?name|artifactId)\s*[=:]\s*['"]([^'"]+)['"]`)
+	versionRegex    = regexp.MustCompile(`(?:version|versionName)\s*[=:]?\s*['"]([^'"]+)['"]`)
+	includeRegex    = regexp.MustCompile(`['"]([^'"]+)['"]`)
+	depRegex        = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*[\(\s]['"]([^'"]+)['"]`)
+	depMapRegex     = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*group\s*[:=]\s*['"]([^'"]+)['"]\s*,\s*name\s*[:=]\s*['"]([^'"]+)['"](?:,\s*version\s*[:=]\s*['"]([^'\"]+)['\"])?`)
+	depProjectRegex = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*project\s*(?:(?:(?:\(\s*path\s*:\s*))|(?:\(?\s*))['"]([^'"]+)['"]`)
 )
 
 func (gf *GradleFlexPack) parseBuildGradleMetadata(content string) (groupId, artifactId, version string) {
+	content = gf.stripComments(content)
+
 	groupMatch := groupRegex.FindStringSubmatch(content)
 	if len(groupMatch) > 1 {
 		groupId = groupMatch[1]
@@ -227,7 +228,7 @@ func (gf *GradleFlexPack) addDependency(configType, groupId, artifactId, version
 	} else {
 		dependencyId = fmt.Sprintf("%s:%s:%s", groupId, artifactId, version)
 	}
-	scopes := gf.mapGradleConfigurationToScopes(configType)
+	scopes := gf.MapGradleConfigurationToScopes(configType)
 
 	if existing, ok := allDeps[dependencyId]; ok {
 		existingScopes := make(map[string]bool)
