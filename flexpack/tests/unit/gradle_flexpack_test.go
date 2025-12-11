@@ -8,6 +8,7 @@ import (
 
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
+	gradleflexpack "github.com/jfrog/build-info-go/flexpack/gradle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +33,7 @@ version = '1.0.0'
 		IncludeTestDependencies: true,
 	}
 
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err, "Should create Gradle FlexPack successfully")
 
 	// Test through public interface - collect build info and verify module ID
@@ -68,7 +69,7 @@ version = '2.0.0'
 	require.NoError(t, err)
 
 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err)
 
 	buildInfo, err := gradleFlex.CollectBuildInfo("test-build", "1")
@@ -100,7 +101,7 @@ dependencies {
 	require.NoError(t, err)
 
 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err, "Should support build.gradle.kts")
 
 	buildInfo, err := gradleFlex.CollectBuildInfo("test-build", "1")
@@ -179,7 +180,7 @@ dependencies {
 	require.NoError(t, err)
 
 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err)
 
 	buildInfo, err := gradleFlex.CollectBuildInfo("multi-module-test", "1")
@@ -220,7 +221,7 @@ dependencies {
 		WorkingDirectory:        tempDir,
 		IncludeTestDependencies: true,
 	}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err)
 
 	buildInfo, err := gradleFlex.CollectBuildInfo("test-build", "1")
@@ -294,7 +295,7 @@ dependencies {
 		WorkingDirectory:        tempDir,
 		IncludeTestDependencies: true,
 	}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err)
 
 	buildInfo, err := gradleFlex.CollectBuildInfo("scope-test", "1")
@@ -322,7 +323,7 @@ func TestGradleFlexPackConsistency(t *testing.T) {
 	setupMinimalGradleProject(t, tempDir)
 
 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err)
 
 	// Test that multiple calls work consistently
@@ -346,7 +347,7 @@ func TestGradleFlexPackBuildInfoStructure(t *testing.T) {
 	setupMinimalGradleProject(t, tempDir)
 
 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err)
 
 	buildInfo, err := gradleFlex.CollectBuildInfo("structure-test", "1.0")
@@ -382,7 +383,7 @@ func TestGradleFlexPackErrorHandling(t *testing.T) {
 	}
 
 	// Constructor should succeed but log a warning (graceful degradation)
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err, "Should create FlexPack even without build.gradle")
 
 	// Build info collection should still work (with minimal info)
@@ -397,7 +398,7 @@ func TestGradleFlexPackChecksumCalculation(t *testing.T) {
 	setupMinimalGradleProject(t, tempDir)
 
 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err)
 
 	buildInfo, err := gradleFlex.CollectBuildInfo("checksum-test", "1")
@@ -409,12 +410,6 @@ func TestGradleFlexPackChecksumCalculation(t *testing.T) {
 		// Checksum structure should exist (may be empty if artifacts not in cache)
 		assert.NotNil(t, dep.Checksum, "Dependency should have checksum structure")
 	}
-}
-
-// TestGradleFlexPackVersion tests that version variable is accessible
-func TestGradleFlexPackVersion(t *testing.T) {
-	// Verify the version variable is accessible and set
-	assert.NotEmpty(t, flexpack.GradleFlexPackVersion, "GradleFlexPackVersion should be set")
 }
 
 // TestGradleFlexPackNoGroupVersion tests handling of projects without group/version
@@ -430,7 +425,7 @@ func TestGradleFlexPackNoGroupVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err)
 
 	buildInfo, err := gradleFlex.CollectBuildInfo("test-build", "1")
@@ -469,7 +464,7 @@ dependencies {
 	require.NoError(t, err)
 
 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gradleFlex, err := flexpack.NewGradleFlexPack(config)
+	gradleFlex, err := gradleflexpack.NewGradleFlexPack(config)
 	require.NoError(t, err)
 
 	buildInfo, err := gradleFlex.CollectBuildInfo("nested-test", "1")
