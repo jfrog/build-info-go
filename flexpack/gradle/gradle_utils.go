@@ -269,12 +269,9 @@ func getGradleCacheBase() (string, error) {
 	if gradleUserHome == "" {
 		// Default to ~/.gradle - this is a safe, known path
 		gradleUserHome = filepath.Join(homeDir, ".gradle")
-	} else {
-		// Validate the environment variable value
-		// Check for path traversal patterns
-		if strings.Contains(gradleUserHome, "..") {
-			return "", fmt.Errorf("path traversal pattern detected in GRADLE_USER_HOME: %s", gradleUserHome)
-		}
+	} else if strings.Contains(gradleUserHome, "..") {
+		// Validate the environment variable value - check for path traversal patterns
+		return "", fmt.Errorf("path traversal pattern detected in GRADLE_USER_HOME: %s", gradleUserHome)
 	}
 
 	// Clean and convert to absolute path to normalize the path
