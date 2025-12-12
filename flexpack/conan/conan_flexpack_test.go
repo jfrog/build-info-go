@@ -1,6 +1,7 @@
-package flexpack
+package conan
 
 import (
+	"github.com/jfrog/build-info-go/entities"
 	"os"
 	"path/filepath"
 	"testing"
@@ -501,8 +502,8 @@ func TestCollectBuildInfo(t *testing.T) {
 
 	assert.Len(t, buildInfo.Modules, 1)
 	module := buildInfo.Modules[0]
-	assert.Equal(t, "testproject:1.0.0", module.Id)
-	assert.Equal(t, "conan", module.Type)
+	assert.Equal(t, "testproject/1.0.0@/", module.Id)
+	assert.Equal(t, entities.ModuleType("conan"), module.Type)
 	assert.Len(t, module.Dependencies, 2)
 
 	// Check dependency details
