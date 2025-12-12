@@ -159,6 +159,10 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) bool {
 		log.Debug("No dependencies block found in build.gradle")
 		return false
 	}
+
+	// Strip comments from dependencies block to avoid parsing commented-out dependencies
+	depsContent = gf.stripComments(depsContent)
+
 	allDeps := make(map[string]flexpack.DependencyInfo)
 
 	// 1. String notation: "group:artifact:version"
