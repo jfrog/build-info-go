@@ -89,49 +89,108 @@ func (gf *GradleFlexPack) validatePathWithinWorkingDir(resolvedPath string) bool
 	return strings.HasPrefix(absResolvedPath, expectedPrefix)
 }
 
-// validatePathWithinBaseDir validates that resolvedPath is within baseDir to prevent path traversal attacks.
-func validatePathWithinBaseDir(baseDir, resolvedPath string) bool {
-	cleanBaseDir := filepath.Clean(baseDir)
-	cleanResolvedPath := filepath.Clean(resolvedPath)
+func safeJoinPath(baseDir string, components ...string) (string, error) {
+	// Validate each component individually
+	for _, component := range components {
+		if component == "" {
+			return "", fmt.Errorf("empty path component")
+		}
+		// Check for path traversal patterns
+		if strings.Contains(component, "..") {
+			return "", fmt.Errorf("path traversal pattern detected in component: %s", component)
+		}
+		// Check for absolute path indicators
+		if filepath.IsAbs(component) {
+			return "", fmt.Errorf("absolute path not allowed in component: %s", component)
+		}
+		// Check for path separators within the component (components should be single directory names)
+		if strings.ContainsAny(component, `/\`) {
+			return "", fmt.Errorf("path separator not allowed in component: %s", component)
+		}
+	}
 
-	absBaseDir, err := filepath.Abs(cleanBaseDir)
+	// Get absolute path of base directory
+	absBaseDir, err := filepath.Abs(filepath.Clean(baseDir))
 	if err != nil {
-		log.Debug(fmt.Sprintf("Failed to get absolute path for base directory: %s", err.Error()))
-		return false
+		return "", fmt.Errorf("failed to get absolute path for base directory: %w", err)
 	}
-	absResolvedPath, err := filepath.Abs(cleanResolvedPath)
+
+	// Construct the path by joining base with components
+	// We rebuild the path from scratch using only the validated component values
+	result := absBaseDir
+	for _, component := range components {
+		// Use only the base name to ensure no path separators sneak through
+		safeName := filepath.Base(component)
+		if safeName != component || safeName == "." || safeName == ".." {
+			return "", fmt.Errorf("invalid path component after sanitization: %s", component)
+		}
+		result = filepath.Join(result, safeName)
+	}
+
+	// Clean and get absolute path of result
+	absResult, err := filepath.Abs(filepath.Clean(result))
 	if err != nil {
-		log.Debug(fmt.Sprintf("Failed to get absolute path for resolved path: %s", err.Error()))
-		return false
+		return "", fmt.Errorf("failed to get absolute path for result: %w", err)
 	}
+
+	// Verify the result is within the base directory
 	absBaseDir = filepath.Clean(absBaseDir)
-	absResolvedPath = filepath.Clean(absResolvedPath)
-	if absResolvedPath == absBaseDir {
-		return true
+	absResult = filepath.Clean(absResult)
+
+	if absResult == absBaseDir {
+		return absResult, nil
 	}
+
 	separator := string(filepath.Separator)
 	expectedPrefix := absBaseDir + separator
-	return strings.HasPrefix(absResolvedPath, expectedPrefix)
+	if !strings.HasPrefix(absResult, expectedPrefix) {
+		return "", fmt.Errorf("path traversal attempt: result %s escapes base %s", absResult, absBaseDir)
+	}
+
+	return absResult, nil
 }
 
-// isValidPathComponent validates that a path component does not contain path traversal sequences.
-func isValidPathComponent(component string) bool {
-	if component == "" {
-		return false
+// The filename is validated and sanitized before joining.
+func safeJoinFilename(dir, filename string) (string, error) {
+	if filename == "" {
+		return "", fmt.Errorf("empty filename")
 	}
-	// Check for path traversal patterns
-	if strings.Contains(component, "..") {
-		return false
+	// Check for path traversal patterns in filename
+	if strings.Contains(filename, "..") {
+		return "", fmt.Errorf("path traversal pattern detected in filename: %s", filename)
 	}
-	// Check for absolute path indicators
-	if filepath.IsAbs(component) {
-		return false
+	// Check for path separators in filename
+	if strings.ContainsAny(filename, `/\`) {
+		return "", fmt.Errorf("path separator not allowed in filename: %s", filename)
 	}
-	// Check for path separators within the component
-	if strings.ContainsAny(component, `/\`) {
-		return false
+
+	// Get absolute path of directory
+	absDir, err := filepath.Abs(filepath.Clean(dir))
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path for directory: %w", err)
 	}
-	return true
+
+	// Use filepath.Base to ensure filename is just a name
+	safeName := filepath.Base(filename)
+	if safeName != filename || safeName == "." || safeName == ".." {
+		return "", fmt.Errorf("invalid filename after sanitization: %s", filename)
+	}
+
+	// Join and verify
+	result := filepath.Join(absDir, safeName)
+	absResult, err := filepath.Abs(filepath.Clean(result))
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path for result: %w", err)
+	}
+
+	// Verify result is within directory
+	separator := string(filepath.Separator)
+	expectedPrefix := absDir + separator
+	if !strings.HasPrefix(absResult, expectedPrefix) {
+		return "", fmt.Errorf("path traversal attempt: result %s escapes directory %s", absResult, absDir)
+	}
+
+	return absResult, nil
 }
 
 // getBuildFileContent reads the build.gradle or build.gradle.kts file for a module.
@@ -209,24 +268,6 @@ func (gf *GradleFlexPack) findGradleArtifact(dep flexpack.DependencyInfo) string
 	group := parts[0]
 	module := parts[1]
 
-	// Validate path components to prevent path traversal attacks
-	if !isValidPathComponent(group) {
-		log.Debug(fmt.Sprintf("Invalid group path component: %s", group))
-		return ""
-	}
-	if !isValidPathComponent(module) {
-		log.Debug(fmt.Sprintf("Invalid module path component: %s", module))
-		return ""
-	}
-	if !isValidPathComponent(dep.Version) {
-		log.Debug(fmt.Sprintf("Invalid version path component: %s", dep.Version))
-		return ""
-	}
-	if !isValidPathComponent(dep.Type) {
-		log.Debug(fmt.Sprintf("Invalid type path component: %s", dep.Type))
-		return ""
-	}
-
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Debug("Failed to get user home directory: " + err.Error())
@@ -239,49 +280,51 @@ func (gf *GradleFlexPack) findGradleArtifact(dep flexpack.DependencyInfo) string
 
 	// Gradle cache structure: ~/.gradle/caches/modules-2/files-2.1/group/module/version/hash/filename
 	cacheBase := filepath.Join(gradleUserHome, "caches", "modules-2", "files-2.1")
-	modulePath := filepath.Join(cacheBase, group, module, dep.Version)
 
-	// Validate that modulePath is within the cache base directory
-	if !validatePathWithinBaseDir(cacheBase, modulePath) {
-		log.Debug(fmt.Sprintf("Path traversal attempt detected for module path: %s", modulePath))
+	// Securely construct and validate the module path - this returns a sanitized path
+	safeModulePath, err := safeJoinPath(cacheBase, group, module, dep.Version)
+	if err != nil {
+		log.Debug(fmt.Sprintf("Invalid module path components: %s", err.Error()))
 		return ""
 	}
 
-	if _, err := os.Stat(modulePath); os.IsNotExist(err) {
+	if _, err := os.Stat(safeModulePath); os.IsNotExist(err) {
 		return ""
 	}
-	entries, err := os.ReadDir(modulePath)
+	entries, err := os.ReadDir(safeModulePath)
 	if err != nil {
 		return ""
 	}
 
 	for _, entry := range entries {
 		if entry.IsDir() {
-			hashDir := filepath.Join(modulePath, entry.Name())
-			// Validate hash directory is within cache base
-			if !validatePathWithinBaseDir(cacheBase, hashDir) {
-				log.Debug(fmt.Sprintf("Path traversal attempt detected for hash directory: %s", hashDir))
+			// Securely join hash directory name
+			safeHashDir, err := safeJoinPath(safeModulePath, entry.Name())
+			if err != nil {
+				log.Debug(fmt.Sprintf("Invalid hash directory: %s", err.Error()))
 				continue
 			}
-			// module-version.type
-			jarFile := filepath.Join(hashDir, fmt.Sprintf("%s-%s.%s", module, dep.Version, dep.Type))
-			// Validate jar file path is within cache base
-			if !validatePathWithinBaseDir(cacheBase, jarFile) {
-				log.Debug(fmt.Sprintf("Path traversal attempt detected for jar file: %s", jarFile))
+
+			// Try module-version.type filename
+			jarFilename := fmt.Sprintf("%s-%s.%s", filepath.Base(module), dep.Version, dep.Type)
+			safeJarFile, err := safeJoinFilename(safeHashDir, jarFilename)
+			if err != nil {
+				log.Debug(fmt.Sprintf("Invalid jar filename: %s", err.Error()))
 				continue
 			}
-			if _, err := os.Stat(jarFile); err == nil {
-				return jarFile
+			if _, err := os.Stat(safeJarFile); err == nil {
+				return safeJarFile
 			}
-			// module.type
-			jarFileAlt := filepath.Join(hashDir, fmt.Sprintf("%s.%s", module, dep.Type))
-			// Validate alternative jar file path is within cache base
-			if !validatePathWithinBaseDir(cacheBase, jarFileAlt) {
-				log.Debug(fmt.Sprintf("Path traversal attempt detected for alternative jar file: %s", jarFileAlt))
+
+			// Try module.type filename
+			jarFilenameAlt := fmt.Sprintf("%s.%s", filepath.Base(module), dep.Type)
+			safeJarFileAlt, err := safeJoinFilename(safeHashDir, jarFilenameAlt)
+			if err != nil {
+				log.Debug(fmt.Sprintf("Invalid alternative jar filename: %s", err.Error()))
 				continue
 			}
-			if _, err := os.Stat(jarFileAlt); err == nil {
-				return jarFileAlt
+			if _, err := os.Stat(safeJarFileAlt); err == nil {
+				return safeJarFileAlt
 			}
 		}
 	}
