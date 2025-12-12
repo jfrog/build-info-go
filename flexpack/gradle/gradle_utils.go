@@ -259,6 +259,43 @@ func (gf *GradleFlexPack) validateAndNormalizeScopes(scopes []string) []string {
 	return normalized
 }
 
+func getGradleCacheBase() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	gradleUserHome := os.Getenv("GRADLE_USER_HOME")
+	if gradleUserHome == "" {
+		// Default to ~/.gradle - this is a safe, known path
+		gradleUserHome = filepath.Join(homeDir, ".gradle")
+	} else {
+		// Validate the environment variable value
+		// Check for path traversal patterns
+		if strings.Contains(gradleUserHome, "..") {
+			return "", fmt.Errorf("path traversal pattern detected in GRADLE_USER_HOME: %s", gradleUserHome)
+		}
+	}
+
+	// Clean and convert to absolute path to normalize the path
+	cleanPath := filepath.Clean(gradleUserHome)
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path for GRADLE_USER_HOME: %w", err)
+	}
+
+	// Construct the cache base path using known, safe path components
+	// Note: We don't check if the path exists here - the caller will handle non-existent paths
+	cacheBase := filepath.Join(absPath, "caches", "modules-2", "files-2.1")
+	cleanCacheBase := filepath.Clean(cacheBase)
+	absCacheBase, err := filepath.Abs(cleanCacheBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path for cache base: %w", err)
+	}
+
+	return absCacheBase, nil
+}
+
 func (gf *GradleFlexPack) findGradleArtifact(dep flexpack.DependencyInfo) string {
 	parts := strings.Split(dep.Name, ":")
 	if len(parts) != 2 {
@@ -268,18 +305,12 @@ func (gf *GradleFlexPack) findGradleArtifact(dep flexpack.DependencyInfo) string
 	group := parts[0]
 	module := parts[1]
 
-	homeDir, err := os.UserHomeDir()
+	// Get a validated, sanitized cache base path
+	cacheBase, err := getGradleCacheBase()
 	if err != nil {
-		log.Debug("Failed to get user home directory: " + err.Error())
+		log.Debug(fmt.Sprintf("Failed to get Gradle cache base: %s", err.Error()))
 		return ""
 	}
-	gradleUserHome := os.Getenv("GRADLE_USER_HOME")
-	if gradleUserHome == "" {
-		gradleUserHome = filepath.Join(homeDir, ".gradle")
-	}
-
-	// Gradle cache structure: ~/.gradle/caches/modules-2/files-2.1/group/module/version/hash/filename
-	cacheBase := filepath.Join(gradleUserHome, "caches", "modules-2", "files-2.1")
 
 	// Securely construct and validate the module path - this returns a sanitized path
 	safeModulePath, err := safeJoinPath(cacheBase, group, module, dep.Version)
