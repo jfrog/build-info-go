@@ -13,8 +13,11 @@ import (
 	"github.com/jfrog/gofrog/log"
 )
 
-// CollectArtifacts collects Conan artifacts from the local cache
+// CollectArtifacts collects Conan artifacts from the local cache.
+// This is typically called after 'conan create' to collect built artifacts.
 func (cf *ConanFlexPack) CollectArtifacts() []entities.Artifact {
+	log.Debug("Collecting Conan artifacts from local cache...")
+
 	var artifacts []entities.Artifact
 
 	packageRef := cf.formatPackageRef()
@@ -32,12 +35,12 @@ func (cf *ConanFlexPack) CollectArtifacts() []entities.Artifact {
 	return artifacts
 }
 
-// formatPackageRef formats the package reference string
+// formatPackageRef formats the package reference string (name/version)
 func (cf *ConanFlexPack) formatPackageRef() string {
 	return fmt.Sprintf("%s/%s", cf.projectName, cf.projectVersion)
 }
 
-// getRecipePath gets the recipe path from Conan cache
+// getRecipePath gets the recipe path from Conan cache using 'conan cache path' command
 func (cf *ConanFlexPack) getRecipePath(packageRef string) string {
 	cmd := exec.Command(cf.config.ConanExecutable, "cache", "path", packageRef)
 	cmd.Dir = cf.config.WorkingDirectory
@@ -51,7 +54,8 @@ func (cf *ConanFlexPack) getRecipePath(packageRef string) string {
 	return strings.TrimSpace(string(output))
 }
 
-// collectRecipeArtifacts collects artifacts from the recipe export folder
+// collectRecipeArtifacts collects artifacts from the recipe export folder.
+// Recipe artifacts include: conanfile.py, conandata.yml, conanmanifest.txt, conan_sources.tgz
 func (cf *ConanFlexPack) collectRecipeArtifacts(recipePath, packageRef string) []entities.Artifact {
 	var artifacts []entities.Artifact
 
@@ -62,7 +66,7 @@ func (cf *ConanFlexPack) collectRecipeArtifacts(recipePath, packageRef string) [
 		}
 	}
 
-	// Check for conan_sources.tgz in the download folder
+	// Check for conan_sources.tgz in the download folder (d/)
 	downloadPath := filepath.Join(filepath.Dir(recipePath), "d")
 	if artifact := cf.tryCreateArtifact(downloadPath, "conan_sources.tgz", packageRef, "sources"); artifact != nil {
 		artifacts = append(artifacts, *artifact)
@@ -87,7 +91,7 @@ func (cf *ConanFlexPack) collectAllPackageArtifacts(packageRef string) []entitie
 	return artifacts
 }
 
-// listPackageIds lists all package IDs for a recipe
+// listPackageIds lists all package IDs for a recipe using 'conan list' command
 func (cf *ConanFlexPack) listPackageIds(packageRef string) []string {
 	cmd := exec.Command(cf.config.ConanExecutable, "list", packageRef+":*", "--format=json")
 	cmd.Dir = cf.config.WorkingDirectory
@@ -116,7 +120,8 @@ func (cf *ConanFlexPack) getPackagePath(packageRef, pkgId string) string {
 	return strings.TrimSpace(string(output))
 }
 
-// collectPackageArtifacts collects artifacts from the package binary folder
+// collectPackageArtifacts collects artifacts from the package binary folder.
+// Package artifacts include: conaninfo.txt, conanmanifest.txt, conan_package.tgz
 func (cf *ConanFlexPack) collectPackageArtifacts(pkgPath, packageRef, packageId string) []entities.Artifact {
 	var artifacts []entities.Artifact
 	pkgRef := packageRef + ":" + packageId
@@ -128,7 +133,7 @@ func (cf *ConanFlexPack) collectPackageArtifacts(pkgPath, packageRef, packageId 
 		}
 	}
 
-	// Check for conan_package.tgz in the build folder
+	// Check for conan_package.tgz in the build folder (parent of package folder)
 	buildPath := filepath.Dir(pkgPath)
 	if artifact := cf.tryCreateArtifact(buildPath, "conan_package.tgz", pkgRef, "package"); artifact != nil {
 		artifacts = append(artifacts, *artifact)
@@ -137,17 +142,13 @@ func (cf *ConanFlexPack) collectPackageArtifacts(pkgPath, packageRef, packageId 
 	return artifacts
 }
 
-// tryCreateArtifact attempts to create an artifact from a file
+// tryCreateArtifact attempts to create an artifact from a file if it exists
 func (cf *ConanFlexPack) tryCreateArtifact(dirPath, filename, packageRef, artifactType string) *entities.Artifact {
 	filePath := filepath.Join(dirPath, filename)
 	if _, err := os.Stat(filePath); err != nil {
 		return nil
 	}
-	return cf.createArtifactFromFile(filePath, filename, packageRef, artifactType)
-}
 
-// createArtifactFromFile creates an artifact entry with checksums
-func (cf *ConanFlexPack) createArtifactFromFile(filePath, filename, packageRef, artifactType string) *entities.Artifact {
 	fileDetails, err := crypto.GetFileDetails(filePath, true)
 	if err != nil {
 		log.Debug(fmt.Sprintf("Failed to get file details for %s: %v", filePath, err))
@@ -166,7 +167,8 @@ func (cf *ConanFlexPack) createArtifactFromFile(filePath, filename, packageRef, 
 	}
 }
 
-// extractPackageIdsFromList extracts package IDs from 'conan list' JSON output
+// extractPackageIdsFromList extracts package IDs from 'conan list' JSON output.
+// JSON structure: {"Local Cache": {"<name>/<version>": {"revisions": {"<rrev>": {"packages": {"<pkg_id>": ...}}}}}}
 func (cf *ConanFlexPack) extractPackageIdsFromList(listOutput []byte) []string {
 	var packageIds []string
 	var listData map[string]interface{}
@@ -176,7 +178,6 @@ func (cf *ConanFlexPack) extractPackageIdsFromList(listOutput []byte) []string {
 		return packageIds
 	}
 
-	// Navigate: {"Local Cache": {"<name>/<version>": {"revisions": {"<rrev>": {"packages": {"<pkg_id>": ...}}}}}}
 	for _, cache := range listData {
 		cacheMap, ok := cache.(map[string]interface{})
 		if !ok {
@@ -214,4 +215,3 @@ func (cf *ConanFlexPack) extractPackageIdsFromList(listOutput []byte) []string {
 
 	return packageIds
 }
-

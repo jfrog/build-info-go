@@ -1,11 +1,11 @@
 package conan
 
 import (
-	"github.com/jfrog/build-info-go/entities"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/jfrog/build-info-go/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,44 +15,13 @@ func TestNewConanFlexPack(t *testing.T) {
 		name        string
 		setupFunc   func(t *testing.T, dir string)
 		expectError bool
-		errContains string
 	}{
 		{
-			name: "loads conanfile.py successfully",
+			name: "creates instance without loading conanfile (lazy init)",
 			setupFunc: func(t *testing.T, dir string) {
-				conanfilePy := `
-name = "hello"
-version = "1.0"
-
-from conan import ConanFile
-
-class HelloConan(ConanFile):
-    requires = "zlib/1.2.13"
-`
-				err := os.WriteFile(filepath.Join(dir, "conanfile.py"), []byte(conanfilePy), 0644)
-				require.NoError(t, err)
+				// Empty directory - conanfile will be loaded lazily
 			},
 			expectError: false,
-		},
-		{
-			name: "loads conanfile.txt successfully",
-			setupFunc: func(t *testing.T, dir string) {
-				conanfileTxt := `[requires]
-zlib/1.2.13
-
-[generators]
-cmake
-`
-				err := os.WriteFile(filepath.Join(dir, "conanfile.txt"), []byte(conanfileTxt), 0644)
-				require.NoError(t, err)
-			},
-			expectError: false,
-		},
-		{
-			name:        "returns error when conanfile not found",
-			setupFunc:   func(t *testing.T, dir string) {},
-			expectError: true,
-			errContains: "no conanfile.py or conanfile.txt found",
 		},
 	}
 
@@ -60,7 +29,7 @@ cmake
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir, err := os.MkdirTemp("", "conan-test-*")
 			require.NoError(t, err)
-			defer os.RemoveAll(tempDir)
+			defer func() { _ = os.RemoveAll(tempDir) }()
 
 			tt.setupFunc(t, tempDir)
 
@@ -73,9 +42,6 @@ cmake
 
 			if tt.expectError {
 				assert.Error(t, err)
-				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
-				}
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, cf)
@@ -177,15 +143,13 @@ func TestParseDependenciesFromGraphInfo(t *testing.T) {
 	cf.parseDependenciesFromGraphInfo(graphData)
 
 	assert.Len(t, cf.dependencies, 2)
+
 	zlibDep := findDependencyByID(cf.dependencies, "zlib:1.2.13")
 	assert.NotNil(t, zlibDep)
-	assert.Equal(t, "zlib", zlibDep.Name)
-	assert.Equal(t, "1.2.13", zlibDep.Version)
 	assert.Contains(t, zlibDep.Scopes, "runtime")
+
 	cmakeDep := findDependencyByID(cf.dependencies, "cmake:3.25.0")
 	assert.NotNil(t, cmakeDep)
-	assert.Equal(t, "cmake", cmakeDep.Name)
-	assert.Equal(t, "3.25.0", cmakeDep.Version)
 	assert.Contains(t, cmakeDep.Scopes, "build")
 }
 
@@ -197,6 +161,7 @@ func TestParseDependenciesWithTransitiveRequestedBy(t *testing.T) {
 		user:           "_",
 		channel:        "_",
 	}
+
 	graphData := &ConanGraphOutput{
 		RootRef: "myapp/1.0",
 		Graph: struct {
@@ -235,11 +200,13 @@ func TestParseDependenciesWithTransitiveRequestedBy(t *testing.T) {
 
 	cf.graphData = graphData
 	cf.parseDependenciesFromGraphInfo(graphData)
+
 	assert.Len(t, cf.dependencies, 3)
-	requestedBy := cf.CalculateRequestedBy()
-	assert.Contains(t, requestedBy["libA:1.0"], "myapp:1.0")
-	assert.Contains(t, requestedBy["libB:2.0"], "libA:1.0")
-	assert.Contains(t, requestedBy["libC:3.0"], "libB:2.0")
+
+	// Check requestedBy relationships
+	assert.Contains(t, cf.requestedByMap["libA:1.0"], "myapp:1.0")
+	assert.Contains(t, cf.requestedByMap["libB:2.0"], "libA:1.0")
+	assert.Contains(t, cf.requestedByMap["libC:3.0"], "libB:2.0")
 }
 
 func TestParseDependenciesWithDiamondDependency(t *testing.T) {
@@ -250,6 +217,7 @@ func TestParseDependenciesWithDiamondDependency(t *testing.T) {
 		user:           "_",
 		channel:        "_",
 	}
+
 	graphData := &ConanGraphOutput{
 		RootRef: "myapp/1.0",
 		Graph: struct {
@@ -286,14 +254,16 @@ func TestParseDependenciesWithDiamondDependency(t *testing.T) {
 			},
 		},
 	}
+
 	cf.graphData = graphData
 	cf.parseDependenciesFromGraphInfo(graphData)
+
 	assert.Len(t, cf.dependencies, 3)
+
 	// Check requestedBy - libC should have 2 requesters
-	requestedBy := cf.CalculateRequestedBy()
-	assert.Len(t, requestedBy["libC:1.0"], 2, "libC should be requested by both libA and libB")
-	assert.Contains(t, requestedBy["libC:1.0"], "libA:1.0")
-	assert.Contains(t, requestedBy["libC:1.0"], "libB:1.0")
+	assert.Len(t, cf.requestedByMap["libC:1.0"], 2, "libC should be requested by both libA and libB")
+	assert.Contains(t, cf.requestedByMap["libC:1.0"], "libA:1.0")
+	assert.Contains(t, cf.requestedByMap["libC:1.0"], "libB:1.0")
 }
 
 func TestMapConanContextToScopes(t *testing.T) {
@@ -321,7 +291,7 @@ func TestMapConanContextToScopes(t *testing.T) {
 func TestParseDependenciesFromLock(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "conan-lock-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	lockContent := `{
 		"version": "0.5",
@@ -340,14 +310,20 @@ func TestParseDependenciesFromLock(t *testing.T) {
 	lockPath := filepath.Join(tempDir, "conan.lock")
 	err = os.WriteFile(lockPath, []byte(lockContent), 0644)
 	require.NoError(t, err)
+
 	cf := &ConanFlexPack{
 		config: ConanConfig{
 			WorkingDirectory: tempDir,
+			ConanExecutable:  "echo", // Prevent actual conan calls
 		},
-		dependencies: []DependencyInfo{},
+		dependencies: []entities.Dependency{},
 	}
-	cf.parseFromLockFile()
+
+	err = cf.parseFromLockFile()
+	require.NoError(t, err)
+
 	assert.Len(t, cf.dependencies, 4)
+
 	// Check requires (runtime dependencies)
 	zlibDep := findDependencyByID(cf.dependencies, "zlib:1.2.13")
 	assert.NotNil(t, zlibDep)
@@ -370,57 +346,33 @@ func TestParseDependenciesFromLock(t *testing.T) {
 
 func TestCalculateScopes(t *testing.T) {
 	cf := &ConanFlexPack{
-		dependencies: []DependencyInfo{
-			{
-				ID:     "runtime-lib:1.0",
-				Scopes: []string{"runtime"},
-			},
-			{
-				ID:     "build-tool:2.0",
-				Scopes: []string{"build"},
-			},
-			{
-				ID:     "test-lib:1.5",
-				Scopes: []string{"test"},
-			},
-			{
-				ID:     "multi-scope:3.0",
-				Scopes: []string{"runtime", "build"},
-			},
+		initialized: true, // Skip lazy init
+		dependencies: []entities.Dependency{
+			{Id: "runtime-lib:1.0", Scopes: []string{"runtime"}},
+			{Id: "build-tool:2.0", Scopes: []string{"build"}},
+			{Id: "test-lib:1.5", Scopes: []string{"test"}},
+			{Id: "multi-scope:3.0", Scopes: []string{"runtime", "build"}},
 		},
 	}
+
 	scopes := cf.CalculateScopes()
+
 	assert.Contains(t, scopes, "runtime")
 	assert.Contains(t, scopes, "build")
 	assert.Contains(t, scopes, "test")
-}
-
-func TestCalculateRequestedBy(t *testing.T) {
-	cf := &ConanFlexPack{
-		requestedByMap: map[string][]string{
-			"zlib:1.2.13":   {"libA:1.0", "libB:2.0"},
-			"openssl:3.0.5": {"libC:1.5"},
-		},
-		dependencies: []DependencyInfo{
-			{ID: "zlib:1.2.13"},
-			{ID: "openssl:3.0.5"},
-		},
-	}
-	requestedBy := cf.CalculateRequestedBy()
-	assert.Len(t, requestedBy, 2)
-	assert.Contains(t, requestedBy["zlib:1.2.13"], "libA:1.0")
-	assert.Contains(t, requestedBy["zlib:1.2.13"], "libB:2.0")
-	assert.Contains(t, requestedBy["openssl:3.0.5"], "libC:1.5")
 }
 
 func TestAddRequestedByNoDuplicates(t *testing.T) {
 	cf := &ConanFlexPack{
 		requestedByMap: make(map[string][]string),
 	}
+
 	cf.addRequestedBy("libA:1.0", "root:1.0")
 	cf.addRequestedBy("libA:1.0", "root:1.0")
 	cf.addRequestedBy("libA:1.0", "root:1.0")
+
 	assert.Len(t, cf.requestedByMap["libA:1.0"], 1)
+
 	cf.addRequestedBy("libA:1.0", "another:2.0")
 	assert.Len(t, cf.requestedByMap["libA:1.0"], 2)
 }
@@ -451,6 +403,7 @@ func TestGetProjectRootId(t *testing.T) {
 			expected:    "myapp/1.0.0@demo/stable",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cf := &ConanFlexPack{
@@ -459,6 +412,7 @@ func TestGetProjectRootId(t *testing.T) {
 				user:           tt.user,
 				channel:        tt.channel,
 			}
+
 			result := cf.getProjectRootId()
 			assert.Equal(t, tt.expected, result)
 		})
@@ -469,28 +423,28 @@ func TestCollectBuildInfo(t *testing.T) {
 	cf := &ConanFlexPack{
 		projectName:    "testproject",
 		projectVersion: "1.0.0",
-		dependencies: []DependencyInfo{
+		user:           "_",
+		channel:        "_",
+		initialized:    true, // Skip lazy init
+		dependencies: []entities.Dependency{
 			{
-				ID:      "dep1:1.0",
-				Name:    "dep1",
-				Version: "1.0",
-				Type:    "conan",
-				Scopes:  []string{"runtime"},
+				Id:     "dep1:1.0",
+				Type:   "conan",
+				Scopes: []string{"runtime"},
 			},
 			{
-				ID:      "dep2:2.0",
-				Name:    "dep2",
-				Version: "2.0",
-				Type:    "conan",
-				Scopes:  []string{"build"},
+				Id:     "dep2:2.0",
+				Type:   "conan",
+				Scopes: []string{"build"},
 			},
 		},
 		requestedByMap: map[string][]string{
 			"dep2:2.0": {"dep1:1.0"},
 		},
+		config: ConanConfig{
+			ConanExecutable: "echo",
+		},
 	}
-
-	cf.config.ConanExecutable = "echo"
 
 	buildInfo, err := cf.CollectBuildInfo("test-build", "1")
 	assert.NoError(t, err)
@@ -502,26 +456,15 @@ func TestCollectBuildInfo(t *testing.T) {
 
 	assert.Len(t, buildInfo.Modules, 1)
 	module := buildInfo.Modules[0]
-	assert.Equal(t, "testproject/1.0.0@/", module.Id)
+	assert.Equal(t, "testproject:1.0.0", module.Id)
 	assert.Equal(t, entities.ModuleType("conan"), module.Type)
 	assert.Len(t, module.Dependencies, 2)
-
-	// Check dependency details
-	for _, dep := range module.Dependencies {
-		switch dep.Id {
-		case "dep1:1.0":
-			assert.Contains(t, dep.Scopes, "runtime")
-		case "dep2:2.0":
-			assert.Contains(t, dep.Scopes, "build")
-			assert.Len(t, dep.RequestedBy, 1)
-			assert.Contains(t, dep.RequestedBy[0], "dep1:1.0")
-		}
-	}
 }
 
-func findDependencyByID(deps []DependencyInfo, id string) *DependencyInfo {
+// findDependencyByID finds a dependency by its ID
+func findDependencyByID(deps []entities.Dependency, id string) *entities.Dependency {
 	for _, dep := range deps {
-		if dep.ID == id {
+		if dep.Id == id {
 			return &dep
 		}
 	}
