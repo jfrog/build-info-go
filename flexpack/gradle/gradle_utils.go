@@ -6,27 +6,23 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/jfrog/build-info-go/flexpack"
-	"github.com/jfrog/gofrog/crypto"
 	"github.com/jfrog/gofrog/log"
-	"github.com/jfrog/gofrog/version"
 )
 
-const minSupportedGradleVersion = "5.0.0"
-
 func GetGradleExecutablePath(workingDirectory string) (string, error) {
-	// Check for Unix wrapper
-	wrapperPath := filepath.Join(workingDirectory, "gradlew")
-	if _, err := os.Stat(wrapperPath); err == nil {
-		return filepath.Abs(wrapperPath)
-	}
-
-	// Check for Windows wrapper
-	wrapperPathBat := filepath.Join(workingDirectory, "gradlew.bat")
-	if _, err := os.Stat(wrapperPathBat); err == nil {
-		return filepath.Abs(wrapperPathBat)
+	// Check for OS-appropriate wrapper first
+	if runtime.GOOS == "windows" {
+		if wrapperPath := filepath.Join(workingDirectory, "gradlew.bat"); fileExists(wrapperPath) {
+			return filepath.Abs(wrapperPath)
+		}
+	} else {
+		if wrapperPath := filepath.Join(workingDirectory, "gradlew"); fileExists(wrapperPath) {
+			return filepath.Abs(wrapperPath)
+		}
 	}
 
 	// Fallback to system Gradle
@@ -35,6 +31,11 @@ func GetGradleExecutablePath(workingDirectory string) (string, error) {
 		return "", fmt.Errorf("gradle executable not found: neither wrapper in %s nor system gradle in PATH", workingDirectory)
 	}
 	return gradleExec, nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {
@@ -54,132 +55,17 @@ func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {
 	return output, nil
 }
 
-func (gf *GradleFlexPack) isGradleVersionCompatible(ver string) bool {
-	v := version.NewVersion(ver)
-	return v.Compare(minSupportedGradleVersion) <= 0
-}
-
-func (gf *GradleFlexPack) validatePathWithinWorkingDir(resolvedPath string) bool {
-	cleanWorkingDir := filepath.Clean(gf.config.WorkingDirectory)
-	cleanResolvedPath := filepath.Clean(resolvedPath)
-
-	absWorkingDir, err := filepath.Abs(cleanWorkingDir)
+// isSubPath checks if child path is within parent directory.
+func isSubPath(parent, child string) bool {
+	parentAbs, err := filepath.Abs(filepath.Clean(parent))
 	if err != nil {
-		log.Debug(fmt.Sprintf("Failed to get absolute path for working directory: %s", err.Error()))
 		return false
 	}
-	absResolvedPath, err := filepath.Abs(cleanResolvedPath)
+	childAbs, err := filepath.Abs(filepath.Clean(child))
 	if err != nil {
-		log.Debug(fmt.Sprintf("Failed to get absolute path for resolved path: %s", err.Error()))
 		return false
 	}
-	absWorkingDir = filepath.Clean(absWorkingDir)
-	absResolvedPath = filepath.Clean(absResolvedPath)
-	return absResolvedPath == absWorkingDir || strings.HasPrefix(absResolvedPath, absWorkingDir+string(filepath.Separator))
-}
-
-func safeJoinPath(baseDir string, components ...string) (string, error) {
-	// Validate each component individually
-	for _, component := range components {
-		if component == "" {
-			return "", fmt.Errorf("empty path component")
-		}
-		// Check for path traversal patterns
-		if strings.Contains(component, "..") {
-			return "", fmt.Errorf("path traversal pattern detected in component: %s", component)
-		}
-		// Check for absolute path indicators
-		if filepath.IsAbs(component) {
-			return "", fmt.Errorf("absolute path not allowed in component: %s", component)
-		}
-		// Check for path separators within the component (components should be single directory names)
-		if strings.ContainsAny(component, `/\`) {
-			return "", fmt.Errorf("path separator not allowed in component: %s", component)
-		}
-	}
-
-	// Get absolute path of base directory
-	absBaseDir, err := filepath.Abs(filepath.Clean(baseDir))
-	if err != nil {
-		return "", fmt.Errorf("failed to get absolute path for base directory: %w", err)
-	}
-
-	// Construct the path by joining base with components
-	// We rebuild the path from scratch using only the validated component values
-	result := absBaseDir
-	for _, component := range components {
-		// Use only the base name to ensure no path separators sneak through
-		safeName := filepath.Base(component)
-		if safeName != component || safeName == "." || safeName == ".." {
-			return "", fmt.Errorf("invalid path component after sanitization: %s", component)
-		}
-		result = filepath.Join(result, safeName)
-	}
-
-	// Clean and get absolute path of result
-	absResult, err := filepath.Abs(filepath.Clean(result))
-	if err != nil {
-		return "", fmt.Errorf("failed to get absolute path for result: %w", err)
-	}
-
-	// Verify the result is within the base directory
-	absBaseDir = filepath.Clean(absBaseDir)
-	absResult = filepath.Clean(absResult)
-
-	if absResult == absBaseDir {
-		return absResult, nil
-	}
-
-	separator := string(filepath.Separator)
-	expectedPrefix := absBaseDir + separator
-	if !strings.HasPrefix(absResult, expectedPrefix) {
-		return "", fmt.Errorf("path traversal attempt: result %s escapes base %s", absResult, absBaseDir)
-	}
-
-	return absResult, nil
-}
-
-// The filename is validated and sanitized before joining.
-func safeJoinFilename(dir, filename string) (string, error) {
-	if filename == "" {
-		return "", fmt.Errorf("empty filename")
-	}
-	// Check for path traversal patterns in filename
-	if strings.Contains(filename, "..") {
-		return "", fmt.Errorf("path traversal pattern detected in filename: %s", filename)
-	}
-	// Check for path separators in filename
-	if strings.ContainsAny(filename, `/\`) {
-		return "", fmt.Errorf("path separator not allowed in filename: %s", filename)
-	}
-
-	// Get absolute path of directory
-	absDir, err := filepath.Abs(filepath.Clean(dir))
-	if err != nil {
-		return "", fmt.Errorf("failed to get absolute path for directory: %w", err)
-	}
-
-	// Use filepath.Base to ensure filename is just a name
-	safeName := filepath.Base(filename)
-	if safeName != filename || safeName == "." || safeName == ".." {
-		return "", fmt.Errorf("invalid filename after sanitization: %s", filename)
-	}
-
-	// Join and verify
-	result := filepath.Join(absDir, safeName)
-	absResult, err := filepath.Abs(filepath.Clean(result))
-	if err != nil {
-		return "", fmt.Errorf("failed to get absolute path for result: %w", err)
-	}
-
-	// Verify result is within directory
-	separator := string(filepath.Separator)
-	expectedPrefix := absDir + separator
-	if !strings.HasPrefix(absResult, expectedPrefix) {
-		return "", fmt.Errorf("path traversal attempt: result %s escapes directory %s", absResult, absDir)
-	}
-
-	return absResult, nil
+	return strings.HasPrefix(childAbs, parentAbs+string(filepath.Separator)) || childAbs == parentAbs
 }
 
 func FindGradleFile(dir, baseName string) (path string, isKts bool, err error) {
@@ -234,7 +120,7 @@ func (gf *GradleFlexPack) getBuildFileContent(moduleName string) ([]byte, string
 	}
 
 	moduleDir := filepath.Join(gf.config.WorkingDirectory, subPath)
-	if !gf.validatePathWithinWorkingDir(moduleDir) {
+	if !isSubPath(gf.config.WorkingDirectory, moduleDir) {
 		return nil, "", fmt.Errorf("path traversal attempt detected for module %s", moduleName)
 	}
 
@@ -333,68 +219,33 @@ func (gf *GradleFlexPack) findGradleArtifact(dep flexpack.DependencyInfo) string
 		return ""
 	}
 
-	// Securely construct and validate the module path - this returns a sanitized path
-	safeModulePath, err := safeJoinPath(cacheBase, group, module, dep.Version)
-	if err != nil {
-		log.Debug(fmt.Sprintf("Invalid module path components: %s", err.Error()))
+	// Build path: ~/.gradle/caches/modules-2/files-2.1/{group}/{module}/{version}
+	modulePath := filepath.Join(cacheBase, group, module, dep.Version)
+	if _, err := os.Stat(modulePath); os.IsNotExist(err) {
 		return ""
 	}
 
-	if _, err := os.Stat(safeModulePath); os.IsNotExist(err) {
-		return ""
-	}
-	entries, err := os.ReadDir(safeModulePath)
+	entries, err := os.ReadDir(modulePath)
 	if err != nil {
 		return ""
 	}
 
 	for _, entry := range entries {
 		if entry.IsDir() {
-			// Securely join hash directory name
-			safeHashDir, err := safeJoinPath(safeModulePath, entry.Name())
-			if err != nil {
-				log.Debug(fmt.Sprintf("Invalid hash directory: %s", err.Error()))
-				continue
+			hashDir := filepath.Join(modulePath, entry.Name())
+
+			// Try module-version.type filename (e.g., commons-io-2.11.0.jar)
+			jarFile := filepath.Join(hashDir, fmt.Sprintf("%s-%s.%s", module, dep.Version, dep.Type))
+			if _, err := os.Stat(jarFile); err == nil {
+				return jarFile
 			}
 
-			// Try module-version.type filename
-			jarFilename := fmt.Sprintf("%s-%s.%s", filepath.Base(module), dep.Version, dep.Type)
-			safeJarFile, err := safeJoinFilename(safeHashDir, jarFilename)
-			if err != nil {
-				log.Debug(fmt.Sprintf("Invalid jar filename: %s", err.Error()))
-				continue
-			}
-			if _, err := os.Stat(safeJarFile); err == nil {
-				return safeJarFile
-			}
-
-			// Try module.type filename
-			jarFilenameAlt := fmt.Sprintf("%s.%s", filepath.Base(module), dep.Type)
-			safeJarFileAlt, err := safeJoinFilename(safeHashDir, jarFilenameAlt)
-			if err != nil {
-				log.Debug(fmt.Sprintf("Invalid alternative jar filename: %s", err.Error()))
-				continue
-			}
-			if _, err := os.Stat(safeJarFileAlt); err == nil {
-				return safeJarFileAlt
+			// Try module.type filename (e.g., commons-io.jar)
+			jarFileAlt := filepath.Join(hashDir, fmt.Sprintf("%s.%s", module, dep.Type))
+			if _, err := os.Stat(jarFileAlt); err == nil {
+				return jarFileAlt
 			}
 		}
 	}
 	return ""
-}
-
-func (gf *GradleFlexPack) calculateFileChecksum(filePath string) (string, string, string, error) {
-	fileDetails, err := crypto.GetFileDetails(filePath, true)
-	if err != nil {
-		return "", "", "", err
-	}
-
-	if fileDetails == nil {
-		return "", "", "", fmt.Errorf("fileDetails is nil for file: %s", filePath)
-	}
-
-	return fileDetails.Checksum.Sha1,
-		fileDetails.Checksum.Sha256,
-		fileDetails.Checksum.Md5,
-		nil
 }

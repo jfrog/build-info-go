@@ -10,6 +10,7 @@ import (
 
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
+	"github.com/jfrog/gofrog/crypto"
 	"github.com/jfrog/gofrog/log"
 )
 
@@ -96,6 +97,12 @@ func (gf *GradleFlexPack) calculateChecksumWithFallback(dep flexpack.DependencyI
 	}
 
 	// 1. Try to find in deployed artifacts (local build)
+	// Example:
+	//   gf.deployedArtifacts = {
+	//     "submodule-a": [{Name: "my-library-1.0.0.jar", Sha1: "abc123", ...}],
+	//     "submodule-b": [{Name: "other-lib-2.0.0.jar", ...}],
+	//   }
+	//   We iterate all modules' artifacts to find one matching expectedName.
 	if len(gf.deployedArtifacts) > 0 {
 		parts := strings.Split(dep.Name, ":")
 		if len(parts) == 2 {
@@ -117,10 +124,10 @@ func (gf *GradleFlexPack) calculateChecksumWithFallback(dep flexpack.DependencyI
 
 	// 2. Fallback to Gradle cache
 	if artifactPath := gf.findGradleArtifact(dep); artifactPath != "" {
-		if sha1, sha256, md5, err := gf.calculateFileChecksum(artifactPath); err == nil {
-			checksumMap["sha1"] = sha1
-			checksumMap["sha256"] = sha256
-			checksumMap["md5"] = md5
+		if fileDetails, err := crypto.GetFileDetails(artifactPath, true); err == nil && fileDetails != nil {
+			checksumMap["sha1"] = fileDetails.Checksum.Sha1
+			checksumMap["sha256"] = fileDetails.Checksum.Sha256
+			checksumMap["md5"] = fileDetails.Checksum.Md5
 			checksumMap["path"] = artifactPath
 			return checksumMap
 		}
