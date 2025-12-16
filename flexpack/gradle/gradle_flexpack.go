@@ -66,7 +66,13 @@ func NewGradleFlexPackWithContext(ctx context.Context, config flexpack.GradleCon
 	}
 
 	if gf.config.GradleExecutable == "" {
-		gf.config.GradleExecutable = gf.getGradleExecutablePath()
+		execPath, err := GetGradleExecutablePath(gf.config.WorkingDirectory)
+		if err != nil {
+			log.Warn("Gradle executable not found in PATH, using 'gradle' as fallback")
+			gf.config.GradleExecutable = "gradle"
+		} else {
+			gf.config.GradleExecutable = execPath
+		}
 	}
 
 	if err := gf.loadBuildGradle(); err != nil {
@@ -242,7 +248,7 @@ func (gf *GradleFlexPack) getGradleVersion() string {
 	if len(matches) > 1 {
 		version := matches[1]
 		if !gf.isGradleVersionCompatible(version) {
-			log.Warn(fmt.Sprintf("Gradle version %s may not be fully compatible; minimum recommended is 6.0", version))
+			log.Warn(fmt.Sprintf("Gradle version %s may not be fully compatible; minimum recommended is 5.0", version))
 		}
 		return version
 	}
