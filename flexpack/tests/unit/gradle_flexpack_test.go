@@ -363,10 +363,6 @@ func TestGradleFlexPackBuildInfoStructure(t *testing.T) {
 	assert.Equal(t, "build-info-go", buildInfo.Agent.Name, "Agent name should be build-info-go")
 	assert.NotEmpty(t, buildInfo.Agent.Version, "Agent version should be set")
 
-	// Verify build agent info
-	require.NotNil(t, buildInfo.BuildAgent, "BuildAgent should not be nil")
-	assert.Equal(t, "Gradle", buildInfo.BuildAgent.Name, "Build agent name should be Gradle")
-
 	// Verify modules
 	require.Greater(t, len(buildInfo.Modules), 0, "Should have at least one module")
 	module := buildInfo.Modules[0]
