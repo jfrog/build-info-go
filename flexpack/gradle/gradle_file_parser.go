@@ -149,21 +149,21 @@ func (gf *GradleFlexPack) parseSettingsGradleModules(content string) []string {
 
 // parseFromBuildGradle parses dependencies directly from build.gradle file using regex.
 // This is a fallback method when CLI-based parsing fails.
-func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) bool {
+func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) []flexpack.DependencyInfo {
 	contentBytes, _, err := gf.getBuildFileContent(moduleName)
 	if err != nil {
 		if moduleName == "" && gf.buildGradlePath == "" {
-			return false
+			return []flexpack.DependencyInfo{}
 		}
 		log.Debug("Failed to read build.gradle for dependency parsing: " + err.Error())
-		return false
+		return []flexpack.DependencyInfo{}
 	}
 
 	content := string(contentBytes)
 	depsContent := gf.extractDependenciesBlock(content)
 	if depsContent == "" {
 		log.Debug("No dependencies block found in build.gradle")
-		return false
+		return []flexpack.DependencyInfo{}
 	}
 
 	// Strip comments from dependencies block to avoid parsing commented-out dependencies
@@ -236,11 +236,11 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) bool {
 		gf.addDependencyFromFile(configType, groupID, artifactID, version, "", allDeps)
 	}
 
+	var deps []flexpack.DependencyInfo
 	for _, dep := range allDeps {
-		gf.dependencies = append(gf.dependencies, dep)
+		deps = append(deps, dep)
 	}
-
-	return len(allDeps) > 0
+	return deps
 }
 
 // extractDependenciesBlock extracts the dependencies { } block from build.gradle content

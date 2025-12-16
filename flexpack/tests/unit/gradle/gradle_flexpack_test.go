@@ -658,33 +658,6 @@ dependencies {
 	assert.NotNil(t, buildInfoWithoutTests)
 }
 
-// TestCalculateRequestedBy tests the CalculateRequestedBy method
-func TestCalculateRequestedBy(t *testing.T) {
-	tempDir := t.TempDir()
-
-	buildGradle := `
-plugins { id 'java' }
-group = 'com.example'
-version = '1.0.0'
-
-dependencies {
-    implementation 'org.springframework:spring-core:5.3.20'
-}
-`
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	_, err = gf.CollectBuildInfo("requested-by-test", "1")
-	require.NoError(t, err)
-
-	requestedBy := gf.CalculateRequestedBy()
-	assert.NotNil(t, requestedBy, "RequestedBy map should not be nil")
-}
-
 // TestMultiLevelDependencyTree tests parsing multi-level transitive dependencies
 func TestMultiLevelDependencyTree(t *testing.T) {
 	tempDir := t.TempDir()

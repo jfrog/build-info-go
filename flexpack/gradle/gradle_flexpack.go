@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -27,13 +28,10 @@ type moduleMetadata struct {
 type GradleFlexPack struct {
 	config            flexpack.GradleConfig
 	ctx               context.Context
-	dependencies      []flexpack.DependencyInfo
-	dependencyGraph   map[string][]string
 	projectName       string
 	projectVersion    string
 	groupId           string
 	artifactId        string
-	requestedByMap    map[string][]string
 	buildGradlePath   string
 	wasPublishCommand bool
 	modulesMap        map[string]moduleMetadata
@@ -58,17 +56,14 @@ func NewGradleFlexPackWithContext(ctx context.Context, config flexpack.GradleCon
 	}
 
 	gf := &GradleFlexPack{
-		config:          config,
-		ctx:             ctx,
-		dependencies:    []flexpack.DependencyInfo{},
-		dependencyGraph: make(map[string][]string),
-		requestedByMap:  make(map[string][]string),
+		config: config,
+		ctx:    ctx,
 	}
 
 	if gf.config.GradleExecutable == "" {
 		execPath, err := GetGradleExecutablePath(gf.config.WorkingDirectory)
 		if err != nil {
-			log.Warn("Gradle executable not found in PATH, using 'gradle' as fallback")
+			log.Warn(fmt.Sprintf("Gradle executable not found (checked wrapper in %s, PATH=%s); using 'gradle' as fallback", gf.config.WorkingDirectory, os.Getenv("PATH")))
 			gf.config.GradleExecutable = "gradle"
 		} else {
 			gf.config.GradleExecutable = execPath
@@ -227,8 +222,8 @@ func (gf *GradleFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 
 	// Context allows callers to cancel long-running operations (e.g., timeout, user interrupt).
 	for _, moduleName := range gf.modulesList {
-		if gf.ctx.Err() != nil {
-			return buildInfo, nil
+		if err := gf.ctx.Err(); err != nil {
+			return buildInfo, err
 		}
 		module := gf.processModule(moduleName)
 		if artifacts, ok := gf.deployedArtifacts[moduleName]; ok {
@@ -251,13 +246,9 @@ func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 		artifactId = meta.Artifact
 	}
 
-	gf.dependencies = []flexpack.DependencyInfo{}
-	gf.dependencyGraph = make(map[string][]string)
-	gf.requestedByMap = make(map[string][]string)
-
-	gf.parseModuleDependencies(moduleName)
-	requestedByMap := gf.CalculateRequestedBy()
-	dependencies := gf.createDependencyEntities(requestedByMap)
+	deps, depGraph := gf.parseModuleDependencies(moduleName)
+	requestedByMap := gf.buildRequestedByMap(depGraph)
+	dependencies := gf.createDependencyEntities(deps, requestedByMap)
 
 	return entities.Module{
 		Id:   fmt.Sprintf("%s:%s:%s", groupId, artifactId, version),
@@ -269,22 +260,27 @@ func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 	}
 }
 
-func (gf *GradleFlexPack) parseModuleDependencies(moduleName string) {
+func (gf *GradleFlexPack) parseModuleDependencies(moduleName string) ([]flexpack.DependencyInfo, map[string][]string) {
+	depGraph := make(map[string][]string)
 	// Primary method: Use Gradle CLI to get resolved dependencies
-	gf.parseWithGradleDependencies(moduleName)
+	deps, parsedGraph := gf.parseWithGradleDependencies(moduleName)
+	if parsedGraph != nil {
+		depGraph = parsedGraph
+	}
 
 	// Fallback: If CLI parsing didn't find any dependencies, try parsing build.gradle directly
-	if len(gf.dependencies) == 0 {
+	if len(deps) == 0 {
 		log.Debug("CLI-based dependency parsing found no dependencies, falling back to build.gradle parsing")
-		if gf.parseFromBuildGradle(moduleName) {
-			log.Debug("Successfully parsed dependencies from build.gradle file")
-		}
+		deps = gf.parseFromBuildGradle(moduleName)
 	}
+
+	return deps, depGraph
 }
 
-func (gf *GradleFlexPack) createDependencyEntities(requestedByMap map[string][]string) []entities.Dependency {
+func (gf *GradleFlexPack) createDependencyEntities(deps []flexpack.DependencyInfo, requestedByMap map[string][]string) []entities.Dependency {
+	sort.Slice(deps, func(i, j int) bool { return deps[i].ID < deps[j].ID })
 	var dependencies []entities.Dependency
-	for _, dep := range gf.dependencies {
+	for _, dep := range deps {
 		checksumMap := gf.calculateChecksumWithFallback(dep)
 
 		checksum := entities.Checksum{}
@@ -320,31 +316,30 @@ func (gf *GradleFlexPack) createDependencyEntities(requestedByMap map[string][]s
 	return dependencies
 }
 
-func (gf *GradleFlexPack) CalculateRequestedBy() map[string][]string {
-	if len(gf.requestedByMap) == 0 {
-		gf.buildRequestedByMap()
-	}
-	return gf.requestedByMap
-}
-
-func (gf *GradleFlexPack) buildRequestedByMap() {
-	for parent, children := range gf.dependencyGraph {
+func (gf *GradleFlexPack) buildRequestedByMap(depGraph map[string][]string) map[string][]string {
+	requestedByMap := make(map[string][]string)
+	for parent, children := range depGraph {
 		for _, child := range children {
-			if gf.requestedByMap[child] == nil {
-				gf.requestedByMap[child] = []string{}
+			if requestedByMap[child] == nil {
+				requestedByMap[child] = []string{}
 			}
 			exists := false
-			for _, req := range gf.requestedByMap[child] {
+			for _, req := range requestedByMap[child] {
 				if req == parent {
 					exists = true
 					break
 				}
 			}
 			if !exists {
-				gf.requestedByMap[child] = append(gf.requestedByMap[child], parent)
+				requestedByMap[child] = append(requestedByMap[child], parent)
 			}
 		}
 	}
+	for child, parents := range requestedByMap {
+		sort.Strings(parents)
+		requestedByMap[child] = parents
+	}
+	return requestedByMap
 }
 
 func (gf *GradleFlexPack) getModuleMetadata(moduleName string) (groupId, artifactId, version string) {
