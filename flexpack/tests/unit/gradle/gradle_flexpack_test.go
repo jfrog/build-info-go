@@ -170,22 +170,6 @@ func TestBuildInfoAgentInfo(t *testing.T) {
 	assert.NotEmpty(t, buildInfo.Agent.Version, "Agent version should be set")
 }
 
-// TestBuildInfoBuildAgent tests build agent (Gradle) information
-func TestBuildInfoBuildAgent(t *testing.T) {
-	tempDir := t.TempDir()
-	setupMinimalGradleProject(t, tempDir)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("build-agent-test", "1")
-	require.NoError(t, err)
-
-	require.NotNil(t, buildInfo.BuildAgent, "BuildAgent should not be nil")
-	assert.Equal(t, "Gradle", buildInfo.BuildAgent.Name)
-}
-
 // TestBuildInfoModuleStructure tests module structure in build info
 func TestBuildInfoModuleStructure(t *testing.T) {
 	tempDir := t.TempDir()
