@@ -1,3 +1,9 @@
+/*
+gradle_file_parser.go provides regex-based parsing of Gradle build files.
+This parser extracts project metadata and dependencies directly from build.gradle,
+build.gradle.kts, and settings.gradle files without requiring Gradle execution.
+It serves as a fallback mechanism when CLI-based dependency resolution fails.
+*/
 package flexpack
 
 import (
