@@ -9,12 +9,8 @@ import (
 	"time"
 
 	"github.com/jfrog/build-info-go/entities"
-	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/gofrog/log"
 )
-
-// DependencyInfo is an alias for flexpack.DependencyInfo
-type DependencyInfo = flexpack.DependencyInfo
 
 // ConanFlexPack implements the FlexPackManager interface for Conan package manager.
 // It handles dependency resolution, checksum calculation, and build info collection.
@@ -29,11 +25,11 @@ type ConanFlexPack struct {
 	conanfilePath   string
 	graphData       *ConanGraphOutput
 	requestedByMap  map[string][]string
-	initialized     bool
+	initialized     bool // Tracks if lazy initialization has been performed
 }
 
 // NewConanFlexPack creates a new Conan FlexPack instance.
-// Note: Conanfile loading is deferred to first dependency parse for lazy initialization.
+// Initialization is deferred until first use (lazy initialization).
 func NewConanFlexPack(config ConanConfig) (*ConanFlexPack, error) {
 	cf := &ConanFlexPack{
 		config:          config,
@@ -42,87 +38,25 @@ func NewConanFlexPack(config ConanConfig) (*ConanFlexPack, error) {
 		requestedByMap:  make(map[string][]string),
 	}
 
-	// Set default executable if not provided
+	// Set default executable if not provided (same pattern as other package managers)
 	if cf.config.ConanExecutable == "" {
-		cf.config.ConanExecutable = cf.getConanExecutablePath()
+		cf.config.ConanExecutable = findConanExecutable()
 	}
 
 	return cf, nil
 }
 
-// GetDependency returns dependency information as a formatted string
-func (cf *ConanFlexPack) GetDependency() string {
-	if err := cf.ensureInitialized(); err != nil {
-		log.Warn("Failed to initialize: " + err.Error())
-		return ""
-	}
-
-	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Project: %s:%s\n", cf.projectName, cf.projectVersion))
-	result.WriteString("Dependencies:\n")
-
-	for _, dep := range cf.dependencies {
-		result.WriteString(fmt.Sprintf("  - %s [conan]\n", dep.Id))
-	}
-
-	return result.String()
-}
-
-// ParseDependencyToList converts parsed dependencies to a list format
-func (cf *ConanFlexPack) ParseDependencyToList() []string {
-	if err := cf.ensureInitialized(); err != nil {
-		log.Warn("Failed to initialize: " + err.Error())
-		return nil
-	}
-
-	var depList []string
-	for _, dep := range cf.dependencies {
-		depList = append(depList, dep.Id)
-	}
-
-	return depList
-}
-
-// CalculateScopes returns unique scopes from dependencies in standard order.
-// Conan supports the following scopes:
-//   - runtime: Regular dependencies (requires)
-//   - build: Build-time dependencies (build_requires, tool_requires)
-//   - test: Test dependencies (test_requires)
-//   - python: Python extension dependencies (python_requires)
-func (cf *ConanFlexPack) CalculateScopes() []string {
-	if err := cf.ensureInitialized(); err != nil {
-		return nil
-	}
-
-	scopesMap := make(map[string]bool)
-	for _, dep := range cf.dependencies {
-		for _, scope := range dep.Scopes {
-			scopesMap[scope] = true
-		}
-	}
-
-	// Return scopes in Conan standard order
-	var orderedScopes []string
-	conanScopeOrder := []string{"runtime", "build", "test", "python"}
-	for _, scope := range conanScopeOrder {
-		if scopesMap[scope] {
-			orderedScopes = append(orderedScopes, scope)
-		}
-	}
-
-	return orderedScopes
-}
-
 // CollectBuildInfo collects complete build information for Conan project.
-// Note: Artifacts are NOT collected here - they are collected during upload
-// by jfrog-cli-artifactory when artifacts are uploaded to Artifactory.
 // This method only collects dependencies from the local Conan cache.
+// Artifacts are collected separately during upload by jfrog-cli-artifactory.
 func (cf *ConanFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities.BuildInfo, error) {
 	log.Debug("Starting Conan build info collection...")
 
 	if err := cf.ensureInitialized(); err != nil {
 		return nil, fmt.Errorf("failed to initialize: %w", err)
 	}
+
+	conanVersion := cf.getConanVersion()
 
 	buildInfo := &entities.BuildInfo{
 		Name:    buildName,
@@ -134,7 +68,7 @@ func (cf *ConanFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 		},
 		BuildAgent: &entities.Agent{
 			Name:    "Conan",
-			Version: cf.getConanVersion(),
+			Version: conanVersion,
 		},
 		Modules: []entities.Module{},
 	}
@@ -150,24 +84,8 @@ func (cf *ConanFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 	return buildInfo, nil
 }
 
-// GetProjectDependencies returns all project dependencies with full details
-func (cf *ConanFlexPack) GetProjectDependencies() ([]entities.Dependency, error) {
-	if err := cf.ensureInitialized(); err != nil {
-		return nil, err
-	}
-	return cf.dependencies, nil
-}
-
-// GetDependencyGraph returns the complete dependency graph
-func (cf *ConanFlexPack) GetDependencyGraph() (map[string][]string, error) {
-	if err := cf.ensureInitialized(); err != nil {
-		return nil, err
-	}
-	return cf.dependencyGraph, nil
-}
-
 // ensureInitialized loads conanfile and parses dependencies if not already done.
-// This implements lazy initialization - conanfile is only loaded when needed.
+// This implements lazy initialization pattern - conanfile is only loaded when needed.
 func (cf *ConanFlexPack) ensureInitialized() error {
 	if cf.initialized {
 		return nil
@@ -222,19 +140,19 @@ func (cf *ConanFlexPack) extractProjectInfoFromConanfilePy() error {
 
 	contentStr := string(content)
 
-	cf.projectName = cf.extractPythonAttribute(contentStr, "name")
+	cf.projectName = extractPythonAttribute(contentStr, "name")
 	if cf.projectName == "" {
 		cf.projectName = filepath.Base(cf.config.WorkingDirectory)
 	}
 
-	cf.projectVersion = cf.extractPythonAttribute(contentStr, "version")
+	cf.projectVersion = extractPythonAttribute(contentStr, "version")
 
-	cf.user = cf.extractPythonAttribute(contentStr, "user")
+	cf.user = extractPythonAttribute(contentStr, "user")
 	if cf.user == "" {
 		cf.user = "_"
 	}
 
-	cf.channel = cf.extractPythonAttribute(contentStr, "channel")
+	cf.channel = extractPythonAttribute(contentStr, "channel")
 	if cf.channel == "" {
 		cf.channel = "_"
 	}
@@ -245,7 +163,7 @@ func (cf *ConanFlexPack) extractProjectInfoFromConanfilePy() error {
 // extractPythonAttribute extracts a string attribute value from Python source code.
 // Supports both single and double quoted strings.
 // Example: For 'name = "mylib"' with attr="name", returns "mylib"
-func (cf *ConanFlexPack) extractPythonAttribute(content, attr string) string {
+func extractPythonAttribute(content, attr string) string {
 	// Try double quotes: attr = "value"
 	pattern := attr + ` = "`
 	if idx := strings.Index(content, pattern); idx != -1 {
@@ -283,8 +201,9 @@ func (cf *ConanFlexPack) getProjectRootId() string {
 	return fmt.Sprintf("%s:%s", cf.projectName, cf.projectVersion)
 }
 
-// getConanExecutablePath finds the Conan executable in PATH
-func (cf *ConanFlexPack) getConanExecutablePath() string {
+// findConanExecutable finds the Conan executable in PATH.
+// Returns "conan" as default if not found.
+func findConanExecutable() string {
 	if path, err := exec.LookPath("conan"); err == nil {
 		return path
 	}
@@ -301,7 +220,6 @@ func (cf *ConanFlexPack) getConanVersion() string {
 	}
 
 	// Parse "Conan version X.Y.Z" format
-	// Split by whitespace and take the version number (3rd field)
 	version := strings.TrimSpace(string(output))
 	lines := strings.Split(version, "\n")
 

@@ -344,24 +344,6 @@ func TestParseDependenciesFromLock(t *testing.T) {
 	assert.Contains(t, pylintDep.Scopes, "python")
 }
 
-func TestCalculateScopes(t *testing.T) {
-	cf := &ConanFlexPack{
-		initialized: true, // Skip lazy init
-		dependencies: []entities.Dependency{
-			{Id: "runtime-lib:1.0", Scopes: []string{"runtime"}},
-			{Id: "build-tool:2.0", Scopes: []string{"build"}},
-			{Id: "test-lib:1.5", Scopes: []string{"test"}},
-			{Id: "multi-scope:3.0", Scopes: []string{"runtime", "build"}},
-		},
-	}
-
-	scopes := cf.CalculateScopes()
-
-	assert.Contains(t, scopes, "runtime")
-	assert.Contains(t, scopes, "build")
-	assert.Contains(t, scopes, "test")
-}
-
 func TestAddRequestedByNoDuplicates(t *testing.T) {
 	cf := &ConanFlexPack{
 		requestedByMap: make(map[string][]string),
