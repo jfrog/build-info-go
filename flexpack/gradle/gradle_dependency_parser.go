@@ -27,7 +27,7 @@ type gradleNodePtr struct {
 	Children   []*gradleNodePtr
 }
 
-func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) {
+func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) ([]flexpack.DependencyInfo, map[string][]string) {
 	isAndroid := false
 	if content, _, err := gf.getBuildFileContent(moduleName); err == nil {
 		isAndroid = strings.Contains(string(content), "com.android.application") ||
@@ -56,6 +56,7 @@ func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) {
 	}
 
 	allDeps := make(map[string]flexpack.DependencyInfo)
+	depGraph := make(map[string][]string)
 
 	for _, config := range configs {
 
@@ -78,14 +79,16 @@ func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) {
 
 		scopes := gf.MapGradleConfigurationToScopes(config)
 		for _, dep := range dependencies {
-			gf.processGradleDependency(dep, "", scopes, allDeps)
+			gf.processGradleDependency(dep, "", scopes, allDeps, depGraph)
 		}
 	}
 
+	var deps []flexpack.DependencyInfo
 	for _, dep := range allDeps {
-		gf.dependencies = append(gf.dependencies, dep)
+		deps = append(deps, dep)
 	}
-	log.Debug(fmt.Sprintf("Collected %d dependencies", len(gf.dependencies)))
+	log.Debug(fmt.Sprintf("Collected %d dependencies", len(deps)))
+	return deps, depGraph
 }
 
 func (gf *GradleFlexPack) ParseGradleDependencyTree(output string) ([]GradleDepNode, error) {
@@ -321,7 +324,7 @@ func (gf *GradleFlexPack) MapGradleConfigurationToScopes(config string) []string
 	}
 }
 
-func (gf *GradleFlexPack) processGradleDependency(dep GradleDepNode, parent string, scopes []string, allDeps map[string]flexpack.DependencyInfo) {
+func (gf *GradleFlexPack) processGradleDependency(dep GradleDepNode, parent string, scopes []string, allDeps map[string]flexpack.DependencyInfo, depGraph map[string][]string) {
 	if dep.Group == "" || dep.Module == "" || dep.Version == "" {
 		return
 	}
@@ -362,12 +365,12 @@ func (gf *GradleFlexPack) processGradleDependency(dep GradleDepNode, parent stri
 	}
 
 	if parent != "" {
-		if gf.dependencyGraph[parent] == nil {
-			gf.dependencyGraph[parent] = []string{}
+		if depGraph[parent] == nil {
+			depGraph[parent] = []string{}
 		}
-		gf.dependencyGraph[parent] = append(gf.dependencyGraph[parent], dependencyId)
+		depGraph[parent] = append(depGraph[parent], dependencyId)
 	}
 	for _, child := range dep.Children {
-		gf.processGradleDependency(child, dependencyId, scopes, allDeps)
+		gf.processGradleDependency(child, dependencyId, scopes, allDeps, depGraph)
 	}
 }

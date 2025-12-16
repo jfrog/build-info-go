@@ -376,6 +376,12 @@ gradle.rootProject {
         t.failOnBrokenSymlinks.set(getProp('ciManifest.failOnBrokenSymlinks', true))
         t.failOnHashError.set(getProp('ciManifest.failOnHash', true))
     }
+
+    // Aggregator to publish only to safe (local/file) repositories so that manifest has artifacts
+    tasks.register("flexpackPublishToLocal") { agg ->
+        agg.group = "publishing"
+        agg.description = "Publishes Maven/Ivy publications to local/file repositories for manifest extraction"
+    }
 }
 
 // Ensure we wait for ALL projects to finish evaluation
@@ -399,6 +405,44 @@ gradle.projectsEvaluated {
             // Fix: Use mustRunAfter to avoid triggering manifest task unnecessarily
             rootTask.mustRunAfter(project.tasks.withType(PublishToMavenRepository))
             rootTask.mustRunAfter(project.tasks.withType(PublishToIvyRepository))
+        }
+
+        // Wire safe publish tasks (file-based or *local* by name) into flexpackPublishToLocal
+        def publishAggregator = project.rootProject.tasks.findByName("flexpackPublishToLocal")
+        if (publishAggregator) {
+            def isSafeRepo = { repo ->
+                try {
+                    def url = repo?.url?.toString()
+                    if (!url) return false
+                    return url.startsWith("file:")
+                } catch (Exception ignore) {
+                    return false
+                }
+            }
+
+            // Legacy task that always exists for Maven local if the plugin is applied
+            def legacyMavenLocal = project.tasks.findByName("publishToMavenLocal")
+            if (legacyMavenLocal) {
+                publishAggregator.dependsOn(legacyMavenLocal)
+            }
+
+            publishing.repositories.all { repo ->
+                if (!isSafeRepo(repo)) return
+
+                publishing.publications.all { publication ->
+                    def pubName = publication.name.capitalize()
+                    def repoName = repo.name.capitalize()
+
+                    def mavenTaskName = "publish${pubName}PublicationTo${repoName}Repository"
+                    def ivyTaskName = mavenTaskName // same pattern for Ivy publications
+
+                    [mavenTaskName, ivyTaskName].each { taskName ->
+                        if (project.tasks.names.contains(taskName)) {
+                            publishAggregator.dependsOn(project.tasks.getByName(taskName))
+                        }
+                    }
+                }
+            }
         }
     }
 }

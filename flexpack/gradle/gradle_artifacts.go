@@ -44,7 +44,8 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 		return nil, fmt.Errorf("failed to write init script: %w", err)
 	}
 
-	tasks := []string{"publishToMavenLocal", "generateCiManifest", "-I", initScriptPath}
+	// flexpackPublishToLocal is registered by the init script and safely depends only on local publish tasks
+	tasks := []string{"flexpackPublishToLocal", "generateCiManifest", "-I", initScriptPath}
 	if output, err := gf.runGradleCommand(tasks...); err != nil {
 		return nil, fmt.Errorf("gradle command failed: %s - %w", string(output), err)
 	}
