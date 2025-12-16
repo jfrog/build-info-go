@@ -6,33 +6,35 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/gofrog/crypto"
 	"github.com/jfrog/gofrog/log"
+	"github.com/jfrog/gofrog/version"
 )
 
-func (gf *GradleFlexPack) getGradleExecutablePath() string {
-	wrapperPath := filepath.Join(gf.config.WorkingDirectory, "gradlew")
+const minSupportedGradleVersion = "5.0.0"
+
+func GetGradleExecutablePath(workingDirectory string) (string, error) {
+	// Check for Unix wrapper
+	wrapperPath := filepath.Join(workingDirectory, "gradlew")
 	if _, err := os.Stat(wrapperPath); err == nil {
-		return wrapperPath
+		return filepath.Abs(wrapperPath)
 	}
 
 	// Check for Windows wrapper
-	wrapperPathBat := filepath.Join(gf.config.WorkingDirectory, "gradlew.bat")
+	wrapperPathBat := filepath.Join(workingDirectory, "gradlew.bat")
 	if _, err := os.Stat(wrapperPathBat); err == nil {
-		return wrapperPathBat
+		return filepath.Abs(wrapperPathBat)
 	}
 
-	// Default to system Gradle
+	// Fallback to system Gradle
 	gradleExec, err := exec.LookPath("gradle")
 	if err != nil {
-		log.Warn("Gradle executable not found in PATH, using 'gradle' as fallback")
-		return "gradle"
+		return "", fmt.Errorf("gradle executable not found: neither wrapper in %s nor system gradle in PATH", workingDirectory)
 	}
-	return gradleExec
+	return gradleExec, nil
 }
 
 func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {
@@ -52,17 +54,9 @@ func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {
 	return output, nil
 }
 
-func (gf *GradleFlexPack) isGradleVersionCompatible(version string) bool {
-	parts := strings.Split(version, ".")
-	if len(parts) < 1 {
-		return false
-	}
-	major, err := strconv.Atoi(parts[0])
-	if err != nil {
-		log.Debug("Failed to parse Gradle major version: " + err.Error())
-		return false
-	}
-	return major >= 5
+func (gf *GradleFlexPack) isGradleVersionCompatible(ver string) bool {
+	v := version.NewVersion(ver)
+	return v.Compare(minSupportedGradleVersion) <= 0
 }
 
 func (gf *GradleFlexPack) validatePathWithinWorkingDir(resolvedPath string) bool {
@@ -81,12 +75,7 @@ func (gf *GradleFlexPack) validatePathWithinWorkingDir(resolvedPath string) bool
 	}
 	absWorkingDir = filepath.Clean(absWorkingDir)
 	absResolvedPath = filepath.Clean(absResolvedPath)
-	if absResolvedPath == absWorkingDir {
-		return true
-	}
-	separator := string(filepath.Separator)
-	expectedPrefix := absWorkingDir + separator
-	return strings.HasPrefix(absResolvedPath, expectedPrefix)
+	return absResolvedPath == absWorkingDir || strings.HasPrefix(absResolvedPath, absWorkingDir+string(filepath.Separator))
 }
 
 func safeJoinPath(baseDir string, components ...string) (string, error) {
@@ -193,6 +182,49 @@ func safeJoinFilename(dir, filename string) (string, error) {
 	return absResult, nil
 }
 
+func FindGradleFile(dir, baseName string) (path string, isKts bool, err error) {
+	// Sanitize the directory path
+	sanitizedDir, err := filepath.Abs(filepath.Clean(dir))
+	if err != nil {
+		return "", false, fmt.Errorf("invalid directory path: %w", err)
+	}
+
+	// Validate baseName doesn't contain path separators (prevent traversal via filename)
+	if strings.ContainsAny(baseName, `/\`) {
+		return "", false, fmt.Errorf("invalid base name: %s", baseName)
+	}
+
+	// Check for Groovy DSL file
+	groovyPath := filepath.Join(sanitizedDir, baseName+".gradle")
+	absGroovyPath, err := filepath.Abs(filepath.Clean(groovyPath))
+	if err != nil {
+		return "", false, fmt.Errorf("invalid gradle file path: %w", err)
+	}
+	// Validate path is within directory
+	if !strings.HasPrefix(absGroovyPath, sanitizedDir+string(filepath.Separator)) && absGroovyPath != sanitizedDir {
+		return "", false, fmt.Errorf("path traversal detected")
+	}
+	if _, err := os.Stat(absGroovyPath); err == nil {
+		return absGroovyPath, false, nil
+	}
+
+	// Check for Kotlin DSL file
+	ktsPath := filepath.Join(sanitizedDir, baseName+".gradle.kts")
+	absKtsPath, err := filepath.Abs(filepath.Clean(ktsPath))
+	if err != nil {
+		return "", false, fmt.Errorf("invalid gradle file path: %w", err)
+	}
+	// Validate path is within directory
+	if !strings.HasPrefix(absKtsPath, sanitizedDir+string(filepath.Separator)) && absKtsPath != sanitizedDir {
+		return "", false, fmt.Errorf("path traversal detected")
+	}
+	if _, err := os.Stat(absKtsPath); err == nil {
+		return absKtsPath, true, nil
+	}
+
+	return "", false, fmt.Errorf("no %s.gradle or %s.gradle.kts found in %s", baseName, baseName, dir)
+}
+
 // getBuildFileContent reads the build.gradle or build.gradle.kts file for a module.
 func (gf *GradleFlexPack) getBuildFileContent(moduleName string) ([]byte, string, error) {
 	subPath := ""
@@ -201,26 +233,18 @@ func (gf *GradleFlexPack) getBuildFileContent(moduleName string) ([]byte, string
 		subPath = strings.ReplaceAll(moduleName, ":", string(filepath.Separator))
 	}
 
-	buildGradlePath := filepath.Join(gf.config.WorkingDirectory, subPath, "build.gradle")
-	buildGradleKtsPath := filepath.Join(gf.config.WorkingDirectory, subPath, "build.gradle.kts")
-
-	if !gf.validatePathWithinWorkingDir(buildGradlePath) {
-		return nil, "", fmt.Errorf("path traversal attempt detected for module %s (build.gradle)", moduleName)
-	}
-	if !gf.validatePathWithinWorkingDir(buildGradleKtsPath) {
-		return nil, "", fmt.Errorf("path traversal attempt detected for module %s (build.gradle.kts)", moduleName)
+	moduleDir := filepath.Join(gf.config.WorkingDirectory, subPath)
+	if !gf.validatePathWithinWorkingDir(moduleDir) {
+		return nil, "", fmt.Errorf("path traversal attempt detected for module %s", moduleName)
 	}
 
-	if _, err := os.Stat(buildGradlePath); err == nil {
-		content, err := os.ReadFile(buildGradlePath)
-		return content, buildGradlePath, err
+	path, _, err := FindGradleFile(moduleDir, "build")
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: neither build.gradle nor build.gradle.kts found", os.ErrNotExist)
 	}
 
-	if _, err := os.Stat(buildGradleKtsPath); err == nil {
-		content, err := os.ReadFile(buildGradleKtsPath)
-		return content, buildGradleKtsPath, err
-	}
-	return nil, "", fmt.Errorf("%w: neither build.gradle nor build.gradle.kts found", os.ErrNotExist)
+	content, err := os.ReadFile(path)
+	return content, path, err
 }
 
 func (gf *GradleFlexPack) readSettingsFile() (string, error) {
