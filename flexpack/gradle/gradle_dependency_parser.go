@@ -2,15 +2,10 @@ package flexpack
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/gofrog/log"
-)
-
-var (
-	gradleVersionRegex = regexp.MustCompile(`Gradle\s+(\d+\.\d+(?:\.\d+)?)`)
 )
 
 type GradleDepNode struct {

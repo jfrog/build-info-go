@@ -35,7 +35,7 @@ type GradleFlexPack struct {
 	artifactId        string
 	requestedByMap    map[string][]string
 	buildGradlePath   string
-	WasPublishCommand bool
+	wasPublishCommand bool
 	modulesMap        map[string]moduleMetadata
 	modulesList       []string
 	deployedArtifacts map[string][]entities.Artifact
@@ -80,6 +80,10 @@ func NewGradleFlexPackWithContext(ctx context.Context, config flexpack.GradleCon
 	}
 	gf.scanAllModules()
 	return gf, nil
+}
+
+func (gf *GradleFlexPack) SetWasPublishCommand(wasPublish bool) {
+	gf.wasPublishCommand = wasPublish
 }
 
 func (gf *GradleFlexPack) loadBuildGradle() error {
@@ -148,7 +152,7 @@ func (gf *GradleFlexPack) resolveModuleInfo(moduleName string) (moduleMetadata, 
 	if moduleName != "" {
 		subPath := strings.ReplaceAll(moduleName, ":", string(filepath.Separator))
 		modulePath := filepath.Join(gf.config.WorkingDirectory, subPath)
-		if !gf.validatePathWithinWorkingDir(modulePath) {
+		if !isSubPath(gf.config.WorkingDirectory, modulePath) {
 			log.Debug(fmt.Sprintf("Skipping module %s: path traversal detected", moduleName))
 			return moduleMetadata{}, false
 		}
@@ -210,14 +214,10 @@ func (gf *GradleFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 			Name:    "build-info-go",
 			Version: agentVersion,
 		},
-		BuildAgent: &entities.Agent{
-			Name:    "Gradle",
-			Version: gf.getGradleVersion(),
-		},
 		Modules: []entities.Module{},
 	}
 
-	if gf.WasPublishCommand {
+	if gf.wasPublishCommand {
 		if artifacts, err := gf.getGradleDeployedArtifacts(); err == nil {
 			gf.deployedArtifacts = artifacts
 		} else {
@@ -225,9 +225,10 @@ func (gf *GradleFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 		}
 	}
 
+	// Context allows callers to cancel long-running operations (e.g., timeout, user interrupt).
 	for _, moduleName := range gf.modulesList {
 		if gf.ctx.Err() != nil {
-			return nil, fmt.Errorf("context cancelled: %w", gf.ctx.Err())
+			return buildInfo, nil
 		}
 		module := gf.processModule(moduleName)
 		if artifacts, ok := gf.deployedArtifacts[moduleName]; ok {
@@ -236,23 +237,6 @@ func (gf *GradleFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 		buildInfo.Modules = append(buildInfo.Modules, module)
 	}
 	return buildInfo, nil
-}
-
-func (gf *GradleFlexPack) getGradleVersion() string {
-	output, err := gf.runGradleCommand("--version")
-	if err != nil {
-		log.Debug("Failed to get Gradle version: " + err.Error())
-		return "unknown"
-	}
-	matches := gradleVersionRegex.FindStringSubmatch(string(output))
-	if len(matches) > 1 {
-		version := matches[1]
-		if !gf.isGradleVersionCompatible(version) {
-			log.Warn(fmt.Sprintf("Gradle version %s may not be fully compatible; minimum recommended is 5.0", version))
-		}
-		return version
-	}
-	return "unknown"
 }
 
 // We might need to process modules parallelly for better performance
@@ -275,15 +259,12 @@ func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 	requestedByMap := gf.CalculateRequestedBy()
 	dependencies := gf.createDependencyEntities(requestedByMap)
 
-	props := make(map[string]string)
-	subPath := strings.ReplaceAll(moduleName, ":", string(filepath.Separator))
-	subPath = strings.TrimPrefix(subPath, string(filepath.Separator))
-	props["module_path"] = subPath
-
 	return entities.Module{
-		Id:           fmt.Sprintf("%s:%s:%s", groupId, artifactId, version),
-		Type:         entities.Gradle,
-		Properties:   props,
+		Id:   fmt.Sprintf("%s:%s:%s", groupId, artifactId, version),
+		Type: entities.Gradle,
+		Properties: map[string]string{
+			"module_path": strings.TrimPrefix(strings.ReplaceAll(moduleName, ":", string(filepath.Separator)), string(filepath.Separator)),
+		},
 		Dependencies: dependencies,
 	}
 }
