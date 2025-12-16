@@ -52,14 +52,26 @@ func (cf *ConanFlexPack) parseWithConanGraphInfo() error {
 	cmd := exec.Command(cf.config.ConanExecutable, args...)
 	cmd.Dir = cf.config.WorkingDirectory
 
-	output, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("conan graph info failed: %w", err)
-	}
+	// Capture stdout separately from stderr
+	// Conan outputs JSON to stdout and status messages to stderr
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
+	err := cmd.Run()
+
+	// Get stdout content (the JSON output)
+	output := stdout.String()
+
+	// Try to parse JSON even if command failed - Conan sometimes exits non-zero
+	// but still produces valid JSON output (e.g., when deps are missing from cache)
 	var graphData ConanGraphOutput
-	if err := json.Unmarshal(output, &graphData); err != nil {
-		return fmt.Errorf("failed to parse graph info JSON: %w", err)
+	if jsonErr := json.Unmarshal([]byte(output), &graphData); jsonErr != nil {
+		// If JSON parsing failed and command also failed, return command error
+		if err != nil {
+			return fmt.Errorf("conan graph info failed: %w (stderr: %s)", err, stderr.String())
+		}
+		return fmt.Errorf("failed to parse graph info JSON: %w (output: %s)", jsonErr, output)
 	}
 
 	cf.graphData = &graphData

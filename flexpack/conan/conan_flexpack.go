@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/gofrog/log"
@@ -314,28 +313,4 @@ func (cf *ConanFlexPack) getConanVersion() string {
 	}
 
 	return "unknown"
-}
-
-// SaveConanBuildInfoForJfrogCli saves build info in a format compatible with jfrog-cli.
-// This allows 'jf rt bp' command to publish the collected build info.
-func SaveConanBuildInfoForJfrogCli(buildInfo *entities.BuildInfo) error {
-	log.Debug(fmt.Sprintf("Saving Conan build info: %s/%s", buildInfo.Name, buildInfo.Number))
-
-	buildInfoService := build.NewBuildInfoService()
-
-	buildInstance, err := buildInfoService.GetOrCreateBuildWithProject(
-		buildInfo.Name,
-		buildInfo.Number,
-		"",
-	)
-	if err != nil {
-		return fmt.Errorf("failed to get or create build: %w", err)
-	}
-
-	if err := buildInstance.SaveBuildInfo(buildInfo); err != nil {
-		return fmt.Errorf("failed to save build info: %w", err)
-	}
-
-	log.Debug("Successfully saved Conan build info for jfrog-cli")
-	return nil
 }
