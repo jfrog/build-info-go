@@ -13,6 +13,66 @@ import (
 	"github.com/jfrog/gofrog/log"
 )
 
+// SanitizePath cleans a path and converts it to an absolute path.
+func SanitizePath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("path cannot be empty")
+	}
+	return filepath.Abs(filepath.Clean(path))
+}
+
+// IsPathContainedIn checks if childPath is contained within parentPath (or equals it).
+func IsPathContainedIn(childPath, parentPath string) bool {
+	return strings.HasPrefix(childPath+string(filepath.Separator), parentPath+string(filepath.Separator)) || childPath == parentPath
+}
+
+// SanitizeAndValidatePath sanitizes a path and validates it stays within the provided base directory.
+func SanitizeAndValidatePath(path, baseDir string) (string, error) {
+	sanitizedPath, err := SanitizePath(path)
+	if err != nil {
+		return "", err
+	}
+	sanitizedBase, err := SanitizePath(baseDir)
+	if err != nil {
+		return "", err
+	}
+	if !IsPathContainedIn(sanitizedPath, sanitizedBase) {
+		return "", fmt.Errorf("path %s escapes base directory %s", sanitizedPath, sanitizedBase)
+	}
+	return sanitizedPath, nil
+}
+
+// IsEscaped reports whether the byte at index is escaped by an odd number of backslashes.
+func IsEscaped(content string, index int) bool {
+	backslashes := 0
+	for j := index - 1; j >= 0; j-- {
+		if content[j] == '\\' {
+			backslashes++
+		} else {
+			break
+		}
+	}
+	return backslashes%2 != 0
+}
+
+// IsDelimiter reports Gradle block delimiters and whitespace.
+func IsDelimiter(b byte) bool {
+	switch b {
+	case '{', '}', '(', ')', ';', ',':
+		return true
+	}
+	return IsWhitespace(b)
+}
+
+// IsWhitespace reports ASCII whitespace used by Gradle parsing helpers.
+func IsWhitespace(b byte) bool {
+	switch b {
+	case ' ', '\t', '\n', '\r':
+		return true
+	}
+	return false
+}
+
 func GetGradleExecutablePath(workingDirectory string) (string, error) {
 	// Check for OS-appropriate wrapper first
 	if runtime.GOOS == "windows" {
@@ -36,6 +96,27 @@ func GetGradleExecutablePath(workingDirectory string) (string, error) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// GetGradleUserHome returns the Gradle user home directory
+func GetGradleUserHome() string {
+	if envHome := os.Getenv("GRADLE_USER_HOME"); envHome != "" {
+		if abs, err := filepath.Abs(filepath.Clean(envHome)); err == nil {
+			return abs
+		}
+		return filepath.Clean(envHome)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	defaultHome := filepath.Join(homeDir, ".gradle")
+	if abs, err := filepath.Abs(filepath.Clean(defaultHome)); err == nil {
+		return abs
+	}
+	return filepath.Clean(defaultHome)
 }
 
 func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {

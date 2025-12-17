@@ -17,7 +17,7 @@ import (
 
 var agentVersion = "1.0.0"
 
-const defaultGradleCommandTimeout = 1 * time.Minute
+const defaultGradleCommandTimeout = 5 * time.Minute
 
 type moduleMetadata struct {
 	Group    string
@@ -250,11 +250,16 @@ func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 	requestedByMap := gf.buildRequestedByMap(depGraph)
 	dependencies := gf.createDependencyEntities(deps, requestedByMap)
 
+	modulePath := strings.TrimPrefix(strings.ReplaceAll(moduleName, ":", string(filepath.Separator)), string(filepath.Separator))
+	if modulePath == "" {
+		modulePath = "."
+	}
+
 	return entities.Module{
 		Id:   fmt.Sprintf("%s:%s:%s", groupId, artifactId, version),
 		Type: entities.Gradle,
 		Properties: map[string]string{
-			"module_path": strings.TrimPrefix(strings.ReplaceAll(moduleName, ":", string(filepath.Separator)), string(filepath.Separator)),
+			"module_path": modulePath,
 		},
 		Dependencies: dependencies,
 	}

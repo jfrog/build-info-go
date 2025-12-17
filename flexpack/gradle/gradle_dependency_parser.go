@@ -73,7 +73,7 @@ func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) ([]flex
 
 		dependencies, err := gf.ParseGradleDependencyTree(string(output))
 		if err != nil {
-			log.Debug(fmt.Sprintf("Failed to parse text output for configuration %s: %s", config, err.Error()))
+			log.Debug(fmt.Sprintf("Failed to parse dependency tree output for configuration %s: %s", config, err.Error()))
 			continue
 		}
 
