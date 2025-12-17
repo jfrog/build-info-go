@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,38 +31,41 @@ type deployedArtifactJSON struct {
 func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Artifact, error) {
 	initScriptFile, err := os.CreateTemp("", "init-artifact-extractor-*.gradle")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create init script: %w", err)
+		return nil, fmt.Errorf("failed to prepare Gradle artifact collection: %w", err)
 	}
 	initScriptPath := initScriptFile.Name()
 	defer func() { _ = initScriptFile.Close() }()
 	defer func() {
 		if err := os.Remove(initScriptPath); err != nil {
-			log.Debug("Failed to remove init script: " + err.Error())
+			log.Warn("Failed to remove temporary artifacts generation script: " + err.Error())
 		}
 	}()
 
 	if _, err := initScriptFile.WriteString(initScriptContent); err != nil {
-		return nil, fmt.Errorf("failed to write init script: %w", err)
+		return nil, fmt.Errorf("failed to prepare Gradle artifact collection: %w", err)
 	}
 
 	// flexpackPublishToLocal is registered by the init script and safely depends only on local publish tasks
 	tasks := []string{"flexpackPublishToLocal", "generateCiManifest", "-I", initScriptPath}
 	if output, err := gf.runGradleCommand(tasks...); err != nil {
-		return nil, fmt.Errorf("gradle command failed: %s - %w", string(output), err)
+		return nil, fmt.Errorf("failed to collect Gradle artifacts: %w (output: %s)", err, string(output))
 	}
 
-	manifestPath := filepath.Join(gf.config.WorkingDirectory, "build", "ci-artifacts-manifest.json")
+	manifestPath, err := resolveManifestPath(gf.config.WorkingDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect Gradle artifacts: %w", err)
+	}
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read manifest: %w", err)
+		return nil, fmt.Errorf("failed to collect Gradle artifacts: cannot read generated artifacts: %w", err)
 	}
 	if err := os.Remove(manifestPath); err != nil {
-		log.Warn("Failed to delete manifest file: " + err.Error())
+		log.Warn("Failed to remove generated artifacts file: " + err.Error())
 	}
 
 	var artifacts []deployedArtifactJSON
 	if err := json.Unmarshal(content, &artifacts); err != nil {
-		return nil, fmt.Errorf("failed to parse manifest: %w", err)
+		return nil, fmt.Errorf("failed to collect Gradle artifacts: cannot parse generated artifacts: %w", err)
 	}
 
 	result := make(map[string][]entities.Artifact)
@@ -85,6 +89,58 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 		result[moduleName] = append(result[moduleName], entityArtifact)
 	}
 	return result, nil
+}
+
+func resolveManifestPath(workingDir string) (string, error) {
+	defaultPath := filepath.Join(workingDir, "build", "ci-artifacts-manifest.json")
+	if _, err := os.Stat(defaultPath); err == nil {
+		return defaultPath, nil
+	}
+
+	const maxDepth = 5
+	startDepth := strings.Count(workingDir, string(os.PathSeparator))
+	var found string
+
+	skipDirs := map[string]bool{
+		".git":         true,
+		".gradle":      true,
+		".idea":        true,
+		"node_modules": true,
+		"buildSrc":     true,
+	}
+
+	err := filepath.WalkDir(workingDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		depth := strings.Count(path, string(os.PathSeparator)) - startDepth
+		if depth > maxDepth {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if d.IsDir() && skipDirs[d.Name()] {
+			return filepath.SkipDir
+		}
+
+		if !d.IsDir() && strings.EqualFold(d.Name(), "ci-artifacts-manifest.json") {
+			found = path
+			return io.EOF
+		}
+		return nil
+	})
+
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	if found != "" {
+		return found, nil
+	}
+
+	return "", fmt.Errorf("generated manifest not found under %s (checked default and limited scan)", workingDir)
 }
 
 // if a module is a dependency, the checksum calculation depends if the artifact is published or not

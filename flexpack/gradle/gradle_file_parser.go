@@ -168,7 +168,6 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) []flexpack.Dep
 
 	// Strip comments from dependencies block to avoid parsing commented-out dependencies
 	depsContent = gf.stripComments(depsContent)
-
 	allDeps := make(map[string]flexpack.DependencyInfo)
 
 	// 1. String notation: "group:artifact:version"
@@ -193,7 +192,6 @@ func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) []flexpack.Dep
 		if len(parts) >= 4 {
 			classifier = parts[3]
 		}
-
 		gf.addDependencyFromFile(configType, groupID, artifactID, version, classifier, allDeps)
 	}
 
