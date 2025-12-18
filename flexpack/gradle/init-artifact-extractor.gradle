@@ -238,8 +238,8 @@ abstract class CiManifestTask extends DefaultTask {
         def results = []
 
         // --- Process Primary Artifact ---
-        // Enhanced Key: Includes module and destName to prevent collisions
-        String primaryKey = "PRIMARY|${item.moduleName}|${item.repoPath}|${item.destName}"
+        // Note: The same published file can be observed multiple times under different Gradle project paths (especially in composite builds or certain publishing setups).
+        String primaryKey = "PRIMARY|${item.repoPath}"
 
         if (processedKeys.add(primaryKey)) {
             def hashes = hash ? computeHashes(file, failHashError, errorLog, hasErrors) : [sha1: null, sha256: null, md5: null]
@@ -262,7 +262,8 @@ abstract class CiManifestTask extends DefaultTask {
             boolean ascIsSymlink = Files.isSymbolicLink(ascFile.toPath())
 
             if (!ascIsSymlink || followSymlinks) {
-                String ascKey = "SIG|${item.moduleName}|${item.repoPath}.asc|${item.destName}.asc"
+                // Deduplicate detached signatures by final repository path as well.
+                String ascKey = "SIG|${item.repoPath}.asc"
 
                 if (processedKeys.add(ascKey)) {
                     if (Files.isReadable(ascFile.toPath())) {
