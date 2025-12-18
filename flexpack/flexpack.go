@@ -2,6 +2,7 @@ package flexpack
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/jfrog/build-info-go/entities"
 )
@@ -43,6 +44,7 @@ type DependencyInfo struct {
 	Version      string           `json:"version"`
 	Name         string           `json:"name"`
 	Path         string           `json:"path,omitempty"`
+	Repository   string           `json:"-"`
 	Dependencies []DependencyInfo `json:"dependencies,omitempty"`
 }
 
@@ -70,5 +72,10 @@ type PoetryConfig struct {
 // IsFlexPackEnabled checks if the FlexPack (native) implementation should be used
 // Returns true if JFROG_RUN_NATIVE environment variable is set to "true"
 func IsFlexPackEnabled() bool {
-	return os.Getenv("JFROG_RUN_NATIVE") == "true"
+	value, err := strconv.ParseBool(os.Getenv("JFROG_RUN_NATIVE"))
+	if err != nil {
+		// Invalid value or not set - default to false (legacy)
+		return false
+	}
+	return value
 }

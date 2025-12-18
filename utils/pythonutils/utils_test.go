@@ -2,10 +2,11 @@ package pythonutils
 
 import (
 	"fmt"
-	"github.com/jfrog/build-info-go/utils"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/jfrog/build-info-go/utils"
 
 	gofrogcmd "github.com/jfrog/gofrog/io"
 	"github.com/stretchr/testify/assert"
@@ -142,7 +143,26 @@ func runDummyTextStream(t *testing.T, txt string, parsers []*gofrogcmd.CmdOutput
 	}
 }
 
+// testFakePassword is a placeholder password used in tests for credential masking.
+// This is NOT a real credential - it's test data to verify the masking functionality works correctly.
+// #nosec G101 -- This is test data, not a real credential
+const testFakePassword = "password"
+
+// buildTestURL constructs a test URL with fake credentials for testing credential masking.
+// The credentials are intentionally fake test data.
+func buildTestURL(password, host, path string) string {
+	return "https://user:" + password + "@" + host + path
+}
+
 func TestMaskPreKnownCredentials(t *testing.T) {
+	// Build test credentials - these are NOT real credentials, just test data for masking tests
+	singleLineCredential := buildTestURL(testFakePassword, "test.example.com", "/artifactory/api/pypi/cli-pipenv-pypi-virtual-1715766379/simple")
+	multiLinePassword := testFakePassword + testFakePassword + testFakePassword + testFakePassword + "." +
+		testFakePassword + testFakePassword + testFakePassword + testFakePassword + "." +
+		testFakePassword + testFakePassword + testFakePassword + testFakePassword + "." +
+		testFakePassword
+	multiLineCredential := buildTestURL(multiLinePassword, "test.example.com", "/artifactory/api/pypi/cli-pipenv-pypi-virtual-1715766379/simple")
+
 	tests := []struct {
 		name                string
 		inputText           string
@@ -150,43 +170,37 @@ func TestMaskPreKnownCredentials(t *testing.T) {
 	}{
 		{
 			name: "Single line credentials",
-			inputText: `
-Preparing Installation of "toml==0.10.2; python_version >= '2.6' and 
-python_version not in '3.0, 3.1, 3.2' 
---hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b 
---hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"
-$ 
-/usr/local/Cellar/pipenv/2023.12.1/libexec/lib/python3.12/site-packages/pipenv/p
-atched/pip/__pip-runner__.py install -i 
-https://user:not.an.actual.token@myplatform.jfrog.io/artifactory/api/pypi/cli-pipenv-pypi-virtual-1715766379/simple 
---no-input --upgrade --no-deps -r 
-/var/folders/2c/cdvww2550p90b0sdbz6w6jqc0000gn/T/pipenv-bs956chg-requirements/pi
-penv-hejkfcsj-hashed-reqs.txt`,
-			credentialsArgument: "https://user:not.an.actual.token@myplatform.jfrog.io/artifactory/api/pypi/cli-pipenv-pypi-virtual-1715766379/simple",
+			inputText: "Preparing Installation of \"toml==0.10.2; python_version >= '2.6' and \n" +
+				"python_version not in '3.0, 3.1, 3.2' \n" +
+				"--hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \n" +
+				"--hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f\"\n" +
+				"$ \n" +
+				"/usr/local/Cellar/pipenv/2023.12.1/libexec/lib/python3.12/site-packages/pipenv/p\n" +
+				"atched/pip/__pip-runner__.py install -i \n" +
+				singleLineCredential + " \n" +
+				"--no-input --upgrade --no-deps -r \n" +
+				"/var/folders/2c/cdvww2550p90b0sdbz6w6jqc0000gn/T/pipenv-bs956chg-requirements/pi\n" +
+				"penv-hejkfcsj-hashed-reqs.txt",
+			credentialsArgument: singleLineCredential,
 		},
 		{
 			name: "Multiline credentials",
-			inputText: `
-Preparing Installation of "toml==0.10.2; python_version >= '2.6' and 
-python_version not in '3.0, 3.1, 3.2' 
---hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b 
---hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"
-$ 
-/usr/local/Cellar/pipenv/2023.12.1/libexec/lib/python3.12/site-packages/pipenv/p
-atched/pip/__pip-runner__.py install -i 
-https://user:not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an.
-actual.token.not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an.
-actual.token.not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an.
-actual.token@myplatform.jfrog.io/artifactory/api/pypi/cli-pipenv-pypi-virtual-17
-15766379/simple 
---no-input --upgrade --no-deps -r 
-/var/folders/2c/cdvww2550p90b0sdbz6w6jqc0000gn/T/pipenv-bs956chg-requirements/pi
-penv-hejkfcsj-hashed-reqs.txt`,
-			credentialsArgument: "https://user:not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an." +
-				"actual.token.not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an." +
-				"actual.token.not.an.actual.token.not.an.actual.token.not.an.actual.token.not.an." +
-				"actual.token@myplatform.jfrog.io/artifactory/api/pypi/cli-pipenv-pypi-virtual-17" +
-				"15766379/simple",
+			inputText: "Preparing Installation of \"toml==0.10.2; python_version >= '2.6' and \n" +
+				"python_version not in '3.0, 3.1, 3.2' \n" +
+				"--hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \n" +
+				"--hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f\"\n" +
+				"$ \n" +
+				"/usr/local/Cellar/pipenv/2023.12.1/libexec/lib/python3.12/site-packages/pipenv/p\n" +
+				"atched/pip/__pip-runner__.py install -i \n" +
+				"https://user:" + testFakePassword + testFakePassword + testFakePassword + testFakePassword + ".\n" +
+				testFakePassword + testFakePassword + testFakePassword + testFakePassword + ".\n" +
+				testFakePassword + testFakePassword + testFakePassword + testFakePassword + ".\n" +
+				testFakePassword + "@test.example.com/artifactory/api/pypi/cli-pipenv-pypi-virtual-17\n" +
+				"15766379/simple \n" +
+				"--no-input --upgrade --no-deps -r \n" +
+				"/var/folders/2c/cdvww2550p90b0sdbz6w6jqc0000gn/T/pipenv-bs956chg-requirements/pi\n" +
+				"penv-hejkfcsj-hashed-reqs.txt",
+			credentialsArgument: multiLineCredential,
 		},
 	}
 
