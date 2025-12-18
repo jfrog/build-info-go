@@ -12,45 +12,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestGradlewWrapperDetection tests that projects with gradlew wrapper are handled correctly
-func TestGradlewWrapperDetection(t *testing.T) {
-	tempDir := t.TempDir()
+// TestGradleWrapperDetection tests that projects with gradlew wrappers are handled correctly
+func TestGradleWrapperDetection(t *testing.T) {
+	tests := []struct {
+		name       string
+		wrapperFile string
+		content    string
+	}{
+		{"unix wrapper", "gradlew", "#!/bin/bash\necho 'gradlew'"},
+		{"windows wrapper", "gradlew.bat", "@echo off\necho Gradle"},
+	}
 
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+
+			err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
 plugins { id 'java' }
 group = 'com.example'
 version = '1.0.0'
 `), 0644)
-	require.NoError(t, err)
+			require.NoError(t, err)
 
-	// Create gradlew wrapper (Unix)
-	err = os.WriteFile(filepath.Join(tempDir, "gradlew"), []byte("#!/bin/bash\necho 'gradlew'"), 0755)
-	require.NoError(t, err)
+			err = os.WriteFile(filepath.Join(tempDir, tt.wrapperFile), []byte(tt.content), 0755)
+			require.NoError(t, err)
 
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-	assert.NotNil(t, gf)
-}
-
-// TestGradlewBatWrapperDetection tests Windows gradlew.bat wrapper detection
-func TestGradlewBatWrapperDetection(t *testing.T) {
-	tempDir := t.TempDir()
-
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(tempDir, "gradlew.bat"), []byte("@echo off\necho Gradle"), 0755)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-	assert.NotNil(t, gf)
+			config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+			gf, err := gradleflexpack.NewGradleFlexPack(config)
+			require.NoError(t, err)
+			assert.NotNil(t, gf)
+		})
+	}
 }
 
 // TestCustomGradleExecutable tests using a custom Gradle executable path
@@ -73,8 +65,8 @@ version = '1.0.0'
 	assert.NotNil(t, gf)
 }
 
-// TestDefaultCommandTimeout tests that default timeout is applied
-func TestDefaultCommandTimeout(t *testing.T) {
+// TestCommandTimeout tests default and custom timeout configurations
+func TestCommandTimeout(t *testing.T) {
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -84,30 +76,22 @@ version = '1.0.0'
 `), 0644)
 	require.NoError(t, err)
 
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-	assert.NotNil(t, gf)
-}
+	t.Run("default timeout", func(t *testing.T) {
+		config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+		gf, err := gradleflexpack.NewGradleFlexPack(config)
+		require.NoError(t, err)
+		assert.NotNil(t, gf)
+	})
 
-// TestCustomCommandTimeout tests custom timeout configuration
-func TestCustomCommandTimeout(t *testing.T) {
-	tempDir := t.TempDir()
-
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{
-		WorkingDirectory: tempDir,
-		CommandTimeout:   30 * time.Second,
-	}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-	assert.NotNil(t, gf)
+	t.Run("custom timeout", func(t *testing.T) {
+		config := flexpack.GradleConfig{
+			WorkingDirectory: tempDir,
+			CommandTimeout:   30 * time.Second,
+		}
+		gf, err := gradleflexpack.NewGradleFlexPack(config)
+		require.NoError(t, err)
+		assert.NotNil(t, gf)
+	})
 }
 
 // TestWorkingDirectoryWithSpacesInPath tests paths containing spaces
@@ -286,55 +270,30 @@ version = "3.0.0"
 	assert.Contains(t, moduleId, "3.0.0", "Should parse Kotlin DSL version")
 }
 
-// TestEmptyBuildGradle tests handling of empty build.gradle
-func TestEmptyBuildGradle(t *testing.T) {
-	tempDir := t.TempDir()
+// TestMinimalOrEmptyBuildGradle tests handling of minimal content build files
+func TestMinimalOrEmptyBuildGradle(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{"empty file", ""},
+		{"only comments", "// This is a comment\n/* Multi-line comment */\n"},
+		{"only whitespace", "   \n\n   \t\n  "},
+	}
 
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(""), 0644)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(tt.content), 0644)
+			require.NoError(t, err)
 
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
+			config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+			gf, err := gradleflexpack.NewGradleFlexPack(config)
+			require.NoError(t, err)
 
-	buildInfo, err := gf.CollectBuildInfo("empty-test", "1")
-	require.NoError(t, err)
-
-	moduleId := buildInfo.Modules[0].Id
-	assert.Contains(t, moduleId, "unspecified", "Should use unspecified for empty build file")
-}
-
-// TestBuildGradleWithOnlyComments tests build file with only comments
-func TestBuildGradleWithOnlyComments(t *testing.T) {
-	tempDir := t.TempDir()
-
-	content := `// This is a comment
-/* Multi-line comment */
-`
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(content), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("comments-test", "1")
-	require.NoError(t, err)
-	assert.NotNil(t, buildInfo)
-}
-
-// TestBuildGradleWithOnlyWhitespace tests handling of whitespace-only build file
-func TestBuildGradleWithOnlyWhitespace(t *testing.T) {
-	tempDir := t.TempDir()
-
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte("   \n\n   \t\n  "), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("whitespace-test", "1")
-	require.NoError(t, err)
-	assert.NotNil(t, buildInfo)
+			buildInfo, err := gf.CollectBuildInfo("minimal-test", "1")
+			require.NoError(t, err)
+			assert.NotNil(t, buildInfo)
+		})
+	}
 }

@@ -358,9 +358,13 @@ gradle.rootProject {
         t.group = "reporting"
         t.description = "Generates a JSON manifest of all published artifacts"
 
-        // Use layout API
-        t.manifestFile.set(layout.buildDirectory.file("ci-artifacts-manifest.json"))
-        t.failureLogFile.set(layout.buildDirectory.file("ci-manifest-failures.log"))
+        // Use layout API with configurable manifest filename to support concurrent builds
+        def manifestFileName = project.hasProperty('ciManifest.fileName') 
+            ? project.property('ciManifest.fileName') 
+            : "ci-artifacts-manifest.json"
+        def failureLogName = manifestFileName.replace('.json', '-failures.log')
+        t.manifestFile.set(layout.buildDirectory.file(manifestFileName))
+        t.failureLogFile.set(layout.buildDirectory.file(failureLogName))
 
         // 1. Allow CLI Overrides via Project Properties
         def p = project

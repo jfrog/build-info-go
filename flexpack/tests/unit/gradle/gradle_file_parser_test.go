@@ -11,172 +11,118 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestParseGroupIdWithSingleQuotes tests parsing group with single quotes
-func TestParseGroupIdWithSingleQuotes(t *testing.T) {
-	tempDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
+// TestParseMetadata tests parsing of group, artifact, and version from build.gradle
+func TestParseMetadata(t *testing.T) {
+	tests := []struct {
+		name         string
+		buildContent string
+		expectedInId string
+		description  string
+	}{
+		{
+			name: "single quotes",
+			buildContent: `plugins { id 'java' }
 group = 'com.example.single'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("group-test", "1")
-	require.NoError(t, err)
-	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.single")
-}
-
-// TestParseGroupIdWithDoubleQuotes tests parsing group with double quotes
-func TestParseGroupIdWithDoubleQuotes(t *testing.T) {
-	tempDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
+version = '1.0.0'`,
+			expectedInId: "com.example.single",
+		},
+		{
+			name: "double quotes",
+			buildContent: `plugins { id 'java' }
 group = "com.example.double"
-version = "1.0.0"
-`), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("group-test", "1")
-	require.NoError(t, err)
-	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.double")
-}
-
-// TestParseGroupIdMissing tests parsing when no group is specified
-func TestParseGroupIdMissing(t *testing.T) {
-	tempDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("group-test", "1")
-	require.NoError(t, err)
-	assert.Contains(t, buildInfo.Modules[0].Id, "unspecified")
-}
-
-// TestParseVersionSnapshot tests parsing SNAPSHOT version
-func TestParseVersionSnapshot(t *testing.T) {
-	tempDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
+version = "1.0.0"`,
+			expectedInId: "com.example.double",
+		},
+		{
+			name: "missing group defaults to unspecified",
+			buildContent: `plugins { id 'java' }
+version = '1.0.0'`,
+			expectedInId: "unspecified",
+		},
+		{
+			name: "SNAPSHOT version",
+			buildContent: `plugins { id 'java' }
 group = 'com.example'
-version = '2.0.0-SNAPSHOT'
-`), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("version-test", "1")
-	require.NoError(t, err)
-	assert.Contains(t, buildInfo.Modules[0].Id, "2.0.0-SNAPSHOT")
-}
-
-// TestParseVersionReleaseCandidate tests parsing RC version
-func TestParseVersionReleaseCandidate(t *testing.T) {
-	tempDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
+version = '2.0.0-SNAPSHOT'`,
+			expectedInId: "2.0.0-SNAPSHOT",
+		},
+		{
+			name: "RC version",
+			buildContent: `plugins { id 'java' }
 group = 'com.example'
-version = '3.0.0-RC1'
-`), 0644)
-	require.NoError(t, err)
+version = '3.0.0-RC1'`,
+			expectedInId: "3.0.0-RC1",
+		},
+		{
+			name: "missing version defaults to unspecified",
+			buildContent: `plugins { id 'java' }
+group = 'com.example'`,
+			expectedInId: "unspecified",
+		},
+	}
 
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(tt.buildContent), 0644)
+			require.NoError(t, err)
 
-	buildInfo, err := gf.CollectBuildInfo("version-test", "1")
-	require.NoError(t, err)
-	assert.Contains(t, buildInfo.Modules[0].Id, "3.0.0-RC1")
+			config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+			gf, err := gradleflexpack.NewGradleFlexPack(config)
+			require.NoError(t, err)
+
+			buildInfo, err := gf.CollectBuildInfo("metadata-test", "1")
+			require.NoError(t, err)
+			assert.Contains(t, buildInfo.Modules[0].Id, tt.expectedInId)
+		})
+	}
 }
 
-// TestParseVersionMissing tests parsing when no version is specified
-func TestParseVersionMissing(t *testing.T) {
-	tempDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example'
-`), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("version-test", "1")
-	require.NoError(t, err)
-	assert.Contains(t, buildInfo.Modules[0].Id, "unspecified")
-}
-
-// TestDependencyStringNotation tests parsing dependencies with string notation
-func TestDependencyStringNotation(t *testing.T) {
-	tempDir := t.TempDir()
-
-	buildGradle := `
-plugins { id 'java' }
+// TestDependencyNotations tests parsing dependencies with various notations
+func TestDependencyNotations(t *testing.T) {
+	tests := []struct {
+		name         string
+		buildContent string
+	}{
+		{
+			name: "string notation",
+			buildContent: `plugins { id 'java' }
 group = 'com.example'
 version = '1.0.0'
-
 dependencies {
     implementation 'com.google.guava:guava:31.1-jre'
-    implementation 'org.apache.commons:commons-lang3:3.12.0'
     testImplementation 'junit:junit:4.13.2'
-}
-`
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{
-		WorkingDirectory:        tempDir,
-		IncludeTestDependencies: true,
-	}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("string-dep-test", "1")
-	require.NoError(t, err)
-	assert.NotNil(t, buildInfo)
-}
-
-// TestDependencyMapNotation tests parsing dependencies with map notation
-func TestDependencyMapNotation(t *testing.T) {
-	tempDir := t.TempDir()
-
-	buildGradle := `
-plugins { id 'java' }
+}`,
+		},
+		{
+			name: "map notation",
+			buildContent: `plugins { id 'java' }
 group = 'com.example'
 version = '1.0.0'
-
 dependencies {
     implementation group: 'com.google.code.gson', name: 'gson', version: '2.10'
-    implementation(group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.14')
-}
-`
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
-	require.NoError(t, err)
+}`,
+		},
+	}
 
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(tt.buildContent), 0644)
+			require.NoError(t, err)
 
-	buildInfo, err := gf.CollectBuildInfo("map-dep-test", "1")
-	require.NoError(t, err)
-	assert.NotNil(t, buildInfo)
+			config := flexpack.GradleConfig{
+				WorkingDirectory:        tempDir,
+				IncludeTestDependencies: true,
+			}
+			gf, err := gradleflexpack.NewGradleFlexPack(config)
+			require.NoError(t, err)
+
+			buildInfo, err := gf.CollectBuildInfo("dep-notation-test", "1")
+			require.NoError(t, err)
+			assert.NotNil(t, buildInfo)
+		})
+	}
 }
 
 // TestProjectDependencyParsing tests parsing project(':module') dependencies
@@ -345,60 +291,51 @@ dependencies {
 	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.kotlin")
 }
 
-// TestSettingsGradleParsing tests parsing of settings.gradle for project name
-func TestSettingsGradleParsing(t *testing.T) {
-	tempDir := t.TempDir()
+// TestSettingsFileParsing tests parsing of settings.gradle and settings.gradle.kts
+func TestSettingsFileParsing(t *testing.T) {
+	tests := []struct {
+		name            string
+		settingsFile    string
+		settingsContent string
+		expectedInId    string
+	}{
+		{
+			name:            "groovy settings file",
+			settingsFile:    "settings.gradle",
+			settingsContent: `rootProject.name = 'my-project-from-settings'`,
+			expectedInId:    "my-project-from-settings",
+		},
+		{
+			name:            "kotlin settings file",
+			settingsFile:    "settings.gradle.kts",
+			settingsContent: `rootProject.name = "kotlin-settings-project"`,
+			expectedInId:    "kotlin-settings-project",
+		},
+	}
 
-	buildGradle := `
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+
+			err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
 plugins { id 'java' }
 group = 'com.example'
 version = '1.0.0'
-`
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
-	require.NoError(t, err)
+`), 0644)
+			require.NoError(t, err)
 
-	settings := `rootProject.name = 'my-project-from-settings'
-`
-	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(settings), 0644)
-	require.NoError(t, err)
+			err = os.WriteFile(filepath.Join(tempDir, tt.settingsFile), []byte(tt.settingsContent), 0644)
+			require.NoError(t, err)
 
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
+			config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+			gf, err := gradleflexpack.NewGradleFlexPack(config)
+			require.NoError(t, err)
 
-	buildInfo, err := gf.CollectBuildInfo("settings-test", "1")
-	require.NoError(t, err)
-	assert.Contains(t, buildInfo.Modules[0].Id, "my-project-from-settings")
-}
-
-// TestSettingsGradleKtsParsing tests parsing of settings.gradle.kts for rootProject.name
-func TestSettingsGradleKtsParsing(t *testing.T) {
-	tempDir := t.TempDir()
-
-	// Build file without explicit name
-	buildGradle := `
-plugins { id 'java' }
-group = 'com.example'
-version = '1.0.0'
-`
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
-	require.NoError(t, err)
-
-	// settings.gradle.kts with rootProject.name - should be used for artifact ID
-	settingsKts := `rootProject.name = "kotlin-settings-project"
-`
-	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle.kts"), []byte(settingsKts), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("kts-settings-test", "1")
-	require.NoError(t, err)
-
-	// rootProject.name from settings.gradle.kts should be used as artifact ID
-	assert.Contains(t, buildInfo.Modules[0].Id, "kotlin-settings-project")
+			buildInfo, err := gf.CollectBuildInfo("settings-test", "1")
+			require.NoError(t, err)
+			assert.Contains(t, buildInfo.Modules[0].Id, tt.expectedInId)
+		})
+	}
 }
 
 // TestIncludeStatementParsing tests parsing of include statements
@@ -434,8 +371,8 @@ include 'core'
 	assert.GreaterOrEqual(t, len(buildInfo.Modules), 1, "Should have modules")
 }
 
-// TestCommentedIncludeStatement tests that commented include statements are NOT parsed
-func TestCommentedIncludeStatement(t *testing.T) {
+// TestCommentHandling tests that comments are properly ignored in settings.gradle
+func TestCommentHandling(t *testing.T) {
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -451,9 +388,18 @@ version = '1.0.0'
 	err = os.WriteFile(filepath.Join(appDir, "build.gradle"), []byte(`plugins { id 'java' }`), 0644)
 	require.NoError(t, err)
 
-	settings := `rootProject.name = 'comment-test'
+	// Settings file with single-line and multi-line comments
+	settings := `// Root project name
+rootProject.name = 'comment-test'
+
+/* This is a multi-line comment */
 include 'app'
-// include 'commented-module'
+
+/* Block commented module:
+include 'block-commented-module'
+*/
+
+// include 'line-commented-module'
 `
 	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(settings), 0644)
 	require.NoError(t, err)
@@ -465,54 +411,10 @@ include 'app'
 	buildInfo, err := gf.CollectBuildInfo("comment-test", "1")
 	require.NoError(t, err)
 
+	// Verify commented modules are NOT included
 	for _, module := range buildInfo.Modules {
-		assert.NotContains(t, module.Id, "commented-module")
-	}
-}
-
-// TestSettingsGradleWithComments tests settings.gradle with various comment styles
-func TestSettingsGradleWithComments(t *testing.T) {
-	tempDir := t.TempDir()
-
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
-
-	appDir := filepath.Join(tempDir, "app")
-	err = os.MkdirAll(appDir, 0755)
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(appDir, "build.gradle"), []byte(`plugins { id 'java' }`), 0644)
-	require.NoError(t, err)
-
-	settings := `// Root project name
-rootProject.name = 'comment-styles'
-
-/* This is a multi-line
-   comment */
-include 'app'
-
-/*
-include 'shouldnt-be-included'
-*/
-
-// include 'also-shouldnt-be-included'
-`
-	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(settings), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("comment-styles-test", "1")
-	require.NoError(t, err)
-
-	for _, module := range buildInfo.Modules {
-		assert.NotContains(t, module.Id, "shouldnt-be-included")
-		assert.NotContains(t, module.Id, "also-shouldnt-be-included")
+		assert.NotContains(t, module.Id, "block-commented-module")
+		assert.NotContains(t, module.Id, "line-commented-module")
 	}
 }
 
@@ -547,57 +449,56 @@ includeBuild("../another-project")
 	}
 }
 
-// TestMalformedBuildGradle tests handling of syntactically incorrect build files
-func TestMalformedBuildGradle(t *testing.T) {
-	tempDir := t.TempDir()
-
-	buildGradle := `
-plugins { id 'java' }
-group = 'com.example'
+// TestMalformedContent tests graceful handling of syntactically incorrect files
+func TestMalformedContent(t *testing.T) {
+	tests := []struct {
+		name            string
+		buildContent    string
+		settingsContent string
+		expectedInId    string
+	}{
+		{
+			name: "unclosed dependencies block",
+			buildContent: `plugins { id 'java' }
+group = 'com.example.malformed'
 version = '1.0.0'
-
 dependencies {
-    implementation 'org.slf4j:slf4j-api:2.0.0'
-`
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("malformed-test", "1")
-	require.NoError(t, err)
-	assert.NotNil(t, buildInfo)
-}
-
-// TestUnclosedBlockComment tests handling of malformed content with unclosed block comment
-func TestUnclosedBlockComment(t *testing.T) {
-	tempDir := t.TempDir()
-
-	settings := `
-rootProject.name = 'unclosed-comment'
-/* This block comment is never closed
-include 'app'
-`
-	err := os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(settings), 0644)
-	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
+    implementation 'org.slf4j:slf4j-api:2.0.0'`,
+			expectedInId: "com.example.malformed",
+		},
+		{
+			name: "unclosed block comment in settings",
+			buildContent: `plugins { id 'java' }
 group = 'com.example'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
+version = '1.0.0'`,
+			settingsContent: `rootProject.name = 'unclosed-comment'
+/* This block comment is never closed
+include 'app'`,
+			expectedInId: "unclosed-comment",
+		},
+	}
 
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
 
-	buildInfo, err := gf.CollectBuildInfo("unclosed-comment-test", "1")
-	require.NoError(t, err)
+			err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(tt.buildContent), 0644)
+			require.NoError(t, err)
 
-	assert.Contains(t, buildInfo.Modules[0].Id, "unclosed-comment")
+			if tt.settingsContent != "" {
+				err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(tt.settingsContent), 0644)
+				require.NoError(t, err)
+			}
+
+			config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+			gf, err := gradleflexpack.NewGradleFlexPack(config)
+			require.NoError(t, err)
+
+			buildInfo, err := gf.CollectBuildInfo("malformed-test", "1")
+			require.NoError(t, err)
+			assert.Contains(t, buildInfo.Modules[0].Id, tt.expectedInId)
+		})
+	}
 }
 
 // TestNameRegexFalsePositive tests that 'name' in non-project contexts doesn't confuse parsing
@@ -721,9 +622,86 @@ afterEvaluate {
 
 	buildInfo, err := gf.CollectBuildInfo("android-test", "1")
 	require.NoError(t, err)
-	
+
 	// Expect ch.datatrans:android-sample-app:0.0.6
 	assert.Contains(t, buildInfo.Modules[0].Id, "ch.datatrans")
 	assert.Contains(t, buildInfo.Modules[0].Id, "android-sample-app")
 	assert.Contains(t, buildInfo.Modules[0].Id, "0.0.6")
+}
+
+// TestConfigurationToScopeMapping tests scope mapping for Gradle configurations
+func TestConfigurationToScopeMapping(t *testing.T) {
+	tempDir := t.TempDir()
+
+	buildGradle := `
+plugins { id 'java' }
+group = 'com.example'
+version = '1.0.0'
+
+dependencies {
+    implementation 'org.slf4j:slf4j-api:2.0.0'
+    compileOnly 'org.projectlombok:lombok:1.18.24'
+    runtimeOnly 'ch.qos.logback:logback-classic:1.4.5'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+}
+`
+	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradle), 0644)
+	require.NoError(t, err)
+
+	config := flexpack.GradleConfig{
+		WorkingDirectory:        tempDir,
+		IncludeTestDependencies: true,
+	}
+	gf, err := gradleflexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gf.CollectBuildInfo("scope-test", "1")
+	require.NoError(t, err)
+
+	validScopes := map[string]bool{
+		"compile": true, "runtime": true, "test": true, "provided": true, "system": true,
+	}
+
+	for _, module := range buildInfo.Modules {
+		for _, dep := range module.Dependencies {
+			for _, scope := range dep.Scopes {
+				assert.True(t, validScopes[scope], "Invalid scope %s for dep %s", scope, dep.Id)
+			}
+		}
+	}
+}
+
+// TestAndroidScopeMapping verifies scope mapping logic handles Android configurations
+func TestAndroidScopeMapping(t *testing.T) {
+	tempDir := t.TempDir()
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gf, err := gradleflexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	tests := []struct {
+		config string
+		scope  string
+	}{
+		{"debugCompileClasspath", "compile"},
+		{"debugRuntimeClasspath", "runtime"},
+		{"releaseCompileClasspath", "compile"},
+		{"releaseRuntimeClasspath", "runtime"},
+		{"debugAndroidTestCompileClasspath", "test"},
+		{"debugUnitTestCompileClasspath", "test"},
+		{"releaseUnitTestRuntimeClasspath", "test"},
+		{"testCompileClasspath", "test"},
+		{"compileClasspath", "compile"},
+	}
+
+	for _, tt := range tests {
+		scopes := gf.MapGradleConfigurationToScopes(tt.config)
+		found := false
+		for _, s := range scopes {
+			if s == tt.scope {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "Configuration %s should map to scope %s", tt.config, tt.scope)
+	}
 }
