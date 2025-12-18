@@ -2,6 +2,7 @@ package flexpack
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,8 +22,8 @@ func SanitizePath(path string) (string, error) {
 	return filepath.Abs(filepath.Clean(path))
 }
 
-// IsPathContainedIn checks if childPath is contained within parentPath (or equals it).
-func IsPathContainedIn(childPath, parentPath string) bool {
+// isPathContainedIn checks if childPath is contained within parentPath (or equals it).
+func isPathContainedIn(childPath, parentPath string) bool {
 	return strings.HasPrefix(childPath+string(filepath.Separator), parentPath+string(filepath.Separator)) || childPath == parentPath
 }
 
@@ -36,7 +37,7 @@ func SanitizeAndValidatePath(path, baseDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !IsPathContainedIn(sanitizedPath, sanitizedBase) {
+	if !isPathContainedIn(sanitizedPath, sanitizedBase) {
 		return "", fmt.Errorf("path %s escapes base directory %s", sanitizedPath, sanitizedBase)
 	}
 	return sanitizedPath, nil
@@ -285,6 +286,12 @@ func getGradleCacheBase() (string, error) {
 }
 
 func (gf *GradleFlexPack) findGradleArtifact(dep flexpack.DependencyInfo) string {
+	// Default to jar if missing.
+	depType := strings.TrimSpace(dep.Type)
+	if depType == "" {
+		depType = "jar"
+	}
+
 	parts := strings.Split(dep.Name, ":")
 	if len(parts) != 2 {
 		return ""
@@ -292,6 +299,11 @@ func (gf *GradleFlexPack) findGradleArtifact(dep flexpack.DependencyInfo) string
 
 	group := parts[0]
 	module := parts[1]
+	classifier := ""
+	// dep.ID is typically group:module:version[:classifier]
+	if idParts := strings.Split(dep.ID, ":"); len(idParts) >= 4 {
+		classifier = idParts[3]
+	}
 
 	// Get a validated, sanitized cache base path
 	cacheBase, err := getGradleCacheBase()
@@ -303,30 +315,232 @@ func (gf *GradleFlexPack) findGradleArtifact(dep flexpack.DependencyInfo) string
 	// Build path: ~/.gradle/caches/modules-2/files-2.1/{group}/{module}/{version}
 	modulePath := filepath.Join(cacheBase, group, module, dep.Version)
 	if _, err := os.Stat(modulePath); os.IsNotExist(err) {
+		log.Debug(fmt.Sprintf("Gradle cache path not found for dependency %s: %s", dep.ID, modulePath))
 		return ""
 	}
 
 	entries, err := os.ReadDir(modulePath)
 	if err != nil {
+		log.Debug(fmt.Sprintf("Failed to read Gradle cache directory for dependency %s: %s", dep.ID, err.Error()))
 		return ""
 	}
 
 	for _, entry := range entries {
 		if entry.IsDir() {
 			hashDir := filepath.Join(modulePath, entry.Name())
-
-			// Try module-version.type filename (e.g., commons-io-2.11.0.jar)
-			jarFile := filepath.Join(hashDir, fmt.Sprintf("%s-%s.%s", module, dep.Version, dep.Type))
-			if _, err := os.Stat(jarFile); err == nil {
-				return jarFile
+			var expected string
+			if classifier != "" {
+				expected = fmt.Sprintf("%s-%s-%s.%s", module, dep.Version, classifier, depType)
+			} else {
+				expected = fmt.Sprintf("%s-%s.%s", module, dep.Version, depType)
+			}
+			if resolved := findFileCaseInsensitive(hashDir, expected); resolved != "" {
+				return resolved
 			}
 
-			// Try module.type filename (e.g., commons-io.jar)
-			jarFileAlt := filepath.Join(hashDir, fmt.Sprintf("%s.%s", module, dep.Type))
-			if _, err := os.Stat(jarFileAlt); err == nil {
-				return jarFileAlt
+			if classifier == "" {
+				if resolved := findArtifactFromGradleModuleMetadata(hashDir, module, dep.Version, depType); resolved != "" {
+					return resolved
+				}
+				if resolved := findUniqueVariantArtifact(hashDir, module, dep.Version, depType); resolved != "" {
+					return resolved
+				}
 			}
 		}
 	}
 	return ""
+}
+
+func findFileCaseInsensitive(dir, expectedName string) string {
+	expectedName = strings.TrimSpace(expectedName)
+	if expectedName == "" {
+		return ""
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	expectedLower := strings.ToLower(expectedName)
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		nameLower := strings.ToLower(e.Name())
+		// Ignore sidecars/metadata even if someone asks for them by mistake.
+		if strings.HasSuffix(nameLower, ".sha1") || strings.HasSuffix(nameLower, ".sha256") || strings.HasSuffix(nameLower, ".md5") {
+			continue
+		}
+		if strings.HasSuffix(nameLower, ".module") || strings.HasSuffix(nameLower, ".json") {
+			continue
+		}
+		if nameLower == expectedLower {
+			return filepath.Join(dir, e.Name())
+		}
+	}
+	return ""
+}
+
+func findUniqueVariantArtifact(hashDir, module, version, ext string) string {
+	module = strings.ToLower(strings.TrimSpace(module))
+	version = strings.ToLower(strings.TrimSpace(version))
+	ext = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(ext)), ".")
+	if ext == "" {
+		ext = "jar"
+	}
+	if module == "" || version == "" {
+		return ""
+	}
+
+	entries, err := os.ReadDir(hashDir)
+	if err != nil {
+		return ""
+	}
+
+	prefix := module + "-" + version + "-"
+	suffix := "." + ext
+
+	var found string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		nameLower := strings.ToLower(e.Name())
+		// Ignore sidecars/metadata
+		if strings.HasSuffix(nameLower, ".sha1") || strings.HasSuffix(nameLower, ".sha256") || strings.HasSuffix(nameLower, ".md5") {
+			continue
+		}
+		if strings.HasSuffix(nameLower, ".module") || strings.HasSuffix(nameLower, ".json") || strings.HasSuffix(nameLower, ".pom") {
+			continue
+		}
+		if !strings.HasSuffix(nameLower, suffix) || !strings.HasPrefix(nameLower, prefix) {
+			continue
+		}
+
+		// Exclude common non-runtime jars.
+		if strings.Contains(nameLower, "-sources.") || strings.Contains(nameLower, "-javadoc.") || strings.Contains(nameLower, "-tests.") {
+			continue
+		}
+
+		// Candidate found.
+		candidate := filepath.Join(hashDir, e.Name())
+		if found != "" && found != candidate {
+			// Ambiguous: more than one candidate.
+			return ""
+		}
+		found = candidate
+	}
+	return found
+}
+
+type gradleModuleMetadata struct {
+	Variants []struct {
+		Name  string `json:"name"`
+		Files []struct {
+			Name string `json:"name"`
+		} `json:"files"`
+	} `json:"variants"`
+}
+
+func findArtifactFromGradleModuleMetadata(hashDir, module, version, ext string) string {
+	module = strings.TrimSpace(module)
+	version = strings.TrimSpace(version)
+	ext = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(ext)), ".")
+	if ext == "" {
+		ext = "jar"
+	}
+	if module == "" || version == "" {
+		return ""
+	}
+
+	entries, err := os.ReadDir(hashDir)
+	if err != nil {
+		return ""
+	}
+
+	// Prefer the expected "<module>-<version>.module" filename, but fall back to any ".module" file.
+	expectedModuleFile := strings.ToLower(fmt.Sprintf("%s-%s.module", module, version))
+	var moduleMetaPath string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		nameLower := strings.ToLower(e.Name())
+		if strings.HasSuffix(nameLower, ".module") && nameLower == expectedModuleFile {
+			moduleMetaPath = filepath.Join(hashDir, e.Name())
+			break
+		}
+	}
+	if moduleMetaPath == "" {
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			nameLower := strings.ToLower(e.Name())
+			if strings.HasSuffix(nameLower, ".module") {
+				moduleMetaPath = filepath.Join(hashDir, e.Name())
+				break
+			}
+		}
+	}
+	if moduleMetaPath == "" {
+		return ""
+	}
+
+	content, err := os.ReadFile(moduleMetaPath)
+	if err != nil || len(content) == 0 {
+		return ""
+	}
+
+	var meta gradleModuleMetadata
+	if err := json.Unmarshal(content, &meta); err != nil {
+		return ""
+	}
+
+	// We prefer runtime variants, since build-info dependencies represent runtime-resolved artifacts.
+	preferredVariantNameContains := []string{"runtime"}
+
+	// Try preferred variants first; if none exist, fall back to all variants.
+	tryVariants := func(filter bool) string {
+		var chosen string
+		for _, v := range meta.Variants {
+			nameLower := strings.ToLower(v.Name)
+			if filter {
+				ok := false
+				for _, needle := range preferredVariantNameContains {
+					if strings.Contains(nameLower, needle) {
+						ok = true
+						break
+					}
+				}
+				if !ok {
+					continue
+				}
+			}
+			for _, f := range v.Files {
+				fileName := strings.TrimSpace(f.Name)
+				if fileName == "" {
+					continue
+				}
+				if !strings.HasSuffix(strings.ToLower(fileName), "."+ext) {
+					continue
+				}
+				// Keep this strict: the file must exist in the cache hash dir.
+				p := filepath.Join(hashDir, fileName)
+				if _, err := os.Stat(p); err != nil {
+					continue
+				}
+				// If multiple different candidates exist across variants/files, treat as ambiguous.
+				if chosen != "" && chosen != p {
+					return ""
+				}
+				chosen = p
+			}
+		}
+		return chosen
+	}
+
+	if resolved := tryVariants(true); resolved != "" {
+		return resolved
+	}
+	return tryVariants(false)
 }

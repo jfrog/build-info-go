@@ -467,42 +467,6 @@ version = '1.0.0'
 `), 0644)
 	require.NoError(t, err)
 
-	deepPath := filepath.Join(tempDir, "libs", "core", "utils", "common")
-	err = os.MkdirAll(deepPath, 0755)
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(deepPath, "build.gradle"), []byte(`
-plugins { id 'java-library' }
-group = 'com.example.libs.utils'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
-
-	settingsContent := `rootProject.name = 'deep-nested'
-include 'libs:core:utils:common'
-`
-	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(settingsContent), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("nested-test", "1")
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(buildInfo.Modules), 1, "Should have at least root module")
-}
-
-// TestVeryLongModulePath tests handling of very long module paths
-func TestVeryLongModulePath(t *testing.T) {
-	tempDir := t.TempDir()
-
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
-
 	deepPath := filepath.Join(tempDir, "level1", "level2", "level3", "level4", "level5")
 	err = os.MkdirAll(deepPath, 0755)
 	require.NoError(t, err)
@@ -524,8 +488,8 @@ include 'level1:level2:level3:level4:level5'
 	assert.GreaterOrEqual(t, len(buildInfo.Modules), 1)
 }
 
-// TestModulePathWithHyphensAndUnderscores tests module names with special characters
-func TestModulePathWithHyphensAndUnderscores(t *testing.T) {
+// TestModuleNamesWithSpecialCharacters tests module names with various special characters
+func TestModuleNamesWithSpecialCharacters(t *testing.T) {
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -535,7 +499,8 @@ version = '1.0.0'
 `), 0644)
 	require.NoError(t, err)
 
-	modules := []string{"my-app", "my_lib", "core-utils", "data_layer"}
+	// Test various special character patterns in module names
+	modules := []string{"my-app", "my_lib", "core-utils", "my.module", "module_v2"}
 	for _, m := range modules {
 		dir := filepath.Join(tempDir, m)
 		err = os.MkdirAll(dir, 0755)
@@ -548,7 +513,8 @@ version = '1.0.0'
 include 'my-app'
 include 'my_lib'
 include 'core-utils'
-include 'data_layer'
+include 'my.module'
+include 'module_v2'
 `
 	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(settingsContent), 0644)
 	require.NoError(t, err)
@@ -558,43 +524,6 @@ include 'data_layer'
 	require.NoError(t, err)
 
 	buildInfo, err := gf.CollectBuildInfo("special-test", "1")
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(buildInfo.Modules), 1)
-}
-
-// TestModuleNameWithSpecialCharacters tests module names with various special characters
-func TestModuleNameWithSpecialCharacters(t *testing.T) {
-	tempDir := t.TempDir()
-
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
-
-	specialNames := []string{"my.module", "my_module_v2", "module-with-dashes"}
-	for _, name := range specialNames {
-		dir := filepath.Join(tempDir, name)
-		err = os.MkdirAll(dir, 0755)
-		require.NoError(t, err)
-		err = os.WriteFile(filepath.Join(dir, "build.gradle"), []byte(`plugins { id 'java' }`), 0644)
-		require.NoError(t, err)
-	}
-
-	settings := `rootProject.name = 'special-chars-project'
-include 'my.module'
-include 'my_module_v2'
-include 'module-with-dashes'
-`
-	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(settings), 0644)
-	require.NoError(t, err)
-
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-
-	buildInfo, err := gf.CollectBuildInfo("special-module-names-test", "1")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(buildInfo.Modules), 1)
 }
@@ -718,6 +647,67 @@ dependencies {
 	buildInfo, err := gf.CollectBuildInfo("api-config-test", "1")
 	require.NoError(t, err)
 	assert.NotNil(t, buildInfo)
+}
+
+// TestGradleFlexPackWithSettingsGradle tests project name resolution from settings.gradle
+func TestGradleFlexPackWithSettingsGradle(t *testing.T) {
+	tempDir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
+plugins { id 'java' }
+group = 'com.example'
+version = '2.0.0'
+`), 0644)
+	require.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(tempDir, "settings.gradle"), []byte(`rootProject.name = 'my-gradle-project'
+`), 0644)
+	require.NoError(t, err)
+
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gf, err := gradleflexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gf.CollectBuildInfo("test-build", "1")
+	require.NoError(t, err)
+	require.Greater(t, len(buildInfo.Modules), 0)
+
+	moduleId := buildInfo.Modules[0].Id
+	assert.Contains(t, moduleId, "my-gradle-project", "Module ID should use rootProject.name from settings.gradle")
+}
+
+// TestGradleFlexPackNestedDependencies tests parsing of nested dependency blocks
+func TestGradleFlexPackNestedDependencies(t *testing.T) {
+	tempDir := t.TempDir()
+
+	buildGradleContent := `plugins {
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+dependencies {
+    implementation('org.springframework:spring-core:5.3.0') {
+        exclude group: 'org.springframework', module: 'spring-jcl'
+    }
+    implementation 'com.google.guava:guava:30.0-jre'
+    
+    constraints {
+        implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+    }
+}
+`
+	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(buildGradleContent), 0644)
+	require.NoError(t, err)
+
+	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+	gf, err := gradleflexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
+
+	buildInfo, err := gf.CollectBuildInfo("nested-test", "1")
+	require.NoError(t, err)
+	require.Greater(t, len(buildInfo.Modules), 0)
 }
 
 func setupMinimalGradleProject(t *testing.T, tempDir string) {
