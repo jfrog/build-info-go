@@ -15,13 +15,21 @@ import (
 	"github.com/jfrog/gofrog/log"
 )
 
+// Known limitations:
+//   - Variable interpolation (e.g., "$group:$artifact:$version") is not supported
+//   - Platform/BOM dependencies with platform() or enforcedPlatform() are not fully parsed
+//   - Version catalogs (libs.some.dependency) are not supported
+//   - For full accuracy, prefer CLI-based parsing; these regexes are fallback only
 var (
-	groupRegex      = regexp.MustCompile(`(?:group|groupId)\s*=\s*['"]([^'"]+)['"]`)
-	nameRegex       = regexp.MustCompile(`(?:(?:rootProject\.)?name|artifactId)\s*=\s*['"]([^'"]+)['"]`)
-	versionRegex    = regexp.MustCompile(`(?:version\s*=|versionName)\s*['"]([^'"]+)['"]`)
-	includeRegex    = regexp.MustCompile(`['"]([^'"]+)['"]`)
-	depRegex        = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*[\(\s]['"]([^'"]+)['"]`)
-	depMapRegex     = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*group\s*[:=]\s*['"]([^'"]+)['"]\s*,\s*name\s*[:=]\s*['"]([^'"]+)['"](?:,\s*version\s*[:=]\s*['"]([^'\"]+)['\"])?`)
+	groupRegex   = regexp.MustCompile(`(?:group|groupId)\s*=\s*['"]([^'"]+)['"]`)
+	nameRegex    = regexp.MustCompile(`(?:(?:rootProject\.)?name|artifactId)\s*=\s*['"]([^'"]+)['"]`)
+	versionRegex = regexp.MustCompile(`(?:version\s*=|versionName)\s*['"]([^'"]+)['"]`)
+	includeRegex = regexp.MustCompile(`['"]([^'"]+)['"]`)
+	// depRegex handles string notation: implementation("group:artifact:version") or implementation 'group:artifact:version'
+	depRegex = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*[\(\s]['"]([^'"]+)['"]`)
+	// depMapRegex handles map notation: implementation(group: 'x', name: 'y', version: 'z') - supports both Groovy (:) and Kotlin (=) syntax
+	depMapRegex = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*group\s*[:=]\s*['"]([^'"]+)['"]\s*,\s*name\s*[:=]\s*['"]([^'"]+)['"](?:,\s*version\s*[:=]\s*['"]([^'\"]+)['\"])?`)
+	// depProjectRegex handles project dependencies: implementation(project(':module')) or implementation(project(path: ':module'))
 	depProjectRegex = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*(?:\(|\s)\s*project\s*(?:(?:(?:\(\s*path\s*:\s*))|(?:\(?\s*))['"]([^'"]+)['"]`)
 )
 
@@ -342,15 +350,7 @@ func (gf *GradleFlexPack) addDependencyFromFile(configType, groupID, artifactID,
 	scopes := gf.MapGradleConfigurationToScopes(configType)
 
 	if existing, ok := allDeps[dependencyID]; ok {
-		existingScopes := make(map[string]bool)
-		for _, s := range existing.Scopes {
-			existingScopes[s] = true
-		}
-		for _, s := range scopes {
-			if !existingScopes[s] {
-				existing.Scopes = append(existing.Scopes, s)
-			}
-		}
+		existing.Scopes = MergeScopes(existing.Scopes, scopes)
 		allDeps[dependencyID] = existing
 	} else {
 		depInfo := flexpack.DependencyInfo{

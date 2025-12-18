@@ -246,6 +246,17 @@ func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 		artifactId = meta.Artifact
 	}
 
+	// Ensure we have valid module metadata - use defaults if empty
+	if groupId == "" {
+		groupId = "unspecified"
+	}
+	if artifactId == "" {
+		artifactId = "unspecified"
+	}
+	if version == "" {
+		version = "unspecified"
+	}
+
 	deps, depGraph := gf.parseModuleDependencies(moduleName)
 	requestedByMap := gf.buildRequestedByMap(depGraph)
 	dependencies := gf.createDependencyEntities(deps, requestedByMap)
@@ -289,28 +300,37 @@ func (gf *GradleFlexPack) createDependencyEntities(deps []flexpack.DependencyInf
 		checksumMap := gf.calculateChecksumWithFallback(dep)
 
 		checksum := entities.Checksum{}
-		if checksumMap != nil {
-			if sha1, ok := checksumMap["sha1"].(string); ok {
-				checksum.Sha1 = sha1
-			}
-			if sha256, ok := checksumMap["sha256"].(string); ok {
-				checksum.Sha256 = sha256
-			}
-			if md5, ok := checksumMap["md5"].(string); ok {
-				checksum.Md5 = md5
-			}
-
-			if checksum.Sha1 == "" && checksum.Sha256 == "" {
-				log.Warn(fmt.Sprintf("Skipping dependency %s: checksums map existed but contained no hashes", dep.ID))
-				continue
-			}
+		if sha1, ok := checksumMap["sha1"].(string); ok {
+			checksum.Sha1 = sha1
 		}
+		if sha256, ok := checksumMap["sha256"].(string); ok {
+			checksum.Sha256 = sha256
+		}
+		if md5, ok := checksumMap["md5"].(string); ok {
+			checksum.Md5 = md5
+		}
+
+		if checksum.Sha1 == "" && checksum.Sha256 == "" && checksum.Md5 == "" {
+			artifactPath, _ := checksumMap["path"].(string)
+			if artifactPath == "" {
+				log.Warn(fmt.Sprintf("Skipping dependency %s: could not find artifact to calculate checksums", dep.ID))
+			} else {
+				log.Warn(fmt.Sprintf("Skipping dependency %s: artifact found but contained no checksums (%s)", dep.ID, artifactPath))
+			}
+			continue
+		}
+
+		// Sort scopes for deterministic output
+		sort.Strings(dep.Scopes)
 
 		entity := entities.Dependency{
 			Id:       dep.ID,
 			Type:     dep.Type,
 			Scopes:   dep.Scopes,
 			Checksum: checksum,
+		}
+		if entity.Type == "" {
+			entity.Type = "jar"
 		}
 
 		if requesters, exists := requestedByMap[dep.ID]; exists && len(requesters) > 0 {

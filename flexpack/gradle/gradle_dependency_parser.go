@@ -2,11 +2,28 @@ package flexpack
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/gofrog/log"
 )
+
+// MergeScopes merges new scopes into existing scopes, avoiding duplicates and returning sorted result.
+func MergeScopes(existing, new []string) []string {
+	scopeSet := make(map[string]bool)
+	for _, s := range existing {
+		scopeSet[s] = true
+	}
+	for _, s := range new {
+		if !scopeSet[s] {
+			existing = append(existing, s)
+			scopeSet[s] = true
+		}
+	}
+	sort.Strings(existing)
+	return existing
+}
 
 type GradleDepNode struct {
 	Group      string
@@ -30,9 +47,11 @@ type gradleNodePtr struct {
 func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) ([]flexpack.DependencyInfo, map[string][]string) {
 	isAndroid := false
 	if content, _, err := gf.getBuildFileContent(moduleName); err == nil {
-		isAndroid = strings.Contains(string(content), "com.android.application") ||
-			strings.Contains(string(content), "com.android.library") ||
-			strings.Contains(string(content), "android") // Heuristic for 'android { ... }' block or plugin
+		contentStr := string(content)
+		isAndroid = strings.Contains(contentStr, "com.android.application") ||
+			strings.Contains(contentStr, "com.android.library") ||
+			strings.Contains(contentStr, "android {") ||
+			strings.Contains(contentStr, "android{")
 	}
 
 	var configs []string
@@ -336,17 +355,8 @@ func (gf *GradleFlexPack) processGradleDependency(dep GradleDepNode, parent stri
 		dependencyId = fmt.Sprintf("%s:%s:%s", dep.Group, dep.Module, dep.Version)
 	}
 
-	if _, exists := allDeps[dependencyId]; exists {
-		existingDep := allDeps[dependencyId]
-		existingScopes := make(map[string]bool)
-		for _, s := range existingDep.Scopes {
-			existingScopes[s] = true
-		}
-		for _, s := range scopes {
-			if !existingScopes[s] {
-				existingDep.Scopes = append(existingDep.Scopes, s)
-			}
-		}
+	if existingDep, exists := allDeps[dependencyId]; exists {
+		existingDep.Scopes = MergeScopes(existingDep.Scopes, scopes)
 		allDeps[dependencyId] = existingDep
 	} else {
 		depType := "jar"
