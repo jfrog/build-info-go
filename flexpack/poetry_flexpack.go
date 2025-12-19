@@ -29,7 +29,15 @@ type PoetryFlexPack struct {
 }
 
 // PoetryPyProjectToml represents the structure of pyproject.toml file for Poetry
+// Supports both Poetry 1.x format ([tool.poetry]) and Poetry 2.x format ([project])
 type PoetryPyProjectToml struct {
+	// Poetry 2.x format (PEP 621)
+	Project struct {
+		Name         string   `toml:"name"`
+		Version      string   `toml:"version"`
+		Dependencies []string `toml:"dependencies"`
+	} `toml:"project"`
+	// Poetry 1.x format
 	Tool struct {
 		Poetry struct {
 			Name            string                 `toml:"name"`
@@ -194,6 +202,7 @@ func (pf *PoetryFlexPack) CalculateRequestedBy() map[string][]string {
 }
 
 // loadPyProjectToml loads and parses the pyproject.toml file
+// Supports both Poetry 1.x format ([tool.poetry]) and Poetry 2.x format ([project])
 func (pf *PoetryFlexPack) loadPyProjectToml() error {
 	pyprojectPath := filepath.Join(pf.config.WorkingDirectory, "pyproject.toml")
 	data, err := os.ReadFile(pyprojectPath)
@@ -204,8 +213,27 @@ func (pf *PoetryFlexPack) loadPyProjectToml() error {
 	if err := toml.Unmarshal(data, pf.pyprojectData); err != nil {
 		return fmt.Errorf("failed to parse pyproject.toml: %w", err)
 	}
+
+	// Try Poetry 1.x format first ([tool.poetry])
 	pf.projectName = pf.pyprojectData.Tool.Poetry.Name
 	pf.projectVersion = pf.pyprojectData.Tool.Poetry.Version
+
+	// Fallback to Poetry 2.x / PEP 621 format ([project])
+	if pf.projectName == "" {
+		pf.projectName = pf.pyprojectData.Project.Name
+	}
+	if pf.projectVersion == "" {
+		pf.projectVersion = pf.pyprojectData.Project.Version
+	}
+
+	// Validate that we found name and version
+	if pf.projectName == "" {
+		return fmt.Errorf("project name not found in pyproject.toml (checked [tool.poetry.name] and [project.name])")
+	}
+	if pf.projectVersion == "" {
+		return fmt.Errorf("project version not found in pyproject.toml (checked [tool.poetry.version] and [project.version])")
+	}
+
 	return nil
 }
 
