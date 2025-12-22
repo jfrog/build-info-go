@@ -13,6 +13,7 @@ import (
 	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
+	gradleflex "github.com/jfrog/build-info-go/flexpack/gradle"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 	clitool "github.com/urfave/cli/v2"
@@ -116,6 +117,26 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			UsageText: "bi gradle",
 			Flags:     flags,
 			Action: func(context *clitool.Context) (err error) {
+				if flexpack.IsFlexPackEnabled() {
+					config := flexpack.GradleConfig{
+						WorkingDirectory:        ".",
+						IncludeTestDependencies: true,
+					}
+
+					gradleFlex, err := gradleflex.NewGradleFlexPack(config)
+					if err != nil {
+						return fmt.Errorf("failed to create Gradle instance: %w", err)
+					}
+
+					// Set the flag to indicate that the publish command was used such that the artifacts will be scanned and present in build-info.
+					gradleFlex.SetWasPublishCommand(true)
+					buildInfo, err := gradleFlex.CollectBuildInfo("gradle-build", "1")
+					if err != nil {
+						return fmt.Errorf("failed to collect build info: %w", err)
+					}
+					return printBuildInfo(buildInfo, context.String(formatFlag))
+				}
+
 				service := build.NewBuildInfoService()
 				service.SetLogger(logger)
 				bld, err := service.GetOrCreateBuild("gradle-build", "1")
