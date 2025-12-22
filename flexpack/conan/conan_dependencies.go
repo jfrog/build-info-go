@@ -151,7 +151,6 @@ func (cf *ConanFlexPack) createDependencyEntity(name, version string, node Conan
 	scopes := cf.determineScopesFromEdge(edge, node.Context)
 	dep := entities.Dependency{
 		Id:     dependencyID,
-		Type:   "conan",
 		Scopes: scopes,
 	}
 	checksum, err := cf.calculateDependencyChecksum(name, version)
@@ -264,7 +263,6 @@ func (cf *ConanFlexPack) extractDependenciesFromLockRequires(requires []string, 
 		name, version := cf.parseConanReference(req)
 		if name != "" {
 			dep := entities.Dependency{
-				Type:   "conan",
 				Id:     fmt.Sprintf("%s:%s", name, version),
 				Scopes: []string{scope},
 			}

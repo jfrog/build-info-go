@@ -522,12 +522,10 @@ func TestCollectBuildInfo(t *testing.T) {
 		dependencies: []entities.Dependency{
 			{
 				Id:     "dep1:1.0",
-				Type:   "conan",
 				Scopes: []string{"runtime"},
 			},
 			{
 				Id:     "dep2:2.0",
-				Type:   "conan",
 				Scopes: []string{"build"},
 			},
 		},
