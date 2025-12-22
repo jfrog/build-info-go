@@ -25,7 +25,7 @@ type ConanFlexPack struct {
 	conanfilePath   string
 	graphData       *ConanGraphOutput
 	requestedByMap  map[string][]string
-	initialized     bool // Tracks if lazy initialization has been performed
+	initialized     bool
 }
 
 // NewConanFlexPack creates a new Conan FlexPack instance.
@@ -37,12 +37,16 @@ func NewConanFlexPack(config ConanConfig) (*ConanFlexPack, error) {
 		dependencyGraph: make(map[string][]string),
 		requestedByMap:  make(map[string][]string),
 	}
-
 	// Set default executable if not provided (same pattern as other package managers)
 	if cf.config.ConanExecutable == "" {
-		cf.config.ConanExecutable = findConanExecutable()
+		execPath, err := findConanExecutable()
+		if err != nil {
+			log.Warn("Conan executable not found in PATH, will try 'conan' command: " + err.Error())
+			cf.config.ConanExecutable = "conan"
+		} else {
+			cf.config.ConanExecutable = execPath
+		}
 	}
-
 	return cf, nil
 }
 
@@ -50,14 +54,11 @@ func NewConanFlexPack(config ConanConfig) (*ConanFlexPack, error) {
 // This method only collects dependencies from the local Conan cache.
 // Artifacts are collected separately during upload by jfrog-cli-artifactory.
 func (cf *ConanFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities.BuildInfo, error) {
-	log.Debug("Starting Conan build info collection...")
-
+	log.Debug("Starting Conan build info collection")
 	if err := cf.ensureInitialized(); err != nil {
 		return nil, fmt.Errorf("failed to initialize: %w", err)
 	}
-
 	conanVersion := cf.getConanVersion()
-
 	buildInfo := &entities.BuildInfo{
 		Name:    buildName,
 		Number:  buildNumber,
@@ -72,14 +73,12 @@ func (cf *ConanFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 		},
 		Modules: []entities.Module{},
 	}
-
 	module := entities.Module{
 		Id:           cf.getProjectRootId(),
 		Type:         entities.Conan,
 		Dependencies: cf.dependencies,
 	}
 	buildInfo.Modules = append(buildInfo.Modules, module)
-
 	log.Debug(fmt.Sprintf("Collected %d dependencies for module %s", len(cf.dependencies), module.Id))
 	return buildInfo, nil
 }
@@ -90,17 +89,13 @@ func (cf *ConanFlexPack) ensureInitialized() error {
 	if cf.initialized {
 		return nil
 	}
-
-	log.Debug("Initializing Conan FlexPack...")
-
+	log.Debug("Initializing Conan FlexPack")
 	if err := cf.loadConanfile(); err != nil {
 		return fmt.Errorf("failed to load conanfile: %w", err)
 	}
-
 	if err := cf.parseDependencies(); err != nil {
 		return fmt.Errorf("failed to parse dependencies: %w", err)
 	}
-
 	cf.initialized = true
 	log.Debug(fmt.Sprintf("Initialized with project %s, %d dependencies", cf.projectName, len(cf.dependencies)))
 	return nil
@@ -109,14 +104,11 @@ func (cf *ConanFlexPack) ensureInitialized() error {
 // loadConanfile loads either conanfile.py or conanfile.txt and extracts project metadata.
 // Conanfile.py is preferred as it contains more metadata (name, version, user, channel).
 func (cf *ConanFlexPack) loadConanfile() error {
-	// Check for conanfile.py first (preferred in Conan)
 	conanfilePy := filepath.Join(cf.config.WorkingDirectory, "conanfile.py")
 	if _, err := os.Stat(conanfilePy); err == nil {
 		cf.conanfilePath = conanfilePy
 		return cf.extractProjectInfoFromConanfilePy()
 	}
-
-	// Fallback to conanfile.txt
 	conanfileTxt := filepath.Join(cf.config.WorkingDirectory, "conanfile.txt")
 	if _, err := os.Stat(conanfileTxt); err == nil {
 		cf.conanfilePath = conanfileTxt
@@ -126,7 +118,6 @@ func (cf *ConanFlexPack) loadConanfile() error {
 		cf.channel = "_"
 		return nil
 	}
-
 	return fmt.Errorf("no conanfile.py or conanfile.txt found in %s", cf.config.WorkingDirectory)
 }
 
@@ -137,31 +128,29 @@ func (cf *ConanFlexPack) extractProjectInfoFromConanfilePy() error {
 	if err != nil {
 		return err
 	}
-
 	contentStr := string(content)
-
 	cf.projectName = extractPythonAttribute(contentStr, "name")
 	if cf.projectName == "" {
 		cf.projectName = filepath.Base(cf.config.WorkingDirectory)
 	}
-
+	// Version can be empty in Conan for consumer-only recipes (conanfile.txt style usage)
 	cf.projectVersion = extractPythonAttribute(contentStr, "version")
-
 	cf.user = extractPythonAttribute(contentStr, "user")
 	if cf.user == "" {
 		cf.user = "_"
 	}
-
 	cf.channel = extractPythonAttribute(contentStr, "channel")
 	if cf.channel == "" {
 		cf.channel = "_"
 	}
-
 	return nil
 }
 
 // extractPythonAttribute extracts a string attribute value from Python source code.
 // Supports both single and double quoted strings.
+// Uses strings.Index which returns the FIRST occurrence, so if there are duplicate
+// definitions like name="mylib1" and name="mylib", the first one is returned.
+// This matches Python's behavior where the first class attribute definition takes precedence.
 // Example: For 'name = "mylib"' with attr="name", returns "mylib"
 func extractPythonAttribute(content, attr string) string {
 	// Try double quotes: attr = "value"
@@ -172,7 +161,6 @@ func extractPythonAttribute(content, attr string) string {
 			return content[start : start+end]
 		}
 	}
-
 	// Try single quotes: attr = 'value'
 	pattern = attr + ` = '`
 	if idx := strings.Index(content, pattern); idx != -1 {
@@ -181,33 +169,36 @@ func extractPythonAttribute(content, attr string) string {
 			return content[start : start+end]
 		}
 	}
-
 	return ""
 }
 
 // getProjectRootId returns the project identifier for the root project.
-// Format depends on whether user/channel are specified:
-//   - With user/channel: "name/version@user/channel"
-//   - Without: "name:version"
+// Format depends on whether user/channel and version are specified:
+//   - With user/channel and version: "name/version@user/channel"
+//   - Without user/channel but with version: "name:version"
+//   - Without version: just "name" (for consumer-only recipes)
 func (cf *ConanFlexPack) getProjectRootId() string {
-	if cf.projectName == "" || cf.projectVersion == "" {
+	// Handle empty version case - Conan allows consumer-only recipes without version
+	if cf.projectName == "" {
+		return "unknown"
+	}
+	if cf.projectVersion == "" {
 		return cf.projectName
 	}
-
 	if cf.user != "_" && cf.channel != "_" {
 		return fmt.Sprintf("%s/%s@%s/%s", cf.projectName, cf.projectVersion, cf.user, cf.channel)
 	}
-
 	return fmt.Sprintf("%s:%s", cf.projectName, cf.projectVersion)
 }
 
 // findConanExecutable finds the Conan executable in PATH.
-// Returns "conan" as default if not found.
-func findConanExecutable() string {
-	if path, err := exec.LookPath("conan"); err == nil {
-		return path
+// Returns error if conan is not found, allowing caller to decide fallback behavior.
+func findConanExecutable() (string, error) {
+	path, err := exec.LookPath("conan")
+	if err != nil {
+		return "", fmt.Errorf("conan executable not found in PATH: %w", err)
 	}
-	return "conan"
+	return path, nil
 }
 
 // getConanVersion gets the Conan version for build info.
@@ -218,17 +209,13 @@ func (cf *ConanFlexPack) getConanVersion() string {
 	if err != nil {
 		return "unknown"
 	}
-
-	// Parse "Conan version X.Y.Z" format
 	version := strings.TrimSpace(string(output))
 	lines := strings.Split(version, "\n")
-
 	if len(lines) > 0 {
 		fields := strings.Fields(lines[0])
 		if len(fields) >= 3 {
 			return fields[2]
 		}
 	}
-
 	return "unknown"
 }
