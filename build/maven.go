@@ -21,8 +21,7 @@ const (
 	classworldsConfFileName         = "classworlds.conf"
 	PropertiesTempFolderName        = "properties"
 	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
-	GeneratedBuildInfoTempPrefix    = "generatedBuildInfo"
-	MavenExtractorDependencyVersion = "2.39.5"
+	MavenExtractorDependencyVersion = "2.43.4"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
