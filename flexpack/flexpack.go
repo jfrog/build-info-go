@@ -3,7 +3,6 @@ package flexpack
 import (
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/jfrog/build-info-go/entities"
 )
@@ -68,21 +67,6 @@ type PoetryConfig struct {
 
 	// IncludeDevDependencies indicates whether to include development dependencies
 	IncludeDevDependencies bool
-}
-
-// GradleConfig holds configuration specific to Gradle operations
-type GradleConfig struct {
-	// WorkingDirectory is the directory where Gradle should operate
-	WorkingDirectory string
-
-	// IncludeTestDependencies indicates whether to include test dependencies
-	IncludeTestDependencies bool
-
-	// GradleExecutable is the path to the Gradle executable (optional, will be auto-detected)
-	GradleExecutable string
-
-	// CommandTimeout is the maximum duration for Gradle commands (optional, defaults to 10 minutes)
-	CommandTimeout time.Duration
 }
 
 // IsFlexPackEnabled checks if the FlexPack (native) implementation should be used
