@@ -53,6 +53,12 @@ jobs:
       - name: Setup Go with cache
         uses: jfrog/.github/actions/install-go-with-cache@main
 
+      - name: Setup Gradle with cache
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          # Pin version to avoid first-run distro download stalls on Windows hosts.
+          gradle-version: 8.10
+
       - name: Install NuGet
         uses: nuget/setup-nuget@v2
         with:
