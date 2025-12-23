@@ -128,3 +128,108 @@ func TestGetDependencyIdForBuildInfo(t *testing.T) {
 		assert.Equal(t, expected[index], actualId)
 	}
 }
+
+func TestGetDirectDependenciesDeterministic(t *testing.T) {
+	// Test that direct dependencies are returned in sorted order
+	content := []byte(`{
+  "version": 3,
+  "targets": {},
+  "project": {
+    "restore": {"packagesPath": "unused"},
+    "frameworks": {
+      "net8.0": {
+        "dependencies": {
+          "Zebra": {"target": "Package", "version": "1.0.0"},
+          "Alpha": {"target": "Package", "version": "1.0.0"},
+          "Middle": {"target": "Package", "version": "1.0.0"}
+        }
+      }
+    }
+  }
+}`)
+
+	var assetsObj assets
+	assert.NoError(t, json.Unmarshal(content, &assetsObj))
+
+	// Run multiple times to verify consistency
+	expected := []string{"alpha", "middle", "zebra"}
+	for i := 0; i < 10; i++ {
+		result := assetsObj.getDirectDependencies()
+		assert.Equal(t, expected, result, "Run %d produced different order", i)
+	}
+}
+
+func TestGetChildrenMapDeterministic(t *testing.T) {
+	// Test that children map returns sorted children across multiple target frameworks
+	content := []byte(`{
+  "version": 3,
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "Parent/1.0.0": {
+        "dependencies": {
+          "Zebra": "1.0.0",
+          "Alpha": "1.0.0"
+        }
+      }
+    },
+    ".NETCoreApp,Version=v7.0": {
+      "Parent/1.0.0": {
+        "dependencies": {
+          "Middle": "1.0.0",
+          "Alpha": "1.0.0"
+        }
+      }
+    }
+  },
+  "project": {
+    "restore": {"packagesPath": "unused"},
+    "frameworks": {}
+  }
+}`)
+
+	var assetsObj assets
+	assert.NoError(t, json.Unmarshal(content, &assetsObj))
+
+	// Run multiple times to verify consistency
+	// Alpha appears in both frameworks (should be deduplicated)
+	expected := []string{"alpha", "middle", "zebra"}
+	for i := 0; i < 10; i++ {
+		result := assetsObj.getChildrenMap()
+		assert.Equal(t, expected, result["parent"], "Run %d produced different order", i)
+	}
+}
+
+func TestSetToSortedSlice(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]struct{}
+		expected []string
+	}{
+		{
+			name:     "empty map",
+			input:    map[string]struct{}{},
+			expected: []string{},
+		},
+		{
+			name:     "single element",
+			input:    map[string]struct{}{"alpha": {}},
+			expected: []string{"alpha"},
+		},
+		{
+			name: "multiple elements sorted",
+			input: map[string]struct{}{
+				"zebra":  {},
+				"alpha":  {},
+				"middle": {},
+			},
+			expected: []string{"alpha", "middle", "zebra"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := setToSortedSlice(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
