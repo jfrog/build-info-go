@@ -31,6 +31,7 @@ func TestNonExistentWorkingDirectory(t *testing.T) {
 
 // TestNoBuildFileGracefulHandling tests handling when no build file exists
 func TestNoBuildFileGracefulHandling(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
@@ -44,6 +45,7 @@ func TestNoBuildFileGracefulHandling(t *testing.T) {
 
 // TestCollectBuildInfoBasic tests basic build info collection
 func TestCollectBuildInfoBasic(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 	setupMinimalGradleProject(t, tempDir)
 
@@ -70,6 +72,8 @@ func TestCollectBuildInfoBasic(t *testing.T) {
 
 // TestCollectBuildInfoWithDifferentBuildNumbers tests collecting build info with various identifiers
 func TestCollectBuildInfoWithDifferentBuildNumbers(t *testing.T) {
+	skipIfGradleInvalid(t)
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 	setupMinimalGradleProject(t, tempDir)
 
@@ -100,6 +104,8 @@ func TestCollectBuildInfoWithDifferentBuildNumbers(t *testing.T) {
 
 // TestCollectBuildInfoIdempotent tests that multiple calls produce consistent results
 func TestCollectBuildInfoIdempotent(t *testing.T) {
+	skipIfGradleInvalid(t)
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 	setupMinimalGradleProject(t, tempDir)
 
@@ -130,6 +136,8 @@ func TestCollectBuildInfoIdempotent(t *testing.T) {
 
 // TestCollectBuildInfoWithDifferentInstances tests multiple FlexPack instances
 func TestCollectBuildInfoWithDifferentInstances(t *testing.T) {
+	skipIfGradleInvalid(t)
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 	setupMinimalGradleProject(t, tempDir)
 
@@ -155,6 +163,7 @@ func TestCollectBuildInfoWithDifferentInstances(t *testing.T) {
 
 // TestBuildInfoAgentInfo tests agent information in build info
 func TestBuildInfoAgentInfo(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 	setupMinimalGradleProject(t, tempDir)
 
@@ -172,6 +181,7 @@ func TestBuildInfoAgentInfo(t *testing.T) {
 
 // TestBuildInfoModuleStructure tests module structure in build info
 func TestBuildInfoModuleStructure(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 	setupMinimalGradleProject(t, tempDir)
 
@@ -194,6 +204,7 @@ func TestBuildInfoModuleStructure(t *testing.T) {
 
 // TestBuildInfoTimestamp tests that started timestamp is properly formatted
 func TestBuildInfoTimestamp(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 	setupMinimalGradleProject(t, tempDir)
 
@@ -212,6 +223,7 @@ func TestBuildInfoTimestamp(t *testing.T) {
 
 // TestModuleIdFormatConsistency tests that module IDs consistently have group:artifact:version format
 func TestModuleIdFormatConsistency(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -243,6 +255,7 @@ version = '2.0.0-SNAPSHOT'
 
 // TestVersionWithMetadata tests version strings with build metadata
 func TestVersionWithMetadata(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradle := `
@@ -264,6 +277,7 @@ version = '1.0.0+build.123'
 
 // TestBuildNameAndNumberSpecialChars tests build info with special characters in name/number
 func TestBuildNameAndNumberSpecialChars(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -298,6 +312,7 @@ version = '1.0.0'
 
 // TestMultiModuleBuildInfoStructure tests build info structure for multi-module projects
 func TestMultiModuleBuildInfoStructure(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -340,6 +355,7 @@ include 'core'
 
 // TestMultiModuleUniqueness tests that module IDs are unique
 func TestMultiModuleUniqueness(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -382,6 +398,7 @@ include 'moduleB'
 
 // TestModuleWithSameNameAsRoot tests module with same artifact name as root project
 func TestModuleWithSameNameAsRoot(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -421,6 +438,7 @@ include 'libs:core'
 
 // TestModuleWithGroupOverride tests submodule with its own group ID
 func TestModuleWithGroupOverride(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -458,6 +476,7 @@ include 'submodule'
 
 // TestDeepNestedModulePath tests deeply nested module paths
 func TestDeepNestedModulePath(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -490,6 +509,7 @@ include 'level1:level2:level3:level4:level5'
 
 // TestModuleNamesWithSpecialCharacters tests module names with various special characters
 func TestModuleNamesWithSpecialCharacters(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -532,6 +552,7 @@ include 'module_v2'
 
 // TestIncludeTestDependenciesConfig tests the IncludeTestDependencies configuration
 func TestIncludeTestDependenciesConfig(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradle := `
@@ -573,6 +594,7 @@ dependencies {
 
 // TestMultiLevelDependencyTree tests parsing multi-level transitive dependencies
 func TestMultiLevelDependencyTree(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradle := `
@@ -599,6 +621,7 @@ dependencies {
 
 // TestAnnotationProcessorDependencies tests kapt/annotationProcessor configurations
 func TestAnnotationProcessorDependencies(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradle := `
@@ -625,6 +648,7 @@ dependencies {
 
 // TestApiConfiguration tests 'api' configuration for java-library plugin
 func TestApiConfiguration(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradle := `
@@ -651,6 +675,7 @@ dependencies {
 
 // TestGradleFlexPackWithSettingsGradle tests project name resolution from settings.gradle
 func TestGradleFlexPackWithSettingsGradle(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
@@ -678,6 +703,7 @@ version = '2.0.0'
 
 // TestGradleFlexPackNestedDependencies tests parsing of nested dependency blocks
 func TestGradleFlexPackNestedDependencies(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradleContent := `plugins {

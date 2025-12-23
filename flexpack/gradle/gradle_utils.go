@@ -124,12 +124,17 @@ func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(gf.ctx, gf.config.CommandTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, gf.config.GradleExecutable, args...)
+	// Add non-interactive and CI-friendly flags
+	fullArgs := append([]string{"--no-daemon", "--console=plain", "--warning-mode=none"}, args...)
+
+	cmd := exec.CommandContext(ctx, gf.config.GradleExecutable, fullArgs...)
 	cmd.Dir = gf.config.WorkingDirectory
+	// Ensure no input is expected
+	cmd.Stdin = nil
 
 	output, err := cmd.CombinedOutput()
 	if ctx.Err() == context.DeadlineExceeded {
-		return output, fmt.Errorf("gradle command timed out after %v: %s", gf.config.CommandTimeout, strings.Join(args, " "))
+		return output, fmt.Errorf("gradle command timed out after %v: %s", gf.config.CommandTimeout, strings.Join(fullArgs, " "))
 	}
 	if err != nil {
 		return output, fmt.Errorf("gradle command failed: %w", err)

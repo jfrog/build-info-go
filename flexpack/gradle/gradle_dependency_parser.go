@@ -86,7 +86,8 @@ func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) ([]flex
 		args := []string{taskPrefix + "dependencies", "--configuration", config, "--quiet"}
 		output, err := gf.runGradleCommand(args...)
 		if err != nil {
-			log.Debug(fmt.Sprintf("Failed to get dependencies for configuration %s: %s", config, string(output)))
+			// Include the error and output in the debug log.
+			log.Debug(fmt.Sprintf("Gradle 'dependencies' command failed for configuration %s. Error: %v, Output: %s", config, err, string(output)))
 			continue
 		}
 

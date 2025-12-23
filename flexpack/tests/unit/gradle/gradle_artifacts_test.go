@@ -1,12 +1,8 @@
 package unit
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/jfrog/build-info-go/flexpack"
@@ -17,6 +13,7 @@ import (
 
 // TestBuildInfoDependencyChecksums tests checksum fields on dependencies
 func TestBuildInfoDependencyChecksums(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 	setupMinimalGradleProjectForArtifacts(t, tempDir)
 
@@ -45,6 +42,7 @@ func TestBuildInfoDependencyChecksums(t *testing.T) {
 
 // TestBuildInfoDependencyStructure tests dependency structure when present
 func TestBuildInfoDependencyStructure(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradle := `
@@ -78,6 +76,7 @@ dependencies {
 
 // TestDependencyWithClassifier tests dependencies with classifier
 func TestDependencyWithClassifier(t *testing.T) {
+	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradle := `
@@ -105,17 +104,7 @@ dependencies {
 // TestIvyAndMavenPublishToLocal ensures the init script wiring publishes Maven and Ivy artifacts to local/file repos
 // and the manifest is generated without errors.
 func TestIvyAndMavenPublishToLocal(t *testing.T) {
-	if _, err := exec.LookPath("gradle"); err != nil {
-		t.Skip("gradle executable not found in PATH")
-	}
-
-	major, err := detectGradleMajorVersion()
-	if err != nil {
-		t.Skipf("skipping: unable to detect Gradle version (%v)", err)
-	}
-	if major < 7 {
-		t.Skipf("skipping: Gradle version %d is too old for Java 17+ runtime in CI", major)
-	}
+	skipIfGradleInvalid(t)
 
 	tempDir := t.TempDir()
 	setupGradleProjectWithPublishing(t, tempDir)
@@ -204,25 +193,4 @@ public class App {
 }`
 	err = os.WriteFile(filepath.Join(srcDir, "App.java"), []byte(javaFile), 0644)
 	require.NoError(t, err, "Should create Java source")
-}
-
-// detectGradleMajorVersion returns the major version of the Gradle executable in PATH.
-func detectGradleMajorVersion() (int, error) {
-	cmd := exec.Command("gradle", "--version")
-	out, err := cmd.Output()
-	if err != nil {
-		return 0, err
-	}
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Gradle ") {
-			ver := strings.TrimPrefix(line, "Gradle ")
-			parts := strings.Split(ver, ".")
-			if len(parts) > 0 {
-				return strconv.Atoi(parts[0])
-			}
-		}
-	}
-	return 0, fmt.Errorf("could not parse gradle version from output")
 }

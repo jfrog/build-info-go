@@ -1,8 +1,12 @@
 package unit
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,9 +19,9 @@ import (
 // TestGradleWrapperDetection tests that projects with gradlew wrappers are handled correctly
 func TestGradleWrapperDetection(t *testing.T) {
 	tests := []struct {
-		name       string
+		name        string
 		wrapperFile string
-		content    string
+		content     string
 	}{
 		{"unix wrapper", "gradlew", "#!/bin/bash\necho 'gradlew'"},
 		{"windows wrapper", "gradlew.bat", "@echo off\necho Gradle"},
@@ -295,5 +299,42 @@ func TestMinimalOrEmptyBuildGradle(t *testing.T) {
 			require.NoError(t, err)
 			assert.NotNil(t, buildInfo)
 		})
+	}
+}
+
+// detectGradleMajorVersion returns the major version of the Gradle executable in PATH.
+func detectGradleMajorVersion() (int, error) {
+	cmd := exec.Command("gradle", "--version")
+	out, err := cmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Gradle ") {
+			ver := strings.TrimPrefix(line, "Gradle ")
+			parts := strings.Split(ver, ".")
+			if len(parts) > 0 {
+				return strconv.Atoi(parts[0])
+			}
+		}
+	}
+	return 0, fmt.Errorf("could not parse gradle version from output")
+}
+
+func skipIfGradleInvalid(t *testing.T) {
+	if _, err := exec.LookPath("gradle"); err != nil {
+		t.Skip("gradle executable not found in PATH")
+	}
+
+	major, err := detectGradleMajorVersion()
+	if err != nil {
+		t.Skipf("skipping: unable to detect Gradle version (%v)", err)
+	}
+	// Gradle 8.1 and below have issues with Java 21+ which is common on modern CI runners.
+	// We require at least Gradle 7 for basic compatibility in these tests.
+	if major < 7 {
+		t.Skipf("skipping: Gradle version %d is too old for CI runtime", major)
 	}
 }
