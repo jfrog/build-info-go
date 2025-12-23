@@ -84,12 +84,15 @@ func (gf *GradleFlexPack) parseWithGradleDependencies(moduleName string) ([]flex
 			taskPrefix = ":" + moduleName + ":"
 		}
 		args := []string{taskPrefix + "dependencies", "--configuration", config, "--quiet"}
+		log.Info(fmt.Sprintf("Gradle dependencies start: module=%q config=%q", moduleName, config))
 		output, err := gf.runGradleCommand(args...)
 		if err != nil {
 			// Include the error and output in the debug log.
 			log.Debug(fmt.Sprintf("Gradle 'dependencies' command failed for configuration %s. Error: %v, Output: %s", config, err, string(output)))
 			continue
 		}
+
+		log.Info(fmt.Sprintf("Gradle dependencies done: module=%q config=%q", moduleName, config))
 
 		dependencies, err := gf.ParseGradleDependencyTree(string(output))
 		if err != nil {

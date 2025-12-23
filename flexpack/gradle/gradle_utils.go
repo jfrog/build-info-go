@@ -132,6 +132,7 @@ func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {
 	// Ensure no input is expected
 	cmd.Stdin = nil
 
+	log.Info(fmt.Sprintf("Running Gradle: cmd=%q args=%v dir=%q", gf.config.GradleExecutable, fullArgs, gf.config.WorkingDirectory))
 	output, err := cmd.CombinedOutput()
 	if ctx.Err() == context.DeadlineExceeded {
 		return output, fmt.Errorf("gradle command timed out after %v: %s", gf.config.CommandTimeout, strings.Join(fullArgs, " "))
