@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/jfrog/build-info-go/build/utils/dotnet/dependencies"
@@ -72,20 +73,35 @@ func (solution *solution) BuildInfo(moduleName string, log utils.Log) (*buildinf
 		module := buildinfo.Module{Id: getModuleId(moduleName, currProject.Name()), Type: buildinfo.Nuget}
 
 		// Populate requestedBy field
+		// Seed all direct dependencies with the module path
 		for _, directDepName := range directDeps {
-			// Populate the direct dependency requested by only if the dependency exist in the cache
 			if directDep, exist := projectDependencies[directDepName]; exist {
-				directDep.RequestedBy = [][]string{{module.Id}}
+				// Add the direct path (don't overwrite - merge with existing)
+				directDep.RequestedBy = append(directDep.RequestedBy, []string{module.Id})
+			}
+		}
+		// Propagate paths to transitive dependencies
+		for _, directDepName := range directDeps {
+			if directDep, exist := projectDependencies[directDepName]; exist {
 				populateRequestedBy(*directDep, projectDependencies, childrenMap)
 			}
 		}
 
 		// Populate module dependencies
-		for _, dep := range projectDependencies {
+		// Sort dependency keys for deterministic output
+		depKeys := make([]string, 0, len(projectDependencies))
+		for key := range projectDependencies {
+			depKeys = append(depKeys, key)
+		}
+		sort.Strings(depKeys)
+
+		for _, key := range depKeys {
+			dep := projectDependencies[key]
 			// If dependency has no RequestedBy field, it means that the dependency not accessible in the current project.
 			// In that case, the dependency is assumed to be under a project which is referenced by this project.
 			// We therefore don't include the dependency in the build-info.
 			if len(dep.RequestedBy) > 0 {
+				sortRequestedByPaths(dep.RequestedBy)
 				module.Dependencies = append(module.Dependencies, *dep)
 			}
 		}
@@ -126,6 +142,40 @@ func populateRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap 
 func getDependencyName(dependencyKey string) string {
 	dependencyName := dependencyKey[0:strings.Index(dependencyKey, ":")]
 	return strings.ToLower(dependencyName)
+}
+
+// sortRequestedByPaths sorts RequestedBy paths for deterministic output.
+// Shorter paths come first (direct deps before transitive), then lexicographic order.
+func sortRequestedByPaths(paths [][]string) {
+	sort.Slice(paths, func(i, j int) bool {
+		// Shorter paths come first
+		if len(paths[i]) != len(paths[j]) {
+			return len(paths[i]) < len(paths[j])
+		}
+		// Same length: compare lexicographically
+		for k := 0; k < len(paths[i]); k++ {
+			if paths[i][k] != paths[j][k] {
+				return paths[i][k] < paths[j][k]
+			}
+		}
+		return false
+	})
+}
+
+// isMatchingDependencySource checks if a dependency source file belongs to a project.
+// It matches if the source is:
+// - directly in the project root directory
+// - under the project's obj directory (for project.assets.json)
+// - in a subdirectory named after the project
+func isMatchingDependencySource(source, projectRootPath, projectObjPattern, projectNamePattern string) bool {
+	sourceLower := strings.ToLower(source)
+	// Check if source is directly in project root
+	isInRoot := projectRootPath == strings.ToLower(filepath.Dir(source))
+	// Check if source is under the project's obj directory
+	isUnderObjDir := strings.Contains(sourceLower, projectObjPattern)
+	// Check if source path contains the project name directory (handles subdirs like /projectname/obj/)
+	isUnderSubDirWithName := strings.Contains(sourceLower, projectNamePattern)
+	return isInRoot || isUnderObjDir || isUnderSubDirWithName
 }
 
 func (solution *solution) Marshal() ([]byte, error) {
@@ -233,14 +283,12 @@ func (solution *solution) loadSingleProject(project project.Project, log utils.L
 	// It can be located directly in the project's root directory or in a directory with the project name under the solution root
 	// or under obj directory (in case of assets.json file)
 	projectRootPath := strings.ToLower(project.RootPath())
-	projectPathPattern := strings.ToLower(filepath.Join(projectRootPath, dependencies.AssetDirName) + string(filepath.Separator))
-	projectNamePattern := strings.ToLower(string(filepath.Separator) + project.Name())
+	projectObjPattern := strings.ToLower(filepath.Join(projectRootPath, dependencies.AssetDirName) + string(filepath.Separator))
+	// Pattern includes trailing separator to avoid partial matches (e.g., "project" matching "projectname")
+	projectNamePattern := strings.ToLower(string(filepath.Separator) + project.Name() + string(filepath.Separator))
 	var dependenciesSource string
 	for _, source := range solution.dependenciesSources {
-		isInRoot := projectRootPath == strings.ToLower(filepath.Dir(source))
-		isUnderObjDir := strings.Contains(strings.ToLower(source), projectPathPattern)
-		isUnderSubDirWithName := strings.HasSuffix(strings.ToLower(filepath.Dir(source)), projectNamePattern)
-		if isInRoot || isUnderObjDir || isUnderSubDirWithName {
+		if isMatchingDependencySource(source, projectRootPath, projectObjPattern, projectNamePattern) {
 			dependenciesSource = source
 			break
 		}
