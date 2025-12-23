@@ -92,7 +92,7 @@ jobs:
 
       - name: Tests
         env:
-          GOTOOLCHAIN: 'go1.25.4'
+          GOTOOLCHAIN: 'go1.25.5'
         run: |
           go env
           go test -v -race -timeout 0 -cover ./...
