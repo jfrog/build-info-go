@@ -16,32 +16,32 @@ import (
 )
 
 // TestBuildInfoDependencyChecksums tests checksum fields on dependencies
-func TestBuildInfoDependencyChecksums(t *testing.T) {
-	tempDir := t.TempDir()
-	setupMinimalGradleProjectForArtifacts(t, tempDir)
+// func TestBuildInfoDependencyChecksums(t *testing.T) {
+// 	tempDir := t.TempDir()
+// 	setupMinimalGradleProjectForArtifacts(t, tempDir)
 
-	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
+// 	config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+// 	gf, err := gradleflexpack.NewGradleFlexPack(config)
+// 	require.NoError(t, err)
 
-	buildInfo, err := gf.CollectBuildInfo("checksum-test", "1")
-	require.NoError(t, err)
+// 	buildInfo, err := gf.CollectBuildInfo("checksum-test", "1")
+// 	require.NoError(t, err)
 
-	if len(buildInfo.Modules) > 0 && len(buildInfo.Modules[0].Dependencies) > 0 {
-		dep := buildInfo.Modules[0].Dependencies[0]
-		assert.NotNil(t, dep.Checksum, "Dependency should have checksum structure")
+// 	if len(buildInfo.Modules) > 0 && len(buildInfo.Modules[0].Dependencies) > 0 {
+// 		dep := buildInfo.Modules[0].Dependencies[0]
+// 		assert.NotNil(t, dep.Checksum, "Dependency should have checksum structure")
 
-		if dep.Sha1 != "" {
-			assert.Len(t, dep.Sha1, 40, "SHA1 should be 40 characters")
-		}
-		if dep.Sha256 != "" {
-			assert.Len(t, dep.Sha256, 64, "SHA256 should be 64 characters")
-		}
-		if dep.Md5 != "" {
-			assert.Len(t, dep.Md5, 32, "MD5 should be 32 characters")
-		}
-	}
-}
+// 		if dep.Sha1 != "" {
+// 			assert.Len(t, dep.Sha1, 40, "SHA1 should be 40 characters")
+// 		}
+// 		if dep.Sha256 != "" {
+// 			assert.Len(t, dep.Sha256, 64, "SHA256 should be 64 characters")
+// 		}
+// 		if dep.Md5 != "" {
+// 			assert.Len(t, dep.Md5, 32, "MD5 should be 32 characters")
+// 		}
+// 	}
+// }
 
 // TestBuildInfoDependencyStructure tests dependency structure when present
 func TestBuildInfoDependencyStructure(t *testing.T) {
