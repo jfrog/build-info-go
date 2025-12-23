@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/crypto"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 const (
@@ -65,28 +67,46 @@ func (extractor *assetsExtractor) new(dependenciesSource string, log utils.Log) 
 }
 
 func (assets *assets) getChildrenMap() map[string][]string {
-	dependenciesRelations := map[string][]string{}
+	// Use a set to deduplicate children across multiple target frameworks
+	dependenciesRelations := map[string]map[string]struct{}{}
 	for _, dependencies := range assets.Targets {
 		for dependencyId, targetDependencies := range dependencies {
-			var transitive []string
-			for transitiveName := range targetDependencies.Dependencies {
-				transitive = append(transitive, strings.ToLower(transitiveName))
-			}
 			dependencyName := getDependencyName(dependencyId)
-			dependenciesRelations[dependencyName] = transitive
+			if _, ok := dependenciesRelations[dependencyName]; !ok {
+				dependenciesRelations[dependencyName] = map[string]struct{}{}
+			}
+			for transitiveName := range targetDependencies.Dependencies {
+				dependenciesRelations[dependencyName][strings.ToLower(transitiveName)] = struct{}{}
+			}
 		}
 	}
-	return dependenciesRelations
+	// Convert sets to sorted slices for deterministic output
+	result := make(map[string][]string, len(dependenciesRelations))
+	for dependencyName, transitiveSet := range dependenciesRelations {
+		result[dependencyName] = setToSortedSlice(transitiveSet)
+	}
+	return result
+}
+
+func setToSortedSlice(values map[string]struct{}) []string {
+	sortedValues := make([]string, 0, len(values))
+	for value := range values {
+		sortedValues = append(sortedValues, value)
+	}
+	sort.Strings(sortedValues)
+	return sortedValues
 }
 
 func (assets *assets) getDirectDependencies() []string {
-	var directDependencies []string
+	// Use a set to deduplicate across multiple target frameworks
+	directDependencies := map[string]struct{}{}
 	for _, framework := range assets.Project.Frameworks {
 		for dependencyName := range framework.Dependencies {
-			directDependencies = append(directDependencies, strings.ToLower(dependencyName))
+			directDependencies[strings.ToLower(dependencyName)] = struct{}{}
 		}
 	}
-	return directDependencies
+	// Return sorted slice for deterministic output
+	return setToSortedSlice(directDependencies)
 }
 
 func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.Dependency, error) {
