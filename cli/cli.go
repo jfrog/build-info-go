@@ -13,6 +13,7 @@ import (
 	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
+	"github.com/jfrog/build-info-go/flexpack/conan"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 	clitool "github.com/urfave/cli/v2"
@@ -233,6 +234,31 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return fmt.Errorf("failed to create Helm instance: %w", err)
 				}
 				buildInfo, err := helmFlex.CollectBuildInfo("helm-build", "1")
+				if err != nil {
+					return fmt.Errorf("failed to collect build info: %w", err)
+				}
+				formatValue, _, err := extractStringFlag(context.Args().Slice(), formatFlag)
+				if err != nil {
+					return err
+				}
+				return printBuildInfo(buildInfo, formatValue)
+			},
+		},
+		{
+			Name:            "conan",
+			Usage:           "Generate build-info for a Conan project",
+			UsageText:       "bi conan",
+			Flags:           flags,
+			SkipFlagParsing: true,
+			Action: func(context *clitool.Context) (err error) {
+				config := conan.ConanConfig{
+					WorkingDirectory: ".",
+				}
+				conanFlex, err := conan.NewConanFlexPack(config)
+				if err != nil {
+					return fmt.Errorf("failed to create Conan instance: %w", err)
+				}
+				buildInfo, err := conanFlex.CollectBuildInfo("conan-build", "1")
 				if err != nil {
 					return fmt.Errorf("failed to collect build info: %w", err)
 				}
