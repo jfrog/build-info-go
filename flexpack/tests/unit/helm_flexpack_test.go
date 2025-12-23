@@ -725,6 +725,7 @@ type warningFilterWriter struct {
 func (w *warningFilterWriter) Write(p []byte) (n int, err error) {
 	// Buffer the data to check for complete lines
 	w.buffer = append(w.buffer, p...)
+
 	// Process complete lines
 	for {
 		newlineIndex := -1
@@ -734,6 +735,7 @@ func (w *warningFilterWriter) Write(p []byte) (n int, err error) {
 				break
 			}
 		}
+
 		if newlineIndex == -1 {
 			// No complete line yet, wait for more data
 			return len(p), nil
@@ -748,6 +750,7 @@ func (w *warningFilterWriter) Write(p []byte) (n int, err error) {
 			// Skip this warning line
 			continue
 		}
+
 		// Write non-filtered lines to original stderr
 		_, writeErr := w.original.Write([]byte(line))
 		if writeErr != nil {
