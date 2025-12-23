@@ -1,12 +1,14 @@
 package unit
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -302,10 +304,22 @@ func TestMinimalOrEmptyBuildGradle(t *testing.T) {
 	}
 }
 
-// detectGradleMajorVersion returns the major version of the Gradle executable in PATH.
+var (
+	gradleCheckOnce   sync.Once
+	gradleCheckErr    error
+	gradleMajorCached int
+)
+
+// detectGradleMajorVersion returns the major version of the Gradle executable in PATH, with a timeout.
 func detectGradleMajorVersion() (int, error) {
-	cmd := exec.Command("gradle", "--version")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "gradle", "--version")
 	out, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return 0, fmt.Errorf("gradle --version timed out after 15s")
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -323,18 +337,29 @@ func detectGradleMajorVersion() (int, error) {
 	return 0, fmt.Errorf("could not parse gradle version from output")
 }
 
-func skipIfGradleInvalid(t *testing.T) {
-	if _, err := exec.LookPath("gradle"); err != nil {
-		t.Skip("gradle executable not found in PATH")
-	}
+func ensureGradleValid() (int, error) {
+	gradleCheckOnce.Do(func() {
+		if _, err := exec.LookPath("gradle"); err != nil {
+			gradleCheckErr = err
+			return
+		}
+		major, err := detectGradleMajorVersion()
+		if err != nil {
+			gradleCheckErr = err
+			return
+		}
+		gradleMajorCached = major
+		if major < 7 {
+			gradleCheckErr = fmt.Errorf("gradle version %d is too old for CI runtime", major)
+		}
+	})
+	return gradleMajorCached, gradleCheckErr
+}
 
-	major, err := detectGradleMajorVersion()
+func skipIfGradleInvalid(t *testing.T) {
+	major, err := ensureGradleValid()
 	if err != nil {
-		t.Skipf("skipping: unable to detect Gradle version (%v)", err)
+		t.Skipf("skipping: %v", err)
 	}
-	// Gradle 8.1 and below have issues with Java 21+ which is common on modern CI runners.
-	// We require at least Gradle 7 for basic compatibility in these tests.
-	if major < 7 {
-		t.Skipf("skipping: Gradle version %d is too old for CI runtime", major)
-	}
+	_ = major
 }

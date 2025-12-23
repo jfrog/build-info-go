@@ -95,5 +95,8 @@ jobs:
           GOTOOLCHAIN: 'go1.25.5'
           JFROG_CLI_LOG_LEVEL: DEBUG
         run: |
+          set -x
+          java -version
+          gradle --version
           go env
           go test -v -race -timeout 0 -cover ./...
