@@ -18,6 +18,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Force CI-like environment so Gradle uses --no-daemon in tests.
+func TestMain(m *testing.M) {
+	_ = os.Setenv("CI", "true")
+	os.Exit(m.Run())
+}
+
 // TestGradleWrapperDetection tests that projects with gradlew wrappers are handled correctly
 func TestGradleWrapperDetection(t *testing.T) {
 	tests := []struct {
