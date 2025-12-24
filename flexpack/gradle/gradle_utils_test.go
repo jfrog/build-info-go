@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,8 +21,13 @@ import (
 
 // Force CI-like environment so Gradle uses --no-daemon in tests.
 func TestMain(m *testing.M) {
-	_ = os.Setenv("CI", "true")
-	os.Exit(m.Run())
+	prevCI := os.Getenv("CI")
+	_ = os.Unsetenv("CI")
+	code := m.Run()
+	if prevCI != "" {
+		_ = os.Setenv("CI", prevCI)
+	}
+	os.Exit(code)
 }
 
 // TestGradleWrapperDetection tests that projects with gradlew wrappers are handled correctly
@@ -363,9 +369,33 @@ func ensureGradleValid() (int, error) {
 }
 
 func skipIfGradleInvalid(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skipf("Skipping %s on Windows to avoid interactive prompts/hangs", t.Name())
+	}
+	if locks := detectGradleDaemonLocks(); len(locks) > 0 {
+		t.Logf("Gradle daemon lock files detected (potential stale daemon): %s", strings.Join(locks, ", "))
+	}
 	major, err := ensureGradleValid()
 	if err != nil {
-		t.Skipf("skipping: %v", err)
+		t.Skipf("skipping %s: %v", t.Name(), err)
 	}
 	_ = major
+}
+
+// detectGradleDaemonLocks reports any Gradle daemon lock files under GRADLE_USER_HOME (or default ~/.gradle).
+func detectGradleDaemonLocks() []string {
+	gradleHome := os.Getenv("GRADLE_USER_HOME")
+	if gradleHome == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+		gradleHome = filepath.Join(home, ".gradle")
+	}
+	pattern := filepath.Join(gradleHome, "daemon", "*", "*.lck")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil
+	}
+	return matches
 }
