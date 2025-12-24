@@ -1,4 +1,4 @@
-package unit
+package flexpack_test
 
 import (
 	"os"

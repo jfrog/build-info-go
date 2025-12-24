@@ -1,4 +1,4 @@
-package unit
+package flexpack_test
 
 import (
 	"testing"
@@ -95,4 +95,3 @@ func TestMergeScopesIdempotent(t *testing.T) {
 
 	assert.Equal(t, result1, result2, "merging same scopes twice should be idempotent")
 }
-

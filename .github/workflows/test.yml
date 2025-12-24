@@ -93,11 +93,6 @@ jobs:
       - name: Tests
         env:
           GOTOOLCHAIN: 'go1.25.5'
-          JFROG_CLI_LOG_LEVEL: DEBUG
-        shell: bash
         run: |
-          set -x
-          java -version
-          gradle --version
           go env
           go test -v -race -timeout 0 -cover ./...

@@ -1,18 +1,14 @@
 package flexpack
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/gofrog/log"
@@ -128,65 +124,28 @@ func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(gf.ctx, gf.config.CommandTimeout)
 	defer cancel()
 
-	// Add non-interactive and CI-friendly flags
-	fullArgs := append([]string{"--no-daemon", "--console=plain", "--warning-mode=none"}, args...)
+	// Add non-interactive flags; only disable the daemon in CI or when explicitly requested.
+	base := []string{"--console=plain", "--warning-mode=none"}
+	noDaemon := strings.EqualFold(os.Getenv("CI"), "true") || strings.EqualFold(os.Getenv("JFROG_GRADLE_NO_DAEMON"), "true")
+	if noDaemon {
+		base = append([]string{"--no-daemon"}, base...)
+	}
+	fullArgs := append(base, args...)
 
 	cmd := exec.CommandContext(ctx, gf.config.GradleExecutable, fullArgs...)
 	cmd.Dir = gf.config.WorkingDirectory
-	// Ensure no input is expected; closed stdin will surface prompts as immediate failure
-	cmd.Stdin = strings.NewReader("")
+	// Ensure no input is expected
+	cmd.Stdin = nil
 
-	log.Info(fmt.Sprintf("Running Gradle: cmd=%q args=%v dir=%q", gf.config.GradleExecutable, fullArgs, gf.config.WorkingDirectory))
-
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
-	}
-
-	var stdoutBuf, stderrBuf bytes.Buffer
-	var wg sync.WaitGroup
-
-	// Stream stdout/stderr to logs and buffers for post-mortem analysis.
-	streamPipe := func(prefix string, r io.Reader, buf *bytes.Buffer) {
-		defer wg.Done()
-		scanner := bufio.NewScanner(r)
-		for scanner.Scan() {
-			line := scanner.Text()
-			buf.WriteString(line)
-			buf.WriteByte('\n')
-			log.Info(fmt.Sprintf("Gradle %s: %s", prefix, line))
-			// Heuristic: surface potential prompts explicitly
-			lower := strings.ToLower(line)
-			if strings.Contains(lower, "enter ") || strings.Contains(lower, "password") || strings.Contains(lower, "license") || strings.Contains(lower, "[y/n") || strings.Contains(lower, "(y/n") {
-				log.Warn(fmt.Sprintf("Gradle %s may be waiting for input: %s", prefix, line))
-			}
-		}
-	}
-
-	wg.Add(2)
-	go streamPipe("stdout", stdoutPipe, &stdoutBuf)
-	go streamPipe("stderr", stderrPipe, &stderrBuf)
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start gradle command: %w", err)
-	}
-
-	wg.Wait()
-	err = cmd.Wait()
-
-	combined := append(stdoutBuf.Bytes(), stderrBuf.Bytes()...)
+	output, err := cmd.CombinedOutput()
 
 	if ctx.Err() == context.DeadlineExceeded {
-		return combined, fmt.Errorf("gradle command timed out after %v: %s", gf.config.CommandTimeout, strings.Join(fullArgs, " "))
+		return output, fmt.Errorf("gradle command timed out after %v: %s", gf.config.CommandTimeout, strings.Join(fullArgs, " "))
 	}
 	if err != nil {
-		return combined, fmt.Errorf("gradle command failed: %w", err)
+		return output, fmt.Errorf("gradle command failed: %w", err)
 	}
-	return combined, nil
+	return output, nil
 }
 
 // isSubPath checks if child path is within parent directory.
