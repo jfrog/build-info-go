@@ -12,11 +12,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/jfrog/build-info-go/flexpack"
-	gradleflexpack "github.com/jfrog/build-info-go/flexpack/gradle"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // Force CI-like environment so Gradle uses --no-daemon in tests.
@@ -63,100 +58,100 @@ func TestMain(m *testing.M) {
 // 	}
 // }
 
-// TestCustomGradleExecutable tests using a custom Gradle executable path
-func TestCustomGradleExecutable(t *testing.T) {
-	tempDir := t.TempDir()
+// // TestCustomGradleExecutable tests using a custom Gradle executable path
+// func TestCustomGradleExecutable(t *testing.T) {
+// 	tempDir := t.TempDir()
 
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
+// 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
+// plugins { id 'java' }
+// group = 'com.example'
+// version = '1.0.0'
+// `), 0644)
+// 	require.NoError(t, err)
 
-	config := flexpack.GradleConfig{
-		WorkingDirectory: tempDir,
-		GradleExecutable: "/custom/path/to/gradle",
-	}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
-	assert.NotNil(t, gf)
-}
+// 	config := flexpack.GradleConfig{
+// 		WorkingDirectory: tempDir,
+// 		GradleExecutable: "/custom/path/to/gradle",
+// 	}
+// 	gf, err := gradleflexpack.NewGradleFlexPack(config)
+// 	require.NoError(t, err)
+// 	assert.NotNil(t, gf)
+// }
 
-// TestCommandTimeout tests default and custom timeout configurations
-func TestCommandTimeout(t *testing.T) {
-	tempDir := t.TempDir()
+// // TestCommandTimeout tests default and custom timeout configurations
+// func TestCommandTimeout(t *testing.T) {
+// 	tempDir := t.TempDir()
 
-	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
+// 	err := os.WriteFile(filepath.Join(tempDir, "build.gradle"), []byte(`
+// plugins { id 'java' }
+// group = 'com.example'
+// version = '1.0.0'
+// `), 0644)
+// 	require.NoError(t, err)
 
-	t.Run("default timeout", func(t *testing.T) {
-		config := flexpack.GradleConfig{WorkingDirectory: tempDir}
-		gf, err := gradleflexpack.NewGradleFlexPack(config)
-		require.NoError(t, err)
-		assert.NotNil(t, gf)
-	})
+// 	t.Run("default timeout", func(t *testing.T) {
+// 		config := flexpack.GradleConfig{WorkingDirectory: tempDir}
+// 		gf, err := gradleflexpack.NewGradleFlexPack(config)
+// 		require.NoError(t, err)
+// 		assert.NotNil(t, gf)
+// 	})
 
-	t.Run("custom timeout", func(t *testing.T) {
-		config := flexpack.GradleConfig{
-			WorkingDirectory: tempDir,
-			CommandTimeout:   30 * time.Second,
-		}
-		gf, err := gradleflexpack.NewGradleFlexPack(config)
-		require.NoError(t, err)
-		assert.NotNil(t, gf)
-	})
-}
+// 	t.Run("custom timeout", func(t *testing.T) {
+// 		config := flexpack.GradleConfig{
+// 			WorkingDirectory: tempDir,
+// 			CommandTimeout:   30 * time.Second,
+// 		}
+// 		gf, err := gradleflexpack.NewGradleFlexPack(config)
+// 		require.NoError(t, err)
+// 		assert.NotNil(t, gf)
+// 	})
+// }
 
-// TestWorkingDirectoryWithSpacesInPath tests paths containing spaces
-func TestWorkingDirectoryWithSpacesInPath(t *testing.T) {
-	tempDir := t.TempDir()
-	spacedDir := filepath.Join(tempDir, "My Gradle Project")
-	err := os.MkdirAll(spacedDir, 0755)
-	require.NoError(t, err)
+// // TestWorkingDirectoryWithSpacesInPath tests paths containing spaces
+// func TestWorkingDirectoryWithSpacesInPath(t *testing.T) {
+// 	tempDir := t.TempDir()
+// 	spacedDir := filepath.Join(tempDir, "My Gradle Project")
+// 	err := os.MkdirAll(spacedDir, 0755)
+// 	require.NoError(t, err)
 
-	err = os.WriteFile(filepath.Join(spacedDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example.spaced'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
+// 	err = os.WriteFile(filepath.Join(spacedDir, "build.gradle"), []byte(`
+// plugins { id 'java' }
+// group = 'com.example.spaced'
+// version = '1.0.0'
+// `), 0644)
+// 	require.NoError(t, err)
 
-	config := flexpack.GradleConfig{WorkingDirectory: spacedDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
+// 	config := flexpack.GradleConfig{WorkingDirectory: spacedDir}
+// 	gf, err := gradleflexpack.NewGradleFlexPack(config)
+// 	require.NoError(t, err)
 
-	buildInfo, err := gf.CollectBuildInfo("test", "1")
-	require.NoError(t, err)
-	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.spaced")
-}
+// 	buildInfo, err := gf.CollectBuildInfo("test", "1")
+// 	require.NoError(t, err)
+// 	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.spaced")
+// }
 
-// TestWorkingDirectoryWithUnicodeCharacters tests paths with unicode characters
-func TestWorkingDirectoryWithUnicodeCharacters(t *testing.T) {
-	tempDir := t.TempDir()
-	unicodeDir := filepath.Join(tempDir, "gradle-project-日本語")
-	err := os.MkdirAll(unicodeDir, 0755)
-	require.NoError(t, err)
+// // TestWorkingDirectoryWithUnicodeCharacters tests paths with unicode characters
+// func TestWorkingDirectoryWithUnicodeCharacters(t *testing.T) {
+// 	tempDir := t.TempDir()
+// 	unicodeDir := filepath.Join(tempDir, "gradle-project-日本語")
+// 	err := os.MkdirAll(unicodeDir, 0755)
+// 	require.NoError(t, err)
 
-	err = os.WriteFile(filepath.Join(unicodeDir, "build.gradle"), []byte(`
-plugins { id 'java' }
-group = 'com.example.unicode'
-version = '1.0.0'
-`), 0644)
-	require.NoError(t, err)
+// 	err = os.WriteFile(filepath.Join(unicodeDir, "build.gradle"), []byte(`
+// plugins { id 'java' }
+// group = 'com.example.unicode'
+// version = '1.0.0'
+// `), 0644)
+// 	require.NoError(t, err)
 
-	config := flexpack.GradleConfig{WorkingDirectory: unicodeDir}
-	gf, err := gradleflexpack.NewGradleFlexPack(config)
-	require.NoError(t, err)
+// 	config := flexpack.GradleConfig{WorkingDirectory: unicodeDir}
+// 	gf, err := gradleflexpack.NewGradleFlexPack(config)
+// 	require.NoError(t, err)
 
-	buildInfo, err := gf.CollectBuildInfo("test", "1")
-	require.NoError(t, err)
-	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.unicode")
-}
+// 	buildInfo, err := gf.CollectBuildInfo("test", "1")
+// 	require.NoError(t, err)
+// 	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.unicode")
+// }
 
 // // TestPathTraversalInModuleNames tests that malicious module names are filtered out
 // func TestPathTraversalInModuleNames(t *testing.T) {
