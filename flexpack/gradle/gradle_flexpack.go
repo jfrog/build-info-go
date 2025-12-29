@@ -71,7 +71,7 @@ func NewGradleFlexPackWithContext(ctx context.Context, config flexpack.GradleCon
 	}
 
 	if err := gf.loadBuildGradle(); err != nil {
-		log.Warn("Failed to load build.gradle: " + err.Error())
+		return nil, fmt.Errorf("failed to load build.gradle")
 	}
 	gf.scanAllModules()
 	return gf, nil
