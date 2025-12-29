@@ -1,5 +1,19 @@
 package flexpack_test
 
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
 // import (
 // 	"context"
 // 	"fmt"
@@ -316,86 +330,86 @@ package flexpack_test
 // 	}
 // }
 
-// var (
-// 	gradleCheckOnce   sync.Once
-// 	gradleCheckErr    error
-// 	gradleMajorCached int
-// )
+var (
+	gradleCheckOnce   sync.Once
+	gradleCheckErr    error
+	gradleMajorCached int
+)
 
 // // detectGradleMajorVersion returns the major version of the Gradle executable in PATH, with a timeout.
-// func detectGradleMajorVersion() (int, error) {
-// 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-// 	defer cancel()
+func detectGradleMajorVersion() (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 
-// 	cmd := exec.CommandContext(ctx, "gradle", "--version")
-// 	out, err := cmd.Output()
-// 	if ctx.Err() == context.DeadlineExceeded {
-// 		return 0, fmt.Errorf("gradle --version timed out after 15s")
-// 	}
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	lines := strings.Split(string(out), "\n")
-// 	for _, line := range lines {
-// 		line = strings.TrimSpace(line)
-// 		if strings.HasPrefix(line, "Gradle ") {
-// 			ver := strings.TrimPrefix(line, "Gradle ")
-// 			parts := strings.Split(ver, ".")
-// 			if len(parts) > 0 {
-// 				return strconv.Atoi(parts[0])
-// 			}
-// 		}
-// 	}
-// 	return 0, fmt.Errorf("could not parse gradle version from output")
-// }
+	cmd := exec.CommandContext(ctx, "gradle", "--version")
+	out, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return 0, fmt.Errorf("gradle --version timed out after 15s")
+	}
+	if err != nil {
+		return 0, err
+	}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Gradle ") {
+			ver := strings.TrimPrefix(line, "Gradle ")
+			parts := strings.Split(ver, ".")
+			if len(parts) > 0 {
+				return strconv.Atoi(parts[0])
+			}
+		}
+	}
+	return 0, fmt.Errorf("could not parse gradle version from output")
+}
 
-// func ensureGradleValid() (int, error) {
-// 	gradleCheckOnce.Do(func() {
-// 		if _, err := exec.LookPath("gradle"); err != nil {
-// 			gradleCheckErr = err
-// 			return
-// 		}
-// 		major, err := detectGradleMajorVersion()
-// 		if err != nil {
-// 			gradleCheckErr = err
-// 			return
-// 		}
-// 		gradleMajorCached = major
-// 		if major < 7 {
-// 			gradleCheckErr = fmt.Errorf("gradle version %d is too old for CI runtime", major)
-// 		}
-// 	})
-// 	return gradleMajorCached, gradleCheckErr
-// }
+func ensureGradleValid() (int, error) {
+	gradleCheckOnce.Do(func() {
+		if _, err := exec.LookPath("gradle"); err != nil {
+			gradleCheckErr = err
+			return
+		}
+		major, err := detectGradleMajorVersion()
+		if err != nil {
+			gradleCheckErr = err
+			return
+		}
+		gradleMajorCached = major
+		if major < 7 {
+			gradleCheckErr = fmt.Errorf("gradle version %d is too old for CI runtime", major)
+		}
+	})
+	return gradleMajorCached, gradleCheckErr
+}
 
-// func skipIfGradleInvalid(t *testing.T) {
-// 	if runtime.GOOS == "windows" {
-// 		t.Skipf("Skipping %s on Windows to avoid interactive prompts/hangs", t.Name())
-// 	}
-// 	if locks := detectGradleDaemonLocks(); len(locks) > 0 {
-// 		t.Logf("Gradle daemon lock files detected (potential stale daemon): %s", strings.Join(locks, ", "))
-// 	}
-// 	major, err := ensureGradleValid()
-// 	if err != nil {
-// 		t.Skipf("skipping %s: %v", t.Name(), err)
-// 	}
-// 	_ = major
-// }
+func skipIfGradleInvalid(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skipf("Skipping %s on Windows to avoid interactive prompts/hangs", t.Name())
+	}
+	if locks := detectGradleDaemonLocks(); len(locks) > 0 {
+		t.Logf("Gradle daemon lock files detected (potential stale daemon): %s", strings.Join(locks, ", "))
+	}
+	major, err := ensureGradleValid()
+	if err != nil {
+		t.Skipf("skipping %s: %v", t.Name(), err)
+	}
+	_ = major
+}
 
-// // detectGradleDaemonLocks reports any Gradle daemon lock files under GRADLE_USER_HOME (or default ~/.gradle).
-// func detectGradleDaemonLocks() []string {
-// 	gradleHome := os.Getenv("GRADLE_USER_HOME")
-// 	if gradleHome == "" {
-// 		home, err := os.UserHomeDir()
-// 		if err != nil {
-// 			return nil
-// 		}
-// 		gradleHome = filepath.Join(home, ".gradle")
-// 	}
-// 	pattern := filepath.Join(gradleHome, "daemon", "*", "*.lck")
-// 	matches, err := filepath.Glob(pattern)
-// 	if err != nil {
-// 		return nil
-// 	}
-// 	return matches
-// }
+// detectGradleDaemonLocks reports any Gradle daemon lock files under GRADLE_USER_HOME (or default ~/.gradle).
+func detectGradleDaemonLocks() []string {
+	gradleHome := os.Getenv("GRADLE_USER_HOME")
+	if gradleHome == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+		gradleHome = filepath.Join(home, ".gradle")
+	}
+	pattern := filepath.Join(gradleHome, "daemon", "*", "*.lck")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil
+	}
+	return matches
+}
