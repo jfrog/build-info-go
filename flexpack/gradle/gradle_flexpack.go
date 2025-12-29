@@ -261,17 +261,9 @@ func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 	requestedByMap := gf.buildRequestedByMap(depGraph)
 	dependencies := gf.createDependencyEntities(deps, requestedByMap)
 
-	modulePath := strings.TrimPrefix(strings.ReplaceAll(moduleName, ":", string(filepath.Separator)), string(filepath.Separator))
-	if modulePath == "" {
-		modulePath = "."
-	}
-
 	return entities.Module{
-		Id:   fmt.Sprintf("%s:%s:%s", groupId, artifactId, version),
-		Type: entities.Gradle,
-		Properties: map[string]string{
-			"module_path": modulePath,
-		},
+		Id:           fmt.Sprintf("%s:%s:%s", groupId, artifactId, version),
+		Type:         entities.Gradle,
 		Dependencies: dependencies,
 	}
 }

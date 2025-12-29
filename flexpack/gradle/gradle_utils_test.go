@@ -204,34 +204,34 @@ include '..:..:..:windows:system32'
 }
 
 // TestSymlinkedWorkingDirectory tests behavior with symlinked working directory
-// func TestSymlinkedWorkingDirectory(t *testing.T) {
-// 	tempDir := t.TempDir()
+func TestSymlinkedWorkingDirectory(t *testing.T) {
+	tempDir := t.TempDir()
 
-// 	projectDir := filepath.Join(tempDir, "actual-project")
-// 	err := os.MkdirAll(projectDir, 0755)
-// 	require.NoError(t, err)
+	projectDir := filepath.Join(tempDir, "actual-project")
+	err := os.MkdirAll(projectDir, 0755)
+	require.NoError(t, err)
 
-// 	err = os.WriteFile(filepath.Join(projectDir, "build.gradle"), []byte(`
-// plugins { id 'java' }
-// group = 'com.example.symlink'
-// version = '1.0.0'
-// `), 0644)
-// 	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(projectDir, "build.gradle"), []byte(`
+plugins { id 'java' }
+group = 'com.example.symlink'
+version = '1.0.0'
+`), 0644)
+	require.NoError(t, err)
 
-// 	symlinkDir := filepath.Join(tempDir, "symlink-project")
-// 	err = os.Symlink(projectDir, symlinkDir)
-// 	if err != nil {
-// 		t.Skip("Symlinks not supported on this system")
-// 	}
+	symlinkDir := filepath.Join(tempDir, "symlink-project")
+	err = os.Symlink(projectDir, symlinkDir)
+	if err != nil {
+		t.Skip("Symlinks not supported on this system")
+	}
 
-// 	config := flexpack.GradleConfig{WorkingDirectory: symlinkDir}
-// 	gf, err := gradleflexpack.NewGradleFlexPack(config)
-// 	require.NoError(t, err)
+	config := flexpack.GradleConfig{WorkingDirectory: symlinkDir}
+	gf, err := gradleflexpack.NewGradleFlexPack(config)
+	require.NoError(t, err)
 
-// 	buildInfo, err := gf.CollectBuildInfo("symlink-test", "1")
-// 	require.NoError(t, err)
-// 	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.symlink")
-// }
+	buildInfo, err := gf.CollectBuildInfo("symlink-test", "1")
+	require.NoError(t, err)
+	assert.Contains(t, buildInfo.Modules[0].Id, "com.example.symlink")
+}
 
 // TestBuildGradlePreferredOverKts tests that build.gradle is preferred when both exist
 func TestBuildGradlePreferredOverKts(t *testing.T) {
