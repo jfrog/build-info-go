@@ -97,7 +97,7 @@ func CreateArtifactsFromPaths(artifactsPaths []string) (artifacts []entities.Art
 
 		artifact := entities.Artifact{Name: filepath.Base(absPath), Path: path.Join(projectName, projectVersion, filepath.Base(absPath)),
 			Type: strings.TrimPrefix(filepath.Ext(absPath), ".")}
-		artifact.Checksum = entities.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}
+		artifact.Checksum = entities.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5, Sha256: fileDetails.Checksum.Sha256}
 		artifacts = append(artifacts, artifact)
 	}
 	return
