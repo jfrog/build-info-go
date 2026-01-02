@@ -41,7 +41,7 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 			log.Debug(fmt.Sprintf("Failed to close temporary artifacts generation script: %s", closeErr.Error()))
 		}
 		if removeErr := os.Remove(initScriptPath); removeErr != nil {
-			log.Warn("Failed to remove temporary artifacts generation script: " + removeErr.Error())
+			log.Warn("failed to remove temporary artifacts generation script")
 		}
 	}()
 
@@ -70,7 +70,7 @@ func (gf *GradleFlexPack) getGradleDeployedArtifacts() (map[string][]entities.Ar
 		return nil, fmt.Errorf("failed to collect Gradle artifacts: cannot read generated artifacts: %w", err)
 	}
 	if err := os.Remove(manifestPath); err != nil {
-		log.Warn("Failed to remove generated artifacts file: " + err.Error())
+		log.Warn("failed to remove generated artifacts file")
 	}
 
 	var artifacts []deployedArtifactJSON
@@ -158,7 +158,7 @@ func resolveManifestPath(workingDir, manifestFileName string) (string, error) {
 		return found, nil
 	}
 
-	return "", fmt.Errorf("generated manifest %s not found under %s (checked default and limited scan)", manifestFileName, workingDir)
+	return "", fmt.Errorf("generated manifest %s not found under %s ", manifestFileName, workingDir)
 }
 
 // if a module is a dependency, the checksum calculation depends if the artifact is published or not
