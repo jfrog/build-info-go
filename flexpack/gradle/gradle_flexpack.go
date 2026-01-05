@@ -71,7 +71,7 @@ func NewGradleFlexPackWithContext(ctx context.Context, config flexpack.GradleCon
 	}
 
 	if err := gf.loadBuildGradle(); err != nil {
-		log.Warn("Failed to load build.gradle: " + err.Error())
+		return nil, fmt.Errorf("failed to load build.gradle")
 	}
 	gf.scanAllModules()
 	return gf, nil
@@ -123,7 +123,7 @@ func (gf *GradleFlexPack) scanAllModules() {
 
 	modules, err := gf.getModules()
 	if err != nil {
-		log.Warn("Failed to get modules list from settings.gradle: " + err.Error())
+		log.Warn("failed to get modules list from settings.gradle")
 		// Fallback: at least add the root module
 		gf.modulesMap[""] = moduleMetadata{
 			Group:    gf.groupId,
@@ -152,7 +152,6 @@ func (gf *GradleFlexPack) resolveModuleInfo(moduleName string) (moduleMetadata, 
 			return moduleMetadata{}, false
 		}
 	}
-
 	var finalGroup, finalArtifact, finalVersion string
 
 	if moduleName == "" {
@@ -216,7 +215,8 @@ func (gf *GradleFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 		if artifacts, err := gf.getGradleDeployedArtifacts(); err == nil {
 			gf.deployedArtifacts = artifacts
 		} else {
-			log.Warn("Failed to get deployed artifacts: " + err.Error())
+			log.Warn("could not retrieve deployed artifacts; continuing without deployment details")
+			log.Debug("failed to get deployed artifacts: " + err.Error())
 		}
 	}
 
@@ -239,11 +239,16 @@ func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 	groupId := gf.groupId
 	version := gf.projectVersion
 	artifactId := gf.artifactId
+	var properties map[string]string
 
 	if meta, ok := gf.modulesMap[moduleName]; ok {
 		groupId = meta.Group
 		version = meta.Version
 		artifactId = meta.Artifact
+	}
+
+	if moduleName != "" {
+		properties = map[string]string{"moduleName": moduleName}
 	}
 
 	// Ensure we have valid module metadata - use defaults if empty
@@ -261,17 +266,10 @@ func (gf *GradleFlexPack) processModule(moduleName string) entities.Module {
 	requestedByMap := gf.buildRequestedByMap(depGraph)
 	dependencies := gf.createDependencyEntities(deps, requestedByMap)
 
-	modulePath := strings.TrimPrefix(strings.ReplaceAll(moduleName, ":", string(filepath.Separator)), string(filepath.Separator))
-	if modulePath == "" {
-		modulePath = "."
-	}
-
 	return entities.Module{
-		Id:   fmt.Sprintf("%s:%s:%s", groupId, artifactId, version),
-		Type: entities.Gradle,
-		Properties: map[string]string{
-			"module_path": modulePath,
-		},
+		Id:           fmt.Sprintf("%s:%s:%s", groupId, artifactId, version),
+		Properties:   properties,
+		Type:         entities.Gradle,
 		Dependencies: dependencies,
 	}
 }

@@ -124,20 +124,17 @@ func (gf *GradleFlexPack) runGradleCommand(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(gf.ctx, gf.config.CommandTimeout)
 	defer cancel()
 
-	// Add non-interactive flags; only disable the daemon in CI or when explicitly requested.
-	base := []string{"--console=plain", "--warning-mode=none"}
+	// Add non-interactive flags only in CI or when explicitly requested.
+	base := []string{}
 	noDaemon := strings.EqualFold(os.Getenv("CI"), "true") || strings.EqualFold(os.Getenv("JFROG_GRADLE_NO_DAEMON"), "true")
 	if noDaemon {
-		base = append([]string{"--no-daemon"}, base...)
+		base = append(base, "--console=plain", "--warning-mode=none", "--no-daemon")
 	}
 	base = append(base, args...)
 	fullArgs := base
 
 	cmd := exec.CommandContext(ctx, gf.config.GradleExecutable, fullArgs...)
 	cmd.Dir = gf.config.WorkingDirectory
-	// Ensure no input is expected
-	// cmd.Stdin = nil
-
 	output, err := cmd.CombinedOutput()
 
 	if ctx.Err() == context.DeadlineExceeded {

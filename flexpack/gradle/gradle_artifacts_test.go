@@ -13,7 +13,6 @@ import (
 
 // TestBuildInfoDependencyChecksums tests checksum fields on dependencies
 func TestBuildInfoDependencyChecksums(t *testing.T) {
-	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 	setupMinimalGradleProjectForArtifacts(t, tempDir)
 
@@ -42,7 +41,6 @@ func TestBuildInfoDependencyChecksums(t *testing.T) {
 
 // TestBuildInfoDependencyStructure tests dependency structure when present
 func TestBuildInfoDependencyStructure(t *testing.T) {
-	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradle := `
@@ -76,7 +74,6 @@ dependencies {
 
 // TestDependencyWithClassifier tests dependencies with classifier
 func TestDependencyWithClassifier(t *testing.T) {
-	skipIfGradleInvalid(t)
 	tempDir := t.TempDir()
 
 	buildGradle := `
@@ -104,8 +101,6 @@ dependencies {
 // TestIvyAndMavenPublishToLocal ensures the init script wiring publishes Maven and Ivy artifacts to local/file repos
 // and the manifest is generated without errors.
 func TestIvyAndMavenPublishToLocal(t *testing.T) {
-	skipIfGradleInvalid(t)
-
 	tempDir := t.TempDir()
 	setupGradleProjectWithPublishing(t, tempDir)
 
