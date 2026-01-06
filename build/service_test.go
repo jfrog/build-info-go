@@ -66,9 +66,6 @@ func TestNewBuildInfoService(t *testing.T) {
 	// tempDirPath should contain user-specific directory
 	assert.True(t, strings.Contains(service.tempDirPath, BuildsJfrogPath),
 		"tempDirPath should contain '%s', got: %s", BuildsJfrogPath, service.tempDirPath)
-
-	// buildDirectory should be set
-	assert.NotEmpty(t, service.buildDirectory, "buildDirectory should not be empty")
 }
 
 func TestGetUserSpecificBuildDirName(t *testing.T) {
@@ -89,8 +86,7 @@ func TestGetUserSpecificBuildDirName(t *testing.T) {
 func TestGetUserSpecificBuildDirNameLazyInit(t *testing.T) {
 	// Create service with empty buildDirectory to test lazy initialization
 	service := &BuildInfoService{
-		tempDirPath:    "/tmp/test",
-		buildDirectory: "", // Empty to trigger lazy init
+		tempDirPath: "/tmp/test",
 	}
 
 	dirName := service.GetUserSpecificBuildDirName()
@@ -99,10 +95,6 @@ func TestGetUserSpecificBuildDirNameLazyInit(t *testing.T) {
 	assert.NotEmpty(t, dirName, "GetUserSpecificBuildDirName should initialize if empty")
 	assert.True(t, strings.HasPrefix(dirName, BuildsJfrogPath),
 		"Lazily initialized directory should start with '%s', got: %s", BuildsJfrogPath, dirName)
-
-	// Should also update the service's buildDirectory field
-	assert.Equal(t, dirName, service.buildDirectory,
-		"buildDirectory field should be updated after lazy init")
 }
 
 func TestMultipleUsersGetDifferentPaths(t *testing.T) {

@@ -18,21 +18,17 @@ const BuildsDirPath = "builds"
 const DefaultUser = "default"
 
 type BuildInfoService struct {
-	tempDirPath    string
-	logger         utils.Log
-	buildDirectory string
+	tempDirPath string
+	logger      utils.Log
 }
 
 func NewBuildInfoService() *BuildInfoService {
 	userSpecificBuildDir := resolveUserSpecificBuildDirName()
-	return &BuildInfoService{tempDirPath: filepath.Join(os.TempDir(), userSpecificBuildDir), logger: &utils.NullLog{}, buildDirectory: userSpecificBuildDir}
+	return &BuildInfoService{tempDirPath: filepath.Join(os.TempDir(), userSpecificBuildDir), logger: &utils.NullLog{}}
 }
 
 func (bis *BuildInfoService) GetUserSpecificBuildDirName() string {
-	if bis.buildDirectory == "" {
-		bis.buildDirectory = resolveUserSpecificBuildDirName()
-	}
-	return bis.buildDirectory
+	return resolveUserSpecificBuildDirName()
 }
 
 func (bis *BuildInfoService) SetTempDirPath(tempDirPath string) {
@@ -95,11 +91,9 @@ func getOrCreateBuildGeneralDetails(buildName, buildNumber string, buildTime tim
 }
 
 func resolveUserSpecificBuildDirName() string {
+	username := DefaultUser
 	currentUser, err := user.Current()
-	var username string
-	if err != nil {
-		username = DefaultUser
-	} else {
+	if err == nil {
 		username = currentUser.Username
 	}
 	return path.Join(BuildsJfrogPath+username, BuildsDirPath)
