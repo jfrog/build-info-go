@@ -66,3 +66,12 @@ type ConanLockNode struct {
 	PackageId     string            `json:"package_id"`
 }
 
+// ConanInspectOutput represents the output of 'conan inspect . --format=json'
+// This provides accurate project metadata without parsing Python source code.
+type ConanInspectOutput struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	User    string `json:"user"`
+	Channel string `json:"channel"`
+}
+
