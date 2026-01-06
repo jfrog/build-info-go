@@ -512,6 +512,69 @@ func TestExtractPythonAttribute(t *testing.T) {
 	}
 }
 
+func TestExtractProjectInfoUsingConanInspect(t *testing.T) {
+	// Skip if conan is not installed
+	if _, err := findConanExecutable(); err != nil {
+		t.Skip("Conan not installed, skipping conan inspect test")
+	}
+	tempDir, err := os.MkdirTemp("", "conan-inspect-test-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tempDir) }()
+	// Create a conanfile.py with project metadata
+	conanfileContent := `from conan import ConanFile
+
+class TestPackage(ConanFile):
+    name = "testpkg"
+    version = "2.5.0"
+    user = "myorg"
+    channel = "testing"
+`
+	err = os.WriteFile(filepath.Join(tempDir, "conanfile.py"), []byte(conanfileContent), 0644)
+	require.NoError(t, err)
+	cf := &ConanFlexPack{
+		config: ConanConfig{
+			WorkingDirectory: tempDir,
+			ConanExecutable:  "conan",
+		},
+		conanfilePath: filepath.Join(tempDir, "conanfile.py"),
+	}
+	err = cf.extractProjectInfoUsingConanInspect()
+	require.NoError(t, err)
+	assert.Equal(t, "testpkg", cf.projectName)
+	assert.Equal(t, "2.5.0", cf.projectVersion)
+	assert.Equal(t, "myorg", cf.user)
+	assert.Equal(t, "testing", cf.channel)
+}
+
+func TestExtractProjectInfoFallbackToPythonParsing(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "conan-fallback-test-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tempDir) }()
+	// Create a conanfile.py with project metadata
+	conanfileContent := `from conan import ConanFile
+
+class TestPackage(ConanFile):
+    name = "fallbackpkg"
+    version = "1.0.0"
+`
+	err = os.WriteFile(filepath.Join(tempDir, "conanfile.py"), []byte(conanfileContent), 0644)
+	require.NoError(t, err)
+	cf := &ConanFlexPack{
+		config: ConanConfig{
+			WorkingDirectory: tempDir,
+			ConanExecutable:  "nonexistent-conan-binary", // Force fallback
+		},
+		conanfilePath: filepath.Join(tempDir, "conanfile.py"),
+	}
+	// extractProjectInfoFromConanfilePy should fallback to regex parsing
+	err = cf.extractProjectInfoFromConanfilePy()
+	require.NoError(t, err)
+	assert.Equal(t, "fallbackpkg", cf.projectName)
+	assert.Equal(t, "1.0.0", cf.projectVersion)
+	assert.Equal(t, "_", cf.user)
+	assert.Equal(t, "_", cf.channel)
+}
+
 func TestCollectBuildInfo(t *testing.T) {
 	cf := &ConanFlexPack{
 		projectName:    "testproject",
