@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/user"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -11,7 +13,9 @@ import (
 	"github.com/jfrog/build-info-go/utils"
 )
 
-const BuildsTempPath = "jfrog/builds/"
+const BuildsJfrogPath = "jfrog-"
+const BuildsDirPath = "builds"
+const DefaultUser = "default"
 
 type BuildInfoService struct {
 	tempDirPath string
@@ -19,7 +23,12 @@ type BuildInfoService struct {
 }
 
 func NewBuildInfoService() *BuildInfoService {
-	return &BuildInfoService{tempDirPath: filepath.Join(os.TempDir(), BuildsTempPath), logger: &utils.NullLog{}}
+	userSpecificBuildDir := resolveUserSpecificBuildDirName()
+	return &BuildInfoService{tempDirPath: filepath.Join(os.TempDir(), userSpecificBuildDir), logger: &utils.NullLog{}}
+}
+
+func (bis *BuildInfoService) GetUserSpecificBuildDirName() string {
+	return resolveUserSpecificBuildDirName()
 }
 
 func (bis *BuildInfoService) SetTempDirPath(tempDirPath string) {
@@ -79,4 +88,14 @@ func getOrCreateBuildGeneralDetails(buildName, buildNumber string, buildTime tim
 		return buildTime, err
 	}
 	return buildTime, os.WriteFile(detailsFilePath, content.Bytes(), 0600)
+}
+
+func resolveUserSpecificBuildDirName() string {
+	username := DefaultUser
+	currentUser, err := user.Current()
+	if err == nil {
+		username = currentUser.Username
+	}
+	return path.Join(BuildsJfrogPath+username, BuildsDirPath)
+
 }
