@@ -32,6 +32,7 @@ type PythonTool string
 var (
 	credentialsInUrlRegexp = regexp.MustCompile(utils.CredentialsInUrlRegexp)
 	catchAllRegexp         = regexp.MustCompile(".*")
+	// example: pkg.name--foo_bar...baz
 	canonicalPkgNameRegexp = regexp.MustCompile(`[-_.]+`)
 )
 
@@ -169,8 +170,8 @@ func getFilePath(srcPath, fileName string) (string, error) {
 	return filePath, nil
 }
 
-// canonicalizePackageName normalizes Python package name
-func canonicalizePackageName(name string) string {
+// normalizePyPIIdentifier normalizes Python package names
+func normalizePyPIIdentifier(name string) string {
 	return canonicalPkgNameRegexp.ReplaceAllString(strings.ToLower(name), "-")
 }
 
@@ -329,7 +330,7 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 		if dashIdx := strings.Index(distribution, "-"); dashIdx != -1 {
 			distribution = distribution[:dashIdx]
 		}
-		if canonicalizePackageName(distribution) != canonicalizePackageName(packageNameLower) {
+		if normalizePyPIIdentifier(distribution) != normalizePyPIIdentifier(packageNameLower) {
 			log.Debug(fmt.Sprintf("Skipping download path %s because it does not match package %s", fileName, packageName))
 			return pattern.Line, nil
 		}
