@@ -32,6 +32,8 @@ type PythonTool string
 var (
 	credentialsInUrlRegexp = regexp.MustCompile(utils.CredentialsInUrlRegexp)
 	catchAllRegexp         = regexp.MustCompile(".*")
+	// example: pkg.name--foo_bar...baz
+	canonicalPkgNameRegexp = regexp.MustCompile(`[-_.]+`)
 )
 
 // Parse pythonDependencyPackage list to dependencies map. (mapping dependency to his child deps)
@@ -166,6 +168,11 @@ func getFilePath(srcPath, fileName string) (string, error) {
 		return "", err
 	}
 	return filePath, nil
+}
+
+// normalizePyPIIdentifier normalizes Python package names
+func normalizePyPIIdentifier(name string) string {
+	return canonicalPkgNameRegexp.ReplaceAllString(strings.ToLower(name), "-")
 }
 
 // Create the CmdOutputPattern objects that can capture group content that may span multiple lines for logs that have line size limitations.
@@ -315,16 +322,23 @@ func InstallWithLogParsing(tool PythonTool, commandArgs []string, log utils.Log,
 			log.Debug(fmt.Sprintf("Could not resolve package name for download path: %s , continuing...", fileName))
 			return pattern.Line, nil
 		}
-		// Only save if the filename matches the expected package name pattern
+		// Only save if the filename belongs to the expected package
 		fileNameLower := strings.ToLower(fileName)
 		packageNameLower := strings.ToLower(packageName)
-		// Check if the wheel file name starts with the package name (with underscore or dash)
-		if strings.HasPrefix(fileNameLower, packageNameLower+"-") || strings.HasPrefix(fileNameLower, packageNameLower+"_") || strings.HasPrefix(fileNameLower, strings.ReplaceAll(packageNameLower, "-", "_")+"-") || strings.HasPrefix(fileNameLower, strings.ReplaceAll(packageNameLower, "_", "-")+"-") {
-			// Save dependency information.
-			dependenciesMap[packageNameLower] = entities.Dependency{Id: fileName}
-			expectingPackageFilePath = false
-			log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
+		// Extract distribution name from artifact filename (segment before first '-')
+		distribution := fileNameLower
+		if dashIdx := strings.Index(distribution, "-"); dashIdx != -1 {
+			distribution = distribution[:dashIdx]
 		}
+		if normalizePyPIIdentifier(distribution) != normalizePyPIIdentifier(packageNameLower) {
+			log.Debug(fmt.Sprintf("Skipping download path %s because it does not match package %s", fileName, packageName))
+			return pattern.Line, nil
+		}
+
+		// Save dependency information.
+		dependenciesMap[packageNameLower] = entities.Dependency{Id: fileName}
+		expectingPackageFilePath = false
+		log.Debug(fmt.Sprintf("Found package: %s installed with: %s", packageName, fileName))
 		return pattern.Line, nil
 	}
 
