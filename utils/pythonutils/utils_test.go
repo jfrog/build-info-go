@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 
 	gofrogcmd "github.com/jfrog/gofrog/io"
@@ -230,4 +231,67 @@ func maskCredentialsInText(t *testing.T, text, credentialsArgument string) strin
 
 func getOnelinerText(inputText string) string {
 	return strings.ReplaceAll(inputText, "\n", "")
+}
+
+func TestInstallParserSkipsMismatchedDistribution(t *testing.T) {
+	dependenciesMap := map[string]entities.Dependency{}
+	var packageName string
+	expectingPackageFilePath := false
+
+	collectingParser := &gofrogcmd.CmdOutputPattern{
+		RegExp: regexp.MustCompile(`^Collecting\s` + packageNameRegexp),
+		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
+			packageName = pattern.MatchedResults[1]
+			expectingPackageFilePath = true
+			return pattern.Line, nil
+		},
+	}
+
+	cachedParser := &gofrogcmd.CmdOutputPattern{
+		RegExp: regexp.MustCompile(startUsingCachedPattern + `(` + usingCacheCaptureGroup + `)`),
+		ExecFunc: func(pattern *gofrogcmd.CmdOutputPattern) (string, error) {
+			fileName := extractFileNameFromRegexCaptureGroup(pattern)
+			if fileName == "" || !expectingPackageFilePath || packageName == "" {
+				return pattern.Line, nil
+			}
+
+			fileNameLower := strings.ToLower(fileName)
+			packageNameLower := strings.ToLower(packageName)
+			distribution := fileNameLower
+			if dashIdx := strings.Index(distribution, "-"); dashIdx != -1 {
+				distribution = distribution[:dashIdx]
+			}
+			if normalizePyPIIdentifier(distribution) != normalizePyPIIdentifier(packageNameLower) {
+				return pattern.Line, nil
+			}
+
+			dependenciesMap[packageNameLower] = entities.Dependency{Id: fileName}
+			expectingPackageFilePath = false
+			return pattern.Line, nil
+		},
+	}
+
+	lines := []string{
+		"Collecting pydantic",
+		"  Using cached https://example.com/pydantic_core-2.33.2-cp313-cp313-macosx_11_0_arm64.whl (8.8 MB)",
+		"Collecting pydantic-core",
+		"  Using cached https://example.com/pydantic_core-2.33.2-cp313-cp313-macosx_11_0_arm64.whl (8.8 MB)",
+	}
+
+	for _, line := range lines {
+		for _, parser := range []*gofrogcmd.CmdOutputPattern{collectingParser, cachedParser} {
+			if parser.RegExp.MatchString(line) {
+				parser.MatchedResults = parser.RegExp.FindStringSubmatch(line)
+				parser.Line = line
+				_, err := parser.ExecFunc(parser)
+				assert.NoError(t, err)
+			}
+		}
+	}
+
+	_, hasPydantic := dependenciesMap["pydantic"]
+	_, hasPydanticCore := dependenciesMap["pydantic-core"]
+
+	assert.False(t, hasPydantic, "pydantic should not bind to pydantic_core wheel")
+	assert.True(t, hasPydanticCore, "pydantic-core should bind to its wheel")
 }
