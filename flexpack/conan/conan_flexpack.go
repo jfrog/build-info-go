@@ -1,6 +1,7 @@
 package conan
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -122,8 +123,53 @@ func (cf *ConanFlexPack) loadConanfile() error {
 }
 
 // extractProjectInfoFromConanfilePy extracts project metadata from conanfile.py.
-// Parses Python class attributes like: name = "mylib", version = "1.0.0"
+// Uses 'conan inspect . --format=json' which is more reliable than parsing Python source.
+// Falls back to regex parsing if the inspect command fails.
 func (cf *ConanFlexPack) extractProjectInfoFromConanfilePy() error {
+	// Try using conan inspect first (preferred method)
+	if err := cf.extractProjectInfoUsingConanInspect(); err == nil {
+		log.Debug("Successfully extracted project info using 'conan inspect'")
+		return nil
+	} else {
+		log.Debug("Conan inspect failed, falling back to regex parsing: " + err.Error())
+	}
+	// Fallback to regex parsing for older Conan versions or edge cases
+	return cf.extractProjectInfoByParsingPython()
+}
+
+// extractProjectInfoUsingConanInspect uses 'conan inspect . --format=json' to get project metadata.
+// This is the preferred method as it uses Conan's own parser and handles all edge cases.
+func (cf *ConanFlexPack) extractProjectInfoUsingConanInspect() error {
+	cmd := exec.Command(cf.config.ConanExecutable, "inspect", cf.config.WorkingDirectory, "--format=json")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("conan inspect failed: %w", err)
+	}
+	var inspectOutput ConanInspectOutput
+	if err := json.Unmarshal(output, &inspectOutput); err != nil {
+		return fmt.Errorf("failed to parse conan inspect output: %w", err)
+	}
+	cf.projectName = inspectOutput.Name
+	if cf.projectName == "" {
+		cf.projectName = filepath.Base(cf.config.WorkingDirectory)
+	}
+	cf.projectVersion = inspectOutput.Version
+	cf.user = inspectOutput.User
+	if cf.user == "" {
+		cf.user = "_"
+	}
+	cf.channel = inspectOutput.Channel
+	if cf.channel == "" {
+		cf.channel = "_"
+	}
+	log.Debug(fmt.Sprintf("Conan inspect: name=%s, version=%s, user=%s, channel=%s",
+		cf.projectName, cf.projectVersion, cf.user, cf.channel))
+	return nil
+}
+
+// extractProjectInfoByParsingPython extracts project info by parsing Python source code.
+// This is a fallback method when 'conan inspect' is not available or fails.
+func (cf *ConanFlexPack) extractProjectInfoByParsingPython() error {
 	content, err := os.ReadFile(cf.conanfilePath)
 	if err != nil {
 		return err
@@ -133,7 +179,6 @@ func (cf *ConanFlexPack) extractProjectInfoFromConanfilePy() error {
 	if cf.projectName == "" {
 		cf.projectName = filepath.Base(cf.config.WorkingDirectory)
 	}
-	// Version can be empty in Conan for consumer-only recipes (conanfile.txt style usage)
 	cf.projectVersion = extractPythonAttribute(contentStr, "version")
 	cf.user = extractPythonAttribute(contentStr, "user")
 	if cf.user == "" {
