@@ -1,7 +1,6 @@
 package cienv
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -62,26 +61,15 @@ func TestGitHubActionsProvider_IsActive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Save and restore original values
+			// Clear all relevant env vars for clean test state
 			envVarsToRestore := []string{GitHubActionsEnvVar, GitHubWorkflowEnvVar, GitHubRunIDEnvVar}
-			originals := make(map[string]string)
 			for _, key := range envVarsToRestore {
-				originals[key] = os.Getenv(key)
-				os.Unsetenv(key)
+				unsetEnvForTest(t, key)
 			}
-			defer func() {
-				for key, val := range originals {
-					if val == "" {
-						os.Unsetenv(key)
-					} else {
-						os.Setenv(key, val)
-					}
-				}
-			}()
 
 			// Set test environment variables
 			for key, val := range tt.envVars {
-				os.Setenv(key, val)
+				setEnvForTest(t, key, val)
 			}
 
 			assert.Equal(t, tt.expected, provider.IsActive())
@@ -132,24 +120,16 @@ func TestGitHubActionsProvider_GetVcsInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Save and restore original values
-			origOwner := os.Getenv(GitHubRepositoryOwnerEnvVar)
-			origRepo := os.Getenv(GitHubRepositoryEnvVar)
-			defer func() {
-				os.Setenv(GitHubRepositoryOwnerEnvVar, origOwner)
-				os.Setenv(GitHubRepositoryEnvVar, origRepo)
-			}()
-
-			if tt.owner == "" {
-				os.Unsetenv(GitHubRepositoryOwnerEnvVar)
+			if tt.owner != "" {
+				setEnvForTest(t, GitHubRepositoryOwnerEnvVar, tt.owner)
 			} else {
-				os.Setenv(GitHubRepositoryOwnerEnvVar, tt.owner)
+				unsetEnvForTest(t, GitHubRepositoryOwnerEnvVar)
 			}
 
-			if tt.repository == "" {
-				os.Unsetenv(GitHubRepositoryEnvVar)
+			if tt.repository != "" {
+				setEnvForTest(t, GitHubRepositoryEnvVar, tt.repository)
 			} else {
-				os.Setenv(GitHubRepositoryEnvVar, tt.repository)
+				unsetEnvForTest(t, GitHubRepositoryEnvVar)
 			}
 
 			info := provider.GetVcsInfo()
@@ -161,30 +141,13 @@ func TestGitHubActionsProvider_GetVcsInfo(t *testing.T) {
 }
 
 func TestGitHubActionsIntegration(t *testing.T) {
-	// Test full integration: CI=true + GitHub env vars
-	origCI := os.Getenv(CIEnvVar)
-	origActions := os.Getenv(GitHubActionsEnvVar)
-	origWorkflow := os.Getenv(GitHubWorkflowEnvVar)
-	origRunID := os.Getenv(GitHubRunIDEnvVar)
-	origOwner := os.Getenv(GitHubRepositoryOwnerEnvVar)
-	origRepo := os.Getenv(GitHubRepositoryEnvVar)
-
-	defer func() {
-		os.Setenv(CIEnvVar, origCI)
-		os.Setenv(GitHubActionsEnvVar, origActions)
-		os.Setenv(GitHubWorkflowEnvVar, origWorkflow)
-		os.Setenv(GitHubRunIDEnvVar, origRunID)
-		os.Setenv(GitHubRepositoryOwnerEnvVar, origOwner)
-		os.Setenv(GitHubRepositoryEnvVar, origRepo)
-	}()
-
-	// Set all required env vars
-	os.Setenv(CIEnvVar, "true")
-	os.Setenv(GitHubActionsEnvVar, "true")
-	os.Setenv(GitHubWorkflowEnvVar, "CI")
-	os.Setenv(GitHubRunIDEnvVar, "123456")
-	os.Setenv(GitHubRepositoryOwnerEnvVar, "jfrog")
-	os.Setenv(GitHubRepositoryEnvVar, "jfrog/jfrog-client-go")
+	// Set all required env vars using helper
+	setEnvForTest(t, CIEnvVar, "true")
+	setEnvForTest(t, GitHubActionsEnvVar, "true")
+	setEnvForTest(t, GitHubWorkflowEnvVar, "CI")
+	setEnvForTest(t, GitHubRunIDEnvVar, "123456")
+	setEnvForTest(t, GitHubRepositoryOwnerEnvVar, "jfrog")
+	setEnvForTest(t, GitHubRepositoryEnvVar, "jfrog/jfrog-client-go")
 
 	// Should detect GitHub Actions
 	assert.True(t, IsRunningInCI())

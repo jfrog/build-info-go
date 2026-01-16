@@ -1,7 +1,6 @@
 package cienv
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -75,10 +74,8 @@ func TestProviderRegistry(t *testing.T) {
 	ClearProviders()
 	defer ClearProviders()
 
-	// Set CI=true for this test
-	origCI := os.Getenv(CIEnvVar)
-	os.Setenv(CIEnvVar, "true")
-	defer os.Setenv(CIEnvVar, origCI)
+	// Set CI=true for this test using helper
+	setEnvForTest(t, CIEnvVar, "true")
 
 	// Initially no providers
 	assert.Empty(t, GetRegisteredProviders())
@@ -123,10 +120,8 @@ func TestCIEnvVarRequired(t *testing.T) {
 	ClearProviders()
 	defer ClearProviders()
 
-	// Ensure CI is not set
-	origCI := os.Getenv(CIEnvVar)
-	os.Unsetenv(CIEnvVar)
-	defer os.Setenv(CIEnvVar, origCI)
+	// Ensure CI is not set using helper
+	unsetEnvForTest(t, CIEnvVar)
 
 	// Register an active provider
 	activeProvider := &mockProvider{
@@ -139,8 +134,8 @@ func TestCIEnvVarRequired(t *testing.T) {
 	assert.Nil(t, GetActiveProvider())
 	assert.False(t, IsRunningInCI())
 
-	// Set CI=true
-	os.Setenv(CIEnvVar, "true")
+	// Set CI=true using helper
+	setEnvForTest(t, CIEnvVar, "true")
 
 	// Now it should return the provider
 	assert.NotNil(t, GetActiveProvider())
