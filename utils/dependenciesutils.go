@@ -7,6 +7,8 @@ import (
 	"path"
 	"path/filepath"
 	"time"
+
+	"github.com/jfrog/build-info-go/utils/cienv"
 )
 
 const (
@@ -16,6 +18,10 @@ const (
 	buildTimestampKey              = "buildInfo.build.timestamp"
 	buildNumberKey                 = "buildInfo.build.number"
 	projectKey                     = "buildInfo.build.project"
+	// CI VCS property keys
+	vcsProviderKey = "buildInfo.vcs.provider"
+	vcsOrgKey      = "buildInfo.vcs.org"
+	vcsRepoKey     = "buildInfo.vcs.repo"
 )
 
 // Download the relevant build-info-extractor jar, if it does not already exist locally.
@@ -69,6 +75,15 @@ func CreateExtractorPropsFile(extractorConfPath, buildInfoPath, buildName, build
 		buildNumberKey:    buildNumber,
 		projectKey:        project,
 	}
+
+	// Add CI VCS properties when running in a CI environment
+	ciVcsInfo := cienv.GetCIVcsInfo()
+	if !ciVcsInfo.IsEmpty() {
+		buildProperties[vcsProviderKey] = ciVcsInfo.Provider
+		buildProperties[vcsOrgKey] = ciVcsInfo.Org
+		buildProperties[vcsRepoKey] = ciVcsInfo.Repo
+	}
+
 	return propertiesFile.Name(), writeProps(propertiesFile, configProperties, buildProperties)
 }
 

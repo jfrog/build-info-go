@@ -79,6 +79,29 @@ func (targetBuildInfo *BuildInfo) SetPluginVersion(pluginVersion string) {
 	targetBuildInfo.PluginVersion = pluginVersion
 }
 
+// SetCIVcsInfo sets the CI VCS properties (provider, org, repo) on all VCS entries.
+// If no VCS entries exist, creates a new one with just the CI info.
+func (targetBuildInfo *BuildInfo) SetCIVcsInfo(provider, org, repo string) {
+	if provider == "" && org == "" && repo == "" {
+		return
+	}
+	if len(targetBuildInfo.VcsList) == 0 {
+		// Create a new VCS entry with just CI info
+		targetBuildInfo.VcsList = append(targetBuildInfo.VcsList, Vcs{
+			Provider: provider,
+			Org:      org,
+			Repo:     repo,
+		})
+	} else {
+		// Add CI info to existing VCS entries
+		for i := range targetBuildInfo.VcsList {
+			targetBuildInfo.VcsList[i].Provider = provider
+			targetBuildInfo.VcsList[i].Org = org
+			targetBuildInfo.VcsList[i].Repo = repo
+		}
+	}
+}
+
 // Append the modules of the received build info to this build info.
 // If the two build info instances contain modules with identical names, these modules are merged.
 // When merging the modules, the artifacts and dependencies remain unique according to their checksum.
@@ -620,6 +643,10 @@ type Vcs struct {
 	Revision string `json:"revision,omitempty"`
 	Branch   string `json:"branch,omitempty"`
 	Message  string `json:"message,omitempty"`
+	// CI environment VCS properties (populated automatically when running in CI)
+	Provider string `json:"provider,omitempty"`
+	Org      string `json:"org,omitempty"`
+	Repo     string `json:"repo,omitempty"`
 }
 
 type Partials []*Partial
