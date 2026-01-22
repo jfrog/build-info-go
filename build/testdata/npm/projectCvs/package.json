@@ -1,0 +1,16 @@
+{
+  "name": "cvs-test-project",
+  "version": "1.0.0",
+  "description": "Test project for CVS (Curation Version Substitution)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "lightweight": "^0.1.0",
+    "lodash": "999.999.999"
+  }
+}
+
