@@ -237,7 +237,9 @@ func runNpmInstallWithRetry(executablePath, workDir string, npmInstallCommandArg
 
 		log.Info(fmt.Sprintf("Retrying without package %s...", pkgId))
 		blocked = append(blocked, NotFoundPackage{Name: name, Version: version})
-		removePackageFromPackageJson(pkgJsonPath, name)
+		if err := removePackageFromPackageJson(pkgJsonPath, name); err != nil {
+			return blocked, err
+		}
 	}
 }
 
