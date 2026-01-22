@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/jfrog/gofrog/crypto"
+	"github.com/jfrog/gofrog/log"
 
 	"golang.org/x/exp/slices"
 
@@ -165,7 +166,9 @@ func runNpmLsWithCurationSupport(executablePath, srcPath string, npmListParams N
 	if err != nil {
 		return nil, nil, err
 	}
-	defer utils.RemoveTempDir(tempDir)
+	defer func() {
+		_ = utils.RemoveTempDir(tempDir)
+	}()
 
 	if err := utils.CopyDir(srcPath, tempDir, true, []string{"node_modules"}); err != nil {
 		return nil, nil, err
@@ -194,6 +197,7 @@ func runNpmLsWithCurationSupport(executablePath, srcPath string, npmListParams N
 func addNotFoundPackagesToNpmLsOutput(data []byte, blockedPackages []NotFoundPackage) []byte {
 	var npmLsOutput map[string]interface{}
 	if err := json.Unmarshal(data, &npmLsOutput); err != nil {
+		log.Debug("Failed to add blocked packages to npm ls output: unable to parse JSON")
 		return data
 	}
 	deps, ok := npmLsOutput["dependencies"].(map[string]interface{})
@@ -207,7 +211,11 @@ func addNotFoundPackagesToNpmLsOutput(data []byte, blockedPackages []NotFoundPac
 			"missing": true,
 		}
 	}
-	result, _ := json.Marshal(npmLsOutput)
+	result, err := json.Marshal(npmLsOutput)
+	if err != nil {
+		log.Debug("Failed to add blocked packages to npm ls output: unable to marshal JSON")
+		return data
+	}
 	return result
 }
 

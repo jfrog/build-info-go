@@ -542,12 +542,15 @@ func TestAddNotFoundPackagesToNpmLsOutput(t *testing.T) {
 	err := json.Unmarshal(result, &output)
 	assert.NoError(t, err)
 
-	deps := output["dependencies"].(map[string]interface{})
+	deps, ok := output["dependencies"].(map[string]interface{})
+	assert.True(t, ok, "dependencies should be a map")
 
-	express := deps["express"].(map[string]interface{})
+	express, ok := deps["express"].(map[string]interface{})
+	assert.True(t, ok, "express should be a map")
 	assert.Equal(t, "4.18.0", express["version"])
 
-	lodash := deps["lodash"].(map[string]interface{})
+	lodash, ok := deps["lodash"].(map[string]interface{})
+	assert.True(t, ok, "lodash should be a map")
 	assert.Equal(t, "4.17.21", lodash["version"])
 	assert.Equal(t, true, lodash["missing"])
 
