@@ -257,16 +257,56 @@ func mergeModules(merge *Module, into *Module) {
 func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
 	for _, mergeArtifact := range *mergeArtifacts {
 		exists := false
-		for _, artifact := range *intoArtifacts {
-			if mergeArtifact.Sha1 == artifact.Sha1 {
+
+		// First, try to find artifact by name (logical identity)
+		// This is crucial for Maven SNAPSHOT artifacts which get new SHA1s on each build
+		for i, artifact := range *intoArtifacts {
+			if mergeArtifact.Name != "" && mergeArtifact.Name == artifact.Name {
+				// Found artifact with same name - merge them intelligently
+				// This prevents duplicate entries for rebuilt artifacts (e.g., Maven WAR files)
+				(*intoArtifacts)[i] = mergeTwoArtifacts(artifact, mergeArtifact)
 				exists = true
 				break
 			}
 		}
+
+		// If not found by name, check by SHA1 for backward compatibility
+		// This handles cases where artifacts are truly identical
+		if !exists {
+			for _, artifact := range *intoArtifacts {
+				if mergeArtifact.Sha1 != "" && mergeArtifact.Sha1 == artifact.Sha1 {
+					exists = true
+					break
+				}
+			}
+		}
+
+		// Only append if artifact doesn't exist by either name or SHA1
 		if !exists {
 			*intoArtifacts = append(*intoArtifacts, mergeArtifact)
 		}
 	}
+}
+
+// mergeTwoArtifacts intelligently merges two artifacts with the same name.
+// Takes checksums from the newer artifact (artifact2) since it represents a rebuild,
+// but preserves the Path from whichever artifact has it (preferring artifact2, falling back to artifact1).
+func mergeTwoArtifacts(artifact1, artifact2 Artifact) Artifact {
+	// Start with the newer artifact as the base
+	merged := artifact2
+
+	// If the newer artifact doesn't have a path but the older one does, preserve the old path
+	// This handles cases where build info is collected before deployment completes
+	if merged.Path == "" && artifact1.Path != "" {
+		merged.Path = artifact1.Path
+	}
+
+	// Similarly for OriginalDeploymentRepo
+	if merged.OriginalDeploymentRepo == "" && artifact1.OriginalDeploymentRepo != "" {
+		merged.OriginalDeploymentRepo = artifact1.OriginalDeploymentRepo
+	}
+
+	return merged
 }
 
 func mergeDependenciesLists(dependenciesToAdd, intoDependencies *[]Dependency) {
