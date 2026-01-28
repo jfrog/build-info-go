@@ -345,10 +345,10 @@ func TestMergeArtifacts_SameNameDifferentSHA1(t *testing.T) {
 	assert.Equal(t, "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-20260127.075227-2.war", warArtifact.Path, "WAR should have new path")
 }
 
-// TestMergeArtifacts_PathPreservation tests that the path is preserved when the newer artifact doesn't have one
-// This handles the case where build info is collected before deployment completes
-func TestMergeArtifacts_PathPreservation(t *testing.T) {
-	// First artifact: has path (from install/deploy)
+// TestMergeArtifacts_DifferentSHA1NoPathBackfill tests that for different SHA1s,
+// we do NOT backfill path from old artifact (different SHA1 = different file = different path)
+func TestMergeArtifacts_DifferentSHA1NoPathBackfill(t *testing.T) {
+	// First artifact: has path
 	existingArtifacts := []Artifact{
 		{
 			Name:                   "artifact.war",
@@ -362,15 +362,15 @@ func TestMergeArtifacts_PathPreservation(t *testing.T) {
 		},
 	}
 
-	// Second artifact: rebuilt with new checksum but no path yet (build info collected before deployment)
+	// Second artifact: rebuilt with new checksum but no path (different SHA1 = different file!)
 	newArtifacts := []Artifact{
 		{
 			Name:                   "artifact.war",
 			Type:                   "war",
-			Path:                   "", // No path yet!
+			Path:                   "", // No path - but this is a DIFFERENT file!
 			OriginalDeploymentRepo: "",
 			Checksum: Checksum{
-				Sha1: "new-sha1",
+				Sha1: "new-sha1", // Different SHA1!
 				Md5:  "new-md5",
 			},
 		},
@@ -380,12 +380,53 @@ func TestMergeArtifacts_PathPreservation(t *testing.T) {
 
 	assert.Len(t, existingArtifacts, 1, "Should have 1 artifact")
 
-	// Verify: newer checksums, but old path preserved
+	// Verify: newer artifact is used as-is (no path backfill because SHA1 differs)
 	assert.Equal(t, "new-sha1", existingArtifacts[0].Sha1, "Should have new SHA1")
+	assert.Empty(t, existingArtifacts[0].Path, "Should NOT backfill path when SHA1 differs (different file = different path)")
+	assert.Empty(t, existingArtifacts[0].OriginalDeploymentRepo, "Should NOT backfill repo when SHA1 differs")
+}
+
+// TestMergeArtifacts_SameSHA1Skipped tests that for identical SHA1s,
+// the existing artifact is kept unchanged (same file, no action needed)
+func TestMergeArtifacts_SameSHA1Skipped(t *testing.T) {
+	// First artifact: has path
+	existingArtifacts := []Artifact{
+		{
+			Name:                   "artifact.war",
+			Type:                   "war",
+			Path:                   "org/example/artifact/1.0-SNAPSHOT/artifact-1.0-20260127-1.war",
+			OriginalDeploymentRepo: "libs-snapshot-local",
+			Checksum: Checksum{
+				Sha1: "same-sha1",
+				Md5:  "same-md5",
+			},
+		},
+	}
+
+	// Second artifact: same SHA1 (same file - should be skipped entirely)
+	newArtifacts := []Artifact{
+		{
+			Name:                   "artifact.war",
+			Type:                   "war",
+			Path:                   "different/path/artifact.war", // Different path but same SHA1
+			OriginalDeploymentRepo: "different-repo",
+			Checksum: Checksum{
+				Sha1: "same-sha1", // SAME SHA1 = same file
+				Md5:  "same-md5",
+			},
+		},
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	assert.Len(t, existingArtifacts, 1, "Should have 1 artifact (duplicate skipped)")
+
+	// Verify: existing artifact unchanged (new artifact was skipped because SHA1 matches)
+	assert.Equal(t, "same-sha1", existingArtifacts[0].Sha1)
 	assert.Equal(t, "org/example/artifact/1.0-SNAPSHOT/artifact-1.0-20260127-1.war",
-		existingArtifacts[0].Path, "Should preserve old path when new one is empty")
+		existingArtifacts[0].Path, "Should keep existing artifact unchanged")
 	assert.Equal(t, "libs-snapshot-local",
-		existingArtifacts[0].OriginalDeploymentRepo, "Should preserve deployment repo")
+		existingArtifacts[0].OriginalDeploymentRepo, "Should keep existing artifact unchanged")
 }
 
 // TestMergeArtifacts_DifferentNames tests that artifacts with different names are all preserved
@@ -517,4 +558,87 @@ func TestBuildInfoAppend_MavenSnapshotScenario(t *testing.T) {
 	assert.Equal(t, "war-build2-sha", buildInfo1.Modules[0].Artifacts[0].Sha1, "Should have newer WAR (from second build)")
 	assert.Equal(t, "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-20260127.075227-2.war",
 		buildInfo1.Modules[0].Artifacts[0].Path, "Should have path from second build")
+}
+
+// TestMergeArtifacts_SHA1PriorityOverName tests that SHA1 comparison takes priority over name comparison
+// This is critical for deterministic package managers (Go, NPM, etc.) where identical checksums mean identical artifacts
+func TestMergeArtifacts_SHA1PriorityOverName(t *testing.T) {
+	// Scenario: Deterministic build - same artifact built twice produces identical SHA1
+	// (e.g., Go module, NPM package with lockfile)
+	existingArtifacts := []Artifact{
+		{
+			Name:     "my-module-v1.0.0.tar.gz",
+			Type:     "tar",
+			Path:     "repo/my-module/v1.0.0/my-module-v1.0.0.tar.gz",
+			Checksum: Checksum{Sha1: "identical-sha1-from-deterministic-build", Md5: "identical-md5"},
+		},
+	}
+
+	// Same artifact with identical SHA1 (deterministic rebuild)
+	newArtifacts := []Artifact{
+		{
+			Name:     "my-module-v1.0.0.tar.gz",
+			Type:     "tar",
+			Path:     "repo/my-module/v1.0.0/my-module-v1.0.0.tar.gz",
+			Checksum: Checksum{Sha1: "identical-sha1-from-deterministic-build", Md5: "identical-md5"},
+		},
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	// PRIORITY 1 (SHA1) should catch this - should NOT merge/replace, just skip
+	// Result: Still 1 artifact, unchanged (not merged)
+	assert.Len(t, existingArtifacts, 1, "Should have 1 artifact (SHA1 match = skip, no merge needed)")
+	assert.Equal(t, "identical-sha1-from-deterministic-build", existingArtifacts[0].Sha1, "SHA1 should be unchanged")
+	assert.Equal(t, "repo/my-module/v1.0.0/my-module-v1.0.0.tar.gz", existingArtifacts[0].Path, "Path should be unchanged")
+}
+
+// TestMergeArtifacts_NameFallbackWhenSHA1Differs tests that name comparison is used as fallback
+// when SHA1s differ (non-deterministic package managers)
+func TestMergeArtifacts_NameFallbackWhenSHA1Differs(t *testing.T) {
+	// Scenario: Non-deterministic build - Maven SNAPSHOT WAR with different checksums but same name
+	existingArtifacts := []Artifact{
+		{
+			Name:     "app.war",
+			Type:     "war",
+			Path:     "repo/app/1.0-SNAPSHOT/app-1.0-20260127-1.war",
+			Checksum: Checksum{Sha1: "sha1-build1", Md5: "md5-build1"},
+		},
+	}
+
+	newArtifacts := []Artifact{
+		{
+			Name:     "app.war", // Same name
+			Type:     "war",
+			Path:     "repo/app/1.0-SNAPSHOT/app-1.0-20260127-2.war",
+			Checksum: Checksum{Sha1: "sha1-build2", Md5: "md5-build2"}, // Different SHA1 (non-deterministic)
+		},
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	// PRIORITY 1 (SHA1) fails to match, falls back to PRIORITY 2 (Name)
+	// Result: 1 artifact, merged with newer checksums
+	assert.Len(t, existingArtifacts, 1, "Should have 1 artifact (name match = merge)")
+	assert.Equal(t, "sha1-build2", existingArtifacts[0].Sha1, "Should have newer SHA1 (merged)")
+	assert.Equal(t, "repo/app/1.0-SNAPSHOT/app-1.0-20260127-2.war", existingArtifacts[0].Path, "Should have newer path")
+}
+
+// TestMergeArtifacts_BothDiffer tests that artifacts are added when both SHA1 and name differ
+func TestMergeArtifacts_BothDiffer(t *testing.T) {
+	existingArtifacts := []Artifact{
+		{Name: "artifact-a.jar", Checksum: Checksum{Sha1: "sha1-a"}},
+	}
+
+	newArtifacts := []Artifact{
+		{Name: "artifact-b.jar", Checksum: Checksum{Sha1: "sha1-b"}}, // Different name and SHA1
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	// Both PRIORITY 1 (SHA1) and PRIORITY 2 (Name) fail to match
+	// Result: 2 artifacts (new one added)
+	assert.Len(t, existingArtifacts, 2, "Should have 2 artifacts (neither SHA1 nor name match)")
+	assert.Contains(t, existingArtifacts, Artifact{Name: "artifact-a.jar", Checksum: Checksum{Sha1: "sha1-a"}})
+	assert.Contains(t, existingArtifacts, Artifact{Name: "artifact-b.jar", Checksum: Checksum{Sha1: "sha1-b"}})
 }

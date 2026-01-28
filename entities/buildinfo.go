@@ -2,18 +2,27 @@ package entities
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/jfrog/build-info-go/utils/compareutils"
+	"github.com/jfrog/gofrog/log"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/gofrog/stringutils"
 )
+
+// MergeArtifactsByNameEnv controls whether artifacts with the same name but different SHA1s
+// should be merged (keeping the newer one). This handles non-deterministic builds like Maven SNAPSHOTs.
+// Set to "FALSE" to disable name-based merging and only use SHA1 comparison.
+// Default: enabled (any value other than "FALSE")
+const MergeArtifactsByNameEnv = "JFROG_CLI_MERGE_ARTIFACTS_BY_NAME"
 
 type ModuleType string
 
@@ -255,58 +264,67 @@ func mergeModules(merge *Module, into *Module) {
 }
 
 func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
-	for _, mergeArtifact := range *mergeArtifacts {
+	mergeByNameEnabled := strings.ToUpper(os.Getenv(MergeArtifactsByNameEnv)) != "FALSE"
+
+	for _, newArtifact := range *mergeArtifacts {
 		exists := false
 
-		// First, try to find artifact by name (logical identity)
-		// This is crucial for Maven SNAPSHOT artifacts which get new SHA1s on each build
-		for i, artifact := range *intoArtifacts {
-			if mergeArtifact.Name != "" && mergeArtifact.Name == artifact.Name {
-				// Found artifact with same name - merge them intelligently
-				// This prevents duplicate entries for rebuilt artifacts (e.g., Maven WAR files)
-				(*intoArtifacts)[i] = mergeTwoArtifacts(artifact, mergeArtifact)
+		// PRIORITY 1: Check SHA1 - if checksums match, artifact already exists (skip it)
+		for _, existingArtifact := range *intoArtifacts {
+			if newArtifact.Sha1 == existingArtifact.Sha1 {
 				exists = true
 				break
 			}
 		}
 
-		// If not found by name, check by SHA1 for backward compatibility
-		// This handles cases where artifacts are truly identical
-		if !exists {
-			for _, artifact := range *intoArtifacts {
-				if mergeArtifact.Sha1 != "" && mergeArtifact.Sha1 == artifact.Sha1 {
+		// PRIORITY 2: If SHA1 doesn't match, check by artifact name
+		// This handles non-deterministic builds (Maven WAR with timestamps, etc.)
+		// where rebuilding produces different checksums for the same logical artifact.
+		if !exists && mergeByNameEnabled {
+			for i, existingArtifact := range *intoArtifacts {
+				if newArtifact.Name == existingArtifact.Name && isSameLogicalArtifact(existingArtifact, newArtifact) {
+					// Same logical artifact (confirmed by path/repo) but different checksum
+					// Replace with newArtifact (represents latest deployed state)
+					log.Warn(fmt.Sprintf("Artifact '%s' has different checksum than existing (old: %s, new: %s). Using the newer artifact.",
+						newArtifact.Name, existingArtifact.Sha1, newArtifact.Sha1))
+					(*intoArtifacts)[i] = newArtifact
 					exists = true
 					break
 				}
 			}
 		}
 
-		// Only append if artifact doesn't exist by either name or SHA1
+		// No match found - add as new artifact
 		if !exists {
-			*intoArtifacts = append(*intoArtifacts, mergeArtifact)
+			*intoArtifacts = append(*intoArtifacts, newArtifact)
 		}
 	}
 }
 
-// mergeTwoArtifacts intelligently merges two artifacts with the same name.
-// Takes checksums from the newer artifact (artifact2) since it represents a rebuild,
-// but preserves the Path from whichever artifact has it (preferring artifact2, falling back to artifact1).
-func mergeTwoArtifacts(artifact1, artifact2 Artifact) Artifact {
-	// Start with the newer artifact as the base
-	merged := artifact2
-
-	// If the newer artifact doesn't have a path but the older one does, preserve the old path
-	// This handles cases where build info is collected before deployment completes
-	if merged.Path == "" && artifact1.Path != "" {
-		merged.Path = artifact1.Path
+// isSameLogicalArtifact checks if two artifacts represent the same logical artifact.
+// Returns true if they are in the same directory and same repository.
+func isSameLogicalArtifact(existing, new Artifact) bool {
+	// Check if paths are in the same directory
+	if extractPathDir(existing.Path) != extractPathDir(new.Path) {
+		return false
 	}
 
-	// Similarly for OriginalDeploymentRepo
-	if merged.OriginalDeploymentRepo == "" && artifact1.OriginalDeploymentRepo != "" {
-		merged.OriginalDeploymentRepo = artifact1.OriginalDeploymentRepo
+	// Check repo - reject if BOTH have repos AND they differ
+	if existing.OriginalDeploymentRepo != "" && new.OriginalDeploymentRepo != "" &&
+		existing.OriginalDeploymentRepo != new.OriginalDeploymentRepo {
+		return false
 	}
 
-	return merged
+	return true
+}
+
+// extractPathDir extracts the directory portion from an artifact path
+func extractPathDir(path string) string {
+	lastSlash := strings.LastIndex(path, "/")
+	if lastSlash == -1 {
+		return ""
+	}
+	return path[:lastSlash]
 }
 
 func mergeDependenciesLists(dependenciesToAdd, intoDependencies *[]Dependency) {
