@@ -273,3 +273,331 @@ func TestToCycloneDxBOM(t *testing.T) {
 		assert.True(t, dependsOnIsSorted)
 	}
 }
+
+// TestMergeArtifacts_SameNameDifferentSHA1 tests the fix for the Maven SNAPSHOT artifact duplicate issue
+// When artifacts have the same name but different SHA1s (e.g., rebuilt Maven WAR files),
+// the newer artifact should replace the older one, not create a duplicate entry.
+// The newer SHA1 is used, but the path is preserved if the newer one doesn't have it.
+func TestMergeArtifacts_SameNameDifferentSHA1(t *testing.T) {
+	// Scenario: Maven WAR file rebuilt between install and deploy
+	// First build: multi3-3.7-SNAPSHOT.war with SHA1: old-sha1
+	existingArtifacts := []Artifact{
+		{
+			Name: "multi3-3.7-SNAPSHOT.war",
+			Type: "war",
+			Path: "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-20260127.075227-1.war",
+			Checksum: Checksum{
+				Sha1: "old-sha1-from-first-build",
+				Md5:  "old-md5",
+			},
+		},
+		{
+			Name: "multi3-3.7-SNAPSHOT.pom",
+			Type: "pom",
+			Path: "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-SNAPSHOT.pom",
+			Checksum: Checksum{
+				Sha1: "pom-sha1",
+				Md5:  "pom-md5",
+			},
+		},
+	}
+
+	// Second build: multi3-3.7-SNAPSHOT.war rebuilt with new SHA1 and new path
+	newArtifacts := []Artifact{
+		{
+			Name: "multi3-3.7-SNAPSHOT.war",
+			Type: "war",
+			Path: "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-20260127.075227-2.war",
+			Checksum: Checksum{
+				Sha1: "new-sha1-from-second-build",
+				Md5:  "new-md5",
+			},
+		},
+		{
+			Name: "multi3-3.7-SNAPSHOT.pom",
+			Type: "pom",
+			Path: "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-SNAPSHOT.pom",
+			Checksum: Checksum{
+				Sha1: "pom-sha1", // POM unchanged
+				Md5:  "pom-md5",
+			},
+		},
+	}
+
+	// Merge artifacts
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	// Verify results
+	assert.Len(t, existingArtifacts, 2, "Should have 2 artifacts, not 3 (no duplicate WAR)")
+
+	// Find the WAR artifact
+	var warArtifact *Artifact
+	for i := range existingArtifacts {
+		if existingArtifacts[i].Name == "multi3-3.7-SNAPSHOT.war" {
+			warArtifact = &existingArtifacts[i]
+			break
+		}
+	}
+
+	// Verify the WAR was merged with newer SHA1 and newer path
+	assert.NotNil(t, warArtifact, "WAR artifact should exist")
+	assert.Equal(t, "new-sha1-from-second-build", warArtifact.Sha1, "WAR should have new SHA1")
+	assert.Equal(t, "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-20260127.075227-2.war", warArtifact.Path, "WAR should have new path")
+}
+
+// TestMergeArtifacts_PathPreservation tests that the path is preserved when the newer artifact doesn't have one
+// This handles the case where build info is collected before deployment completes
+func TestMergeArtifacts_PathPreservation(t *testing.T) {
+	// First artifact: has path (from install/deploy)
+	existingArtifacts := []Artifact{
+		{
+			Name:                   "artifact.war",
+			Type:                   "war",
+			Path:                   "org/example/artifact/1.0-SNAPSHOT/artifact-1.0-20260127-1.war",
+			OriginalDeploymentRepo: "libs-snapshot-local",
+			Checksum: Checksum{
+				Sha1: "old-sha1",
+				Md5:  "old-md5",
+			},
+		},
+	}
+
+	// Second artifact: rebuilt with new checksum but no path yet (build info collected before deployment)
+	newArtifacts := []Artifact{
+		{
+			Name:                   "artifact.war",
+			Type:                   "war",
+			Path:                   "", // No path yet!
+			OriginalDeploymentRepo: "",
+			Checksum: Checksum{
+				Sha1: "new-sha1",
+				Md5:  "new-md5",
+			},
+		},
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	assert.Len(t, existingArtifacts, 1, "Should have 1 artifact")
+
+	// Verify: newer checksums, but old path preserved
+	assert.Equal(t, "new-sha1", existingArtifacts[0].Sha1, "Should have new SHA1")
+	assert.Equal(t, "org/example/artifact/1.0-SNAPSHOT/artifact-1.0-20260127-1.war",
+		existingArtifacts[0].Path, "Should preserve old path when new one is empty")
+	assert.Equal(t, "libs-snapshot-local",
+		existingArtifacts[0].OriginalDeploymentRepo, "Should preserve deployment repo")
+}
+
+// TestMergeArtifacts_DifferentNames tests that artifacts with different names are all preserved
+func TestMergeArtifacts_DifferentNames(t *testing.T) {
+	existingArtifacts := []Artifact{
+		{Name: "artifact-a.jar", Checksum: Checksum{Sha1: "sha1-a"}},
+		{Name: "artifact-b.jar", Checksum: Checksum{Sha1: "sha1-b"}},
+	}
+
+	newArtifacts := []Artifact{
+		{Name: "artifact-c.jar", Checksum: Checksum{Sha1: "sha1-c"}},
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	assert.Len(t, existingArtifacts, 3, "Should have 3 distinct artifacts")
+	assert.Contains(t, existingArtifacts, Artifact{Name: "artifact-a.jar", Checksum: Checksum{Sha1: "sha1-a"}})
+	assert.Contains(t, existingArtifacts, Artifact{Name: "artifact-b.jar", Checksum: Checksum{Sha1: "sha1-b"}})
+	assert.Contains(t, existingArtifacts, Artifact{Name: "artifact-c.jar", Checksum: Checksum{Sha1: "sha1-c"}})
+}
+
+// TestMergeArtifacts_SameNameSameSHA1 tests backward compatibility when SHA1 matches
+func TestMergeArtifacts_SameNameSameSHA1(t *testing.T) {
+	existingArtifacts := []Artifact{
+		{
+			Name:     "artifact.jar",
+			Checksum: Checksum{Sha1: "same-sha1"},
+		},
+	}
+
+	newArtifacts := []Artifact{
+		{
+			Name:     "artifact.jar",
+			Checksum: Checksum{Sha1: "same-sha1"},
+		},
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	// Should replace by name first, resulting in 1 artifact
+	assert.Len(t, existingArtifacts, 1, "Should have 1 artifact (deduplicated by name)")
+}
+
+// TestMergeArtifacts_MultipleRebuilds simulates multiple Maven builds with same build name/number
+func TestMergeArtifacts_MultipleRebuilds(t *testing.T) {
+	// First build
+	existingArtifacts := []Artifact{
+		{Name: "multi1-3.7-SNAPSHOT.jar", Checksum: Checksum{Sha1: "build1-jar-sha"}},
+		{Name: "multi3-3.7-SNAPSHOT.war", Checksum: Checksum{Sha1: "build1-war-sha"}},
+	}
+
+	// Second build (both rebuilt with new SHA1s)
+	secondBuildArtifacts := []Artifact{
+		{Name: "multi1-3.7-SNAPSHOT.jar", Checksum: Checksum{Sha1: "build2-jar-sha"}},
+		{Name: "multi3-3.7-SNAPSHOT.war", Checksum: Checksum{Sha1: "build2-war-sha"}},
+	}
+
+	mergeArtifacts(&secondBuildArtifacts, &existingArtifacts)
+
+	// Should still have only 2 artifacts (replaced, not duplicated)
+	assert.Len(t, existingArtifacts, 2, "Should have 2 artifacts (no duplicates)")
+
+	// Verify both were replaced with newer versions
+	for _, artifact := range existingArtifacts {
+		if artifact.Name == "multi1-3.7-SNAPSHOT.jar" {
+			assert.Equal(t, "build2-jar-sha", artifact.Sha1, "JAR should be from build 2")
+		}
+		if artifact.Name == "multi3-3.7-SNAPSHOT.war" {
+			assert.Equal(t, "build2-war-sha", artifact.Sha1, "WAR should be from build 2")
+		}
+	}
+}
+
+// TestMergeArtifacts_EmptyName tests handling of artifacts without names
+func TestMergeArtifacts_EmptyName(t *testing.T) {
+	existingArtifacts := []Artifact{
+		{Name: "", Checksum: Checksum{Sha1: "sha1-a"}},
+	}
+
+	newArtifacts := []Artifact{
+		{Name: "", Checksum: Checksum{Sha1: "sha1-b"}},
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	// Without names, should fall back to SHA1 comparison
+	// Different SHA1s means both should be present
+	assert.Len(t, existingArtifacts, 2, "Should have 2 artifacts (no name to match, different SHA1s)")
+}
+
+// TestBuildInfoAppend_MavenSnapshotScenario tests the full scenario of Maven install + deploy
+func TestBuildInfoAppend_MavenSnapshotScenario(t *testing.T) {
+	// BuildInfo after: jf mvn install --build-name=froggy --build-number=10.0.1
+	buildInfo1 := BuildInfo{
+		Modules: []Module{{
+			Id: "org.jfrog.test:multi3:3.7-SNAPSHOT",
+			Artifacts: []Artifact{
+				{
+					Name:     "multi3-3.7-SNAPSHOT.war",
+					Type:     "war",
+					Path:     "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-20260127.075227-1.war",
+					Checksum: Checksum{Sha1: "war-build1-sha"},
+				},
+			},
+		}},
+	}
+
+	// BuildInfo after: jf mvn deploy --build-name=froggy --build-number=10.0.1 (same build!)
+	buildInfo2 := BuildInfo{
+		Modules: []Module{{
+			Id: "org.jfrog.test:multi3:3.7-SNAPSHOT",
+			Artifacts: []Artifact{
+				{
+					Name:     "multi3-3.7-SNAPSHOT.war",
+					Type:     "war",
+					Path:     "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-20260127.075227-2.war",
+					Checksum: Checksum{Sha1: "war-build2-sha"},
+				},
+			},
+		}},
+	}
+
+	// Append (merge) the second build into the first
+	buildInfo1.Append(&buildInfo2)
+
+	// Verify: Should have only ONE WAR artifact (the newer one), not two
+	assert.Len(t, buildInfo1.Modules, 1, "Should have 1 module")
+	assert.Len(t, buildInfo1.Modules[0].Artifacts, 1, "Should have 1 artifact (no duplicate)")
+	assert.Equal(t, "war-build2-sha", buildInfo1.Modules[0].Artifacts[0].Sha1, "Should have newer WAR (from second build)")
+	assert.Equal(t, "org/jfrog/test/multi3/3.7-SNAPSHOT/multi3-3.7-20260127.075227-2.war",
+		buildInfo1.Modules[0].Artifacts[0].Path, "Should have path from second build")
+}
+
+// TestMergeArtifacts_SHA1PriorityOverName tests that SHA1 comparison takes priority over name comparison
+// This is critical for deterministic package managers (Go, NPM, etc.) where identical checksums mean identical artifacts
+func TestMergeArtifacts_SHA1PriorityOverName(t *testing.T) {
+	// Scenario: Deterministic build - same artifact built twice produces identical SHA1
+	// (e.g., Go module, NPM package with lockfile)
+	existingArtifacts := []Artifact{
+		{
+			Name:     "my-module-v1.0.0.tar.gz",
+			Type:     "tar",
+			Path:     "repo/my-module/v1.0.0/my-module-v1.0.0.tar.gz",
+			Checksum: Checksum{Sha1: "identical-sha1-from-deterministic-build", Md5: "identical-md5"},
+		},
+	}
+
+	// Same artifact with identical SHA1 (deterministic rebuild)
+	newArtifacts := []Artifact{
+		{
+			Name:     "my-module-v1.0.0.tar.gz",
+			Type:     "tar",
+			Path:     "repo/my-module/v1.0.0/my-module-v1.0.0.tar.gz",
+			Checksum: Checksum{Sha1: "identical-sha1-from-deterministic-build", Md5: "identical-md5"},
+		},
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	// PRIORITY 1 (SHA1) should catch this - should NOT merge/replace, just skip
+	// Result: Still 1 artifact, unchanged (not merged)
+	assert.Len(t, existingArtifacts, 1, "Should have 1 artifact (SHA1 match = skip, no merge needed)")
+	assert.Equal(t, "identical-sha1-from-deterministic-build", existingArtifacts[0].Sha1, "SHA1 should be unchanged")
+	assert.Equal(t, "repo/my-module/v1.0.0/my-module-v1.0.0.tar.gz", existingArtifacts[0].Path, "Path should be unchanged")
+}
+
+// TestMergeArtifacts_NameFallbackWhenSHA1Differs tests that name comparison is used as fallback
+// when SHA1s differ (non-deterministic package managers)
+func TestMergeArtifacts_NameFallbackWhenSHA1Differs(t *testing.T) {
+	// Scenario: Non-deterministic build - Maven SNAPSHOT WAR with different checksums but same name
+	existingArtifacts := []Artifact{
+		{
+			Name:     "app.war",
+			Type:     "war",
+			Path:     "repo/app/1.0-SNAPSHOT/app-1.0-20260127-1.war",
+			Checksum: Checksum{Sha1: "sha1-build1", Md5: "md5-build1"},
+		},
+	}
+
+	newArtifacts := []Artifact{
+		{
+			Name:     "app.war", // Same name
+			Type:     "war",
+			Path:     "repo/app/1.0-SNAPSHOT/app-1.0-20260127-2.war",
+			Checksum: Checksum{Sha1: "sha1-build2", Md5: "md5-build2"}, // Different SHA1 (non-deterministic)
+		},
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	// PRIORITY 1 (SHA1) fails to match, falls back to PRIORITY 2 (Name)
+	// Result: 1 artifact, merged with newer checksums
+	assert.Len(t, existingArtifacts, 1, "Should have 1 artifact (name match = merge)")
+	assert.Equal(t, "sha1-build2", existingArtifacts[0].Sha1, "Should have newer SHA1 (merged)")
+	assert.Equal(t, "repo/app/1.0-SNAPSHOT/app-1.0-20260127-2.war", existingArtifacts[0].Path, "Should have newer path")
+}
+
+// TestMergeArtifacts_BothDiffer tests that artifacts are added when both SHA1 and name differ
+func TestMergeArtifacts_BothDiffer(t *testing.T) {
+	existingArtifacts := []Artifact{
+		{Name: "artifact-a.jar", Checksum: Checksum{Sha1: "sha1-a"}},
+	}
+
+	newArtifacts := []Artifact{
+		{Name: "artifact-b.jar", Checksum: Checksum{Sha1: "sha1-b"}}, // Different name and SHA1
+	}
+
+	mergeArtifacts(&newArtifacts, &existingArtifacts)
+
+	// Both PRIORITY 1 (SHA1) and PRIORITY 2 (Name) fail to match
+	// Result: 2 artifacts (new one added)
+	assert.Len(t, existingArtifacts, 2, "Should have 2 artifacts (neither SHA1 nor name match)")
+	assert.Contains(t, existingArtifacts, Artifact{Name: "artifact-a.jar", Checksum: Checksum{Sha1: "sha1-a"}})
+	assert.Contains(t, existingArtifacts, Artifact{Name: "artifact-b.jar", Checksum: Checksum{Sha1: "sha1-b"}})
+}

@@ -255,18 +255,69 @@ func mergeModules(merge *Module, into *Module) {
 }
 
 func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
-	for _, mergeArtifact := range *mergeArtifacts {
+	for _, newArtifact := range *mergeArtifacts {
 		exists := false
-		for _, artifact := range *intoArtifacts {
-			if mergeArtifact.Sha1 == artifact.Sha1 {
-				exists = true
-				break
+
+		// PRIORITY 1: Check SHA1 first - if checksums match, artifacts are identical
+		// This works for deterministic/symmetric package managers (Go, NPM with lockfiles, etc.)
+		// where the same input always produces the same output checksum
+		if newArtifact.Sha1 != "" {
+			for i, existingArtifact := range *intoArtifacts {
+				if newArtifact.Sha1 == existingArtifact.Sha1 {
+					// Same SHA1 - merge to preserve all fields (path, repo, etc.)
+					// This ensures we don't lose information like path from either artifact
+					(*intoArtifacts)[i] = mergeTwoArtifacts(existingArtifact, newArtifact)
+					exists = true
+					break
+				}
 			}
 		}
+
+		// PRIORITY 2: If SHA1 doesn't match, check by artifact name
+		// This handles non-deterministic/asymmetric package managers (Maven WAR, Docker images with timestamps)
+		// where rebuilding produces different checksums but represents the same logical artifact
+		if !exists && newArtifact.Name != "" {
+			for i, existingArtifact := range *intoArtifacts {
+				if newArtifact.Name == existingArtifact.Name {
+					// Same artifact name but different checksum - merge them intelligently
+					// This prevents duplicate entries for rebuilt artifacts
+					(*intoArtifacts)[i] = mergeTwoArtifacts(existingArtifact, newArtifact)
+					exists = true
+					break
+				}
+			}
+		}
+
+		// PRIORITY 3: If neither SHA1 nor name matches, add as new artifact
 		if !exists {
-			*intoArtifacts = append(*intoArtifacts, mergeArtifact)
+			*intoArtifacts = append(*intoArtifacts, newArtifact)
 		}
 	}
+}
+
+// mergeTwoArtifacts intelligently merges two artifacts with the same name or SHA1.
+// Takes checksums from the newer artifact (newArtifact) since it represents a rebuild,
+// but preserves the Path from whichever artifact has it (preferring newArtifact, falling back to existingArtifact).
+//
+// Safety: We only merge fields when one is empty. If both artifacts have different non-empty values
+// for the same field, we prefer the newer artifact's value, as it represents the latest state.
+func mergeTwoArtifacts(existingArtifact, newArtifact Artifact) Artifact {
+	// Start with the newer artifact as the base (it has the latest checksums and metadata)
+	merged := newArtifact
+
+	// Preserve path from existing artifact ONLY if new artifact doesn't have it
+	// This handles cases where build info is collected before deployment completes
+	// If both have paths, we trust the newer one (it's more up-to-date)
+	if merged.Path == "" && existingArtifact.Path != "" {
+		merged.Path = existingArtifact.Path
+	}
+
+	// Similarly for OriginalDeploymentRepo - only backfill if newer is empty
+	if merged.OriginalDeploymentRepo == "" && existingArtifact.OriginalDeploymentRepo != "" {
+		merged.OriginalDeploymentRepo = existingArtifact.OriginalDeploymentRepo
+	}
+
+	return merged
 }
 
 func mergeDependenciesLists(dependenciesToAdd, intoDependencies *[]Dependency) {
