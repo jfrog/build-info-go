@@ -22,7 +22,7 @@ import (
 // should be merged (keeping the newer one). This handles non-deterministic builds like Maven SNAPSHOTs.
 // Set to "FALSE" to disable name-based merging and only use SHA1 comparison.
 // Default: enabled (any value other than "FALSE")
-const MergeArtifactsByNameEnv = "JFROG_CLI_MERGE_ARTIFACTS_BY_NAME"
+const MergeArtifactsByNameEnv = "JFROG_CLI_MERGE_BUILD_INFO_ARTIFACTS_BY_NAME"
 
 type ModuleType string
 
