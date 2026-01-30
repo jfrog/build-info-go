@@ -1,10 +1,11 @@
 package build
 
 import (
-	"github.com/jfrog/build-info-go/entities"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCollectEnv(t *testing.T) {
@@ -76,6 +77,74 @@ func TestCollectEnv(t *testing.T) {
 			assert.Empty(t, buildInfo.Modules)
 			err = build.Clean()
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestSortBuildInfosByTimestamp(t *testing.T) {
+	tests := []struct {
+		name          string
+		buildInfos    []*entities.BuildInfo
+		expectedOrder []string // Expected order of Started timestamps
+	}{
+		{
+			name: "already sorted",
+			buildInfos: []*entities.BuildInfo{
+				{Name: "build1", Started: "2026-01-30T10:00:00.000+0000"},
+				{Name: "build2", Started: "2026-01-30T11:00:00.000+0000"},
+				{Name: "build3", Started: "2026-01-30T12:00:00.000+0000"},
+			},
+			expectedOrder: []string{
+				"2026-01-30T10:00:00.000+0000",
+				"2026-01-30T11:00:00.000+0000",
+				"2026-01-30T12:00:00.000+0000",
+			},
+		},
+		{
+			name: "reverse order",
+			buildInfos: []*entities.BuildInfo{
+				{Name: "build3", Started: "2026-01-30T12:00:00.000+0000"},
+				{Name: "build2", Started: "2026-01-30T11:00:00.000+0000"},
+				{Name: "build1", Started: "2026-01-30T10:00:00.000+0000"},
+			},
+			expectedOrder: []string{
+				"2026-01-30T10:00:00.000+0000",
+				"2026-01-30T11:00:00.000+0000",
+				"2026-01-30T12:00:00.000+0000",
+			},
+		},
+		{
+			name: "mixed order - Maven install then deploy scenario",
+			buildInfos: []*entities.BuildInfo{
+				{Name: "deploy", Started: "2026-01-30T10:05:30.000+0000"},  // deploy (later)
+				{Name: "install", Started: "2026-01-30T10:05:00.000+0000"}, // install (earlier)
+			},
+			expectedOrder: []string{
+				"2026-01-30T10:05:00.000+0000", // install first
+				"2026-01-30T10:05:30.000+0000", // deploy second
+			},
+		},
+		{
+			name:          "empty list",
+			buildInfos:    []*entities.BuildInfo{},
+			expectedOrder: []string{},
+		},
+		{
+			name: "single item",
+			buildInfos: []*entities.BuildInfo{
+				{Name: "build1", Started: "2026-01-30T10:00:00.000+0000"},
+			},
+			expectedOrder: []string{"2026-01-30T10:00:00.000+0000"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sortBuildInfosByTimestamp(tc.buildInfos)
+			for i, expected := range tc.expectedOrder {
+				assert.Equal(t, expected, tc.buildInfos[i].Started,
+					"Position %d: expected %s, got %s", i, expected, tc.buildInfos[i].Started)
+			}
 		})
 	}
 }

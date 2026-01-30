@@ -265,6 +265,7 @@ func mergeModules(merge *Module, into *Module) {
 
 func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
 	mergeByNameEnabled := strings.ToUpper(os.Getenv(MergeArtifactsByNameEnv)) != "FALSE"
+	log.Debug(fmt.Sprintf("Merge artifacts by name enabled: %v", mergeByNameEnabled))
 
 	for _, newArtifact := range *mergeArtifacts {
 		exists := false
@@ -283,9 +284,9 @@ func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
 		if !exists && mergeByNameEnabled {
 			for i, existingArtifact := range *intoArtifacts {
 				if newArtifact.Name == existingArtifact.Name && isSameLogicalArtifact(existingArtifact, newArtifact) {
-					// Same logical artifact (confirmed by path/repo) but different checksum
-					// Replace with newArtifact (represents latest deployed state)
-					log.Warn(fmt.Sprintf("Artifact '%s' has different checksum than existing (old: %s, new: %s). Using the newer artifact.",
+					// Same logical artifact but different checksum
+					// Use incoming artifact (from later merge operation)
+					log.Warn(fmt.Sprintf("Artifact '%s' has different checksums (%s vs %s). Using incoming artifact.",
 						newArtifact.Name, existingArtifact.Sha1, newArtifact.Sha1))
 					(*intoArtifacts)[i] = newArtifact
 					exists = true
