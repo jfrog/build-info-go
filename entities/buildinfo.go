@@ -2,18 +2,27 @@ package entities
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/jfrog/build-info-go/utils/compareutils"
+	"github.com/jfrog/gofrog/log"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/gofrog/stringutils"
 )
+
+// MergeArtifactsByNameEnv controls whether artifacts with the same name but different SHA1s
+// should be merged (keeping the newer one). This handles non-deterministic builds like Maven SNAPSHOTs.
+// Set to "FALSE" to disable name-based merging and only use SHA1 comparison.
+// Default: enabled (any value other than "FALSE")
+const MergeArtifactsByNameEnv = "JFROG_CLI_MERGE_BUILD_INFO_ARTIFACTS_BY_NAME"
 
 type ModuleType string
 
@@ -255,18 +264,68 @@ func mergeModules(merge *Module, into *Module) {
 }
 
 func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
-	for _, mergeArtifact := range *mergeArtifacts {
+	mergeByNameEnabled := strings.ToUpper(os.Getenv(MergeArtifactsByNameEnv)) != "FALSE"
+	log.Debug(fmt.Sprintf("Merge artifacts by name enabled: %v", mergeByNameEnabled))
+
+	for _, newArtifact := range *mergeArtifacts {
 		exists := false
-		for _, artifact := range *intoArtifacts {
-			if mergeArtifact.Sha1 == artifact.Sha1 {
+
+		// PRIORITY 1: Check SHA1 - if checksums match, artifact already exists (skip it)
+		for _, existingArtifact := range *intoArtifacts {
+			if newArtifact.Sha1 == existingArtifact.Sha1 {
 				exists = true
 				break
 			}
 		}
+
+		// PRIORITY 2: If SHA1 doesn't match, check by artifact name
+		// This handles non-deterministic builds (Maven WAR with timestamps, etc.)
+		// where rebuilding produces different checksums for the same logical artifact.
+		if !exists && mergeByNameEnabled {
+			for i, existingArtifact := range *intoArtifacts {
+				if newArtifact.Name == existingArtifact.Name && isSameLogicalArtifact(existingArtifact, newArtifact) {
+					// Same logical artifact but different checksum
+					// Use incoming artifact (from later merge operation)
+					log.Warn(fmt.Sprintf("Artifact '%s' has different checksums (%s vs %s). Using incoming artifact.",
+						newArtifact.Name, existingArtifact.Sha1, newArtifact.Sha1))
+					(*intoArtifacts)[i] = newArtifact
+					exists = true
+					break
+				}
+			}
+		}
+
+		// No match found - add as new artifact
 		if !exists {
-			*intoArtifacts = append(*intoArtifacts, mergeArtifact)
+			*intoArtifacts = append(*intoArtifacts, newArtifact)
 		}
 	}
+}
+
+// isSameLogicalArtifact checks if two artifacts represent the same logical artifact.
+// Returns true if they are in the same directory and same repository.
+func isSameLogicalArtifact(existing, new Artifact) bool {
+	// Check if paths are in the same directory
+	if extractPathDir(existing.Path) != extractPathDir(new.Path) {
+		return false
+	}
+
+	// Check repo - reject if BOTH have repos AND they differ
+	if existing.OriginalDeploymentRepo != "" && new.OriginalDeploymentRepo != "" &&
+		existing.OriginalDeploymentRepo != new.OriginalDeploymentRepo {
+		return false
+	}
+
+	return true
+}
+
+// extractPathDir extracts the directory portion from an artifact path
+func extractPathDir(path string) string {
+	lastSlash := strings.LastIndex(path, "/")
+	if lastSlash == -1 {
+		return ""
+	}
+	return path[:lastSlash]
 }
 
 func mergeDependenciesLists(dependenciesToAdd, intoDependencies *[]Dependency) {

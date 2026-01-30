@@ -166,6 +166,9 @@ func (b *Build) ToBuildInfo() (*entities.BuildInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Sort generated build infos by Started timestamp (oldest first)
+	// This ensures artifacts are merged in chronological order
+	sortBuildInfosByTimestamp(generatedBuildsInfo)
 	for _, v := range generatedBuildsInfo {
 		buildInfo.Append(v)
 	}
@@ -207,6 +210,20 @@ func (b *Build) getGeneratedBuildsInfo() ([]*entities.BuildInfo, error) {
 		generatedBuildsInfo = append(generatedBuildsInfo, buildInfo)
 	}
 	return generatedBuildsInfo, nil
+}
+
+// sortBuildInfosByTimestamp sorts build infos by their Started timestamp (oldest first).
+// This ensures that when merging, newer artifacts replace older ones correctly.
+func sortBuildInfosByTimestamp(buildInfos []*entities.BuildInfo) {
+	sort.Slice(buildInfos, func(i, j int) bool {
+		timeI, errI := time.Parse(entities.TimeFormat, buildInfos[i].Started)
+		timeJ, errJ := time.Parse(entities.TimeFormat, buildInfos[j].Started)
+		// If parsing fails, maintain original order for those items
+		if errI != nil || errJ != nil {
+			return false
+		}
+		return timeI.Before(timeJ)
+	})
 }
 
 func (b *Build) SaveBuildInfo(buildInfo *entities.BuildInfo) (err error) {
