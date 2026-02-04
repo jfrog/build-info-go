@@ -24,6 +24,11 @@ import (
 
 const npmInstallCommand = "install"
 
+// TransitiveDepMarker is appended to version for transitive blocked packages
+// Uses ":" prefix so it becomes an extra segment that's ignored in parsing but detectable
+// e.g., "5.1.6:TRANSITIVE" -> splits to ["name", "5.1.6", "TRANSITIVE"]
+const TransitiveDepMarker = ":TRANSITIVE"
+
 // CalculateNpmDependenciesList gets an npm project's dependencies.
 func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
 	if log == nil {
@@ -97,8 +102,9 @@ type DependencyInfo = dependencyInfo
 
 // NotFoundPackage represents a package not found during npm install (404/ETARGET).
 type NotFoundPackage struct {
-	Name    string
-	Version string
+	Name         string
+	Version      string
+	IsTransitive bool // True if this is a transitive dependency
 }
 
 // Run 'npm list ...' command and parse the returned result to create a dependencies map of.
@@ -219,8 +225,12 @@ func addNotFoundPackagesToNpmLsOutput(data []byte, blockedPackages []NotFoundPac
 		npmLsOutput["dependencies"] = deps
 	}
 	for _, bp := range blockedPackages {
+		version := bp.Version
+		if bp.IsTransitive {
+			version = bp.Version + TransitiveDepMarker
+		}
 		deps[bp.Name] = map[string]interface{}{
-			"version": bp.Version,
+			"version": version,
 			"missing": true,
 		}
 	}
@@ -253,14 +263,14 @@ func runNpmInstallWithRetry(executablePath, workDir string, npmInstallCommandArg
 		pkgId := name + "@" + version
 		if pkgId == lastPkg {
 			// Package couldn't be removed (transitive dependency)
-			// Just add to blocked and continue, don't fail
 			log.Debug(fmt.Sprintf("Package %s is not found (transitive dependency). Adding to blocked packages and continuing...", pkgId))
+			blocked = append(blocked, NotFoundPackage{Name: name, Version: version, IsTransitive: true})
 			return blocked, nil
 		}
 		lastPkg = pkgId
 
 		log.Info(fmt.Sprintf("Retrying without package %s...", pkgId))
-		blocked = append(blocked, NotFoundPackage{Name: name, Version: version})
+		blocked = append(blocked, NotFoundPackage{Name: name, Version: version, IsTransitive: false})
 		if err := removePackageFromPackageJson(pkgJsonPath, name); err != nil {
 			return blocked, err
 		}
