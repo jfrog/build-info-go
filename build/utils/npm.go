@@ -178,6 +178,19 @@ func runNpmLsWithCurationSupport(executablePath, srcPath string, npmListParams N
 		return nil, blockedPackages, err
 	}
 
+	// Check if package-lock.json exists before running npm ls --package-lock-only
+	packageLockPath := filepath.Join(tempDir, "package-lock.json")
+	packageLockExists, _ := utils.IsFileExists(packageLockPath, false)
+	if !packageLockExists {
+		log.Warn("No package-lock.json found. Cannot run npm ls --package-lock-only.")
+		// Return empty JSON with just the blocked packages
+		data := []byte("{}")
+		if len(blockedPackages) > 0 {
+			data = addNotFoundPackagesToNpmLsOutput(data, blockedPackages)
+		}
+		return data, blockedPackages, nil
+	}
+
 	npmListParams.Args = append(npmListParams.Args, "--json", "--all", "--long", "--package-lock-only")
 	data, errData, err := RunNpmCmd(executablePath, tempDir, AppendNpmCommand(npmListParams.Args, "ls"), log)
 	if err != nil {
@@ -239,7 +252,10 @@ func runNpmInstallWithRetry(executablePath, workDir string, npmInstallCommandArg
 
 		pkgId := name + "@" + version
 		if pkgId == lastPkg {
-			return blocked, fmt.Errorf("package %s is not found", pkgId)
+			// Package couldn't be removed (transitive dependency)
+			// Just add to blocked and continue, don't fail
+			log.Debug(fmt.Sprintf("Package %s is not found (transitive dependency). Adding to blocked packages and continuing...", pkgId))
+			return blocked, nil
 		}
 		lastPkg = pkgId
 
