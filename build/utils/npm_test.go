@@ -271,6 +271,34 @@ func TestCalculateDependenciesMapWithProhibitedInstallation(t *testing.T) {
 	assert.True(t, errors.As(err, &installForbiddenErr))
 }
 
+// TestCalculateDependenciesMapWithCvs tests the full CVS flow with a real npm project.
+func TestCalculateDependenciesMapWithCvs(t *testing.T) {
+	npmVersion, _, err := GetNpmVersionAndExecPath(logger)
+	require.NoError(t, err)
+	if !npmVersion.AtLeast("7.0.0") {
+		t.Skip("Running on npm v7 and above only, skipping...")
+	}
+
+	path, cleanup := tests.CreateTestProject(t, filepath.Join("..", "testdata", "npm", "projectCvs"))
+	defer cleanup()
+
+	dependencies, blockedPackages, err := CalculateDependenciesMapWithCvs(
+		"npm", path, "cvs-test-project",
+		NpmTreeDepListParam{Args: []string{"--cache=" + filepath.Join(path, "tmpcache")}, IgnoreNodeModules: true, OverwritePackageLock: true},
+		logger, false,
+	)
+	assert.NoError(t, err)
+	assert.Len(t, blockedPackages, 1)
+	assert.Equal(t, "lodash", blockedPackages[0].Name)
+	assert.Equal(t, "999.999.999", blockedPackages[0].Version)
+
+	_, hasLightweight := dependencies["lightweight:0.1.0"]
+	assert.True(t, hasLightweight, "package 'lightweight' should be in dependencies")
+
+	_, hasBlocked := dependencies["lodash:999.999.999"]
+	assert.True(t, hasBlocked, "Blocked package should be added to dependencies for audit")
+}
+
 func getExpectedRespForTestDependencyPackageLockOnly() map[string]*dependencyInfo {
 	return map[string]*dependencyInfo{
 		"underscore:1.13.6": {
@@ -482,6 +510,51 @@ func TestFilterUniqueArgs(t *testing.T) {
 	for _, testcase := range testcases {
 		assert.Equal(t, testcase.expectedResult, filterUniqueArgs(testcase.argsToFilter, testcase.alreadyExists))
 	}
+}
+
+// TestParseNpmNotFoundError tests parsing "No matching version found for pkg@version" error messages.
+func TestParseNpmNotFoundError(t *testing.T) {
+	name, version, found := ParseNpmNotFoundError(errors.New("No matching version found for lodash@4.17.21"))
+	assert.True(t, found)
+	assert.Equal(t, "lodash", name)
+	assert.Equal(t, "4.17.21", version)
+
+	name, version, found = ParseNpmNotFoundError(errors.New("No matching version found for @angular/core@15.0.0"))
+	assert.True(t, found)
+	assert.Equal(t, "@angular/core", name)
+	assert.Equal(t, "15.0.0", version)
+
+	_, _, found = ParseNpmNotFoundError(errors.New("npm ERR! code ENOTFOUND"))
+	assert.False(t, found)
+
+	_, _, found = ParseNpmNotFoundError(nil)
+	assert.False(t, found)
+}
+
+// TestAddNotFoundPackagesToNpmLsOutput tests adding blocked packages to npm ls JSON output.
+func TestAddNotFoundPackagesToNpmLsOutput(t *testing.T) {
+	npmLsOutput := `{"name": "test-project", "dependencies": {"express": {"version": "4.18.0"}}}`
+	blockedPackages := []NotFoundPackage{{Name: "lodash", Version: "4.17.21"}}
+
+	result := addNotFoundPackagesToNpmLsOutput([]byte(npmLsOutput), blockedPackages)
+
+	var output map[string]interface{}
+	err := json.Unmarshal(result, &output)
+	assert.NoError(t, err)
+
+	deps, ok := output["dependencies"].(map[string]interface{})
+	assert.True(t, ok, "dependencies should be a map")
+
+	express, ok := deps["express"].(map[string]interface{})
+	assert.True(t, ok, "express should be a map")
+	assert.Equal(t, "4.18.0", express["version"])
+
+	lodash, ok := deps["lodash"].(map[string]interface{})
+	assert.True(t, ok, "lodash should be a map")
+	assert.Equal(t, "4.17.21", lodash["version"])
+	assert.Equal(t, true, lodash["missing"])
+
+	assert.Equal(t, 2, len(deps))
 }
 
 func TestParseDependenciesEdgeCases(t *testing.T) {
