@@ -21,6 +21,9 @@ import (
 )
 
 const pnpmInstallCommand = "install"
+const packageJsonFile = "package.json"
+const pnpmLockFile = "pnpm-lock.yaml"
+const minPnpmVersion = "6.0.0"
 
 // CalculatePnpmDependenciesList gets a pnpm project's dependencies.
 func CalculatePnpmDependenciesList(executablePath, srcPath, moduleId string, pnpmParams PnpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
@@ -77,7 +80,7 @@ func CalculatePnpmDependenciesList(executablePath, srcPath, moduleId string, pnp
 		printPnpmMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
 	}
 	if len(otherMissingDeps) > 0 {
-		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the pnpm store: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'pnpm-lock.yaml'.")
+		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the pnpm store: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or '" + pnpmLockFile + "'.")
 	}
 	return dependenciesList, nil
 }
@@ -180,7 +183,7 @@ func runPnpmLsWithoutNodeModules(executablePath, srcPath string, pnpmListParams 
 // isPnpmInstallRequired determines whether a project installation is required.
 // Checks if the "pnpm-lock.yaml" file exists in the project directory.
 func isPnpmInstallRequired(srcPath string, pnpmListParams PnpmTreeDepListParam, log utils.Log, skipInstall bool) (bool, error) {
-	isPnpmLockExist, err := utils.IsFileExists(filepath.Join(srcPath, "pnpm-lock.yaml"), false)
+	isPnpmLockExist, err := utils.IsFileExists(filepath.Join(srcPath, pnpmLockFile), false)
 	if err != nil {
 		return false, err
 	}
@@ -198,7 +201,7 @@ func isPnpmInstallRequired(srcPath string, pnpmListParams PnpmTreeDepListParam, 
 }
 
 func installPnpmLockfile(executablePath, srcPath string, pnpmInstallCommandArgs, pnpmArgs []string, log utils.Log, pnpmVersion *version.Version) error {
-	if pnpmVersion.AtLeast("6.0.0") {
+	if pnpmVersion.AtLeast(minPnpmVersion) {
 		pnpmArgs = append(pnpmArgs, "--lockfile-only")
 		pnpmArgs = append(pnpmArgs, filterPnpmUniqueArgs(pnpmInstallCommandArgs, pnpmArgs)...)
 		_, _, err := RunPnpmCmd(executablePath, srcPath, AppendPnpmCommand(pnpmArgs, "install"), log)
@@ -207,7 +210,7 @@ func installPnpmLockfile(executablePath, srcPath string, pnpmInstallCommandArgs,
 		}
 		return nil
 	}
-	return errors.New("it looks like you're using version " + pnpmVersion.GetVersion() + " of the pnpm client. Versions below 6.0.0 require running `pnpm install` before running this command")
+	return errors.New("it looks like you're using version " + pnpmVersion.GetVersion() + " of the pnpm client. Versions below " + minPnpmVersion + " require running `pnpm install` before running this command")
 }
 
 // filterPnpmUniqueArgs removes any arguments from argsToFilter that are already present in existingArgs.
@@ -226,14 +229,14 @@ func filterPnpmUniqueArgs(argsToFilter []string, existingArgs []string) []string
 
 // Check if package.json has been modified compared to pnpm-lock.yaml.
 func checkIfPnpmLockFileShouldBeUpdated(srcPath string, log utils.Log) bool {
-	packageJsonInfo, err := os.Stat(filepath.Join(srcPath, "package.json"))
+	packageJsonInfo, err := os.Stat(filepath.Join(srcPath, packageJsonFile))
 	if err != nil {
 		log.Warn("Failed to get file info for package.json, err: %v", err)
 		return false
 	}
 
 	packageJsonInfoModTime := packageJsonInfo.ModTime()
-	pnpmLockInfo, err := os.Stat(filepath.Join(srcPath, "pnpm-lock.yaml"))
+	pnpmLockInfo, err := os.Stat(filepath.Join(srcPath, pnpmLockFile))
 	if err != nil {
 		log.Warn("Failed to get file info for pnpm-lock.yaml, err: %v", err)
 		return false
