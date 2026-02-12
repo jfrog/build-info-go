@@ -11,11 +11,16 @@ const (
 	GitHubActionsEnvVar         = "GITHUB_ACTIONS"
 	GitHubRepositoryEnvVar      = "GITHUB_REPOSITORY"
 	GitHubRepositoryOwnerEnvVar = "GITHUB_REPOSITORY_OWNER"
+	GitHubServerURLEnvVar       = "GITHUB_SERVER_URL"
+	GitHubSHAEnvVar             = "GITHUB_SHA"
+	GitHubRefEnvVar             = "GITHUB_REF"
+	GitHubHeadRefEnvVar         = "GITHUB_HEAD_REF"
 	GitHubWorkflowEnvVar        = "GITHUB_WORKFLOW"
 	GitHubRunIDEnvVar           = "GITHUB_RUN_ID"
 
 	// Provider name constant
 	GitHubProviderName = "github"
+	refsHeadsPrefix    = "refs/heads/"
 )
 
 // GitHubActionsProvider implements CIProvider for GitHub Actions.
@@ -44,6 +49,9 @@ func (g *GitHubActionsProvider) IsActive() bool {
 
 // GetVcsInfo extracts VCS information from GitHub Actions environment variables.
 // Uses GITHUB_REPOSITORY_OWNER for org and derives repo name from GITHUB_REPOSITORY.
+// Sets Url (server_url + repo), Revision (GITHUB_SHA), and Branch.
+// For pull request events, Branch is taken from GITHUB_HEAD_REF (the source branch).
+// For other events, Branch is derived from GITHUB_REF with the refs/heads/ prefix stripped.
 func (g *GitHubActionsProvider) GetVcsInfo() CIVcsInfo {
 	info := CIVcsInfo{
 		Provider: GitHubProviderName,
@@ -61,6 +69,28 @@ func (g *GitHubActionsProvider) GetVcsInfo() CIVcsInfo {
 	} else if fullRepo != "" {
 		// Fallback: if owner is empty, use the full value
 		info.Repo = fullRepo
+	}
+
+	// Url = server_url + "/" + repository
+	serverURL := strings.TrimSuffix(os.Getenv(GitHubServerURLEnvVar), "/")
+	if serverURL != "" && fullRepo != "" {
+		info.Url = serverURL + "/" + fullRepo
+	}
+	info.Revision = os.Getenv(GitHubSHAEnvVar)
+
+	// GITHUB_HEAD_REF is set only for pull_request events and contains the
+	// source branch name directly (e.g. "feature-branch-1").
+	// Prefer it over GITHUB_REF which for PRs is "refs/pull/<number>/merge".
+	headRef := os.Getenv(GitHubHeadRefEnvVar)
+	if headRef != "" {
+		info.Branch = headRef
+	} else {
+		ref := os.Getenv(GitHubRefEnvVar)
+		if strings.HasPrefix(ref, refsHeadsPrefix) {
+			info.Branch = strings.TrimPrefix(ref, refsHeadsPrefix)
+		} else if ref != "" {
+			info.Branch = ref
+		}
 	}
 
 	return info
