@@ -128,7 +128,11 @@ func (ym *YarnModule) appendDependencyRecursively(yarnDependency *buildutils.Yar
 		buildInfoDependencies[id] = buildInfoDependency
 	}
 
-	buildInfoDependency.RequestedBy = append(buildInfoDependency.RequestedBy, pathToRoot)
+	// Limit requestedBy chains to prevent memory issues and excessive build-info size
+	// Following the same approach as Go, NuGet, and Python modules (see entities.RequestedByMaxLength)
+	if len(buildInfoDependency.RequestedBy) < entities.RequestedByMaxLength {
+		buildInfoDependency.RequestedBy = append(buildInfoDependency.RequestedBy, pathToRoot)
+	}
 	return nil
 }
 
