@@ -104,22 +104,93 @@ func (cf *ConanFlexPack) ensureInitialized() error {
 
 // loadConanfile loads either conanfile.py or conanfile.txt and extracts project metadata.
 // Conanfile.py is preferred as it contains more metadata (name, version, user, channel).
+// It searches in RecipeFilePath first (if set), then falls back to WorkingDirectory.
+// If no conanfile is found (e.g. when using --requires), it sets defaults gracefully
+// instead of returning an error, so that dependency parsing can still proceed.
 func (cf *ConanFlexPack) loadConanfile() error {
-	conanfilePy := filepath.Join(cf.config.WorkingDirectory, "conanfile.py")
-	if _, err := os.Stat(conanfilePy); err == nil {
-		cf.conanfilePath = conanfilePy
-		return cf.extractProjectInfoFromConanfilePy()
+	searchDirs := cf.getConanfileSearchDirs()
+
+	for _, dir := range searchDirs {
+		conanfilePy := filepath.Join(dir, "conanfile.py")
+		if _, err := os.Stat(conanfilePy); err == nil {
+			cf.conanfilePath = conanfilePy
+			if err := cf.extractProjectInfoFromConanfilePy(); err != nil {
+				return err
+			}
+			cf.applyOverrides()
+			return nil
+		}
+		conanfileTxt := filepath.Join(dir, "conanfile.txt")
+		if _, err := os.Stat(conanfileTxt); err == nil {
+			cf.conanfilePath = conanfileTxt
+			cf.projectName = filepath.Base(dir)
+			cf.projectVersion = ""
+			cf.user = "_"
+			cf.channel = "_"
+			cf.applyOverrides()
+			return nil
+		}
 	}
-	conanfileTxt := filepath.Join(cf.config.WorkingDirectory, "conanfile.txt")
-	if _, err := os.Stat(conanfileTxt); err == nil {
-		cf.conanfilePath = conanfileTxt
-		cf.projectName = filepath.Base(cf.config.WorkingDirectory)
-		cf.projectVersion = ""
-		cf.user = "_"
-		cf.channel = "_"
-		return nil
+
+	// No conanfile found. This is valid for Conan 2.x commands using --requires
+	// (e.g. conan install --requires zlib/1.2.11). Set defaults and continue.
+	log.Debug("No conanfile.py or conanfile.txt found, using defaults (--requires mode)")
+	cf.projectName = filepath.Base(cf.config.WorkingDirectory)
+	cf.projectVersion = ""
+	cf.user = "_"
+	cf.channel = "_"
+	cf.applyOverrides()
+	return nil
+}
+
+// getConanfileSearchDirs returns the directories to search for conanfile, in priority order.
+// RecipeFilePath takes precedence over WorkingDirectory.
+func (cf *ConanFlexPack) getConanfileSearchDirs() []string {
+	var dirs []string
+	if cf.config.RecipeFilePath != "" {
+		recipeDir := cf.config.RecipeFilePath
+		if info, err := os.Stat(recipeDir); err == nil && !info.IsDir() {
+			recipeDir = filepath.Dir(recipeDir)
+		}
+		dirs = append(dirs, recipeDir)
 	}
-	return fmt.Errorf("no conanfile.py or conanfile.txt found in %s", cf.config.WorkingDirectory)
+	if cf.config.WorkingDirectory != "" {
+		dirs = append(dirs, cf.config.WorkingDirectory)
+	}
+	return dirs
+}
+
+// getRecipeDir returns the directory containing the conanfile (used for running Conan commands).
+// If conanfilePath is already resolved, returns its parent directory.
+// Otherwise falls back to RecipeFilePath, then WorkingDirectory.
+func (cf *ConanFlexPack) getRecipeDir() string {
+	if cf.conanfilePath != "" {
+		return filepath.Dir(cf.conanfilePath)
+	}
+	if cf.config.RecipeFilePath != "" {
+		recipeDir := cf.config.RecipeFilePath
+		if info, err := os.Stat(recipeDir); err == nil && !info.IsDir() {
+			return filepath.Dir(recipeDir)
+		}
+		return recipeDir
+	}
+	return cf.config.WorkingDirectory
+}
+
+// applyOverrides applies CLI-provided overrides (from --name, --version, --user, --channel flags).
+func (cf *ConanFlexPack) applyOverrides() {
+	if cf.config.ProjectNameOverride != "" {
+		cf.projectName = cf.config.ProjectNameOverride
+	}
+	if cf.config.ProjectVersionOverride != "" {
+		cf.projectVersion = cf.config.ProjectVersionOverride
+	}
+	if cf.config.UserOverride != "" {
+		cf.user = cf.config.UserOverride
+	}
+	if cf.config.ChannelOverride != "" {
+		cf.channel = cf.config.ChannelOverride
+	}
 }
 
 // extractProjectInfoFromConanfilePy extracts project metadata from conanfile.py.
