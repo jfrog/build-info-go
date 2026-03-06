@@ -24,19 +24,22 @@ const (
 )
 
 // parseDependencies parses dependencies using conan graph info with fallback to lock file.
-// Returns error if both methods fail.
-func (cf *ConanFlexPack) parseDependencies() error {
+// If both methods fail, logs a warning but does not fail (build info will have no dependencies).
+// This supports --requires mode where graph/lock may not exist yet.
+func (cf *ConanFlexPack) parseDependencies() {
 	if err := cf.parseWithConanGraphInfo(); err == nil {
 		log.Debug("Successfully parsed dependencies using 'conan graph info'")
-		return nil
+		return
 	} else {
 		log.Debug("Conan graph info parsing failed: " + err.Error())
 	}
-	if err := cf.parseDependenciesFromLockFile(); err != nil {
-		return fmt.Errorf("failed to parse dependencies from both graph info and lock file: %w", err)
+	if err := cf.parseDependenciesFromLockFile(); err == nil {
+		log.Debug("Successfully parsed dependencies from conan.lock")
+		return
+	} else {
+		log.Debug("Lock file parsing also failed: " + err.Error())
 	}
-	log.Debug("Successfully parsed dependencies from conan.lock")
-	return nil
+	log.Warn("Could not parse dependencies from graph info or lock file")
 }
 
 // parseWithConanGraphInfo uses 'conan graph info --format=json' to get dependency information.
@@ -44,7 +47,7 @@ func (cf *ConanFlexPack) parseDependencies() error {
 func (cf *ConanFlexPack) parseWithConanGraphInfo() error {
 	args := cf.buildGraphInfoArgs()
 	cmd := exec.Command(cf.config.ConanExecutable, args...)
-	cmd.Dir = cf.config.WorkingDirectory
+	cmd.Dir = cf.getRecipeDir()
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -64,9 +67,28 @@ func (cf *ConanFlexPack) parseWithConanGraphInfo() error {
 }
 
 // buildGraphInfoArgs builds command arguments for conan graph info.
-// Returns: ["graph", "info", "<conanfile>", "--format", "json", ...]
+// When a conanfile exists: ["graph", "info", "<conanfile>", "--format=json", ...]
+// When using --requires (no conanfile): ["graph", "info", "--requires=pkg/ver", "--format=json", ...]
 func (cf *ConanFlexPack) buildGraphInfoArgs() []string {
-	args := []string{conanGraphCmd, conanInfoSubCmd, cf.conanfilePath, conanFormatFlag}
+	args := []string{conanGraphCmd, conanInfoSubCmd}
+
+	if cf.conanfilePath != "" {
+		args = append(args, cf.conanfilePath)
+	} else {
+		// No conanfile present
+		requiresArgs := cf.extractRequiresFromArgs()
+		toolRequiresArgs := cf.extractToolRequiresFromArgs()
+		allInlineArgs := make([]string, 0, len(requiresArgs)+len(toolRequiresArgs))
+		allInlineArgs = append(allInlineArgs, requiresArgs...)
+		allInlineArgs = append(allInlineArgs, toolRequiresArgs...)
+		if len(allInlineArgs) == 0 {
+			// No conanfile and no inline deps graph info will fail, fallback to lock file
+			args = append(args, ".")
+		}
+		args = append(args, allInlineArgs...)
+	}
+
+	args = append(args, conanFormatFlag)
 	if cf.config.Profile != "" {
 		args = append(args, conanProfileFlag, cf.config.Profile)
 	}
@@ -77,6 +99,31 @@ func (cf *ConanFlexPack) buildGraphInfoArgs() []string {
 		args = append(args, conanOptionFlag, fmt.Sprintf("%s=%s", key, value))
 	}
 	return args
+}
+
+// extractRequiresFromArgs extracts --requires flags from the Conan CLI arguments.
+func (cf *ConanFlexPack) extractRequiresFromArgs() []string {
+	return cf.extractFlagValues("--requires")
+}
+
+// extractToolRequiresFromArgs extracts --tool-requires flags from the Conan CLI arguments.
+func (cf *ConanFlexPack) extractToolRequiresFromArgs() []string {
+	return cf.extractFlagValues("--tool-requires")
+}
+
+// extractFlagValues extracts all values for a given flag from the Conan CLI arguments.
+// Supports both --flag=value and --flag value forms.
+func (cf *ConanFlexPack) extractFlagValues(flag string) []string {
+	var result []string
+	prefix := flag + "="
+	for i, arg := range cf.config.ConanArgs {
+		if strings.HasPrefix(arg, prefix) {
+			result = append(result, arg)
+		} else if arg == flag && i+1 < len(cf.config.ConanArgs) {
+			result = append(result, flag+"="+cf.config.ConanArgs[i+1])
+		}
+	}
+	return result
 }
 
 // extractDependenciesFromGraph extracts dependencies from the graph data stored in cf.graphData.
@@ -241,7 +288,7 @@ func (cf *ConanFlexPack) addRequestedBy(dependencyID, parentID string) {
 // parseDependenciesFromLockFile parses dependencies from conan.lock file (fallback method).
 // Lock file contains frozen dependency versions but less metadata than graph info.
 func (cf *ConanFlexPack) parseDependenciesFromLockFile() error {
-	lockPath := filepath.Join(cf.config.WorkingDirectory, "conan.lock")
+	lockPath := filepath.Join(cf.getRecipeDir(), "conan.lock")
 	data, err := os.ReadFile(lockPath)
 	if err != nil {
 		return fmt.Errorf("failed to read conan.lock: %w", err)

@@ -98,10 +98,10 @@ func (mf *MavenFlexPack) GetDependency() string {
 		mf.parseDependencies()
 	}
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Project: %s:%s:%s\n", mf.groupId, mf.artifactId, mf.projectVersion))
+	fmt.Fprintf(&result, "Project: %s:%s:%s\n", mf.groupId, mf.artifactId, mf.projectVersion)
 	result.WriteString("Dependencies:\n")
 	for _, dep := range mf.dependencies {
-		result.WriteString(fmt.Sprintf("  - %s:%s [%s]\n", dep.Name, dep.Version, dep.Type))
+		fmt.Fprintf(&result, "  - %s:%s [%s]\n", dep.Name, dep.Version, dep.Type)
 	}
 	return result.String()
 }
