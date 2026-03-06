@@ -24,23 +24,22 @@ const (
 )
 
 // parseDependencies parses dependencies using conan graph info with fallback to lock file.
-// If both methods fail, logs a warning and returns nil (build info will have no dependencies
-// but the command won't fail). This supports --requires mode where graph/lock may not exist yet.
-func (cf *ConanFlexPack) parseDependencies() error {
+// If both methods fail, logs a warning but does not fail (build info will have no dependencies).
+// This supports --requires mode where graph/lock may not exist yet.
+func (cf *ConanFlexPack) parseDependencies() {
 	if err := cf.parseWithConanGraphInfo(); err == nil {
 		log.Debug("Successfully parsed dependencies using 'conan graph info'")
-		return nil
+		return
 	} else {
 		log.Debug("Conan graph info parsing failed: " + err.Error())
 	}
 	if err := cf.parseDependenciesFromLockFile(); err == nil {
 		log.Debug("Successfully parsed dependencies from conan.lock")
-		return nil
+		return
 	} else {
 		log.Debug("Lock file parsing also failed: " + err.Error())
 	}
 	log.Warn("Could not parse dependencies from graph info or lock file")
-	return nil
 }
 
 // parseWithConanGraphInfo uses 'conan graph info --format=json' to get dependency information.
@@ -79,7 +78,9 @@ func (cf *ConanFlexPack) buildGraphInfoArgs() []string {
 		// No conanfile present
 		requiresArgs := cf.extractRequiresFromArgs()
 		toolRequiresArgs := cf.extractToolRequiresFromArgs()
-		allInlineArgs := append(requiresArgs, toolRequiresArgs...)
+		allInlineArgs := make([]string, 0, len(requiresArgs)+len(toolRequiresArgs))
+		allInlineArgs = append(allInlineArgs, requiresArgs...)
+		allInlineArgs = append(allInlineArgs, toolRequiresArgs...)
 		if len(allInlineArgs) == 0 {
 			// No conanfile and no inline deps graph info will fail, fallback to lock file
 			args = append(args, ".")

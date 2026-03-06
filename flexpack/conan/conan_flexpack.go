@@ -94,9 +94,7 @@ func (cf *ConanFlexPack) ensureInitialized() error {
 	if err := cf.loadConanfile(); err != nil {
 		return fmt.Errorf("failed to load conanfile: %w", err)
 	}
-	if err := cf.parseDependencies(); err != nil {
-		return fmt.Errorf("failed to parse dependencies: %w", err)
-	}
+	cf.parseDependencies()
 	cf.initialized = true
 	log.Debug(fmt.Sprintf("Initialized with project %s, %d dependencies", cf.projectName, len(cf.dependencies)))
 	return nil

@@ -104,10 +104,10 @@ func (pf *PoetryFlexPack) GetDependency() string {
 		pf.parseDependencies()
 	}
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Project: %s:%s\n", pf.projectName, pf.projectVersion))
+	fmt.Fprintf(&result, "Project: %s:%s\n", pf.projectName, pf.projectVersion)
 	result.WriteString("Dependencies:\n")
 	for _, dep := range pf.dependencies {
-		result.WriteString(fmt.Sprintf("  - %s:%s [%s]\n", dep.Name, dep.Version, dep.Type))
+		fmt.Fprintf(&result, "  - %s:%s [%s]\n", dep.Name, dep.Version, dep.Type)
 	}
 	return result.String()
 }
