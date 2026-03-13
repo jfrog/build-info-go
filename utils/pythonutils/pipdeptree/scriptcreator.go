@@ -48,8 +48,16 @@ func main() {
 	// Write the script content a byte-slice
 	resourceString += "var pipDepTreeContent = []byte(`\n" + pyFileString + "`)"
 	// Create .go file with the script content
-	err = os.WriteFile(pipDepTreeContentPath, []byte(resourceString), os.ModePerm)
+	cleanPath := filepath.Clean(pipDepTreeContentPath)
+	f, err := os.OpenFile(cleanPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
 	if err != nil {
+		panic(err)
+	}
+	if _, err := f.Write([]byte(resourceString)); err != nil {
+		_ = f.Close()
+		panic(err)
+	}
+	if err := f.Close(); err != nil {
 		panic(err)
 	}
 }

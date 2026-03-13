@@ -617,7 +617,6 @@ func TestLoadConanfile(t *testing.T) {
 		tempDir, err := os.MkdirTemp("", "conan-load-test-*")
 		require.NoError(t, err)
 		defer func() { _ = os.RemoveAll(tempDir) }()
-		// Create both files
 		pyContent := `name = "mylib"\nversion = "1.0.0"`
 		txtContent := "[requires]\nzlib/1.2.13"
 		err = os.WriteFile(filepath.Join(tempDir, "conanfile.py"), []byte(pyContent), 0644)
@@ -646,7 +645,7 @@ func TestLoadConanfile(t *testing.T) {
 		assert.Contains(t, cf.conanfilePath, "conanfile.txt")
 		assert.Equal(t, filepath.Base(tempDir), cf.projectName)
 	})
-	t.Run("no conanfile error", func(t *testing.T) {
+	t.Run("no conanfile uses defaults", func(t *testing.T) {
 		tempDir, err := os.MkdirTemp("", "conan-load-test-*")
 		require.NoError(t, err)
 		defer func() { _ = os.RemoveAll(tempDir) }()
@@ -654,35 +653,336 @@ func TestLoadConanfile(t *testing.T) {
 			config: ConanConfig{WorkingDirectory: tempDir},
 		}
 		err = cf.loadConanfile()
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "no conanfile.py or conanfile.txt found")
+		assert.NoError(t, err, "loadConanfile should not fail when no conanfile exists (--requires mode)")
+		assert.Empty(t, cf.conanfilePath)
+		assert.Equal(t, filepath.Base(tempDir), cf.projectName)
+		assert.Equal(t, "", cf.projectVersion)
+		assert.Equal(t, "_", cf.user)
+		assert.Equal(t, "_", cf.channel)
+	})
+	t.Run("no conanfile with name/version overrides", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "conan-load-test-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				WorkingDirectory:       tempDir,
+				ProjectNameOverride:    "my-virtual-pkg",
+				ProjectVersionOverride: "2.0.0",
+			},
+		}
+		err = cf.loadConanfile()
+		assert.NoError(t, err)
+		assert.Equal(t, "my-virtual-pkg", cf.projectName)
+		assert.Equal(t, "2.0.0", cf.projectVersion)
+	})
+	t.Run("no conanfile with all reference overrides", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "conan-load-test-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				WorkingDirectory:       tempDir,
+				ProjectNameOverride:    "mypkg",
+				ProjectVersionOverride: "1.0.0",
+				UserOverride:           "myuser",
+				ChannelOverride:        "stable",
+			},
+		}
+		err = cf.loadConanfile()
+		assert.NoError(t, err)
+		assert.Equal(t, "mypkg", cf.projectName)
+		assert.Equal(t, "1.0.0", cf.projectVersion)
+		assert.Equal(t, "myuser", cf.user)
+		assert.Equal(t, "stable", cf.channel)
+	})
+	t.Run("user/channel overrides with conanfile", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "conan-load-test-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		pyContent := `name = "original"
+version = "1.0.0"`
+		err = os.WriteFile(filepath.Join(tempDir, "conanfile.py"), []byte(pyContent), 0644)
+		require.NoError(t, err)
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				WorkingDirectory: tempDir,
+				UserOverride:     "ci-user",
+				ChannelOverride:  "testing",
+			},
+		}
+		err = cf.loadConanfile()
+		assert.NoError(t, err)
+		assert.Equal(t, "original", cf.projectName)
+		assert.Equal(t, "ci-user", cf.user)
+		assert.Equal(t, "testing", cf.channel)
+	})
+	t.Run("RecipeFilePath finds conanfile in subdirectory", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "conan-load-test-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		recipeDir := filepath.Join(tempDir, "recipes", "mylib")
+		require.NoError(t, os.MkdirAll(recipeDir, 0755))
+		pyContent := `name = "mylib"
+version = "1.0.0"`
+		err = os.WriteFile(filepath.Join(recipeDir, "conanfile.py"), []byte(pyContent), 0644)
+		require.NoError(t, err)
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				WorkingDirectory: tempDir,
+				RecipeFilePath:   recipeDir,
+			},
+		}
+		err = cf.loadConanfile()
+		assert.NoError(t, err)
+		assert.Contains(t, cf.conanfilePath, filepath.Join("recipes", "mylib", "conanfile.py"))
+		assert.Equal(t, "mylib", cf.projectName)
+		assert.Equal(t, "1.0.0", cf.projectVersion)
+	})
+	t.Run("RecipeFilePath with no conanfile in cwd succeeds", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "conan-load-test-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		rootDir := filepath.Join(tempDir, "project")
+		recipeDir := filepath.Join(tempDir, "recipes")
+		require.NoError(t, os.MkdirAll(rootDir, 0755))
+		require.NoError(t, os.MkdirAll(recipeDir, 0755))
+		txtContent := "[requires]\nzlib/1.2.13"
+		err = os.WriteFile(filepath.Join(recipeDir, "conanfile.txt"), []byte(txtContent), 0644)
+		require.NoError(t, err)
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				WorkingDirectory: rootDir,
+				RecipeFilePath:   recipeDir,
+			},
+		}
+		err = cf.loadConanfile()
+		assert.NoError(t, err)
+		assert.Contains(t, cf.conanfilePath, filepath.Join("recipes", "conanfile.txt"))
+	})
+	t.Run("name and version overrides from CLI flags", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "conan-load-test-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		pyContent := `from conan import ConanFile
+class MyPkg(ConanFile):
+    pass`
+		err = os.WriteFile(filepath.Join(tempDir, "conanfile.py"), []byte(pyContent), 0644)
+		require.NoError(t, err)
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				WorkingDirectory:       tempDir,
+				ProjectNameOverride:    "overridden-name",
+				ProjectVersionOverride: "9.9.9",
+			},
+		}
+		err = cf.loadConanfile()
+		assert.NoError(t, err)
+		assert.Equal(t, "overridden-name", cf.projectName)
+		assert.Equal(t, "9.9.9", cf.projectVersion)
+	})
+	t.Run("overrides only apply when set", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "conan-load-test-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(tempDir) }()
+		pyContent := `name = "original"
+version = "1.0.0"`
+		err = os.WriteFile(filepath.Join(tempDir, "conanfile.py"), []byte(pyContent), 0644)
+		require.NoError(t, err)
+		cf := &ConanFlexPack{
+			config: ConanConfig{WorkingDirectory: tempDir},
+		}
+		err = cf.loadConanfile()
+		assert.NoError(t, err)
+		assert.Equal(t, "original", cf.projectName)
+		assert.Equal(t, "1.0.0", cf.projectVersion)
 	})
 }
 
 func TestBuildGraphInfoArgs(t *testing.T) {
-	cf := &ConanFlexPack{
-		conanfilePath: "/path/to/conanfile.py",
-		config: ConanConfig{
-			Profile: "default",
-			Settings: map[string]string{
-				"build_type": "Release",
+	t.Run("with conanfile path", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			conanfilePath: "/path/to/conanfile.py",
+			config: ConanConfig{
+				Profile: "default",
+				Settings: map[string]string{
+					"build_type": "Release",
+				},
+				Options: map[string]string{
+					"shared": "True",
+				},
 			},
-			Options: map[string]string{
-				"shared": "True",
+		}
+		args := cf.buildGraphInfoArgs()
+		assert.Contains(t, args, "graph")
+		assert.Contains(t, args, "info")
+		assert.Contains(t, args, "/path/to/conanfile.py")
+		assert.Contains(t, args, "--format=json")
+		assert.Contains(t, args, "-pr")
+		assert.Contains(t, args, "default")
+		assert.Contains(t, args, "-s")
+		assert.Contains(t, args, "build_type=Release")
+		assert.Contains(t, args, "-o")
+		assert.Contains(t, args, "shared=True")
+	})
+	t.Run("without conanfile uses --requires from args", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			conanfilePath: "",
+			config: ConanConfig{
+				ConanArgs: []string{"--requires", "zlib/1.2.11", "--build", "zlib/1.2.11"},
 			},
-		},
-	}
-	args := cf.buildGraphInfoArgs()
-	assert.Contains(t, args, "graph")
-	assert.Contains(t, args, "info")
-	assert.Contains(t, args, "/path/to/conanfile.py")
-	assert.Contains(t, args, "--format=json")
-	assert.Contains(t, args, "-pr")
-	assert.Contains(t, args, "default")
-	assert.Contains(t, args, "-s")
-	assert.Contains(t, args, "build_type=Release")
-	assert.Contains(t, args, "-o")
-	assert.Contains(t, args, "shared=True")
+		}
+		args := cf.buildGraphInfoArgs()
+		assert.Contains(t, args, "graph")
+		assert.Contains(t, args, "info")
+		assert.Contains(t, args, "--requires=zlib/1.2.11")
+		assert.Contains(t, args, "--format=json")
+		assert.NotContains(t, args, ".")
+	})
+	t.Run("without conanfile with --requires=value form", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			conanfilePath: "",
+			config: ConanConfig{
+				ConanArgs: []string{"--requires=zlib/1.2.11", "--requires=openssl/3.0.0"},
+			},
+		}
+		args := cf.buildGraphInfoArgs()
+		assert.Contains(t, args, "--requires=zlib/1.2.11")
+		assert.Contains(t, args, "--requires=openssl/3.0.0")
+		assert.NotContains(t, args, ".")
+	})
+	t.Run("without conanfile uses --tool-requires from args", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			conanfilePath: "",
+			config: ConanConfig{
+				ConanArgs: []string{"--tool-requires", "cmake/3.23.5", "--tool-requires=ninja/1.11.0"},
+			},
+		}
+		args := cf.buildGraphInfoArgs()
+		assert.Contains(t, args, "--tool-requires=cmake/3.23.5")
+		assert.Contains(t, args, "--tool-requires=ninja/1.11.0")
+		assert.NotContains(t, args, ".")
+	})
+	t.Run("without conanfile with both --requires and --tool-requires", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			conanfilePath: "",
+			config: ConanConfig{
+				ConanArgs: []string{"--requires=zlib/1.2.11", "--tool-requires=cmake/3.23.5"},
+			},
+		}
+		args := cf.buildGraphInfoArgs()
+		assert.Contains(t, args, "--requires=zlib/1.2.11")
+		assert.Contains(t, args, "--tool-requires=cmake/3.23.5")
+		assert.NotContains(t, args, ".")
+	})
+	t.Run("only --tool-requires without --requires still works", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			conanfilePath: "",
+			config: ConanConfig{
+				ConanArgs: []string{"--tool-requires=cmake/3.23.5"},
+			},
+		}
+		args := cf.buildGraphInfoArgs()
+		assert.Contains(t, args, "--tool-requires=cmake/3.23.5")
+		assert.NotContains(t, args, ".")
+	})
+	t.Run("without conanfile and no inline deps falls back to dot", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			conanfilePath: "",
+			config: ConanConfig{
+				ConanArgs: []string{"--build", "zlib/1.2.11"},
+			},
+		}
+		args := cf.buildGraphInfoArgs()
+		assert.Contains(t, args, ".")
+	})
+}
+
+func TestExtractRequiresFromArgs(t *testing.T) {
+	t.Run("--requires value form", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				ConanArgs: []string{"--requires", "zlib/1.2.11", "--build", "zlib/1.2.11"},
+			},
+		}
+		result := cf.extractRequiresFromArgs()
+		assert.Equal(t, []string{"--requires=zlib/1.2.11"}, result)
+	})
+	t.Run("--requires=value form", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				ConanArgs: []string{"--requires=zlib/1.2.11"},
+			},
+		}
+		result := cf.extractRequiresFromArgs()
+		assert.Equal(t, []string{"--requires=zlib/1.2.11"}, result)
+	})
+	t.Run("multiple requires", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				ConanArgs: []string{"--requires=zlib/1.2.11", "--requires", "openssl/3.0.0"},
+			},
+		}
+		result := cf.extractRequiresFromArgs()
+		assert.Equal(t, []string{"--requires=zlib/1.2.11", "--requires=openssl/3.0.0"}, result)
+	})
+	t.Run("no requires returns empty", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				ConanArgs: []string{"--build", "missing"},
+			},
+		}
+		result := cf.extractRequiresFromArgs()
+		assert.Empty(t, result)
+	})
+}
+
+func TestExtractToolRequiresFromArgs(t *testing.T) {
+	t.Run("--tool-requires value form", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				ConanArgs: []string{"--tool-requires", "cmake/3.23.5"},
+			},
+		}
+		result := cf.extractToolRequiresFromArgs()
+		assert.Equal(t, []string{"--tool-requires=cmake/3.23.5"}, result)
+	})
+	t.Run("--tool-requires=value form", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				ConanArgs: []string{"--tool-requires=cmake/3.23.5"},
+			},
+		}
+		result := cf.extractToolRequiresFromArgs()
+		assert.Equal(t, []string{"--tool-requires=cmake/3.23.5"}, result)
+	})
+	t.Run("multiple tool-requires", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				ConanArgs: []string{"--tool-requires=cmake/3.23.5", "--tool-requires", "ninja/1.11.0"},
+			},
+		}
+		result := cf.extractToolRequiresFromArgs()
+		assert.Equal(t, []string{"--tool-requires=cmake/3.23.5", "--tool-requires=ninja/1.11.0"}, result)
+	})
+	t.Run("no tool-requires returns empty", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				ConanArgs: []string{"--requires=zlib/1.2.11"},
+			},
+		}
+		result := cf.extractToolRequiresFromArgs()
+		assert.Empty(t, result)
+	})
+	t.Run("does not pick up --requires", func(t *testing.T) {
+		cf := &ConanFlexPack{
+			config: ConanConfig{
+				ConanArgs: []string{"--requires=zlib/1.2.11", "--tool-requires=cmake/3.23.5"},
+			},
+		}
+		result := cf.extractToolRequiresFromArgs()
+		assert.Equal(t, []string{"--tool-requires=cmake/3.23.5"}, result)
+	})
 }
 
 func TestFindConanPackageFile(t *testing.T) {
