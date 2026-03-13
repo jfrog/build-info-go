@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -374,7 +375,11 @@ func (config *mvnRunConfig) runCmd() (err error) {
 
 // To always have color in Maven's output, add "-Dstyle.color=always" to the command line arguments
 func addColorToCmdOutput(command *exec.Cmd) {
-	if term.IsTerminal(int(os.Stderr.Fd())) {
+	fd := os.Stderr.Fd()
+	if fd > math.MaxInt {
+		return
+	}
+	if term.IsTerminal(int(fd)) {
 		shouldAddColor := true
 		for _, arg := range command.Args {
 			if strings.Contains(arg, "-Dstyle.color") {
