@@ -165,14 +165,15 @@ func (cf *ConanFlexPack) getRecipeDir() string {
 	if cf.conanfilePath != "" {
 		return filepath.Dir(cf.conanfilePath)
 	}
-	if cf.config.RecipeFilePath != "" {
-		recipeDir := cf.config.RecipeFilePath
-		if info, err := os.Stat(recipeDir); err == nil && !info.IsDir() {
-			return filepath.Dir(recipeDir)
-		}
-		return recipeDir
+	target := cf.config.RecipeFilePath
+	if target == "" {
+		return cf.config.WorkingDirectory
 	}
-	return cf.config.WorkingDirectory
+
+	if info, err := os.Stat(target); err == nil && !info.IsDir() {
+		return filepath.Dir(target)
+	}
+	return target
 }
 
 // applyOverrides applies CLI-provided overrides (from --name, --version, --user, --channel flags).
