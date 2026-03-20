@@ -5,7 +5,7 @@ go 1.25.5
 require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/CycloneDX/cyclonedx-go v0.9.3
-	github.com/buger/jsonparser v1.1.1
+	github.com/buger/jsonparser v1.1.2
 	github.com/jfrog/gofrog v1.7.6
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v2 v2.27.7
