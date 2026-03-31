@@ -294,14 +294,24 @@ func runYarnInfoOrList(executablePath string, srcPath string, v2AndAbove bool) (
 // Yarn dependency locator usually looks like this: package-name@npm:1.2.3, which is used as the key in the dependencies map.
 // But sometimes it points to a virtual package, so it looks different: package-name@virtual:[ID of virtual package]#npm:1.2.3.
 // In this case we need to omit the part of the virtual package ID, to get the key as it is found in the dependencies map.
+// When the patch: protocol is also involved, the locator may contain multiple '#' delimiters, e.g.:
+// pkg@virtual:HASH#patch:pkg@npm:1.0.0#./patches/pkg.patch
+// We must strip only up to the FIRST '#' after '@virtual:' to preserve the full protocol+path suffix as the map key.
 func GetYarnDependencyKeyFromLocator(yarnDepLocator string) string {
 	virtualIndex := strings.Index(yarnDepLocator, "@virtual:")
 	if virtualIndex == -1 {
 		return yarnDepLocator
 	}
 
-	hashSignIndex := strings.LastIndex(yarnDepLocator, "#")
-	return yarnDepLocator[:virtualIndex+1] + yarnDepLocator[hashSignIndex+1:]
+	// Search for the first '#' starting from the '@virtual:' segment, not the last '#' in the whole string.
+	// Using LastIndex breaks locators that use the patch: protocol, which itself contains a '#' separator
+	// (e.g. pkg@virtual:HASH#patch:pkg@npm:1.0.0#./file.patch → last '#' points to './file.patch', not 'patch:…').
+	virtualSegment := yarnDepLocator[virtualIndex:]
+	firstHashIndex := strings.Index(virtualSegment, "#")
+	if firstHashIndex == -1 {
+		return yarnDepLocator
+	}
+	return yarnDepLocator[:virtualIndex+1] + virtualSegment[firstHashIndex+1:]
 }
 
 // buildYarn1Root builds the root of the project's dependency tree (from direct dependencies in package.json)

@@ -18,6 +18,9 @@ func TestGetYarnDependencyKeyFromLocator(t *testing.T) {
 		{"@babel/highlight@npm:7.14.0", "@babel/highlight@npm:7.14.0"},
 		{"fsevents@patch:fsevents@npm%3A2.3.2#builtin<compat/fsevents>::version=2.3.2&hash=11e9ea", "fsevents@patch:fsevents@npm%3A2.3.2#builtin<compat/fsevents>::version=2.3.2&hash=11e9ea"},
 		{"follow-redirects@virtual:c192f6b3b32cd5d11a443145a3883a70c04cbd7c813b53085dbaf50263735f1162f10fdbddd53c24e162ec3bc#npm:1.14.1", "follow-redirects@npm:1.14.1"},
+		// Yarn Berry patch: protocol combined with a virtual package produces a locator with two '#' delimiters.
+		// Only the virtual hash segment (up to the first '#') must be stripped; the rest is the actual map key.
+		{"mobx-react@virtual:abc123def456#patch:mobx-react@npm:6.3.1#./patches/mobx-react.patch", "mobx-react@patch:mobx-react@npm:6.3.1#./patches/mobx-react.patch"},
 	}
 
 	for _, testCase := range testCases {
