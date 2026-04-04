@@ -8,9 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/jfrog/gofrog/crypto"
+	"github.com/jfrog/gofrog/log"
 
 	"golang.org/x/exp/slices"
 
@@ -21,6 +23,11 @@ import (
 )
 
 const npmInstallCommand = "install"
+
+// TransitiveDepMarker is appended to version for transitive blocked packages
+// Uses ":" prefix so it becomes an extra segment that's ignored in parsing but detectable
+// e.g., "5.1.6:TRANSITIVE" -> splits to ["name", "5.1.6", "TRANSITIVE"]
+const TransitiveDepMarker = ":TRANSITIVE"
 
 // CalculateNpmDependenciesList gets an npm project's dependencies.
 func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
@@ -91,6 +98,15 @@ type dependencyInfo struct {
 	*npmLsDependency
 }
 
+type DependencyInfo = dependencyInfo
+
+// NotFoundPackage represents a package not found during npm install (404/ETARGET).
+type NotFoundPackage struct {
+	Name         string
+	Version      string
+	IsTransitive bool // True if this is a transitive dependency
+}
+
 // Run 'npm list ...' command and parse the returned result to create a dependencies map of.
 // The dependencies map looks like name:version -> entities.Dependency.
 func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmListParams NpmTreeDepListParam, log utils.Log, skipInstall bool) (map[string]*dependencyInfo, error) {
@@ -123,6 +139,176 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmListP
 		}
 		return err
 	})
+}
+
+// CalculateDependenciesMapWithCvs calculates dependencies.
+// It retries npm install when packages are blocked, collecting blocked packages for audit.
+// this code is used by 'jf ca'.
+func CalculateDependenciesMapWithCvs(executablePath, srcPath, moduleId string, npmListParams NpmTreeDepListParam, log utils.Log, skipInstall bool) (map[string]*DependencyInfo, []NotFoundPackage, error) {
+	dependenciesMap := make(map[string]*DependencyInfo)
+	npmVersion, err := GetNpmVersion(executablePath, log)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	data, blockedPackages, err := runNpmLsWithCurationSupport(executablePath, srcPath, npmListParams, log, npmVersion)
+	if err != nil {
+		return nil, blockedPackages, err
+	}
+
+	parseFunc := parseNpmLsDependencyFunc(npmVersion)
+	err = jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
+		if string(key) == "dependencies" {
+			err = parseDependencies(value, []string{moduleId}, dependenciesMap, parseFunc, log)
+		}
+		return err
+	})
+
+	return dependenciesMap, blockedPackages, err
+}
+
+func runNpmLsWithCurationSupport(executablePath, srcPath string, npmListParams NpmTreeDepListParam, log utils.Log, npmVersion *version.Version) ([]byte, []NotFoundPackage, error) {
+	tempDir, err := utils.CreateTempDir()
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		_ = utils.RemoveTempDir(tempDir)
+	}()
+
+	if err := utils.CopyDir(srcPath, tempDir, true, []string{"node_modules"}); err != nil {
+		return nil, nil, err
+	}
+	blockedPackages, err := runNpmInstallWithRetry(executablePath, tempDir, npmListParams.InstallCommandArgs, npmListParams.Args, log, npmVersion)
+	if err != nil {
+		return nil, blockedPackages, err
+	}
+
+	// Check if package-lock.json exists before running npm ls --package-lock-only
+	packageLockPath := filepath.Join(tempDir, "package-lock.json")
+	packageLockExists, _ := utils.IsFileExists(packageLockPath, false)
+	if !packageLockExists {
+		log.Warn("No package-lock.json found. Cannot run npm ls --package-lock-only.")
+		// Return empty JSON with just the blocked packages
+		data := []byte("{}")
+		if len(blockedPackages) > 0 {
+			data = addNotFoundPackagesToNpmLsOutput(data, blockedPackages)
+		}
+		return data, blockedPackages, nil
+	}
+
+	npmListParams.Args = append(npmListParams.Args, "--json", "--all", "--long", "--package-lock-only")
+	data, errData, err := RunNpmCmd(executablePath, tempDir, AppendNpmCommand(npmListParams.Args, "ls"), log)
+	if err != nil {
+		log.Warn(err.Error())
+	} else if len(errData) > 0 {
+		log.Warn("Encountered some issues while running 'npm ls' command:\n" + strings.TrimSpace(string(errData)))
+	}
+
+	// Add blocked packages to the dependency tree for auditing
+	if len(blockedPackages) > 0 {
+		data = addNotFoundPackagesToNpmLsOutput(data, blockedPackages)
+	}
+
+	return data, blockedPackages, nil
+}
+
+func addNotFoundPackagesToNpmLsOutput(data []byte, blockedPackages []NotFoundPackage) []byte {
+	var npmLsOutput map[string]interface{}
+	if err := json.Unmarshal(data, &npmLsOutput); err != nil {
+		log.Debug("Failed to add blocked packages to npm ls output: unable to parse JSON")
+		return data
+	}
+	deps, ok := npmLsOutput["dependencies"].(map[string]interface{})
+	if !ok {
+		deps = make(map[string]interface{})
+		npmLsOutput["dependencies"] = deps
+	}
+	for _, bp := range blockedPackages {
+		version := bp.Version
+		if bp.IsTransitive {
+			version = bp.Version + TransitiveDepMarker
+		}
+		deps[bp.Name] = map[string]interface{}{
+			"version": version,
+			"missing": true,
+		}
+	}
+	result, err := json.Marshal(npmLsOutput)
+	if err != nil {
+		log.Debug("Failed to add blocked packages to npm ls output: unable to marshal JSON")
+		return data
+	}
+	return result
+}
+
+// runNpmInstallWithRetry runs npm install in the given directory (should be temp dir).
+// If a package is blocked (404), it removes it from package.json and retries.
+func runNpmInstallWithRetry(executablePath, workDir string, npmInstallCommandArgs, npmArgs []string, log utils.Log, npmVersion *version.Version) ([]NotFoundPackage, error) {
+	pkgJsonPath := filepath.Join(workDir, "package.json")
+	var blocked []NotFoundPackage
+	var lastPkg string
+
+	for {
+		err := installPackageLock(executablePath, workDir, npmInstallCommandArgs, npmArgs, log, npmVersion)
+		if err == nil {
+			return blocked, nil
+		}
+
+		name, version, found := ParseNpmNotFoundError(err)
+		if !found {
+			return blocked, err
+		}
+
+		pkgId := name + "@" + version
+		if pkgId == lastPkg {
+			// Package couldn't be removed (transitive dependency)
+			log.Debug(fmt.Sprintf("Package %s is not found (transitive dependency). Adding to blocked packages and continuing...", pkgId))
+			blocked = append(blocked, NotFoundPackage{Name: name, Version: version, IsTransitive: true})
+			return blocked, nil
+		}
+		lastPkg = pkgId
+
+		log.Info(fmt.Sprintf("Retrying without package %s...", pkgId))
+		blocked = append(blocked, NotFoundPackage{Name: name, Version: version, IsTransitive: false})
+		if err := removePackageFromPackageJson(pkgJsonPath, name); err != nil {
+			return blocked, err
+		}
+	}
+}
+
+var npmNotFoundPattern = regexp.MustCompile(`No matching version found for\s+(@?[\w./-]+)@([\d][\w._-]*)`)
+
+func ParseNpmNotFoundError(err error) (name, version string, found bool) {
+	if err == nil {
+		return "", "", false
+	}
+	if matches := npmNotFoundPattern.FindStringSubmatch(err.Error()); len(matches) >= 3 {
+		return matches[1], strings.TrimSuffix(matches[2], "."), true
+	}
+	return "", "", false
+}
+
+func removePackageFromPackageJson(packageJsonPath, packageName string) error {
+	data, err := os.ReadFile(packageJsonPath)
+	if err != nil {
+		return err
+	}
+	var pkg map[string]interface{}
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return err
+	}
+	depTypes := []string{"dependencies", "devDependencies", "peerDependencies", "optionalDependencies"}
+	for _, depType := range depTypes {
+		if deps, ok := pkg[depType].(map[string]interface{}); ok {
+			delete(deps, packageName)
+		}
+	}
+	newData, err := json.MarshalIndent(pkg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(packageJsonPath, newData, 0644)
 }
 
 func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log) (data []byte) {
