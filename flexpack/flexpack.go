@@ -70,6 +70,15 @@ type PoetryConfig struct {
 	IncludeDevDependencies bool
 }
 
+// UvConfig holds configuration specific to UV operations
+type UvConfig struct {
+	// WorkingDirectory is the directory where UV should operate
+	WorkingDirectory string
+
+	// IncludeDevDependencies indicates whether to include development dependencies
+	IncludeDevDependencies bool
+}
+
 // GradleConfig holds configuration specific to Gradle operations
 type GradleConfig struct {
 	// WorkingDirectory is the directory where Gradle should operate
