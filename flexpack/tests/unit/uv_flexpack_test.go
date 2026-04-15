@@ -9,8 +9,8 @@ import (
 )
 
 // minimalPyproject returns a minimal valid PEP 621 pyproject.toml content.
-func minimalPyproject(name, version string) string {
-	return "[project]\nname = \"" + name + "\"\nversion = \"" + version + "\"\n"
+func minimalPyproject(name string) string {
+	return "[project]\nname = \"" + name + "\"\nversion = \"1.0.0\"\n"
 }
 
 // minimalUvLock returns a uv.lock with a virtual root and one registry package.
@@ -46,7 +46,7 @@ func writeTempFiles(t *testing.T, dir string, files map[string]string) {
 func TestNewUvFlexPack(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("test-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("test-app"),
 		"uv.lock":        minimalUvLock("test-app"),
 	})
 
@@ -71,7 +71,7 @@ func TestNewUvFlexPack(t *testing.T) {
 func TestUvCollectBuildInfoModuleType(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("test-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("test-app"),
 		"uv.lock":        minimalUvLock("test-app"),
 	})
 
@@ -113,7 +113,7 @@ hash = "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 size = 62574
 `
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("my-app"),
 		"uv.lock":        uvLockContent,
 	})
 
@@ -158,7 +158,7 @@ hash = "sha256:aaaabbbbccccddddeeeeffffaaaabbbbccccddddeeeeffffaaaabbbbccccdddd"
 size = 158
 `
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("my-app"),
 		"uv.lock":        uvLockContent,
 	})
 
@@ -195,7 +195,7 @@ version = "0.1.0"
 source = { git = "https://github.com/example/some-lib?tag=v0.1.0#abcdef1234567890abcdef1234567890abcdef12" }
 `
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("my-app"),
 		"uv.lock":        uvLockContent,
 	})
 
@@ -261,7 +261,7 @@ size = 324467
 	t.Run("include dev deps", func(t *testing.T) {
 		tempDir := t.TempDir()
 		writeTempFiles(t, tempDir, map[string]string{
-			"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+			"pyproject.toml": minimalPyproject("my-app"),
 			"uv.lock":        uvLockContent,
 		})
 
@@ -282,8 +282,9 @@ size = 324467
 		for _, dep := range deps {
 			if dep.Name == "pytest" {
 				found = true
-				if len(dep.Scopes) == 0 || dep.Scopes[0] != "test" {
-					t.Errorf("Expected scope 'test' for dev dep, got %v", dep.Scopes)
+				// No scopes — Python has no compile/runtime distinction (matches pip/pipenv)
+				if len(dep.Scopes) != 0 {
+					t.Errorf("Expected no scopes for dev dep (Python has no scope distinction), got %v", dep.Scopes)
 				}
 				break
 			}
@@ -296,7 +297,7 @@ size = 324467
 	t.Run("exclude dev deps", func(t *testing.T) {
 		tempDir := t.TempDir()
 		writeTempFiles(t, tempDir, map[string]string{
-			"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+			"pyproject.toml": minimalPyproject("my-app"),
 			"uv.lock":        uvLockContent,
 		})
 
@@ -321,7 +322,7 @@ size = 324467
 	})
 }
 
-// TestUvWheelSelectionNoneAny verifies that bestHash/depFilename prefer the
+// TestUvWheelSelectionNoneAny verifies that bestHash/depFileType prefer the
 // pure-Python none-any wheel over platform-specific wheels, and fall back to
 // the first available wheel when none-any is absent.
 func TestUvWheelSelectionNoneAny(t *testing.T) {
@@ -354,7 +355,7 @@ hash = "sha256:windows0000000000000000000000000000000000000000000000000000000000
 size = 1100
 `
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("my-app"),
 		"uv.lock":        uvLockContent,
 	})
 
@@ -370,9 +371,12 @@ size = 1100
 		t.Fatal("Expected at least one dependency")
 	}
 	dep := deps[0]
-	// The none-any wheel must be selected over platform-specific wheels
-	if dep.ID != "multiplatform_pkg-1.0.0-py3-none-any.whl" {
-		t.Errorf("Expected none-any wheel filename, got %q", dep.ID)
+	// ID is now name:version (pip format); sha256 still uses none-any wheel hash
+	if dep.ID != "multiplatform-pkg:1.0.0" {
+		t.Errorf("Expected name:version ID, got %q", dep.ID)
+	}
+	if dep.Type != "whl" {
+		t.Errorf("Expected type 'whl', got %q", dep.Type)
 	}
 	if dep.SHA256 != "noneany00000000000000000000000000000000000000000000000000000000" {
 		t.Errorf("Expected none-any sha256, got %q", dep.SHA256)
@@ -406,7 +410,7 @@ hash = "sha256:secondwheel00000000000000000000000000000000000000000000000000000"
 size = 2100
 `
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("my-app"),
 		"uv.lock":        uvLockContent,
 	})
 
@@ -422,9 +426,12 @@ size = 2100
 		t.Fatal("Expected at least one dependency")
 	}
 	dep := deps[0]
-	// First wheel must be selected when no none-any wheel exists
-	if dep.ID != "platform_only_pkg-2.0.0-cp311-cp311-linux_x86_64.whl" {
-		t.Errorf("Expected first wheel filename as fallback, got %q", dep.ID)
+	// ID is name:version; type is the file extension of the selected wheel
+	if dep.ID != "platform-only-pkg:2.0.0" {
+		t.Errorf("Expected name:version ID, got %q", dep.ID)
+	}
+	if dep.Type != "whl" {
+		t.Errorf("Expected type 'whl', got %q", dep.Type)
 	}
 	if dep.SHA256 != "firstwheel000000000000000000000000000000000000000000000000000000" {
 		t.Errorf("Expected first wheel sha256, got %q", dep.SHA256)
@@ -453,7 +460,7 @@ hash = "sha256:sdist000000000000000000000000000000000000000000000000000000000000
 size = 5000
 `
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("my-app"),
 		"uv.lock":        uvLockContent,
 	})
 
@@ -469,8 +476,12 @@ size = 5000
 		t.Fatal("Expected at least one dependency")
 	}
 	dep := deps[0]
-	if dep.ID != "sdist_only_pkg-3.0.0.tar.gz" {
-		t.Errorf("Expected sdist filename, got %q", dep.ID)
+	// ID is name:version; type is tar.gz for sdist
+	if dep.ID != "sdist-only-pkg:3.0.0" {
+		t.Errorf("Expected name:version ID, got %q", dep.ID)
+	}
+	if dep.Type != "tar.gz" {
+		t.Errorf("Expected type 'tar.gz', got %q", dep.Type)
 	}
 	if dep.SHA256 != "sdist000000000000000000000000000000000000000000000000000000000000" {
 		t.Errorf("Expected sdist sha256, got %q", dep.SHA256)
@@ -529,7 +540,7 @@ hash = "sha256:cccc000000000000000000000000000000000000000000000000000000000000"
 size = 100
 `
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("my-app"),
 		"uv.lock":        uvLockContent,
 	})
 
@@ -537,53 +548,45 @@ size = 100
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
-	deps, err := uf.GetProjectDependencies()
-	if err != nil {
+	if _, err := uf.GetProjectDependencies(); err != nil {
 		t.Fatalf("GetProjectDependencies failed: %v", err)
 	}
 
-	depByName := make(map[string]flexpack.DependencyInfo)
-	for _, d := range deps {
-		depByName[d.Name] = d
-	}
+	// Use GetRequestedByChains() to inspect full [][]string chains (UV-specific).
+	// DependencyInfo.RequestedBy is []string (shared type); chains are stored separately.
+	chains := uf.GetRequestedByChains()
 
-	// pkgb must report pkga as its requester
-	pkgb, ok := depByName["pkgb"]
-	if !ok {
-		t.Fatal("Expected pkgb in dependencies")
-	}
-	if len(pkgb.RequestedBy) == 0 {
-		t.Error("pkgb.RequestedBy should be non-empty (requested by pkga)")
+	// pkgb must report pkga as its direct requester (chain: [pkga:1.0.0, my-app:1.0.0])
+	pkgbChains, ok := chains["pkgb:1.0.0"]
+	if !ok || len(pkgbChains) == 0 {
+		t.Error("pkgb:1.0.0 should have at least one requestedBy chain (requested by pkga)")
 	} else {
 		found := false
-		for _, rb := range pkgb.RequestedBy {
-			if rb == "pkga" {
+		for _, chain := range pkgbChains {
+			if len(chain) > 0 && chain[0] == "pkga:1.0.0" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("pkgb.RequestedBy should contain 'pkga', got %v", pkgb.RequestedBy)
+			t.Errorf("pkgb:1.0.0 requestedBy chains should start with 'pkga:1.0.0', got %v", pkgbChains)
 		}
 	}
 
-	// pkgc must report pkgb as its requester
-	pkgc, ok := depByName["pkgc"]
-	if !ok {
-		t.Fatal("Expected pkgc in dependencies")
-	}
-	if len(pkgc.RequestedBy) == 0 {
-		t.Error("pkgc.RequestedBy should be non-empty (requested by pkgb)")
+	// pkgc must report pkgb as its direct requester (chain: [pkgb:1.0.0, pkga:1.0.0, my-app:1.0.0])
+	pkgcChains, ok2 := chains["pkgc:1.0.0"]
+	if !ok2 || len(pkgcChains) == 0 {
+		t.Error("pkgc:1.0.0 should have at least one requestedBy chain (requested by pkgb)")
 	} else {
 		found := false
-		for _, rb := range pkgc.RequestedBy {
-			if rb == "pkgb" {
+		for _, chain := range pkgcChains {
+			if len(chain) > 0 && chain[0] == "pkgb:1.0.0" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("pkgc.RequestedBy should contain 'pkgb', got %v", pkgc.RequestedBy)
+			t.Errorf("pkgc:1.0.0 requestedBy chains should start with 'pkgb:1.0.0', got %v", pkgcChains)
 		}
 	}
 }
@@ -630,7 +633,7 @@ hash = "sha256:url00000000000000000000000000000000000000000000000000000000000000
 size = 124424
 `
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("my-app"),
 		"uv.lock":        uvLockContent,
 	})
 
@@ -657,8 +660,9 @@ size = 124424
 	}
 }
 
-// TestUvScopeClassification verifies that direct production dependencies get
-// scope "compile" and direct dev dependencies get scope "test".
+// TestUvDevDepInclusion verifies that dev deps are excluded by default and
+// included when IncludeDevDependencies=true. No scopes are set (Python has no
+// compile/runtime distinction — matches pip/pipenv canonical format).
 func TestUvScopeClassification(t *testing.T) {
 	tempDir := t.TempDir()
 	uvLockContent := `version = 1
@@ -697,7 +701,7 @@ hash = "sha256:pytest00000000000000000000000000000000000000000000000000000000000
 size = 324467
 `
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+		"pyproject.toml": minimalPyproject("my-app"),
 		"uv.lock":        uvLockContent,
 	})
 
@@ -722,16 +726,21 @@ size = 324467
 	if !ok {
 		t.Fatal("Expected certifi in dependencies")
 	}
-	if len(certifi.Scopes) == 0 || certifi.Scopes[0] != "compile" {
-		t.Errorf("certifi (direct production dep) should have scope 'compile', got %v", certifi.Scopes)
+	// No scopes — Python has no compile/runtime distinction (matches pip/pipenv)
+	if len(certifi.Scopes) != 0 {
+		t.Errorf("certifi should have no scopes (Python has no compile/runtime distinction), got %v", certifi.Scopes)
+	}
+	if certifi.Type != "whl" {
+		t.Errorf("certifi type should be 'whl', got %q", certifi.Type)
 	}
 
 	pytest, ok := depByName["pytest"]
 	if !ok {
 		t.Fatal("Expected pytest in dependencies (IncludeDevDependencies=true)")
 	}
-	if len(pytest.Scopes) == 0 || pytest.Scopes[0] != "test" {
-		t.Errorf("pytest (dev dep) should have scope 'test', got %v", pytest.Scopes)
+	// Dev deps also have no scopes in the new format
+	if len(pytest.Scopes) != 0 {
+		t.Errorf("pytest should have no scopes, got %v", pytest.Scopes)
 	}
 }
 
@@ -758,7 +767,7 @@ func TestUvErrorHandling(t *testing.T) {
 	t.Run("pyproject.toml present but no uv.lock", func(t *testing.T) {
 		tempDir := t.TempDir()
 		writeTempFiles(t, tempDir, map[string]string{
-			"pyproject.toml": minimalPyproject("my-app", "1.0.0"),
+			"pyproject.toml": minimalPyproject("my-app"),
 		})
 
 		uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{

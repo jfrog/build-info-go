@@ -29,7 +29,7 @@ type FlexPackManager interface {
 	CalculateScopes() []string
 
 	// CalculateRequestedBy determines which dependencies requested a particular package
-	// Returns information about the dependency relationship hierarchy
+	// Returns information about the dependency relationship hierarchy.
 	CalculateRequestedBy() map[string][]string
 }
 
@@ -40,7 +40,7 @@ type DependencyInfo struct {
 	SHA256       string           `json:"sha256"`
 	MD5          string           `json:"md5"`
 	ID           string           `json:"id"`
-	Scopes       []string         `json:"scopes"`
+	Scopes       []string         `json:"scopes,omitempty"`
 	RequestedBy  []string         `json:"requestedBy,omitempty"`
 	Version      string           `json:"version"`
 	Name         string           `json:"name"`

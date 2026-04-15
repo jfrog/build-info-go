@@ -77,21 +77,23 @@ type UvPyProjectToml struct {
 
 // UvFlexPack implements FlexPackManager and BuildInfoCollector for the UV package manager
 type UvFlexPack struct {
-	config         UvConfig
-	lockFileData   *UvLockFile
-	pyprojectData  *UvPyProjectToml
-	projectName    string
-	projectVersion string
-	dependencies   []DependencyInfo
-	depGraph       map[string][]string // normalized-name -> []normalized-name
+	config            UvConfig
+	lockFileData      *UvLockFile
+	pyprojectData     *UvPyProjectToml
+	projectName       string
+	projectVersion    string
+	dependencies      []DependencyInfo
+	depGraph          map[string][]string  // normalized-name -> []normalized-name
+	requestedByChains map[string][][]string // dep ID -> full chains back to root (UV-specific)
 }
 
 // NewUvFlexPack creates a new UvFlexPack instance.
 func NewUvFlexPack(config UvConfig) (*UvFlexPack, error) {
 	uf := &UvFlexPack{
-		config:       config,
-		dependencies: []DependencyInfo{},
-		depGraph:     make(map[string][]string),
+		config:            config,
+		dependencies:      []DependencyInfo{},
+		depGraph:          make(map[string][]string),
+		requestedByChains: make(map[string][][]string),
 	}
 	if err := uf.loadPyProjectToml(); err != nil {
 		return nil, fmt.Errorf("failed to load pyproject.toml: %w", err)
@@ -167,40 +169,63 @@ func bestHash(pkg UvPackage) string {
 	return ""
 }
 
-// depFilename returns the filename-based ID for a package.
-// Prefers pure-Python wheel filename, falls back to first wheel filename, then sdist filename.
-// Falls back to "name-version" if no artifacts are present.
-func depFilename(pkg UvPackage) string {
+// depFileType returns the file extension type for a package artifact.
+// Prefers pure-Python wheel (none-any), falls back to first wheel, then sdist.
+// Matches pip/pipenv behavior: "whl", "tar.gz", "zip", etc.
+func depFileType(pkg UvPackage) string {
+	bestURL := ""
 	for _, w := range pkg.Wheels {
 		if strings.Contains(w.URL, "none-any") && w.URL != "" {
-			return filepath.Base(w.URL)
+			bestURL = w.URL
+			break
 		}
 	}
-	for _, w := range pkg.Wheels {
-		if w.URL != "" {
-			return filepath.Base(w.URL)
+	if bestURL == "" {
+		for _, w := range pkg.Wheels {
+			if w.URL != "" {
+				bestURL = w.URL
+				break
+			}
 		}
 	}
-	if pkg.Sdist != nil && pkg.Sdist.URL != "" {
-		return filepath.Base(pkg.Sdist.URL)
+	if bestURL == "" && pkg.Sdist != nil && pkg.Sdist.URL != "" {
+		bestURL = pkg.Sdist.URL
 	}
-	return fmt.Sprintf("%s-%s", pkg.Name, pkg.Version)
+	if bestURL == "" {
+		return ""
+	}
+	base := filepath.Base(bestURL)
+	if strings.HasSuffix(base, ".tar.gz") {
+		return "tar.gz"
+	}
+	if i := strings.LastIndex(base, "."); i != -1 {
+		return base[i+1:]
+	}
+	return ""
 }
 
 // parseDependencies populates uf.dependencies and uf.depGraph from the lock file.
+// ID format and requestedBy chains match the pip/pipenv canonical build-info format:
+//   - dep ID:  "name:version"  (e.g. "certifi:2026.2.25")
+//   - dep type: file extension (e.g. "whl", "tar.gz")
+//   - requestedBy: full chain back to root module (e.g. [["requests:2.33.1","myapp:0.1.0"]])
+//   - direct deps: requestedBy = [["myapp:0.1.0"]]
+//   - no scopes (Python has no compile/runtime distinction; matches pip/pipenv)
 func (uf *UvFlexPack) parseDependencies() {
 	if uf.lockFileData == nil {
 		return
 	}
 
-	// Build a name->package map (last-write-wins for resolver forks)
+	moduleID := fmt.Sprintf("%s:%s", uf.projectName, uf.projectVersion)
+
+	// Build name->package map
 	pkgByName := make(map[string]*UvPackage)
 	for i := range uf.lockFileData.Packages {
 		pkg := &uf.lockFileData.Packages[i]
 		pkgByName[normalizeName(pkg.Name)] = pkg
 	}
 
-	// Find the root workspace package (virtual or editable at ".")
+	// Find root workspace package
 	var rootPkg *UvPackage
 	for i := range uf.lockFileData.Packages {
 		pkg := &uf.lockFileData.Packages[i]
@@ -210,7 +235,7 @@ func (uf *UvFlexPack) parseDependencies() {
 		}
 	}
 
-	// Collect direct main and dev dep names (always collect both for exclusion logic)
+	// Collect direct main and dev dep names
 	directMainDeps := make(map[string]bool)
 	directDevDeps := make(map[string]bool)
 	if rootPkg != nil {
@@ -224,61 +249,156 @@ func (uf *UvFlexPack) parseDependencies() {
 		}
 	}
 
-	// Build inverse RequestedBy map: depName -> []parentName
-	inverse := make(map[string][]string)
-	for _, pkg := range uf.lockFileData.Packages {
-		if pkg.Source.IsWorkspacePackage() {
-			continue
-		}
-		parentName := normalizeName(pkg.Name)
-		for _, edge := range pkg.Dependencies {
-			childName := normalizeName(edge.Name)
-			inverse[childName] = append(inverse[childName], parentName)
-		}
+	// When excluding dev deps and the project has BOTH main deps and dev deps declared,
+	// compute the reachable set from main deps via BFS. This excludes transitive-only dev deps
+	// (e.g. pytest's dependencies like pluggy, iniconfig) — not just the direct dev dep itself.
+	// If only one side is present (no main deps or no dev deps), fall back to the simple check.
+	var mainReachable map[string]bool
+	if !uf.config.IncludeDevDependencies && rootPkg != nil &&
+		len(directMainDeps) > 0 && len(directDevDeps) > 0 {
+		mainReachable = computeMainReachable(directMainDeps, pkgByName)
 	}
 
-	// Build dep graph and dependency list
-	for _, pkg := range uf.lockFileData.Packages {
+	// Build depInfo map: normalizedName -> *DependencyInfo
+	// Only non-workspace packages. Exclusion logic when IncludeDevDependencies=false:
+	//   - With reachability analysis: skip anything not reachable from main deps
+	//   - Without (no dev deps or no main deps declared): skip direct dev deps only
+	depInfoMap := make(map[string]*DependencyInfo)
+	for i := range uf.lockFileData.Packages {
+		pkg := &uf.lockFileData.Packages[i]
 		if pkg.Source.IsWorkspacePackage() {
 			continue
 		}
 		normalizedName := normalizeName(pkg.Name)
-
-		// Determine scope
-		var scope string
-		if directMainDeps[normalizedName] {
-			scope = "compile"
-		} else if directDevDeps[normalizedName] {
-			scope = "test"
-		} else {
-			// Transitive: use "compile" as default
-			scope = "compile"
+		if !uf.config.IncludeDevDependencies {
+			if mainReachable != nil {
+				if !mainReachable[normalizedName] {
+					continue // reachability analysis: exclude dev-only transitive deps
+				}
+			} else if directDevDeps[normalizedName] {
+				continue // simple fallback: exclude direct dev deps only
+			}
 		}
+		depInfoMap[normalizedName] = &DependencyInfo{
+			ID:      fmt.Sprintf("%s:%s", pkg.Name, pkg.Version),
+			Name:    pkg.Name,
+			Version: pkg.Version,
+			Type:    depFileType(*pkg),
+			SHA256:  extractSHA256(bestHash(*pkg)),
+		}
+	}
 
-		// Skip dev deps if not including them
-		if !uf.config.IncludeDevDependencies && directDevDeps[normalizedName] {
+	// Build forward dep graph: normalizedName -> []normalizedName (children present in depInfoMap)
+	fwdGraph := make(map[string][]string)
+	for normalizedName := range depInfoMap {
+		pkg := pkgByName[normalizedName]
+		if pkg == nil {
 			continue
 		}
-
-		// Build dep graph entry
-		var childNames []string
+		var children []string
 		for _, edge := range pkg.Dependencies {
-			childNames = append(childNames, normalizeName(edge.Name))
+			childName := normalizeName(edge.Name)
+			if _, ok := depInfoMap[childName]; ok {
+				children = append(children, childName)
+			}
 		}
-		uf.depGraph[normalizedName] = childNames
+		fwdGraph[normalizedName] = children
+		uf.depGraph[depInfoMap[normalizedName].ID] = func() []string {
+			var ids []string
+			for _, c := range children {
+				ids = append(ids, depInfoMap[c].ID)
+			}
+			return ids
+		}()
+	}
 
-		dep := DependencyInfo{
-			ID:          depFilename(pkg),
-			Name:        pkg.Name,
-			Version:     pkg.Version,
-			Type:        "pypi",
-			SHA256:      extractSHA256(bestHash(pkg)),
-			SHA1:        "",
-			MD5:         "",
-			Scopes:      []string{scope},
-			RequestedBy: inverse[normalizedName],
+	// Collect direct children of root (main deps; optionally dev deps)
+	var rootChildren []string
+	if rootPkg != nil {
+		for _, edge := range rootPkg.Dependencies {
+			n := normalizeName(edge.Name)
+			if _, ok := depInfoMap[n]; ok {
+				rootChildren = append(rootChildren, n)
+			}
 		}
-		uf.dependencies = append(uf.dependencies, dep)
+		if uf.config.IncludeDevDependencies {
+			for _, edges := range rootPkg.DevDependencies {
+				for _, edge := range edges {
+					n := normalizeName(edge.Name)
+					if _, ok := depInfoMap[n]; ok {
+						rootChildren = append(rootChildren, n)
+					}
+				}
+			}
+		}
+	} else {
+		// No lockfile root found — treat all non-workspace packages as direct deps
+		for n := range depInfoMap {
+			rootChildren = append(rootChildren, n)
+		}
+	}
+
+	// Build requestedBy chains using pip's recursive DFS approach.
+	// Results go into uf.requestedByChains (map[string][][]string), NOT into DependencyInfo.RequestedBy.
+	// This keeps the shared DependencyInfo type ([]string) unchanged for poetry/maven.
+	buildUvRequestedBy(moduleID, []string{}, rootChildren, depInfoMap, fwdGraph, uf.requestedByChains, entities.RequestedByMaxLength)
+
+	for _, dep := range depInfoMap {
+		uf.dependencies = append(uf.dependencies, *dep)
+	}
+}
+
+// computeMainReachable returns the set of normalizedNames reachable from main (non-dev) deps
+// via BFS through the forward dependency graph. Used to exclude dev-only transitive deps.
+func computeMainReachable(directMainDeps map[string]bool, pkgByName map[string]*UvPackage) map[string]bool {
+	reachable := make(map[string]bool)
+	queue := make([]string, 0, len(directMainDeps))
+	for name := range directMainDeps {
+		queue = append(queue, name)
+	}
+	for len(queue) > 0 {
+		name := queue[0]
+		queue = queue[1:]
+		if reachable[name] {
+			continue
+		}
+		reachable[name] = true
+		if pkg, ok := pkgByName[name]; ok {
+			for _, edge := range pkg.Dependencies {
+				childName := normalizeName(edge.Name)
+				if !reachable[childName] {
+					queue = append(queue, childName)
+				}
+			}
+		}
+	}
+	return reachable
+}
+
+// buildUvRequestedBy recursively builds requestedBy chains matching pip/pipenv format.
+// Results are written into chains (dep ID → [][]string), not into DependencyInfo.
+// parentID is the current parent's "name:version" ID.
+// parentChain is the chain from parentID back to the root (not including parentID itself).
+func buildUvRequestedBy(parentID string, parentChain []string, children []string, depInfoMap map[string]*DependencyInfo, fwdGraph map[string][]string, chains map[string][][]string, maxDepth int) {
+	for _, childName := range children {
+		child, ok := depInfoMap[childName]
+		if !ok {
+			continue
+		}
+		if len(chains[child.ID]) >= maxDepth {
+			continue
+		}
+		// New chain entry: [parentID, ...parentChain]
+		newChain := append([]string{parentID}, parentChain...)
+		// Cycle check: if child's own ID already appears in the chain, skip
+		for _, id := range newChain {
+			if id == child.ID {
+				goto next
+			}
+		}
+		chains[child.ID] = append(chains[child.ID], newChain)
+		buildUvRequestedBy(child.ID, newChain, fwdGraph[childName], depInfoMap, fwdGraph, chains, maxDepth)
+	next:
 	}
 }
 
@@ -350,18 +470,35 @@ func (uf *UvFlexPack) CalculateScopes() []string {
 	return scopes
 }
 
-// CalculateRequestedBy returns a map from dependency ID to the list of packages that request it.
+// CalculateRequestedBy returns the direct parent for each dependency ID.
+// Satisfies the FlexPackManager interface (returns map[string][]string).
+// For the full [][]string chains, see requestedByChains.
 func (uf *UvFlexPack) CalculateRequestedBy() map[string][]string {
 	if len(uf.dependencies) == 0 {
 		uf.parseDependencies()
 	}
+	// Flatten each chain to its first element (direct parent) for the []string interface.
 	result := make(map[string][]string)
-	for _, dep := range uf.dependencies {
-		if len(dep.RequestedBy) > 0 {
-			result[dep.ID] = dep.RequestedBy
+	for depID, chains := range uf.requestedByChains {
+		seen := make(map[string]bool)
+		for _, chain := range chains {
+			if len(chain) > 0 && !seen[chain[0]] {
+				result[depID] = append(result[depID], chain[0])
+				seen[chain[0]] = true
+			}
 		}
 	}
 	return result
+}
+
+// GetRequestedByChains returns the full [][]string requestedBy chains for each dependency.
+// Each inner slice is a path from the immediate parent back to the root module.
+// Use this when you need the complete chain (e.g. in tests or build-info consumers).
+func (uf *UvFlexPack) GetRequestedByChains() map[string][][]string {
+	if len(uf.dependencies) == 0 {
+		uf.parseDependencies()
+	}
+	return uf.requestedByChains
 }
 
 // ===== BuildInfoCollector Interface =====
@@ -391,17 +528,14 @@ func (uf *UvFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities
 
 	for _, dep := range deps {
 		entityDep := entities.Dependency{
-			Id:     dep.ID,
-			Type:   dep.Type,
-			Scopes: dep.Scopes,
+			Id:          dep.ID,
+			Type:        dep.Type,
+			RequestedBy: uf.requestedByChains[dep.ID], // full [][]string chains (UV-specific field)
 			Checksum: entities.Checksum{
 				Sha1:   dep.SHA1,
 				Sha256: dep.SHA256,
 				Md5:    dep.MD5,
 			},
-		}
-		if len(dep.RequestedBy) > 0 {
-			entityDep.RequestedBy = [][]string{dep.RequestedBy}
 		}
 		module.Dependencies = append(module.Dependencies, entityDep)
 	}
