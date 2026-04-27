@@ -660,9 +660,10 @@ size = 124424
 	}
 }
 
-// TestUvDevDepInclusion verifies that dev deps are excluded by default and
-// included when IncludeDevDependencies=true. No scopes are set (Python has no
-// compile/runtime distinction — matches pip/pipenv canonical format).
+// TestUvScopeClassification verifies that no scope field is set on any dependency
+// (neither main nor dev), because Python has no compile/runtime distinction —
+// matches pip/pipenv canonical format. Dev dep inclusion behaviour is covered by
+// TestUvDevDependencies.
 func TestUvScopeClassification(t *testing.T) {
 	tempDir := t.TempDir()
 	uvLockContent := `version = 1

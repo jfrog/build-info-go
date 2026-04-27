@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -45,11 +46,6 @@ func (s UvSource) IsWorkspacePackage() bool {
 	return s.Virtual != "" || s.Editable != "" || s.Directory != ""
 }
 
-// HasArtifacts returns true if this source type provides sdist/wheel artifacts.
-func (s UvSource) HasArtifacts() bool {
-	return s.Registry != "" || s.URL != ""
-}
-
 // UvArtifact represents an sdist or wheel entry in uv.lock
 type UvArtifact struct {
 	URL        string `toml:"url"`
@@ -82,8 +78,9 @@ type UvFlexPack struct {
 	pyprojectData     *UvPyProjectToml
 	projectName       string
 	projectVersion    string
+	parsed            bool
 	dependencies      []DependencyInfo
-	depGraph          map[string][]string  // normalized-name -> []normalized-name
+	depGraph          map[string][]string   // dep ID ("name:version") -> []dep IDs
 	requestedByChains map[string][][]string // dep ID -> full chains back to root (UV-specific)
 }
 
@@ -140,9 +137,11 @@ func (uf *UvFlexPack) loadUvLock() error {
 	return nil
 }
 
-// normalizeName converts package names to lowercase with hyphens.
+var pep503Re = regexp.MustCompile(`[-_.]+`)
+
+// normalizeName converts package names to lowercase with hyphens per PEP 503.
 func normalizeName(name string) string {
-	return strings.ToLower(strings.ReplaceAll(name, "_", "-"))
+	return pep503Re.ReplaceAllString(strings.ToLower(name), "-")
 }
 
 // extractSHA256 strips the "sha256:" prefix from a hash string.
@@ -204,6 +203,15 @@ func depFileType(pkg UvPackage) string {
 	return ""
 }
 
+// ensureParsed calls parseDependencies exactly once.
+func (uf *UvFlexPack) ensureParsed() {
+	if uf.parsed {
+		return
+	}
+	uf.parseDependencies()
+	uf.parsed = true
+}
+
 // parseDependencies populates uf.dependencies and uf.depGraph from the lock file.
 // ID format and requestedBy chains match the pip/pipenv canonical build-info format:
 //   - dep ID:  "name:version"  (e.g. "certifi:2026.2.25")
@@ -229,7 +237,7 @@ func (uf *UvFlexPack) parseDependencies() {
 	var rootPkg *UvPackage
 	for i := range uf.lockFileData.Packages {
 		pkg := &uf.lockFileData.Packages[i]
-		if pkg.Source.Virtual == "." || pkg.Source.Editable == "." {
+		if pkg.Source.Virtual == "." || pkg.Source.Editable == "." || pkg.Source.Directory == "." {
 			rootPkg = pkg
 			break
 		}
@@ -406,9 +414,7 @@ func buildUvRequestedBy(parentID string, parentChain []string, children []string
 
 // GetDependency returns a formatted string with dependency information.
 func (uf *UvFlexPack) GetDependency() string {
-	if len(uf.dependencies) == 0 {
-		uf.parseDependencies()
-	}
+	uf.ensureParsed()
 	var result strings.Builder
 	fmt.Fprintf(&result, "Project: %s:%s\n", uf.projectName, uf.projectVersion)
 	result.WriteString("Dependencies:\n")
@@ -420,9 +426,7 @@ func (uf *UvFlexPack) GetDependency() string {
 
 // ParseDependencyToList returns a list of "name:version" strings for all dependencies.
 func (uf *UvFlexPack) ParseDependencyToList() []string {
-	if len(uf.dependencies) == 0 {
-		uf.parseDependencies()
-	}
+	uf.ensureParsed()
 	var depList []string
 	for _, dep := range uf.dependencies {
 		depList = append(depList, fmt.Sprintf("%s:%s", dep.Name, dep.Version))
@@ -432,9 +436,7 @@ func (uf *UvFlexPack) ParseDependencyToList() []string {
 
 // CalculateChecksum returns checksum maps for all dependencies.
 func (uf *UvFlexPack) CalculateChecksum() []map[string]interface{} {
-	if len(uf.dependencies) == 0 {
-		uf.parseDependencies()
-	}
+	uf.ensureParsed()
 	var checksums []map[string]interface{}
 	for _, dep := range uf.dependencies {
 		checksumMap := map[string]interface{}{
@@ -454,9 +456,7 @@ func (uf *UvFlexPack) CalculateChecksum() []map[string]interface{} {
 
 // CalculateScopes returns the unique set of scopes across all dependencies.
 func (uf *UvFlexPack) CalculateScopes() []string {
-	if len(uf.dependencies) == 0 {
-		uf.parseDependencies()
-	}
+	uf.ensureParsed()
 	scopesMap := make(map[string]bool)
 	for _, dep := range uf.dependencies {
 		for _, scope := range dep.Scopes {
@@ -474,9 +474,7 @@ func (uf *UvFlexPack) CalculateScopes() []string {
 // Satisfies the FlexPackManager interface (returns map[string][]string).
 // For the full [][]string chains, see requestedByChains.
 func (uf *UvFlexPack) CalculateRequestedBy() map[string][]string {
-	if len(uf.dependencies) == 0 {
-		uf.parseDependencies()
-	}
+	uf.ensureParsed()
 	// Flatten each chain to its first element (direct parent) for the []string interface.
 	result := make(map[string][]string)
 	for depID, chains := range uf.requestedByChains {
@@ -495,9 +493,7 @@ func (uf *UvFlexPack) CalculateRequestedBy() map[string][]string {
 // Each inner slice is a path from the immediate parent back to the root module.
 // Use this when you need the complete chain (e.g. in tests or build-info consumers).
 func (uf *UvFlexPack) GetRequestedByChains() map[string][][]string {
-	if len(uf.dependencies) == 0 {
-		uf.parseDependencies()
-	}
+	uf.ensureParsed()
 	return uf.requestedByChains
 }
 
@@ -546,17 +542,13 @@ func (uf *UvFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities
 
 // GetProjectDependencies returns all project dependencies with full details.
 func (uf *UvFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
-	if len(uf.dependencies) == 0 {
-		uf.parseDependencies()
-	}
+	uf.ensureParsed()
 	return uf.dependencies, nil
 }
 
 // GetDependencyGraph returns the complete dependency graph.
 func (uf *UvFlexPack) GetDependencyGraph() (map[string][]string, error) {
-	if len(uf.dependencies) == 0 {
-		uf.parseDependencies()
-	}
+	uf.ensureParsed()
 	return uf.depGraph, nil
 }
 
