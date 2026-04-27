@@ -50,7 +50,7 @@ func TestNewUvFlexPack(t *testing.T) {
 		"uv.lock":        minimalUvLock("test-app"),
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestUvCollectBuildInfoModuleType(t *testing.T) {
 		"uv.lock":        minimalUvLock("test-app"),
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -117,7 +117,7 @@ size = 62574
 		"uv.lock":        uvLockContent,
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -162,7 +162,7 @@ size = 158
 		"uv.lock":        uvLockContent,
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -199,7 +199,7 @@ source = { git = "https://github.com/example/some-lib?tag=v0.1.0#abcdef123456789
 		"uv.lock":        uvLockContent,
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -265,7 +265,7 @@ size = 324467
 			"uv.lock":        uvLockContent,
 		})
 
-		uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{
+		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
 			WorkingDirectory:       tempDir,
 			IncludeDevDependencies: true,
 		})
@@ -301,7 +301,7 @@ size = 324467
 			"uv.lock":        uvLockContent,
 		})
 
-		uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{
+		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
 			WorkingDirectory:       tempDir,
 			IncludeDevDependencies: false,
 		})
@@ -359,7 +359,7 @@ size = 1100
 		"uv.lock":        uvLockContent,
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -414,7 +414,7 @@ size = 2100
 		"uv.lock":        uvLockContent,
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -464,7 +464,7 @@ size = 5000
 		"uv.lock":        uvLockContent,
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -544,7 +544,7 @@ size = 100
 		"uv.lock":        uvLockContent,
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -637,7 +637,7 @@ size = 124424
 		"uv.lock":        uvLockContent,
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{WorkingDirectory: tempDir})
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
 		t.Fatalf("NewUvFlexPack failed: %v", err)
 	}
@@ -706,7 +706,7 @@ size = 324467
 		"uv.lock":        uvLockContent,
 	})
 
-	uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
 		WorkingDirectory:       tempDir,
 		IncludeDevDependencies: true,
 	})
@@ -747,7 +747,7 @@ size = 324467
 
 func TestUvErrorHandling(t *testing.T) {
 	t.Run("non-existent dir", func(t *testing.T) {
-		_, err := flexpack.NewUvFlexPack(flexpack.UvConfig{
+		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
 			WorkingDirectory: "/non/existent/directory",
 		})
 		if err == nil {
@@ -757,7 +757,7 @@ func TestUvErrorHandling(t *testing.T) {
 
 	t.Run("dir with no pyproject.toml", func(t *testing.T) {
 		tempDir := t.TempDir()
-		_, err := flexpack.NewUvFlexPack(flexpack.UvConfig{
+		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
 			WorkingDirectory: tempDir,
 		})
 		if err == nil {
@@ -771,7 +771,7 @@ func TestUvErrorHandling(t *testing.T) {
 			"pyproject.toml": minimalPyproject("my-app"),
 		})
 
-		uf, err := flexpack.NewUvFlexPack(flexpack.UvConfig{
+		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
 			WorkingDirectory: tempDir,
 		})
 		if err != nil {

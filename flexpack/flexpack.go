@@ -70,8 +70,8 @@ type PoetryConfig struct {
 	IncludeDevDependencies bool
 }
 
-// UvConfig holds configuration specific to UV operations
-type UvConfig struct {
+// UVConfig holds configuration specific to UV operations
+type UVConfig struct {
 	// WorkingDirectory is the directory where UV should operate
 	WorkingDirectory string
 
