@@ -107,6 +107,7 @@ func (uf *UVFlexPack) loadPyProjectToml() error {
 	// have no pyproject.toml), skip file loading and use the overrides directly.
 	if uf.config.ProjectName != "" {
 		uf.projectName = uf.config.ProjectName
+		// ProjectVersion may be empty for PEP 723 inline scripts; results in "name:" module ID which is acceptable
 		uf.projectVersion = uf.config.ProjectVersion
 		return nil
 	}
@@ -160,18 +161,23 @@ func extractSHA256(hash string) string {
 	return strings.TrimPrefix(hash, "sha256:")
 }
 
-// bestHash returns the best available hash for a package.
+// selectPackageHash returns the best available hash for a package.
 // Prefers pure-Python wheel (none-any), falls back to first wheel, then sdist.
-func bestHash(pkg UVPackage) string {
+func selectPackageHash(pkg UVPackage) string {
+	var firstWheelHash string
 	for _, w := range pkg.Wheels {
-		if strings.Contains(w.URL, "none-any") && w.Hash != "" {
-			return w.Hash
+		if w.Hash == "" {
+			continue
+		}
+		if strings.Contains(w.URL, "none-any") {
+			return w.Hash // universal wheel — best choice
+		}
+		if firstWheelHash == "" {
+			firstWheelHash = w.Hash
 		}
 	}
-	for _, w := range pkg.Wheels {
-		if w.Hash != "" {
-			return w.Hash
-		}
+	if firstWheelHash != "" {
+		return firstWheelHash
 	}
 	if pkg.Sdist != nil && pkg.Sdist.Hash != "" {
 		return pkg.Sdist.Hash
@@ -183,32 +189,29 @@ func bestHash(pkg UVPackage) string {
 // Prefers pure-Python wheel (none-any), falls back to first wheel, then sdist.
 // Matches pip/pipenv behavior: "whl", "tar.gz", "zip", etc.
 func depFileType(pkg UVPackage) string {
-	bestURL := ""
+	var selectedURL string
 	for _, w := range pkg.Wheels {
-		if strings.Contains(w.URL, "none-any") && w.URL != "" {
-			bestURL = w.URL
-			break
+		if w.URL == "" {
+			continue
+		}
+		if strings.Contains(w.URL, "none-any") {
+			selectedURL = w.URL
+			break // universal wheel — best choice
+		}
+		if selectedURL == "" {
+			selectedURL = w.URL // first platform wheel as fallback
 		}
 	}
-	if bestURL == "" {
-		for _, w := range pkg.Wheels {
-			if w.URL != "" {
-				bestURL = w.URL
-				break
-			}
-		}
+	if selectedURL == "" && pkg.Sdist != nil && pkg.Sdist.URL != "" {
+		selectedURL = pkg.Sdist.URL
 	}
-	if bestURL == "" && pkg.Sdist != nil && pkg.Sdist.URL != "" {
-		bestURL = pkg.Sdist.URL
-	}
-	if bestURL == "" {
-		// Git deps have no archive — return "git" so build-info reflects the source type.
+	if selectedURL == "" {
 		if pkg.Source.Git != "" {
 			return "git"
 		}
 		return ""
 	}
-	base := filepath.Base(bestURL)
+	base := filepath.Base(selectedURL)
 	if strings.HasSuffix(base, ".tar.gz") {
 		return "tar.gz"
 	}
@@ -329,12 +332,10 @@ func buildDepInfoMap(packages []UVPackage, includeDevDeps bool, mainReachable ma
 		}
 		normalizedName := normalizeName(pkg.Name)
 		if !includeDevDeps {
-			if mainReachable != nil {
-				if !mainReachable[normalizedName] {
-					continue // reachability analysis: exclude dev-only transitive deps
-				}
-			} else if directDevDeps[normalizedName] {
-				continue // simple fallback: exclude direct dev deps only
+			excluded := (mainReachable != nil && !mainReachable[normalizedName]) ||
+				(mainReachable == nil && directDevDeps[normalizedName])
+			if excluded {
+				continue
 			}
 		}
 		// DirectURL is set for deps not from a registry: direct URL or git.
@@ -348,7 +349,7 @@ func buildDepInfoMap(packages []UVPackage, includeDevDeps bool, mainReachable ma
 			Name:      pkg.Name,
 			Version:   pkg.Version,
 			Type:      depFileType(*pkg),
-			SHA256:    extractSHA256(bestHash(*pkg)),
+			SHA256:    extractSHA256(selectPackageHash(*pkg)),
 			DirectURL: directURL,
 		}
 	}
@@ -359,7 +360,7 @@ func buildDepInfoMap(packages []UVPackage, includeDevDeps bool, mainReachable ma
 // Also populates idGraph with ID-keyed edges.
 func buildForwardGraph(depInfoMap map[string]*DependencyInfo, pkgByName map[string]*UVPackage, idGraph map[string][]string) map[string][]string {
 	fwdGraph := make(map[string][]string, len(depInfoMap))
-	for normalizedName := range depInfoMap {
+	for normalizedName, info := range depInfoMap {
 		pkg := pkgByName[normalizedName]
 		if pkg == nil {
 			continue
@@ -372,7 +373,7 @@ func buildForwardGraph(depInfoMap map[string]*DependencyInfo, pkgByName map[stri
 			}
 		}
 		fwdGraph[normalizedName] = children
-		idGraph[depInfoMap[normalizedName].ID] = func() []string {
+		idGraph[info.ID] = func() []string {
 			var ids []string
 			for _, c := range children {
 				ids = append(ids, depInfoMap[c].ID)
@@ -406,7 +407,7 @@ func buildDepInfoMapFromInstalled(packages []UVPackage, installedPkgs map[string
 			Name:      pkg.Name,
 			Version:   pkg.Version,
 			Type:      depFileType(*pkg),
-			SHA256:    extractSHA256(bestHash(*pkg)),
+			SHA256:    extractSHA256(selectPackageHash(*pkg)),
 			DirectURL: directURL,
 		}
 	}
@@ -513,14 +514,17 @@ func buildUvRequestedBy(parentID string, parentChain []string, children []string
 		// New chain entry: [parentID, ...parentChain]
 		newChain := append([]string{parentID}, parentChain...)
 		// Cycle check: if child's own ID already appears in the chain, skip
+		hasCycle := false
 		for _, id := range newChain {
 			if id == child.ID {
-				goto next
+				hasCycle = true
+				break
 			}
 		}
-		chains[child.ID] = append(chains[child.ID], newChain)
-		buildUvRequestedBy(child.ID, newChain, fwdGraph[childName], depInfoMap, fwdGraph, chains, maxDepth)
-	next:
+		if !hasCycle {
+			chains[child.ID] = append(chains[child.ID], newChain)
+			buildUvRequestedBy(child.ID, newChain, fwdGraph[childName], depInfoMap, fwdGraph, chains, maxDepth)
+		}
 	}
 }
 
