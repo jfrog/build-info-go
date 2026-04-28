@@ -47,6 +47,9 @@ type DependencyInfo struct {
 	Path         string           `json:"path,omitempty"`
 	Repository   string           `json:"-"`
 	Dependencies []DependencyInfo `json:"dependencies,omitempty"`
+	// DirectURL is set for packages installed from a direct URL (not a registry).
+	// These packages are not in Artifactory so sha1/md5 enrichment is skipped.
+	DirectURL string `json:"-"`
 }
 
 // BuildInfoCollector defines methods for collecting build information
@@ -75,8 +78,26 @@ type UVConfig struct {
 	// WorkingDirectory is the directory where UV should operate
 	WorkingDirectory string
 
-	// IncludeDevDependencies indicates whether to include development dependencies
+	// IncludeDevDependencies indicates whether to include development dependencies.
+	// Only used when InstalledPackages is nil (e.g. for lock/build commands where no
+	// venv is available). When InstalledPackages is set this field is ignored.
 	IncludeDevDependencies bool
+
+	// InstalledPackages is the ground-truth set of what uv actually installed,
+	// keyed by normalised package name (lowercase, hyphens) → version string.
+	// When non-nil, only packages present in this map are included in build-info,
+	// which correctly handles --no-dev, --only-dev, --group, --no-group and all
+	// other uv sync flag combinations without any flag parsing on our side.
+	InstalledPackages map[string]string
+
+	// LockFilePath overrides the default uv.lock path. Used for PEP 723 inline scripts
+	// where the lock file is adjacent to the script (e.g. myscript.py.lock).
+	LockFilePath string
+
+	// ProjectName and ProjectVersion override the values read from pyproject.toml.
+	// Set these when there is no pyproject.toml (e.g. for standalone PEP 723 scripts).
+	ProjectName    string
+	ProjectVersion string
 }
 
 // GradleConfig holds configuration specific to Gradle operations

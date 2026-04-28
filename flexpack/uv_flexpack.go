@@ -103,6 +103,13 @@ func NewUVFlexPack(config UVConfig) (*UVFlexPack, error) {
 
 // loadPyProjectToml reads and parses pyproject.toml using PEP 621 [project] section.
 func (uf *UVFlexPack) loadPyProjectToml() error {
+	// When ProjectName is supplied via config (e.g. for PEP 723 inline scripts that
+	// have no pyproject.toml), skip file loading and use the overrides directly.
+	if uf.config.ProjectName != "" {
+		uf.projectName = uf.config.ProjectName
+		uf.projectVersion = uf.config.ProjectVersion
+		return nil
+	}
 	pyprojectPath := filepath.Join(uf.config.WorkingDirectory, "pyproject.toml")
 	data, err := os.ReadFile(pyprojectPath)
 	if err != nil {
@@ -123,9 +130,13 @@ func (uf *UVFlexPack) loadPyProjectToml() error {
 	return nil
 }
 
-// loadUvLock reads and parses uv.lock.
+// loadUvLock reads and parses the lock file. Uses LockFilePath if set (for PEP 723
+// inline scripts whose lock file is adjacent to the script), otherwise uv.lock.
 func (uf *UVFlexPack) loadUvLock() error {
-	lockPath := filepath.Join(uf.config.WorkingDirectory, "uv.lock")
+	lockPath := uf.config.LockFilePath
+	if lockPath == "" {
+		lockPath = filepath.Join(uf.config.WorkingDirectory, "uv.lock")
+	}
 	data, err := os.ReadFile(lockPath)
 	if err != nil {
 		return fmt.Errorf("failed to read uv.lock: %w", err)
@@ -191,6 +202,10 @@ func depFileType(pkg UVPackage) string {
 		bestURL = pkg.Sdist.URL
 	}
 	if bestURL == "" {
+		// Git deps have no archive — return "git" so build-info reflects the source type.
+		if pkg.Source.Git != "" {
+			return "git"
+		}
 		return ""
 	}
 	base := filepath.Base(bestURL)
@@ -227,19 +242,29 @@ func (uf *UVFlexPack) parseDependencies() {
 	moduleID := fmt.Sprintf("%s:%s", uf.projectName, uf.projectVersion)
 	pkgByName := buildPackageMap(uf.lockFileData.Packages)
 	rootPkg := findRootPackage(uf.lockFileData.Packages)
-	mainDeps, devDeps := collectDirectDeps(rootPkg)
 
-	// When excluding dev deps and the project has BOTH main deps and dev deps declared,
-	// compute the reachable set from main deps via BFS to exclude dev-only transitive deps.
-	var mainReachable map[string]bool
-	if !uf.config.IncludeDevDependencies && rootPkg != nil &&
-		len(mainDeps) > 0 && len(devDeps) > 0 {
-		mainReachable = computeMainReachable(mainDeps, pkgByName)
+	var depInfoMap map[string]*DependencyInfo
+	var rootChildren []string
+
+	if uf.config.InstalledPackages != nil {
+		// Ground-truth path: only include packages that uv actually installed.
+		// This correctly handles --no-dev, --only-dev, --group, --no-group and all
+		// other flag combinations without any flag parsing on our side.
+		depInfoMap = buildDepInfoMapFromInstalled(uf.lockFileData.Packages, uf.config.InstalledPackages)
+		rootChildren = collectRootChildrenFromInstalled(rootPkg, depInfoMap)
+	} else {
+		// Fallback path (lock/build/publish — no venv): use IncludeDevDependencies flag.
+		mainDeps, devDeps := collectDirectDeps(rootPkg)
+		var mainReachable map[string]bool
+		if !uf.config.IncludeDevDependencies && rootPkg != nil &&
+			len(mainDeps) > 0 && len(devDeps) > 0 {
+			mainReachable = computeMainReachable(mainDeps, pkgByName)
+		}
+		depInfoMap = buildDepInfoMap(uf.lockFileData.Packages, uf.config.IncludeDevDependencies, mainReachable, devDeps)
+		rootChildren = collectRootChildren(rootPkg, depInfoMap, uf.config.IncludeDevDependencies)
 	}
 
-	depInfoMap := buildDepInfoMap(uf.lockFileData.Packages, uf.config.IncludeDevDependencies, mainReachable, devDeps)
 	fwdGraph := buildForwardGraph(depInfoMap, pkgByName, uf.depGraph)
-	rootChildren := collectRootChildren(rootPkg, depInfoMap, uf.config.IncludeDevDependencies)
 
 	// Build requestedBy chains using pip's recursive DFS approach.
 	// Results go into uf.requestedByChains (map[string][][]string), NOT into DependencyInfo.RequestedBy.
@@ -312,12 +337,19 @@ func buildDepInfoMap(packages []UVPackage, includeDevDeps bool, mainReachable ma
 				continue // simple fallback: exclude direct dev deps only
 			}
 		}
+		// DirectURL is set for deps not from a registry: direct URL or git.
+		// Both are not in Artifactory so AQL enrichment is skipped for them.
+		directURL := pkg.Source.URL
+		if directURL == "" {
+			directURL = pkg.Source.Git
+		}
 		depInfoMap[normalizedName] = &DependencyInfo{
-			ID:      fmt.Sprintf("%s:%s", pkg.Name, pkg.Version),
-			Name:    pkg.Name,
-			Version: pkg.Version,
-			Type:    depFileType(*pkg),
-			SHA256:  extractSHA256(bestHash(*pkg)),
+			ID:        fmt.Sprintf("%s:%s", pkg.Name, pkg.Version),
+			Name:      pkg.Name,
+			Version:   pkg.Version,
+			Type:      depFileType(*pkg),
+			SHA256:    extractSHA256(bestHash(*pkg)),
+			DirectURL: directURL,
 		}
 	}
 	return depInfoMap
@@ -352,6 +384,63 @@ func buildForwardGraph(depInfoMap map[string]*DependencyInfo, pkgByName map[stri
 }
 
 // collectRootChildren returns normalised child names reachable from root that are in depInfoMap.
+// buildDepInfoMapFromInstalled builds depInfoMap using the ground-truth installed set
+// from `uv pip list`. Only packages whose normalised name appears in installedPkgs are included.
+func buildDepInfoMapFromInstalled(packages []UVPackage, installedPkgs map[string]string) map[string]*DependencyInfo {
+	depInfoMap := make(map[string]*DependencyInfo)
+	for i := range packages {
+		pkg := &packages[i]
+		if pkg.Source.IsWorkspacePackage() {
+			continue
+		}
+		normName := normalizeName(pkg.Name)
+		if _, ok := installedPkgs[normName]; !ok {
+			continue // not installed by this uv invocation
+		}
+		directURL := pkg.Source.URL
+		if directURL == "" {
+			directURL = pkg.Source.Git
+		}
+		depInfoMap[normName] = &DependencyInfo{
+			ID:        fmt.Sprintf("%s:%s", pkg.Name, pkg.Version),
+			Name:      pkg.Name,
+			Version:   pkg.Version,
+			Type:      depFileType(*pkg),
+			SHA256:    extractSHA256(bestHash(*pkg)),
+			DirectURL: directURL,
+		}
+	}
+	return depInfoMap
+}
+
+// collectRootChildrenFromInstalled returns root's direct children that are in depInfoMap,
+// scanning both main and dev dependency edges (since InstalledPackages already filtered the set).
+func collectRootChildrenFromInstalled(rootPkg *UVPackage, depInfoMap map[string]*DependencyInfo) []string {
+	if rootPkg == nil {
+		var all []string
+		for n := range depInfoMap {
+			all = append(all, n)
+		}
+		return all
+	}
+	var children []string
+	for _, edge := range rootPkg.Dependencies {
+		n := normalizeName(edge.Name)
+		if _, ok := depInfoMap[n]; ok {
+			children = append(children, n)
+		}
+	}
+	for _, edges := range rootPkg.DevDependencies {
+		for _, edge := range edges {
+			n := normalizeName(edge.Name)
+			if _, ok := depInfoMap[n]; ok {
+				children = append(children, n)
+			}
+		}
+	}
+	return children
+}
+
 func collectRootChildren(rootPkg *UVPackage, depInfoMap map[string]*DependencyInfo, includeDevDeps bool) []string {
 	if rootPkg == nil {
 		// No lockfile root found — treat all non-workspace packages as direct deps
@@ -569,6 +658,20 @@ func (uf *UVFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities
 func (uf *UVFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
 	uf.ensureParsed()
 	return uf.dependencies, nil
+}
+
+// GetDirectURLDeps returns a map of dep ID ("name:version") → source URL for all
+// dependencies that were installed from a direct URL rather than from a registry.
+// These deps are not in Artifactory so sha1/md5 enrichment via AQL should be skipped.
+func (uf *UVFlexPack) GetDirectURLDeps() map[string]string {
+	uf.ensureParsed()
+	result := make(map[string]string)
+	for _, dep := range uf.dependencies {
+		if dep.DirectURL != "" {
+			result[dep.ID] = dep.DirectURL
+		}
+	}
+	return result
 }
 
 // GetDependencyGraph returns the complete dependency graph.
