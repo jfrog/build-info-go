@@ -725,7 +725,7 @@ func (pf *PoetryFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 			},
 		}
 
-		// Add RequestedBy information
+		// Add RequestedBy information (wrap []string into [][]string per build-info spec)
 		if len(dep.RequestedBy) > 0 {
 			entityDep.RequestedBy = [][]string{dep.RequestedBy}
 		}
