@@ -14,6 +14,7 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/build-info-go/flexpack/conan"
+	nixflex "github.com/jfrog/build-info-go/flexpack/nix"
 	gradleflex "github.com/jfrog/build-info-go/flexpack/gradle"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
@@ -280,6 +281,34 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return fmt.Errorf("failed to create Conan instance: %w", err)
 				}
 				buildInfo, err := conanFlex.CollectBuildInfo("conan-build", "1")
+				if err != nil {
+					return fmt.Errorf("failed to collect build info: %w", err)
+				}
+				formatValue, _, err := extractStringFlag(context.Args().Slice(), formatFlag)
+				if err != nil {
+					return err
+				}
+				return printBuildInfo(buildInfo, formatValue)
+			},
+		},
+		{
+			Name:            "nix",
+			Usage:           "Generate build-info for a Nix flake project",
+			UsageText:       "bi nix",
+			Flags:           flags,
+			SkipFlagParsing: true,
+			Action: func(context *clitool.Context) (err error) {
+				if !flexpack.IsFlexPackEnabled() {
+					return fmt.Errorf("nix build-info collection requires FlexPack mode (set JFROG_RUN_NATIVE=true)")
+				}
+				config := nixflex.NixConfig{
+					WorkingDirectory: ".",
+				}
+				nixFlexPack, err := nixflex.NewNixFlexPack(config)
+				if err != nil {
+					return fmt.Errorf("failed to create Nix instance: %w", err)
+				}
+				buildInfo, err := nixFlexPack.CollectBuildInfo("nix-build", "1")
 				if err != nil {
 					return fmt.Errorf("failed to collect build info: %w", err)
 				}
