@@ -46,6 +46,7 @@ const (
 	Terraform ModuleType = "terraform"
 	Helm      ModuleType = "helm"
 	Conan     ModuleType = "conan"
+	Nix       ModuleType = "nix"
 	Uv        ModuleType = "uv"
 )
 
@@ -271,14 +272,9 @@ func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
 	for _, newArtifact := range *mergeArtifacts {
 		exists := false
 
-		// PRIORITY 1: Check SHA1 - if checksums match, prefer the artifact with a real path.
-		// path="." means the artifact was recorded locally before upload; a non-"." path
-		// means it was confirmed in Artifactory. Always keep the richer entry.
-		for i, existingArtifact := range *intoArtifacts {
+		// PRIORITY 1: Check SHA1 - if checksums match, artifact already exists (skip it)
+		for _, existingArtifact := range *intoArtifacts {
 			if newArtifact.Sha1 == existingArtifact.Sha1 {
-				if existingArtifact.Path == "." && newArtifact.Path != "." {
-					(*intoArtifacts)[i] = newArtifact
-				}
 				exists = true
 				break
 			}
