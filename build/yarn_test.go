@@ -81,6 +81,80 @@ func TestAppendDependencyRecursively(t *testing.T) {
 	}
 }
 
+// TestAppendDependencyRecursively_NonRegistryCollapse verifies that non-registry locators
+// (workspace, link, file, portal, git) are excluded from build-info emission but their
+// transitive registry deps are still captured. The non-registry node is also collapsed
+// from the requestedBy chain (option B).
+func TestAppendDependencyRecursively_NonRegistryCollapse(t *testing.T) {
+	// Topology: root -> portal-dep (portal, non-registry) -> xml@npm (registry)
+	//                -> link-dep (link, non-registry)  [no transitive]
+	depMap := map[string]*buildutils.YarnDependency{
+		"xml@npm:1.0.1":                   {Value: "xml@npm:1.0.1", Details: buildutils.YarnDepDetails{Version: "1.0.1"}},
+		"portal-dep@portal:./portal-dep":  {Value: "portal-dep@portal:./portal-dep", Details: buildutils.YarnDepDetails{Version: "1.0.0", Dependencies: []buildutils.YarnDependencyPointer{{Locator: "xml@npm:1.0.1"}}}},
+		"link-dep@link:./link-dep":        {Value: "link-dep@link:./link-dep", Details: buildutils.YarnDepDetails{Version: "1.0.0"}},
+		"root@workspace:.":                {Value: "root@workspace:.", Details: buildutils.YarnDepDetails{Version: "1.0.0", Dependencies: []buildutils.YarnDependencyPointer{{Locator: "portal-dep@portal:./portal-dep"}, {Locator: "link-dep@link:./link-dep"}}}},
+	}
+	ym := &YarnModule{containingBuild: &Build{logger: &utils.NullLog{}}}
+	biDeps := make(map[string]*entities.Dependency)
+
+	// Walk from root (pathToRoot=[]) — simulates normal getDependenciesMap root walk.
+	err := ym.appendDependencyRecursively(depMap["root@workspace:."], []string{}, depMap, biDeps)
+	assert.NoError(t, err)
+
+	// Only xml should be emitted — portal-dep and link-dep are non-registry and dropped.
+	assert.Len(t, biDeps, 1)
+	assert.Contains(t, biDeps, "xml:1.0.1")
+	assert.NotContains(t, biDeps, "portal-dep:1.0.0")
+	assert.NotContains(t, biDeps, "link-dep:1.0.0")
+
+	// requestedBy for xml should be ["root:1.0.0"] — portal-dep collapsed from chain.
+	assert.Equal(t, [][]string{{"root:1.0.0"}}, biDeps["xml:1.0.1"].RequestedBy)
+}
+
+// TestGetDependenciesMap_WorkspaceRoot verifies that when IsYarnWorkspaceProject returns true,
+// getDependenciesMap seeds additional walks from each workspace member and captures their
+// registry deps even though the root node has no direct dependency edges in yarn info output.
+func TestGetDependenciesMap_WorkspaceRoot(t *testing.T) {
+	// Simulates: s1-root (workspace root, no deps) with two workspace members.
+	// pkg-a -> xml@npm:1.0.1
+	// pkg-b -> json@npm:9.0.6
+	depMap := map[string]*buildutils.YarnDependency{
+		"xml@npm:1.0.1":                          {Value: "xml@npm:1.0.1", Details: buildutils.YarnDepDetails{Version: "1.0.1"}},
+		"json@npm:9.0.6":                         {Value: "json@npm:9.0.6", Details: buildutils.YarnDepDetails{Version: "9.0.6"}},
+		"pkg-a@workspace:packages/pkg-a":         {Value: "pkg-a@workspace:packages/pkg-a", Details: buildutils.YarnDepDetails{Version: "1.0.0", Dependencies: []buildutils.YarnDependencyPointer{{Locator: "xml@npm:1.0.1"}}}},
+		"pkg-b@workspace:packages/pkg-b":         {Value: "pkg-b@workspace:packages/pkg-b", Details: buildutils.YarnDepDetails{Version: "1.0.0", Dependencies: []buildutils.YarnDependencyPointer{{Locator: "json@npm:9.0.6"}}}},
+		"s1-root@workspace:.":                    {Value: "s1-root@workspace:.", Details: buildutils.YarnDepDetails{Version: "0.0.0"}},
+	}
+	root := depMap["s1-root@workspace:."]
+
+	containingBuild := &Build{logger: &utils.NullLog{}}
+	ym := &YarnModule{containingBuild: containingBuild}
+
+	biDeps := make(map[string]*entities.Dependency)
+	// Normal root walk first (produces nothing — root has no edges).
+	err := ym.appendDependencyRecursively(root, []string{}, depMap, biDeps)
+	assert.NoError(t, err)
+	assert.Empty(t, biDeps)
+
+	// Simulate workspace seed (as getDependenciesMap does).
+	rootName, _ := root.Name()
+	rootId := rootName + ":" + root.Details.Version
+	for _, dep := range depMap {
+		if dep.Value != root.Value && buildutils.IsWorkspaceLocator(dep.Value) {
+			err = ym.appendDependencyRecursively(dep, []string{rootId}, depMap, biDeps)
+			assert.NoError(t, err)
+		}
+	}
+
+	assert.Len(t, biDeps, 2)
+	assert.Contains(t, biDeps, "xml:1.0.1")
+	assert.Contains(t, biDeps, "json:9.0.6")
+	assert.NotContains(t, biDeps, "pkg-a:1.0.0")
+	assert.NotContains(t, biDeps, "pkg-b:1.0.0")
+	assert.Equal(t, [][]string{{"s1-root:0.0.0"}}, biDeps["xml:1.0.1"].RequestedBy)
+	assert.Equal(t, [][]string{{"s1-root:0.0.0"}}, biDeps["json:9.0.6"].RequestedBy)
+}
+
 func TestGenerateBuildInfoForYarnProject(t *testing.T) {
 	// Copy the project directory to a temporary directory
 	tempDirPath, createTempDirCallback := tests.CreateTempDirWithCallbackAndAssert(t)
