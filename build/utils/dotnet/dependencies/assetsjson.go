@@ -67,23 +67,24 @@ func (extractor *assetsExtractor) new(dependenciesSource string, log utils.Log) 
 }
 
 func (assets *assets) getChildrenMap() map[string][]string {
-	// Use a set to deduplicate children across multiple target frameworks
+	// Key by name:version to preserve per-TFM entries; use a set to deduplicate children across TFMs
 	dependenciesRelations := map[string]map[string]struct{}{}
 	for _, dependencies := range assets.Targets {
 		for dependencyId, targetDependencies := range dependencies {
-			dependencyName := getDependencyName(dependencyId)
-			if _, ok := dependenciesRelations[dependencyName]; !ok {
-				dependenciesRelations[dependencyName] = map[string]struct{}{}
+			dependencyKey := strings.ToLower(getDependencyIdForBuildInfo(dependencyId))
+			if _, ok := dependenciesRelations[dependencyKey]; !ok {
+				dependenciesRelations[dependencyKey] = map[string]struct{}{}
 			}
-			for transitiveName := range targetDependencies.Dependencies {
-				dependenciesRelations[dependencyName][strings.ToLower(transitiveName)] = struct{}{}
+			for transitiveName, transitiveVersion := range targetDependencies.Dependencies {
+				childKey := strings.ToLower(transitiveName) + ":" + transitiveVersion
+				dependenciesRelations[dependencyKey][childKey] = struct{}{}
 			}
 		}
 	}
 	// Convert sets to sorted slices for deterministic output
 	result := make(map[string][]string, len(dependenciesRelations))
-	for dependencyName, transitiveSet := range dependenciesRelations {
-		result[dependencyName] = setToSortedSlice(transitiveSet)
+	for dependencyKey, transitiveSet := range dependenciesRelations {
+		result[dependencyKey] = setToSortedSlice(transitiveSet)
 	}
 	return result
 }
@@ -98,15 +99,25 @@ func setToSortedSlice(values map[string]struct{}) []string {
 }
 
 func (assets *assets) getDirectDependencies() []string {
-	// Use a set to deduplicate across multiple target frameworks
-	directDependencies := map[string]struct{}{}
+	// Collect direct dep names from all frameworks
+	directNames := map[string]bool{}
 	for _, framework := range assets.Project.Frameworks {
-		for dependencyName := range framework.Dependencies {
-			directDependencies[strings.ToLower(dependencyName)] = struct{}{}
+		for depName := range framework.Dependencies {
+			directNames[strings.ToLower(depName)] = true
 		}
 	}
-	// Return sorted slice for deterministic output
-	return setToSortedSlice(directDependencies)
+	// Cross-reference with Libraries to resolve name:version for each direct dep.
+	// A single package name may resolve to multiple versions across TFMs — each is kept.
+	seen := map[string]struct{}{}
+	for libId, library := range assets.Libraries {
+		if library.Type == "project" {
+			continue
+		}
+		if directNames[getDependencyName(libId)] {
+			seen[strings.ToLower(getDependencyIdForBuildInfo(libId))] = struct{}{}
+		}
+	}
+	return setToSortedSlice(seen)
 }
 
 func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.Dependency, error) {
@@ -137,8 +148,8 @@ func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.D
 			return nil, err
 		}
 
-		dependencyName := getDependencyName(dependencyId)
-		dependencies[dependencyName] = &buildinfo.Dependency{Id: getDependencyIdForBuildInfo(dependencyId), Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}}
+		dependencyKey := strings.ToLower(getDependencyIdForBuildInfo(dependencyId))
+		dependencies[dependencyKey] = &buildinfo.Dependency{Id: getDependencyIdForBuildInfo(dependencyId), Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}}
 	}
 
 	return dependencies, nil

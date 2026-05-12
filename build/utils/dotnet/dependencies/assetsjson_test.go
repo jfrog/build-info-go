@@ -90,14 +90,15 @@ func TestNewAssetsExtractor(t *testing.T) {
 	directDependencies, err := extractor.DirectDependencies()
 	assert.NoError(t, err)
 
-	expectedDirectDependencies := []string{"dep1"}
+	// Keys are now name:version to preserve multi-TFM entries
+	expectedDirectDependencies := []string{"dep1:1.0.1"}
 	if !reflect.DeepEqual(expectedDirectDependencies, directDependencies) {
 		t.Errorf("Expected: \n%s, \nGot: \n%s", expectedDirectDependencies, directDependencies)
 	}
 
 	allDependencies, err := extractor.AllDependencies(logger)
 	assert.NoError(t, err)
-	expectedAllDependencies := []string{"dep1", "dep2"}
+	expectedAllDependencies := []string{"dep1:1.0.1", "dep2:1.0.2"}
 	for _, v := range expectedAllDependencies {
 		if _, ok := allDependencies[v]; !ok {
 			t.Error("Expecting", v, "dependency")
@@ -106,8 +107,9 @@ func TestNewAssetsExtractor(t *testing.T) {
 
 	childrenMap, err := extractor.ChildrenMap()
 	assert.NoError(t, err)
-	assert.Len(t, childrenMap["dep1"], 0)
-	assert.Len(t, childrenMap["dep2"], 1)
+	assert.Len(t, childrenMap["dep1:1.0.1"], 0)
+	assert.Len(t, childrenMap["dep2:1.0.2"], 1)
+	assert.Equal(t, "dep1:1.0.1", childrenMap["dep2:1.0.2"][0])
 }
 
 func TestGetDependencyIdForBuildInfo(t *testing.T) {
@@ -130,17 +132,22 @@ func TestGetDependencyIdForBuildInfo(t *testing.T) {
 }
 
 func TestGetDirectDependenciesDeterministic(t *testing.T) {
-	// Test that direct dependencies are returned in sorted order
+	// Test that direct dependencies are returned in sorted name:version order
 	content := []byte(`{
   "version": 3,
   "targets": {},
+  "libraries": {
+    "Zebra/1.0.0":  {"path": "", "files": []},
+    "Alpha/1.0.0":  {"path": "", "files": []},
+    "Middle/1.0.0": {"path": "", "files": []}
+  },
   "project": {
     "restore": {"packagesPath": "unused"},
     "frameworks": {
       "net8.0": {
         "dependencies": {
-          "Zebra": {"target": "Package", "version": "1.0.0"},
-          "Alpha": {"target": "Package", "version": "1.0.0"},
+          "Zebra":  {"target": "Package", "version": "1.0.0"},
+          "Alpha":  {"target": "Package", "version": "1.0.0"},
           "Middle": {"target": "Package", "version": "1.0.0"}
         }
       }
@@ -151,8 +158,8 @@ func TestGetDirectDependenciesDeterministic(t *testing.T) {
 	var assetsObj assets
 	assert.NoError(t, json.Unmarshal(content, &assetsObj))
 
-	// Run multiple times to verify consistency
-	expected := []string{"alpha", "middle", "zebra"}
+	// Run multiple times to verify consistency; keys are now name:version
+	expected := []string{"alpha:1.0.0", "middle:1.0.0", "zebra:1.0.0"}
 	for i := 0; i < 10; i++ {
 		result := assetsObj.getDirectDependencies()
 		assert.Equal(t, expected, result, "Run %d produced different order", i)
@@ -191,12 +198,39 @@ func TestGetChildrenMapDeterministic(t *testing.T) {
 	assert.NoError(t, json.Unmarshal(content, &assetsObj))
 
 	// Run multiple times to verify consistency
-	// Alpha appears in both frameworks (should be deduplicated)
-	expected := []string{"alpha", "middle", "zebra"}
+	// Alpha appears in both TFMs (should be deduplicated); keys are now name:version
+	expected := []string{"alpha:1.0.0", "middle:1.0.0", "zebra:1.0.0"}
 	for i := 0; i < 10; i++ {
 		result := assetsObj.getChildrenMap()
-		assert.Equal(t, expected, result["parent"], "Run %d produced different order", i)
+		assert.Equal(t, expected, result["parent:1.0.0"], "Run %d produced different order", i)
 	}
+}
+
+func TestMultiTFMVersionPreservation(t *testing.T) {
+	// Regression test: for a multi-TFM project where the same package resolves to
+	// different versions per TFM, all (name, version) pairs must be preserved in the
+	// build-info — none dropped due to map-key collisions.
+	extractor, err := (&assetsExtractor{}).new(
+		filepath.Join("testdata", "multitfm", "obj", "project.assets.json"), logger)
+	assert.NoError(t, err)
+
+	allDeps, err := extractor.AllDependencies(logger)
+	assert.NoError(t, err)
+	// 2 packages × 2 TFM versions = 4 entries; previously only 2 survived (nondeterministically)
+	assert.Len(t, allDeps, 4, "all per-TFM versions must be present, none dropped")
+	assert.Contains(t, allDeps, "pkga:1.0.0", "net8 version of pkgA must be present")
+	assert.Contains(t, allDeps, "pkga:2.0.0", "net10 version of pkgA must be present")
+	assert.Contains(t, allDeps, "pkgb:1.0.0", "net8 version of pkgB must be present")
+	assert.Contains(t, allDeps, "pkgb:2.0.0", "net10 version of pkgB must be present")
+
+	directDeps, err := extractor.DirectDependencies()
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"pkga:1.0.0", "pkga:2.0.0"}, directDeps)
+
+	childrenMap, err := extractor.ChildrenMap()
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"pkgb:1.0.0"}, childrenMap["pkga:1.0.0"])
+	assert.ElementsMatch(t, []string{"pkgb:2.0.0"}, childrenMap["pkga:2.0.0"])
 }
 
 func TestSetToSortedSlice(t *testing.T) {

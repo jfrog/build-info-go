@@ -401,12 +401,12 @@ func TestLoadMixed(t *testing.T) {
 			assert.Equal(t, filepath.Join(wd, "tmp", "multi", "multi"), project.RootPath())
 			direct, err := project.Extractor().DirectDependencies()
 			require.NoError(t, err)
-			assert.ElementsMatch(t, []string{"newtonsoft.json"}, direct)
+			assert.ElementsMatch(t, []string{"newtonsoft.json:9.0.1"}, direct)
 		case "core":
 			assert.Equal(t, filepath.Join(wd, "tmp", "multi", "core"), project.RootPath())
 			direct, err := project.Extractor().DirectDependencies()
 			require.NoError(t, err)
-			assert.ElementsMatch(t, []string{"newtonsoft.json"}, direct)
+			assert.ElementsMatch(t, []string{"newtonsoft.json:9.0.1"}, direct)
 		default:
 			t.Errorf("Unexpected project name: %s", project.Name())
 		}
