@@ -76,7 +76,7 @@ func (assets *assets) getChildrenMap() map[string][]string {
 				dependenciesRelations[dependencyKey] = map[string]struct{}{}
 			}
 			for transitiveName, transitiveVersion := range targetDependencies.Dependencies {
-				childKey := strings.ToLower(transitiveName) + ":" + transitiveVersion
+				childKey := strings.ToLower(transitiveName + ":" + transitiveVersion)
 				dependenciesRelations[dependencyKey][childKey] = struct{}{}
 			}
 		}

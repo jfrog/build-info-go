@@ -297,3 +297,31 @@ func TestMultiTFMDependencyTree(t *testing.T) {
 	assert.Equal(t, "pkgb:1.0.0", roots["pkga:1.0.0"][0].Id)
 	assert.Equal(t, "pkgb:2.0.0", roots["pkga:2.0.0"][0].Id)
 }
+
+func TestGetChildrenMapMixedCaseVersion(t *testing.T) {                                                                                                
+	// Version labels in targets[...].dependencies come from consuming packages'                                                                     
+	// .nuspec and may use non-normalized casing (e.g. "1.0.0-Beta").
+	// getAllDependencies lowercases the full name:version, so getChildrenMap                                                                        
+	// must do the same or populateRequestedBy lookups silently miss.                      
+	content := []byte(`{                                                                                                                             
+    "version": 3,                                                                                                                                        
+    "targets": {                                               
+      ".NETCoreApp,Version=v8.0": {                                                                                                                      
+        "Parent/1.0.0": {                                                                      
+          "dependencies": {                                    
+            "Child": "1.0.0-Beta"              
+          }                                                                                                                                              
+        },
+        "Child/1.0.0-Beta": {}                                                                                                                           
+      }                                                                                        
+    },                                                         
+    "project": {                               
+      "restore": {"packagesPath": "unused"},
+      "frameworks": {}
+    }                                                                                                                                                    
+  }`)
+	var assetsObj assets                                                                   
+	assert.NoError(t, json.Unmarshal(content, &assetsObj)) 
+	result := assetsObj.getChildrenMap()
+	assert.Equal(t, []string{"child:1.0.0-beta"}, result["parent:1.0.0"])
+  }
