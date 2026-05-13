@@ -151,22 +151,22 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 
 	runTest := func() [][]string {
 		dependencies := map[string]*buildinfo.Dependency{
-			"depa": {Id: "depA:1"},
-			"depb": {Id: "depB:1"},
-			"depc": {Id: "depC:1"},
-			"depd": {Id: "depD:1"},
+			"depa:1": {Id: "depA:1"},
+			"depb:1": {Id: "depB:1"},
+			"depc:1": {Id: "depC:1"},
+			"depd:1": {Id: "depD:1"},
 		}
 
 		// depA and depB are direct deps, both depend on depC
 		// depC depends on depD
-		directDependencies := []string{"depb", "depa"}
+		directDependencies := []string{"depb:1", "depa:1"}
 		sort.Strings(directDependencies)
 
 		childrenMap := map[string][]string{
-			"depa": {"depc"},
-			"depb": {"depc"},
-			"depc": {"depd"},
-			"depd": {},
+			"depa:1": {"depc:1"},
+			"depb:1": {"depc:1"},
+			"depc:1": {"depd:1"},
+			"depd:1": {},
 		}
 		for key, children := range childrenMap {
 			sort.Strings(children)
@@ -182,7 +182,7 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 		}
 
 		// Sort the results for comparison
-		result := dependencies["depd"].RequestedBy
+		result := dependencies["depd:1"].RequestedBy
 		sortRequestedByPaths(result)
 		return result
 	}

@@ -2,8 +2,10 @@ package dependencies
 
 import (
 	"encoding/json"
+	deptree "github.com/jfrog/build-info-go/build/utils/dotnet/dependenciestree"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -266,4 +268,32 @@ func TestSetToSortedSlice(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestMultiTFMDependencyTree(t *testing.T) {
+	// End-to-end regression: verifies that the three extractor maps connect
+	// correctly through CreateDependencyTree — previously, name-only map keys
+	// caused pkgB to be silently dropped from pkgA's children.
+	extractor, err := (&assetsExtractor{}).new(
+		filepath.Join("testdata", "multitfm", "obj", "project.assets.json"), logger)
+	assert.NoError(t, err)
+
+	tree, err := CreateDependencyTree(extractor, logger)
+	assert.NoError(t, err)
+
+	// 2 root nodes: pkgA per TFM version
+	assert.Len(t, tree, 2, "expected one root node per TFM version of pkgA")
+
+	roots := map[string][]*deptree.DependenciesTree{}
+	for _, node := range tree {
+		roots[node.Id] = node.DirectDependencies
+	}
+
+	// Each root must carry exactly its TFM-matching child
+	assert.Contains(t, roots, "pkga:1.0.0")
+	assert.Contains(t, roots, "pkga:2.0.0")
+	require.Len(t, roots["pkga:1.0.0"], 1, "pkgA:1.0.0 must have exactly one child")
+	require.Len(t, roots["pkga:2.0.0"], 1, "pkgA:2.0.0 must have exactly one child")
+	assert.Equal(t, "pkgb:1.0.0", roots["pkga:1.0.0"][0].Id)
+	assert.Equal(t, "pkgb:2.0.0", roots["pkga:2.0.0"][0].Id)
 }

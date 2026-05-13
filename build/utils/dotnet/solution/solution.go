@@ -124,7 +124,7 @@ func getModuleId(customModuleID, projectName string) string {
 // dependenciesMap  - The input dependencies map
 // childrenMap      - Map from dependency ID to children IDs
 func populateRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap map[string]*buildinfo.Dependency, childrenMap map[string][]string) {
-	childrenList := childrenMap[getDependencyName(parentDependency.Id)]
+	childrenList := childrenMap[strings.ToLower(parentDependency.Id)]
 	for _, childName := range childrenList {
 		if childDep, ok := dependenciesMap[childName]; ok {
 			if childDep.NodeHasLoop() || len(childDep.RequestedBy) >= buildinfo.RequestedByMaxLength {
@@ -137,11 +137,6 @@ func populateRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap 
 			populateRequestedBy(*childDep, dependenciesMap, childrenMap)
 		}
 	}
-}
-
-func getDependencyName(dependencyKey string) string {
-	dependencyName := dependencyKey[0:strings.Index(dependencyKey, ":")]
-	return strings.ToLower(dependencyName)
 }
 
 // sortRequestedByPaths sorts RequestedBy paths for deterministic output.
