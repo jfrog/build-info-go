@@ -202,6 +202,27 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 	assert.Equal(t, expected, firstResult)
 }
 
+func TestPopulateRequestedByLegacyNameOnlyFallback(t *testing.T) {
+	// packagesExtractor (packages.config) keys childrenMap by name only, not name:version.
+	// populateRequestedBy must fall back to a name-only lookup when the name:version key
+	// is absent, so that legacy projects still get correct RequestedBy paths.
+	dependencies := map[string]*buildinfo.Dependency{
+		"newtonsoft.json:9.0.1": {Id: "Newtonsoft.Json:9.0.1"},
+		"log4net:2.0.8":         {Id: "log4net:2.0.8"},
+	}
+
+	// packages.config extractor produces name-only children map keys
+	childrenMap := map[string][]string{
+		"newtonsoft.json": {"log4net:2.0.8"},
+	}
+
+	dependencies["newtonsoft.json:9.0.1"].RequestedBy = [][]string{{"TestModule"}}
+	populateRequestedBy(*dependencies["newtonsoft.json:9.0.1"], dependencies, childrenMap)
+
+	require.Len(t, dependencies["log4net:2.0.8"].RequestedBy, 1)
+	assert.Equal(t, []string{"Newtonsoft.Json:9.0.1", "TestModule"}, dependencies["log4net:2.0.8"].RequestedBy[0])
+}
+
 func TestEmptySolution(t *testing.T) {
 	solution, err := Load(".", "", "", logger)
 	if err != nil {
