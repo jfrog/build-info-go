@@ -293,7 +293,7 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 		},
 		{
 			Name:            "nix",
-			Usage:           "Generate build-info for a Nix flake project",
+			Usage:           "Generate build-info for a Nix channel project",
 			UsageText:       "bi nix",
 			Flags:           flags,
 			SkipFlagParsing: true,
@@ -301,14 +301,14 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				if !flexpack.IsFlexPackEnabled() {
 					return fmt.Errorf("nix build-info collection requires FlexPack mode (set JFROG_RUN_NATIVE=true)")
 				}
-				config := nixflex.NixConfig{
+				config := nixflex.NixChannelConfig{
 					WorkingDirectory: ".",
 				}
-				nixFlexPack, err := nixflex.NewNixFlexPack(config)
+				collector, err := nixflex.NewNixChannelCollector(config)
 				if err != nil {
-					return fmt.Errorf("failed to create Nix instance: %w", err)
+					return fmt.Errorf("failed to create Nix collector: %w", err)
 				}
-				buildInfo, err := nixFlexPack.CollectBuildInfo("nix-build", "1")
+				buildInfo, err := collector.CollectBuildInfo("nix-build", "1")
 				if err != nil {
 					return fmt.Errorf("failed to collect build info: %w", err)
 				}

@@ -1,60 +1,35 @@
 package nix
 
-// NixConfig holds configuration specific to Nix FlexPack operations
-type NixConfig struct {
+// NixChannelConfig holds configuration for Nix channel-based build-info collection.
+type NixChannelConfig struct {
 	WorkingDirectory string
-	// IncludeDevInputs is intentionally unimplemented — Nix flakes do not
-	// distinguish dev vs non-dev inputs at the lock file level. Reserved
-	// for forward compatibility.
-	IncludeDevInputs bool
+	ChannelName      string // e.g. "nixos-25.11"
 }
 
-// NixFlakeLock represents the top-level flake.lock JSON structure (version 7)
-type NixFlakeLock struct {
-	Version int                         `json:"version"`
-	Root    string                      `json:"root"`
-	Nodes   map[string]NixFlakeLockNode `json:"nodes"`
+// NixStorePathInfo represents a single entry from "nix path-info --json -r" output.
+// The JSON output is a map keyed by store path.
+type NixStorePathInfo struct {
+	Path             string   `json:"path,omitempty"`
+	NarHash          string   `json:"narHash"`
+	NarSize          int64    `json:"narSize"`
+	Deriver          string   `json:"deriver,omitempty"`
+	References       []string `json:"references,omitempty"`
+	RegistrationTime int64    `json:"registrationTime,omitempty"`
+	Signatures       []string `json:"signatures,omitempty"`
 }
 
-// NixFlakeLockNode represents a single node in flake.lock
-type NixFlakeLockNode struct {
-	// Inputs maps input names to either a string (direct node ref) or
-	// an array of strings (follows alias path).
-	Inputs   map[string]interface{} `json:"inputs,omitempty"`
-	Locked   *NixLockedRef          `json:"locked,omitempty"`
-	Original *NixOriginalRef        `json:"original,omitempty"`
-	Flake    *bool                  `json:"flake,omitempty"`
-}
-
-// NixLockedRef represents the resolved/pinned reference for a dependency
-type NixLockedRef struct {
-	Type         string `json:"type"`
-	Owner        string `json:"owner,omitempty"`
-	Repo         string `json:"repo,omitempty"`
-	Rev          string `json:"rev,omitempty"`
-	Ref          string `json:"ref,omitempty"`
-	NarHash      string `json:"narHash,omitempty"`
-	LastModified int64  `json:"lastModified,omitempty"`
-	URL          string `json:"url,omitempty"`
-	Host         string `json:"host,omitempty"`
-	Path         string `json:"path,omitempty"`
-}
-
-// NixPathInfo represents the output of "nix path-info --json" for a store path
-type NixPathInfo struct {
-	NarHash    string   `json:"narHash"`
-	NarSize    int64    `json:"narSize"`
-	Deriver    string   `json:"deriver,omitempty"`
-	References []string `json:"references,omitempty"`
-}
-
-// NixOriginalRef represents the original (pre-resolution) input specification
-type NixOriginalRef struct {
-	Type  string `json:"type"`
-	Owner string `json:"owner,omitempty"`
-	Repo  string `json:"repo,omitempty"`
-	Ref   string `json:"ref,omitempty"`
-	URL   string `json:"url,omitempty"`
-	Host  string `json:"host,omitempty"`
-	Path  string `json:"path,omitempty"`
+// NixNarInfo represents the parsed content of a .narinfo file.
+// Narinfo is a plain-text key-value format served by Nix binary caches.
+type NixNarInfo struct {
+	StorePath   string // /nix/store/<hash>-<name>
+	URL         string // nar/<content-hash>.nar.xz
+	Compression string // xz
+	FileHash    string // sha256:<nix32-hash>
+	FileSize    int64
+	NarHash     string // sha256:<nix32-hash>
+	NarSize     int64
+	References  string // space-separated store path basenames
+	Deriver     string // <hash>-<name>.drv
+	System      string // x86_64-linux, aarch64-darwin
+	Sig         string // cache.nixos.org-1:<base64>
 }
