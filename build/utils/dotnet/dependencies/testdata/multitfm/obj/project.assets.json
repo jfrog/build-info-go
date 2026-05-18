@@ -1,0 +1,70 @@
+{
+  "version": 3,
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "pkgA/1.0.0": {
+        "dependencies": {
+          "pkgB": "1.0.0"
+        }
+      },
+      "pkgB/1.0.0": {}
+    },
+    ".NETCoreApp,Version=v10.0": {
+      "pkgA/2.0.0": {
+        "dependencies": {
+          "pkgB": "2.0.0"
+        }
+      },
+      "pkgB/2.0.0": {}
+    }
+  },
+  "libraries": {
+    "pkgA/1.0.0": {
+      "path": "",
+      "files": [
+        "pkgA-1.0.0.nupkg.sha512"
+      ]
+    },
+    "pkgA/2.0.0": {
+      "path": "",
+      "files": [
+        "pkgA-2.0.0.nupkg.sha512"
+      ]
+    },
+    "pkgB/1.0.0": {
+      "path": "",
+      "files": [
+        "pkgB-1.0.0.nupkg.sha512"
+      ]
+    },
+    "pkgB/2.0.0": {
+      "path": "",
+      "files": [
+        "pkgB-2.0.0.nupkg.sha512"
+      ]
+    }
+  },
+  "project": {
+    "restore": {
+      "packagesPath": "testdata/multitfm"
+    },
+    "frameworks": {
+      "net8.0": {
+        "dependencies": {
+          "pkgA": {
+            "target": "Package",
+            "version": "[1.0.0, )"
+          }
+        }
+      },
+      "net10.0": {
+        "dependencies": {
+          "pkgA": {
+            "target": "Package",
+            "version": "[2.0.0, )"
+          }
+        }
+      }
+    }
+  }
+}
