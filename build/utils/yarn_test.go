@@ -239,3 +239,70 @@ func TestSplitNameAndVersion(t *testing.T) {
 	_, _, err := splitNameAndVersion(incorrectFormatPackageName)
 	assert.Error(t, err)
 }
+
+func TestIsYarnWorkspaceProject(t *testing.T) {
+	executablePath, err := GetYarnExecutable()
+	assert.NoError(t, err)
+
+	testDataPath := filepath.Join("..", "testdata", "yarn")
+
+	// v2 project is a plain (non-workspace) project — expects false.
+	nonWorkspacePath := filepath.Join(testDataPath, "v2", "project")
+	isWorkspace, err := IsYarnWorkspaceProject(executablePath, nonWorkspacePath)
+	assert.NoError(t, err)
+	assert.False(t, isWorkspace, "plain yarn project should not be detected as workspace")
+}
+
+func TestExtractLocatorProtocol(t *testing.T) {
+	testCases := []struct {
+		locator          string
+		expectedProtocol string
+	}{
+		{"xml@npm:1.0.1", "npm"},
+		{"pkg-a@workspace:packages/pkg-a", "workspace"},
+		{"@scope/pkg@workspace:.", "workspace"},
+		{"local-lib@link:./local-lib", "link"},
+		{"filelib@file:./filelib.tgz", "file"},
+		{"portallib@portal:./portallib", "portal"},
+		{"left-pad@patch:left-pad@npm%3A1.3.0#./patch.patch", "patch"},
+		{"left-pad@https://github.com/stevemao/left-pad.git#commit=abc", "https"},
+		{"left-pad@git+https://github.com/stevemao/left-pad.git#commit=abc", "git+https"},
+	}
+	for _, tc := range testCases {
+		assert.Equal(t, tc.expectedProtocol, extractLocatorProtocol(tc.locator), "locator: %s", tc.locator)
+	}
+}
+
+func TestIsWorkspaceLocator(t *testing.T) {
+	assert.True(t, IsWorkspaceLocator("pkg-a@workspace:packages/pkg-a"))
+	assert.True(t, IsWorkspaceLocator("@scope/pkg@workspace:."))
+	assert.True(t, IsWorkspaceLocator("root@workspace:."))
+	assert.False(t, IsWorkspaceLocator("xml@npm:1.0.1"))
+	assert.False(t, IsWorkspaceLocator("local-lib@link:./local-lib"))
+	assert.False(t, IsWorkspaceLocator(""))
+	assert.False(t, IsWorkspaceLocator("x"))
+}
+
+func TestIsNonRegistryLocator(t *testing.T) {
+	registryCases := []string{
+		"xml@npm:1.0.1",
+		"@babel/highlight@npm:7.14.0",
+	}
+	for _, l := range registryCases {
+		assert.False(t, IsNonRegistryLocator(l), "expected registry: %s", l)
+	}
+
+	nonRegistryCases := []string{
+		"pkg-a@workspace:packages/pkg-a",
+		"local-lib@link:./local-lib",
+		"filelib@file:./filelib.tgz",
+		"portallib@portal:./portallib",
+		"left-pad@patch:left-pad@npm%3A1.3.0#./p.patch",
+		"left-pad@git+https://github.com/stevemao/left-pad.git#commit=abc",
+		"pkg@git+ssh://github.com/org/repo",
+		"left-pad@https://github.com/stevemao/left-pad.git#commit=abc",
+	}
+	for _, l := range nonRegistryCases {
+		assert.True(t, IsNonRegistryLocator(l), "expected non-registry: %s", l)
+	}
+}
