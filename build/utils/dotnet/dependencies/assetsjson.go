@@ -67,16 +67,31 @@ func (extractor *assetsExtractor) new(dependenciesSource string, log utils.Log) 
 }
 
 func (assets *assets) getChildrenMap() map[string][]string {
-	// Key by name:version to preserve per-TFM entries; use a set to deduplicate children across TFMs
+	// Key by name:version to preserve per-TFM entries; use a set to deduplicate children across TFMs.
+	// Transitive version strings in targets/dependencies are the declared constraint (e.g. "[1.12.9, )"),
+	// not the resolved version. Build a per-TFM name->resolved-name:version map so child keys match
+	// the resolved versions used as keys in dependenciesMap (getAllDependencies).
 	dependenciesRelations := map[string]map[string]struct{}{}
 	for _, dependencies := range assets.Targets {
+		resolvedInTfm := map[string]string{}
+		for depId := range dependencies {
+			if idx := strings.Index(depId, "/"); idx != -1 {
+				resolvedInTfm[strings.ToLower(depId[:idx])] = strings.ToLower(getDependencyIdForBuildInfo(depId))
+			}
+		}
 		for dependencyId, targetDependencies := range dependencies {
 			dependencyKey := strings.ToLower(getDependencyIdForBuildInfo(dependencyId))
 			if _, ok := dependenciesRelations[dependencyKey]; !ok {
 				dependenciesRelations[dependencyKey] = map[string]struct{}{}
 			}
 			for transitiveName, transitiveVersion := range targetDependencies.Dependencies {
-				childKey := strings.ToLower(transitiveName + ":" + transitiveVersion)
+				// Prefer per-TFM resolved version (from library entry in the same target).
+				// Fall back to declared constraint when no library entry exists in this TFM —
+				// rare in real assets.json but kept for safety/back-compat.
+				childKey, ok := resolvedInTfm[strings.ToLower(transitiveName)]
+				if !ok {
+					childKey = strings.ToLower(transitiveName + ":" + transitiveVersion)
+				}
 				dependenciesRelations[dependencyKey][childKey] = struct{}{}
 			}
 		}
