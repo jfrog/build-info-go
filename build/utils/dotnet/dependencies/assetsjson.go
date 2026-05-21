@@ -12,6 +12,7 @@ import (
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/gofrog/crypto"
+	"github.com/jfrog/gofrog/log"
 )
 
 const (
@@ -72,7 +73,7 @@ func (assets *assets) getChildrenMap() map[string][]string {
 	// not the resolved version. Build a per-TFM name->resolved-name:version map so child keys match
 	// the resolved versions used as keys in dependenciesMap (getAllDependencies).
 	dependenciesRelations := map[string]map[string]struct{}{}
-	for _, dependencies := range assets.Targets {
+	for tfm, dependencies := range assets.Targets {
 		resolvedInTfm := map[string]string{}
 		for depId := range dependencies {
 			if idx := strings.Index(depId, "/"); idx != -1 {
@@ -87,10 +88,13 @@ func (assets *assets) getChildrenMap() map[string][]string {
 			for transitiveName, transitiveVersion := range targetDependencies.Dependencies {
 				// Prefer per-TFM resolved version (from library entry in the same target).
 				// Fall back to declared constraint when no library entry exists in this TFM —
-				// rare in real assets.json but kept for safety/back-compat.
+				// rare in real assets.json but kept for safety/back-compat. RequestedBy lookup
+				// may miss in this case because dependenciesMap is keyed by resolved version,
+				// so log the fallback for downstream debugging.
 				childKey, ok := resolvedInTfm[strings.ToLower(transitiveName)]
 				if !ok {
 					childKey = strings.ToLower(transitiveName + ":" + transitiveVersion)
+					log.Debug(fmt.Sprintf("getChildrenMap: no resolved library entry for transitive %q (declared %q) under parent %q in TFM %q; falling back to declared version — RequestedBy may not link.", transitiveName, transitiveVersion, dependencyId, tfm))
 				}
 				dependenciesRelations[dependencyKey][childKey] = struct{}{}
 			}

@@ -324,4 +324,37 @@ func TestGetChildrenMapMixedCaseVersion(t *testing.T) {
 	assert.NoError(t, json.Unmarshal(content, &assetsObj)) 
 	result := assetsObj.getChildrenMap()
 	assert.Equal(t, []string{"child:1.0.0-beta"}, result["parent:1.0.0"])
+}
+
+// TestGetChildrenMapBracketRangeVersion guards the RTECO-1265 regression: when
+// a parent .nuspec declares a child with a constraint expression (e.g. bracket
+// range "[1.12.9, )") instead of a plain version, getChildrenMap must still
+// produce a child key that matches the resolved library entry (e.g.
+// "popper.js:1.12.9"). Otherwise populateRequestedBy in solution.BuildInfo
+// silently misses and the transitive is dropped from the published build-info.
+func TestGetChildrenMapBracketRangeVersion(t *testing.T) {
+	content := []byte(`{
+  "version": 3,
+  "targets": {
+    ".NETFramework,Version=v4.5": {
+      "bootstrap/4.0.0": {
+        "dependencies": {
+          "jQuery": "3.0.0",
+          "popper.js": "[1.12.9, 2.0.0)"
+        }
+      },
+      "jQuery/3.0.0": {},
+      "popper.js/1.12.9": {}
+    }
+  },
+  "project": {
+    "restore": {"packagesPath": "unused"},
+    "frameworks": {}
   }
+}`)
+	var assetsObj assets
+	assert.NoError(t, json.Unmarshal(content, &assetsObj))
+	result := assetsObj.getChildrenMap()
+	// Both children must resolve to the library entry's version, NOT the declared constraint string.
+	assert.ElementsMatch(t, []string{"jquery:3.0.0", "popper.js:1.12.9"}, result["bootstrap:4.0.0"])
+}
