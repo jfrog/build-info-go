@@ -3,15 +3,18 @@ package utils
 import (
 	"fmt"
 	"strings"
+
+	"github.com/jfrog/gofrog/log"
 )
 
 type PackageManager string
 
 const (
-	Npm   PackageManager = "npm"
-	Maven PackageManager = "maven"
-	Pip   PackageManager = "pip"
-	Go    PackageManager = "go"
+	Npm    PackageManager = "npm"
+	Maven  PackageManager = "maven"
+	Pip    PackageManager = "pip"
+	Go     PackageManager = "go"
+	Poetry PackageManager = "poetry"
 )
 
 // ForbiddenError represents a 403 Forbidden error.
@@ -52,6 +55,19 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 	case "go":
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden") ||
 			strings.Contains(strings.ToLower(cmdOutput), " 403")
+	case "poetry":
+		lower := strings.ToLower(cmdOutput)
+		switch {
+		case strings.Contains(lower, "http error 403"):
+			log.Debug("Poetry forbidden output matched pattern: 'http error 403'")
+			return true
+		case strings.Contains(lower, "403 client error"):
+			log.Debug("Poetry forbidden output matched pattern: '403 client error'")
+			return true
+		case strings.Contains(lower, "403 forbidden"):
+			log.Debug("Poetry forbidden output matched pattern: '403 forbidden'")
+			return true
+		}
 	}
 	return false
 }
