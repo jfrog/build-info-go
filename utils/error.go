@@ -42,6 +42,7 @@ func (err *ErrProjectNotInstalled) Error() string {
 
 // IsForbiddenOutput checks whether the provided output includes a 403 Forbidden. The various package managers have their own forbidden output formats.
 func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
+	log.Debug("Checking forbidden output for package manager:", tech)
 	switch tech {
 	case "npm":
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")
