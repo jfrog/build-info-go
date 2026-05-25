@@ -15,6 +15,7 @@ const (
 	Pip    PackageManager = "pip"
 	Go     PackageManager = "go"
 	Poetry PackageManager = "poetry"
+	Yarn   PackageManager = "yarn"
 )
 
 // ForbiddenError represents a 403 Forbidden error.
@@ -44,7 +45,7 @@ func (err *ErrProjectNotInstalled) Error() string {
 func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 	log.Debug("Checking forbidden output for package manager:", tech)
 	switch tech {
-	case "npm":
+	case "npm", "yarn":
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")
 	case "maven":
 		return strings.Contains(cmdOutput, "status code: 403") ||
