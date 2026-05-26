@@ -14,6 +14,7 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/build-info-go/flexpack/conan"
+	nixflex "github.com/jfrog/build-info-go/flexpack/nix"
 	gradleflex "github.com/jfrog/build-info-go/flexpack/gradle"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
@@ -286,6 +287,43 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				formatValue, _, err := extractStringFlag(context.Args().Slice(), formatFlag)
 				if err != nil {
 					return err
+				}
+				return printBuildInfo(buildInfo, formatValue)
+			},
+		},
+		{
+			Name:            "nix",
+			Usage:           "Generate build-info for a Nix project (works for channels and flakes)",
+			UsageText:       "bi nix [store-path ...]",
+			Flags:           flags,
+			SkipFlagParsing: true,
+			Action: func(context *clitool.Context) (err error) {
+				if !flexpack.IsFlexPackEnabled() {
+					return fmt.Errorf("nix build-info collection requires FlexPack mode (set JFROG_RUN_NATIVE=true)")
+				}
+				// Parse --format up front so a typo fails fast instead of after
+				// the (potentially slow) `nix path-info` closure walk.
+				formatValue, positional, err := extractStringFlag(context.Args().Slice(), formatFlag)
+				if err != nil {
+					return err
+				}
+				config := nixflex.NixConfig{
+					WorkingDirectory: ".",
+				}
+				collector, err := nixflex.NewNixFlexPack(config)
+				if err != nil {
+					return fmt.Errorf("failed to create Nix collector: %w", err)
+				}
+				// Any positional args are treated as explicit store paths to
+				// walk; otherwise CollectBuildInfo auto-discovers via ./result.
+				if len(positional) > 0 {
+					if err := collector.CollectStorePathDependencies(positional...); err != nil {
+						return fmt.Errorf("failed to collect Nix dependencies: %w", err)
+					}
+				}
+				buildInfo, err := collector.CollectBuildInfo("nix-build", "1")
+				if err != nil {
+					return fmt.Errorf("failed to collect build info: %w", err)
 				}
 				return printBuildInfo(buildInfo, formatValue)
 			},
