@@ -1,13 +1,22 @@
 package nix
 
-// NixChannelConfig holds configuration for Nix channel-based build-info collection.
-type NixChannelConfig struct {
+// NixConfig holds configuration for Nix build-info collection.
+// The collector reads directly from the local Nix store via the `nix` CLI,
+// so the same configuration works for channel-based (`nix-build`) and
+// flakes-based (`nix build`) workflows.
+type NixConfig struct {
+	// WorkingDirectory is the project root. Defaults to "." when empty.
+	// Used to discover the conventional `./result` build symlink when no
+	// store paths are provided explicitly.
 	WorkingDirectory string
-	ChannelName      string // e.g. "nixos-25.11"
+	// NixExecutable overrides the `nix` binary used to run `path-info`
+	// and `--version`. Defaults to "nix" (resolved on PATH).
+	NixExecutable string
 }
 
-// NixStorePathInfo represents a single entry from "nix path-info --json -r" output.
-// The JSON output is a map keyed by store path.
+// NixStorePathInfo represents a single entry from "nix path-info --json --recursive" output.
+// The JSON output is a map keyed by store path; we copy the key into Path
+// after decoding so consumers don't have to track it separately.
 type NixStorePathInfo struct {
 	Path             string   `json:"path,omitempty"`
 	NarHash          string   `json:"narHash"`
@@ -16,20 +25,4 @@ type NixStorePathInfo struct {
 	References       []string `json:"references,omitempty"`
 	RegistrationTime int64    `json:"registrationTime,omitempty"`
 	Signatures       []string `json:"signatures,omitempty"`
-}
-
-// NixNarInfo represents the parsed content of a .narinfo file.
-// Narinfo is a plain-text key-value format served by Nix binary caches.
-type NixNarInfo struct {
-	StorePath   string // /nix/store/<hash>-<name>
-	URL         string // nar/<content-hash>.nar.xz
-	Compression string // xz
-	FileHash    string // sha256:<nix32-hash>
-	FileSize    int64
-	NarHash     string // sha256:<nix32-hash>
-	NarSize     int64
-	References  string // space-separated store path basenames
-	Deriver     string // <hash>-<name>.drv
-	System      string // x86_64-linux, aarch64-darwin
-	Sig         string // cache.nixos.org-1:<base64>
 }

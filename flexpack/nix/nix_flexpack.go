@@ -13,29 +13,36 @@ import (
 	"github.com/jfrog/gofrog/log"
 )
 
-// NixChannelCollector implements FlexPackManager and BuildInfoCollector for
-// Nix channel-based workflows. It collects dependencies from the Nix store
-// after a package has been installed/built via channels.
-type NixChannelCollector struct {
-	config          NixChannelConfig
+// defaultBuildResultSymlink is the conventional Nix build output symlink
+// produced by both `nix-build` (channels) and `nix build` (flakes).
+const defaultBuildResultSymlink = "./result"
+
+// NixFlexPack implements FlexPackManager and BuildInfoCollector for Nix.
+// It collects dependencies from the local Nix store after a build.
+// The same implementation works for channel-based and flakes-based workflows
+// because both share the /nix/store and the `nix path-info` interface.
+type NixFlexPack struct {
+	config          NixConfig
 	dependencies    []flexpack.DependencyInfo
 	dependencyGraph map[string][]string
 	projectName     string
 }
 
-// NewNixChannelCollector creates a new channel-based collector.
-func NewNixChannelCollector(config NixChannelConfig) (*NixChannelCollector, error) {
+// NewNixFlexPack creates a new Nix FlexPack collector.
+func NewNixFlexPack(config NixConfig) (*NixFlexPack, error) {
 	if config.WorkingDirectory == "" {
 		config.WorkingDirectory = "."
 	}
-
 	absDir, err := filepath.Abs(config.WorkingDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("resolve working directory: %w", err)
 	}
 	config.WorkingDirectory = absDir
+	if config.NixExecutable == "" {
+		config.NixExecutable = "nix"
+	}
 
-	return &NixChannelCollector{
+	return &NixFlexPack{
 		config:          config,
 		dependencies:    []flexpack.DependencyInfo{},
 		dependencyGraph: make(map[string][]string),
@@ -43,15 +50,15 @@ func NewNixChannelCollector(config NixChannelConfig) (*NixChannelCollector, erro
 	}, nil
 }
 
-// CollectStorePathDependencies runs "nix path-info --json -r" on the given store paths
-// and collects the runtime closure as dependencies.
-func (c *NixChannelCollector) CollectStorePathDependencies(storePaths ...string) error {
+// CollectStorePathDependencies runs "nix path-info --json --recursive" on the given store
+// paths and collects the runtime closure as dependencies.
+func (c *NixFlexPack) CollectStorePathDependencies(storePaths ...string) error {
 	if len(storePaths) == 0 {
 		return nil
 	}
 
 	args := append([]string{"path-info", "--json", "--recursive"}, storePaths...)
-	cmd := exec.Command("nix", args...)
+	cmd := exec.Command(c.config.NixExecutable, args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("nix path-info failed: %w", err)
@@ -63,13 +70,11 @@ func (c *NixChannelCollector) CollectStorePathDependencies(storePaths ...string)
 		return fmt.Errorf("parse path-info output: %w", err)
 	}
 
-	// Fill Path field from map key
 	for path, info := range pathInfoMap {
 		info.Path = path
 		pathInfoMap[path] = info
 	}
 
-	// Build dependency graph from references
 	c.dependencyGraph = make(map[string][]string)
 	for parentPath, info := range pathInfoMap {
 		parentID := StorePathToDepID(parentPath)
@@ -82,7 +87,7 @@ func (c *NixChannelCollector) CollectStorePathDependencies(storePaths ...string)
 		}
 	}
 
-	// Convert to DependencyInfo, skip the root store paths (they're the project output, not deps)
+	// Skip the root store paths (they're the project output, not deps)
 	rootIDs := make(map[string]bool)
 	for _, sp := range storePaths {
 		rootIDs[StorePathToDepID(sp)] = true
@@ -98,22 +103,29 @@ func (c *NixChannelCollector) CollectStorePathDependencies(storePaths ...string)
 		pkgName := ExtractPackageName(path)
 		name, version := ExtractNameAndVersion(pkgName)
 
-		// Convert narHash from SRI to hex for Artifactory matching
-		sha256 := info.NarHash
-		if hexHash, err := SriToHex(info.NarHash); err == nil {
-			sha256 = hexHash
+		// NOTE: narHash is the hash of the NAR archive of the unpacked store path,
+		// not the sha256 of the uploaded file. Artifactory computes sha256 over
+		// the uploaded object, so this value will not match by-checksum lookups
+		// against the repository. If SRI conversion fails, leave the field empty
+		// rather than storing an opaque "sha256:<nix32>" string.
+		sha256 := ""
+		if info.NarHash != "" {
+			if hexHash, err := SriToHex(info.NarHash); err == nil {
+				sha256 = hexHash
+			} else {
+				log.Warn(fmt.Sprintf("Could not convert narHash %q for %s to hex; leaving SHA256 empty: %s",
+					info.NarHash, path, err))
+			}
 		}
 
-		dep := flexpack.DependencyInfo{
+		c.dependencies = append(c.dependencies, flexpack.DependencyInfo{
 			ID:      depID,
 			Name:    name,
 			Version: version,
 			SHA256:  sha256,
 			Scopes:  []string{"runtime"},
 			Path:    path,
-		}
-
-		c.dependencies = append(c.dependencies, dep)
+		})
 	}
 
 	log.Debug(fmt.Sprintf("Collected %d runtime dependencies from store closure", len(c.dependencies)))
@@ -121,18 +133,29 @@ func (c *NixChannelCollector) CollectStorePathDependencies(storePaths ...string)
 }
 
 // CollectBuildInfo creates a complete BuildInfo from the collected dependencies.
-func (c *NixChannelCollector) CollectBuildInfo(buildName, buildNumber string) (*entities.BuildInfo, error) {
+// If no dependencies have been collected yet, it auto-discovers them by following
+// the conventional ./result symlink produced by `nix build` / `nix-build`.
+func (c *NixFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities.BuildInfo, error) {
+	if len(c.dependencies) == 0 && len(c.dependencyGraph) == 0 {
+		if err := c.autoDiscoverDependencies(); err != nil {
+			// Auto-discovery is best-effort; surface as a debug message but
+			// continue so callers that intend an empty build-info still work.
+			log.Debug(fmt.Sprintf("Auto-discover skipped: %s", err))
+		}
+	}
+
+	nixVersion := c.getNixVersion()
 	buildInfo := &entities.BuildInfo{
 		Name:    buildName,
 		Number:  buildNumber,
 		Started: time.Now().Format(entities.TimeFormat),
 		Agent: &entities.Agent{
-			Name:    "nix",
-			Version: "1.0",
+			Name:    "build-info-go",
+			Version: "1.0.0",
 		},
 		BuildAgent: &entities.Agent{
-			Name:    "Generic",
-			Version: "1.0",
+			Name:    "Nix",
+			Version: nixVersion,
 		},
 		Modules: []entities.Module{},
 	}
@@ -159,8 +182,13 @@ func (c *NixChannelCollector) CollectBuildInfo(buildName, buildNumber string) (*
 			},
 		}
 
-		if parents, exists := requestedBy[dep.ID]; exists && len(parents) > 0 {
-			entityDep.RequestedBy = [][]string{parents}
+		// Each parent is its own request-chain entry: [[p1], [p2]] not [[p1, p2]].
+		if parents, exists := requestedBy[dep.ID]; exists {
+			chains := make([][]string, 0, len(parents))
+			for _, p := range parents {
+				chains = append(chains, []string{p})
+			}
+			entityDep.RequestedBy = chains
 		}
 
 		module.Dependencies = append(module.Dependencies, entityDep)
@@ -172,18 +200,45 @@ func (c *NixChannelCollector) CollectBuildInfo(buildName, buildNumber string) (*
 	return buildInfo, nil
 }
 
+// autoDiscoverDependencies tries to follow the conventional ./result symlink
+// produced by `nix build` / `nix-build` and collect its runtime closure.
+func (c *NixFlexPack) autoDiscoverDependencies() error {
+	resultPath := filepath.Join(c.config.WorkingDirectory, defaultBuildResultSymlink)
+	target, err := filepath.EvalSymlinks(resultPath)
+	if err != nil {
+		return fmt.Errorf("no %s symlink found in %s: %w",
+			defaultBuildResultSymlink, c.config.WorkingDirectory, err)
+	}
+	log.Debug(fmt.Sprintf("Auto-discovered build root %s -> %s", resultPath, target))
+	return c.CollectStorePathDependencies(target)
+}
+
+// getNixVersion parses `nix --version` output, e.g. "nix (Nix) 2.18.1".
+// Returns "unknown" if the executable is missing or output is unexpected.
+func (c *NixFlexPack) getNixVersion() string {
+	out, err := exec.Command(c.config.NixExecutable, "--version").Output()
+	if err != nil {
+		return "unknown"
+	}
+	fields := strings.Fields(strings.TrimSpace(string(out)))
+	if len(fields) == 0 {
+		return "unknown"
+	}
+	return fields[len(fields)-1]
+}
+
 // GetProjectDependencies returns all collected dependencies.
-func (c *NixChannelCollector) GetProjectDependencies() ([]flexpack.DependencyInfo, error) {
+func (c *NixFlexPack) GetProjectDependencies() ([]flexpack.DependencyInfo, error) {
 	return c.dependencies, nil
 }
 
 // GetDependencyGraph returns the forward dependency graph.
-func (c *NixChannelCollector) GetDependencyGraph() (map[string][]string, error) {
+func (c *NixFlexPack) GetDependencyGraph() (map[string][]string, error) {
 	return c.dependencyGraph, nil
 }
 
 // GetDependency returns a formatted string summary of dependencies.
-func (c *NixChannelCollector) GetDependency() string {
+func (c *NixFlexPack) GetDependency() string {
 	var result strings.Builder
 	fmt.Fprintf(&result, "Project: %s\n", c.projectName)
 	result.WriteString("Dependencies:\n")
@@ -194,7 +249,7 @@ func (c *NixChannelCollector) GetDependency() string {
 }
 
 // ParseDependencyToList returns a list of dependency IDs.
-func (c *NixChannelCollector) ParseDependencyToList() []string {
+func (c *NixFlexPack) ParseDependencyToList() []string {
 	var depList []string
 	for _, dep := range c.dependencies {
 		depList = append(depList, dep.ID)
@@ -203,7 +258,7 @@ func (c *NixChannelCollector) ParseDependencyToList() []string {
 }
 
 // CalculateChecksum returns checksum maps for each dependency.
-func (c *NixChannelCollector) CalculateChecksum() []map[string]interface{} {
+func (c *NixFlexPack) CalculateChecksum() []map[string]interface{} {
 	var checksums []map[string]interface{}
 	for _, dep := range c.dependencies {
 		checksums = append(checksums, map[string]interface{}{
@@ -214,12 +269,12 @@ func (c *NixChannelCollector) CalculateChecksum() []map[string]interface{} {
 }
 
 // CalculateScopes returns the unique set of scopes across all dependencies.
-func (c *NixChannelCollector) CalculateScopes() []string {
+func (c *NixFlexPack) CalculateScopes() []string {
 	return []string{"runtime"}
 }
 
 // CalculateRequestedBy returns the inverted dependency graph.
-func (c *NixChannelCollector) CalculateRequestedBy() map[string][]string {
+func (c *NixFlexPack) CalculateRequestedBy() map[string][]string {
 	requestedBy := make(map[string][]string)
 	for parent, children := range c.dependencyGraph {
 		for _, child := range children {

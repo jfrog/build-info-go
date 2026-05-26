@@ -4,53 +4,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
-
-// ParseNarInfo parses a .narinfo file's plain-text content into a NixNarInfo struct.
-// Format is line-based key-value: "Key: Value"
-func ParseNarInfo(content string) (*NixNarInfo, error) {
-	info := &NixNarInfo{}
-	for _, line := range strings.Split(content, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		idx := strings.Index(line, ": ")
-		if idx == -1 {
-			continue
-		}
-		key := line[:idx]
-		value := line[idx+2:]
-
-		switch key {
-		case "StorePath":
-			info.StorePath = value
-		case "URL":
-			info.URL = value
-		case "Compression":
-			info.Compression = value
-		case "FileHash":
-			info.FileHash = value
-		case "FileSize":
-			info.FileSize, _ = strconv.ParseInt(value, 10, 64)
-		case "NarHash":
-			info.NarHash = value
-		case "NarSize":
-			info.NarSize, _ = strconv.ParseInt(value, 10, 64)
-		case "References":
-			info.References = value
-		case "Deriver":
-			info.Deriver = value
-		case "System":
-			info.System = value
-		case "Sig":
-			info.Sig = value
-		}
-	}
-	return info, nil
-}
 
 // ExtractStoreHash extracts the 32-char hash from a Nix store path.
 // e.g. "/nix/store/yalw1pbrzmzk66phdkhslqh79pvbb67k-hello-2.12.3" → "yalw1pbrzmzk66phdkhslqh79pvbb67k"
@@ -73,12 +28,18 @@ func ExtractPackageName(storePath string) string {
 }
 
 // ExtractNameAndVersion splits a package name into name and version.
+// Nix package names follow "<name>-<version>" where <version> always
+// starts with a digit (Nixpkgs convention). We walk right-to-left to
+// find the last '-' immediately followed by a digit ('0'..'9'); the
+// digit check disambiguates hyphenated names like "version-check-hook"
+// from real version separators like "hello-2.12.3".
 // e.g. "hello-2.12.3" → ("hello", "2.12.3")
-// e.g. "glibc-2.40-66" → ("glibc", "2.40-66")
+// e.g. "glibc-2.40-66" → ("glibc-2.40", "66") (multi-segment versions)
 // e.g. "bash" → ("bash", "")
 func ExtractNameAndVersion(packageName string) (string, string) {
 	for i := len(packageName) - 1; i >= 0; i-- {
-		if packageName[i] == '-' && i+1 < len(packageName) && packageName[i+1] >= '0' && packageName[i+1] <= '9' {
+		if packageName[i] == '-' && i+1 < len(packageName) &&
+			packageName[i+1] >= '0' && packageName[i+1] <= '9' {
 			return packageName[:i], packageName[i+1:]
 		}
 	}
