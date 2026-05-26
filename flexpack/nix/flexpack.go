@@ -17,6 +17,20 @@ import (
 // produced by both `nix-build` (channels) and `nix build` (flakes).
 const defaultBuildResultSymlink = "./result"
 
+// NixConfig holds configuration for Nix build-info collection.
+// The collector reads directly from the local Nix store via the `nix` CLI,
+// so the same configuration works for channel-based (`nix-build`) and
+// flakes-based (`nix build`) workflows.
+type NixConfig struct {
+	// WorkingDirectory is the project root. Defaults to "." when empty.
+	// Used to discover the conventional `./result` build symlink when no
+	// store paths are provided explicitly.
+	WorkingDirectory string
+	// NixExecutable overrides the `nix` binary used to run `path-info`
+	// and `--version`. Defaults to "nix" (resolved on PATH).
+	NixExecutable string
+}
+
 // NixFlexPack implements FlexPackManager and BuildInfoCollector for Nix.
 // It collects dependencies from the local Nix store after a build.
 // The same implementation works for channel-based and flakes-based workflows
@@ -26,6 +40,12 @@ type NixFlexPack struct {
 	dependencies    []flexpack.DependencyInfo
 	dependencyGraph map[string][]string
 	projectName     string
+	// rootStorePaths are the build-output store paths the user (or
+	// autoDiscoverDependencies) passed to CollectStorePathDependencies.
+	// The first one's "<hash>-<name>-<version>" basename is used to derive
+	// the module's name:version — the canonical identity for both
+	// channel-based (`nix-build`) and flakes-based (`nix build`) outputs.
+	rootStorePaths []string
 }
 
 // NewNixFlexPack creates a new Nix FlexPack collector.
@@ -50,12 +70,27 @@ func NewNixFlexPack(config NixConfig) (*NixFlexPack, error) {
 	}, nil
 }
 
+// NixStorePathInfo represents a single entry from "nix path-info --json --recursive" output.
+// The JSON output is a map keyed by store path; we copy the key into Path
+// after decoding so consumers don't have to track it separately.
+type NixStorePathInfo struct {
+	Path             string   `json:"path,omitempty"`
+	NarHash          string   `json:"narHash"`
+	NarSize          int64    `json:"narSize"`
+	Deriver          string   `json:"deriver,omitempty"`
+	References       []string `json:"references,omitempty"`
+	RegistrationTime int64    `json:"registrationTime,omitempty"`
+	Signatures       []string `json:"signatures,omitempty"`
+}
+
 // CollectStorePathDependencies runs "nix path-info --json --recursive" on the given store
 // paths and collects the runtime closure as dependencies.
 func (c *NixFlexPack) CollectStorePathDependencies(storePaths ...string) error {
 	if len(storePaths) == 0 {
 		return nil
 	}
+
+	c.rootStorePaths = append(c.rootStorePaths, storePaths...)
 
 	args := append([]string{"path-info", "--json", "--recursive"}, storePaths...)
 	cmd := exec.Command(c.config.NixExecutable, args...)
@@ -161,7 +196,7 @@ func (c *NixFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities
 	}
 
 	module := entities.Module{
-		Id:   c.projectName,
+		Id:   c.moduleID(),
 		Type: entities.Nix,
 	}
 
@@ -211,6 +246,30 @@ func (c *NixFlexPack) autoDiscoverDependencies() error {
 	}
 	log.Debug(fmt.Sprintf("Auto-discovered build root %s -> %s", resultPath, target))
 	return c.CollectStorePathDependencies(target)
+}
+
+// moduleID returns the module identifier in "name:version" form, derived from
+// the build's root store path (`/nix/store/<hash>-<name>-<version>`). This is
+// the canonical Nix identity for both `nix-build` (channels) and `nix build`
+// (flakes) — both write outputs to the same /nix/store using the same
+// Nixpkgs <name>-<version> convention.
+//
+// Falls back to the working-directory basename when:
+//   - no root store paths have been collected (empty build-info), or
+//   - the basename has no version segment (e.g. `bash` instead of `hello-2.12.3`).
+func (c *NixFlexPack) moduleID() string {
+	if len(c.rootStorePaths) == 0 {
+		return c.projectName
+	}
+	pkgName := ExtractPackageName(c.rootStorePaths[0])
+	name, version := ExtractNameAndVersion(pkgName)
+	if name == "" {
+		return c.projectName
+	}
+	if version == "" {
+		return name
+	}
+	return fmt.Sprintf("%s:%s", name, version)
 }
 
 // getNixVersion parses `nix --version` output, e.g. "nix (Nix) 2.18.1".
