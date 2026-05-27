@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"strings"
-
 )
 
 type PackageManager string
@@ -43,8 +42,11 @@ func (err *ErrProjectNotInstalled) Error() string {
 // IsForbiddenOutput checks whether the provided output includes a 403 Forbidden. The various package managers have their own forbidden output formats.
 func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 	switch tech {
-	case "npm", "yarn":
+	case "npm":
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")
+	case "yarn":
+		return strings.Contains(strings.ToLower(cmdOutput), "403 (forbidden)") ||
+			strings.Contains(strings.ToLower(cmdOutput), "response code: 403")
 	case "maven":
 		return strings.Contains(cmdOutput, "status code: 403") ||
 			strings.Contains(strings.ToLower(cmdOutput), "403 forbidden") ||
@@ -57,7 +59,8 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 			strings.Contains(strings.ToLower(cmdOutput), " 403")
 	case "poetry":
 		return strings.Contains(strings.ToLower(cmdOutput), "http error 403") ||
-			strings.Contains(strings.ToLower(cmdOutput), "403 client error")
+			strings.Contains(strings.ToLower(cmdOutput), "403 client error") ||
+			strings.Contains(strings.ToLower(cmdOutput), "version solving failed")
 	}
 	return false
 }

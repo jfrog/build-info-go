@@ -1,10 +1,12 @@
 package build
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	buildutils "github.com/jfrog/build-info-go/build/utils"
 	"github.com/jfrog/build-info-go/entities"
@@ -222,11 +224,16 @@ func validateYarnVersion(executablePath, srcPath string) (string, error) {
 func RunYarnCommand(executablePath, srcPath string, args ...string) error {
 	command := exec.Command(executablePath, args...)
 	command.Dir = srcPath
-	command.Stdout = os.Stderr
-	command.Stderr = os.Stderr
+	outBuffer := bytes.NewBuffer([]byte{})
+	command.Stdout = outBuffer
+	errBuffer := bytes.NewBuffer([]byte{})
+	command.Stderr = errBuffer
 	err := command.Run()
-	if _, ok := err.(*exec.ExitError); ok {
-		err = errors.New(err.Error())
+	if err != nil {
+		err = fmt.Errorf("error while running '%s %s': %s\n%s\n%s",
+			executablePath, strings.Join(args, " "), err.Error(),
+			strings.TrimSpace(outBuffer.String()),
+			strings.TrimSpace(errBuffer.String()))
 	}
 	return err
 }
