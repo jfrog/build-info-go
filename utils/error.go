@@ -59,8 +59,7 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 			strings.Contains(strings.ToLower(cmdOutput), " 403")
 	case "poetry":
 		return strings.Contains(strings.ToLower(cmdOutput), "http error 403") ||
-			strings.Contains(strings.ToLower(cmdOutput), "403 client error") ||
-			strings.Contains(strings.ToLower(cmdOutput), "version solving failed")
+			strings.Contains(strings.ToLower(cmdOutput), "403 client error")
 	}
 	return false
 }
