@@ -1,0 +1,20 @@
+name: 'Install Local Artifactory'
+description: 'Spins up a local Artifactory instance used by the integration-test jobs.'
+
+inputs:
+  rtlic:
+    description: 'Artifactory license (the RTLIC secret). Must be passed by the caller since composite actions cannot read secrets directly.'
+    required: true
+  connection_timeout_seconds:
+    description: 'How long to wait, in seconds, for Artifactory to become available.'
+    required: false
+    default: '1200'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install local Artifactory
+      uses: jfrog/.github/actions/install-local-artifactory@main
+      with:
+        RTLIC: ${{ inputs.rtlic }}
+        RT_CONNECTION_TIMEOUT_SECONDS: ${{ inputs.connection_timeout_seconds }}
