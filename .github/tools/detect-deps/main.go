@@ -8,6 +8,34 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/jfrog/gofrog/log"
+)
+
+const (
+	// currentBranchEnvVar is the environment variable holding the branch under test.
+	currentBranchEnvVar = "CURRENT_BRANCH"
+	// githubOutputEnvVar is the environment variable pointing to the GitHub Actions output file.
+	githubOutputEnvVar = "GITHUB_OUTPUT"
+	// defaultBranch is used when no branch is provided via the environment.
+	defaultBranch = "main"
+	// masterBranch is the default ref the dependency repositories fall back to.
+	masterBranch = "master"
+
+	// githubBaseURL is the base URL for cloning GitHub repositories.
+	githubBaseURL = "https://github.com"
+	// githubAPIBaseURL is the base URL for the GitHub REST API.
+	githubAPIBaseURL = "https://api.github.com"
+	// jfrogOrg is the GitHub organization that hosts the dependency repositories.
+	jfrogOrg = "jfrog"
+
+	// githubSHAFullLength is the length of a full Git commit SHA.
+	githubSHAFullLength = 40
+	// githubSHAShortMinLength is the minimum length of an abbreviated commit SHA.
+	githubSHAShortMinLength = 7
+
+	// githubOutputFilePerm is the permission used when opening the GitHub output file.
+	githubOutputFilePerm = 0644
 )
 
 // GoMod represents the JSON structure from `go mod edit -json`
@@ -62,15 +90,15 @@ var jfrogDependencies = map[string]string{
 
 func main() {
 	// Get current branch from environment
-	currentBranch := os.Getenv("CURRENT_BRANCH")
+	currentBranch := os.Getenv(currentBranchEnvVar)
 	if currentBranch == "" {
-		currentBranch = "main"
+		currentBranch = defaultBranch
 	}
 
 	// Parse go.mod
 	goMod, err := parseGoMod()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing go.mod: %v\n", err)
+		log.Error(fmt.Sprintf("Error parsing go.mod: %v", err))
 		os.Exit(1)
 	}
 
@@ -81,23 +109,30 @@ func main() {
 	}
 
 	// Open GITHUB_OUTPUT file for writing outputs
-	outputFile := os.Getenv("GITHUB_OUTPUT")
+	outputFile := os.Getenv(githubOutputEnvVar)
 	var output *os.File
 	if outputFile != "" {
 		var err error
 		cleanOutputFile := filepath.Clean(outputFile)
-		output, err = os.OpenFile(cleanOutputFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644) // #nosec G703 -- GitHub Actions env var
+		output, err = os.OpenFile(cleanOutputFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, githubOutputFilePerm) // #nosec G703 -- GitHub Actions env var
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error opening GITHUB_OUTPUT: %v\n", err)
+			log.Error(fmt.Sprintf("Error opening %s: %v", githubOutputEnvVar, err))
 			os.Exit(1)
 		}
 		defer output.Close()
 	}
 
-	// Process each dependency
+	// Collect every resolved repo/ref pair into a single map so the workflow can
+	// consume one JSON "deps" output instead of repeating per-dependency declarations.
+	deps := make(map[string]string)
 	for name, modulePath := range jfrogDependencies {
 		info := detectDependency(name, modulePath, replaces, currentBranch)
-		writeOutput(output, name, info)
+		collectDependency(deps, name, info)
+	}
+
+	if err := writeDeps(output, deps); err != nil {
+		log.Error(fmt.Sprintf("Error writing dependency output: %v", err))
+		os.Exit(1)
 	}
 }
 
@@ -132,7 +167,7 @@ func detectDependency(name, modulePath string, replaces map[string]Replace, curr
 			if ref != "" {
 				// Prefer the current branch if it exists on the forked repo,
 				if branchExists(repo, currentBranch) {
-					fmt.Printf("Found replace directive: %s => %s, branch '%s' exists, using it\n", name, repo, currentBranch)
+					log.Info(fmt.Sprintf("Found replace directive: %s => %s, branch '%s' exists, using it", name, repo, currentBranch))
 					return &DependencyInfo{
 						Name:       name,
 						ModulePath: modulePath,
@@ -145,11 +180,11 @@ func detectDependency(name, modulePath string, replaces map[string]Replace, curr
 				ref = extractCommitFromPseudoVersion(ref)
 				fullSHA := resolveFullSHA(repo, ref)
 				if fullSHA == "" {
-					fmt.Fprintf(os.Stderr, "Error: could not resolve commit %s to full SHA in %s\n", ref, repo)
+					log.Error(fmt.Sprintf("Error: could not resolve commit %s to full SHA in %s", ref, repo))
 					os.Exit(1)
 				}
 				ref = fullSHA
-				fmt.Printf("Found replace directive: %s => %s @ %s\n", name, repo, ref)
+				log.Info(fmt.Sprintf("Found replace directive: %s => %s @ %s", name, repo, ref))
 				return &DependencyInfo{
 					Name:       name,
 					ModulePath: modulePath,
@@ -161,11 +196,11 @@ func detectDependency(name, modulePath string, replaces map[string]Replace, curr
 	}
 
 	// No replace directive found, check if current branch exists in the dependency repo
-	repo := fmt.Sprintf("jfrog/%s", name)
+	repo := fmt.Sprintf("%s/%s", jfrogOrg, name)
 
 	// Check if the current branch exists in the repo
 	if branchExists(repo, currentBranch) {
-		fmt.Printf("Branch '%s' exists in %s, using it\n", currentBranch, repo)
+		log.Info(fmt.Sprintf("Branch '%s' exists in %s, using it", currentBranch, repo))
 		return &DependencyInfo{
 			Name:       name,
 			ModulePath: modulePath,
@@ -174,7 +209,7 @@ func detectDependency(name, modulePath string, replaces map[string]Replace, curr
 		}
 	}
 
-	fmt.Printf("No matching branch for %s, will use default (master)\n", name)
+	log.Info(fmt.Sprintf("No matching branch for %s, will use default (%s)", name, masterBranch))
 	return nil
 }
 
@@ -195,22 +230,22 @@ func extractCommitFromPseudoVersion(version string) string {
 // resolveFullSHA resolves a short commit hash to a full 40-char SHA using the GitHub API.
 // Returns empty string if resolution fails
 func resolveFullSHA(repo, shortHash string) string {
-	if len(shortHash) < 7 || len(shortHash) >= 40 {
+	if len(shortHash) < githubSHAShortMinLength || len(shortHash) >= githubSHAFullLength {
 		return ""
 	}
 	if !validGitRefPattern.MatchString(repo) || !validGitRefPattern.MatchString(shortHash) {
 		return ""
 	}
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/commits/%s", repo, shortHash)
+	apiURL := fmt.Sprintf("%s/repos/%s/commits/%s", githubAPIBaseURL, repo, shortHash)
 	cmd := exec.Command("curl", "-sf", "-H", "Accept: application/vnd.github.v3.sha", apiURL) // #nosec G204 -- inputs validated
 	out, err := cmd.Output()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not resolve full SHA for %s in %s: %v\n", shortHash, repo, err)
+		log.Warn(fmt.Sprintf("could not resolve full SHA for %s in %s: %v", shortHash, repo, err))
 		return ""
 	}
 	sha := strings.TrimSpace(string(out))
-	if len(sha) == 40 {
-		fmt.Printf("Resolved short hash %s to full SHA %s\n", shortHash, sha)
+	if len(sha) == githubSHAFullLength {
+		log.Info(fmt.Sprintf("Resolved short hash %s to full SHA %s", shortHash, sha))
 		return sha
 	}
 	return ""
@@ -231,54 +266,68 @@ var validGitRefPattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
 
 // branchExists checks if a branch exists in a GitHub repository
 func branchExists(repo, branch string) bool {
-	if branch == "" || branch == "main" || branch == "master" {
+	if branch == "" || branch == defaultBranch || branch == masterBranch {
 		return false
 	}
 
 	// Validate repo format to prevent command injection (should be org/repo format)
 	if !validGitRefPattern.MatchString(repo) {
-		fmt.Fprintf(os.Stderr, "Warning: invalid repo format '%s'\n", repo)
+		log.Warn(fmt.Sprintf("invalid repo format '%s'", repo))
 		return false
 	}
 
 	// Validate branch name to prevent command injection
 	if !validGitRefPattern.MatchString(branch) {
-		fmt.Fprintf(os.Stderr, "Warning: invalid branch format '%s'\n", branch)
+		log.Warn(fmt.Sprintf("invalid branch format '%s'", branch))
 		return false
 	}
 
-	url := fmt.Sprintf("https://github.com/%s.git", repo)
+	url := fmt.Sprintf("%s/%s.git", githubBaseURL, repo)
 	cmd := exec.Command("git", "ls-remote", "--heads", url, branch) // #nosec G702 -- inputs validated above
 	out, err := cmd.Output()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to check branch '%s' in %s: %v\n", branch, repo, err)
+		log.Warn(fmt.Sprintf("failed to check branch '%s' in %s: %v", branch, repo, err))
 		return false
 	}
 
 	return strings.Contains(string(out), fmt.Sprintf("refs/heads/%s", branch))
 }
 
-// writeOutput writes the dependency info to GITHUB_OUTPUT
-func writeOutput(output *os.File, name string, info *DependencyInfo) {
-	// Convert name to output key format (e.g., "build-info-go" -> "build_info_go")
+// collectDependency records the resolved repo/ref for a dependency into the deps map,
+// using the snake_case key format expected by the workflow (e.g. "jfrog-cli" -> "jfrog_cli_repo").
+func collectDependency(deps map[string]string, name string, info *DependencyInfo) {
 	keyName := strings.ReplaceAll(name, "-", "_")
 
 	var repo, ref string
 	if info != nil {
 		repo = info.Repo
 		ref = info.Ref
-	}
-
-	// Write to GITHUB_OUTPUT if available
-	if output != nil {
-		fmt.Fprintf(output, "%s_repo=%s\n", keyName, repo)
-		fmt.Fprintf(output, "%s_ref=%s\n", keyName, ref)
-	}
-
-	if info != nil {
-		fmt.Printf("  %s_repo=%s\n", keyName, repo)
-		fmt.Printf("  %s_ref=%s\n", keyName, ref)
+		log.Info(fmt.Sprintf("  %s_repo=%s", keyName, repo))
+		log.Info(fmt.Sprintf("  %s_ref=%s", keyName, ref))
 	} else {
-		fmt.Printf("  %s: using default\n", keyName)
+		log.Info(fmt.Sprintf("  %s: using default", keyName))
 	}
+
+	deps[keyName+"_repo"] = repo
+	deps[keyName+"_ref"] = ref
+}
+
+// writeDeps marshals all dependency repo/ref pairs into a single JSON object and
+// writes it to GITHUB_OUTPUT as the "deps" output. This lets the workflow pass one
+// value to the composite actions instead of repeating each key in every job.
+func writeDeps(output *os.File, deps map[string]string) error {
+	data, err := json.Marshal(deps)
+	if err != nil {
+		return fmt.Errorf("failed to marshal dependencies: %w", err)
+	}
+
+	// Write the machine-readable output consumed by GitHub Actions.
+	if output != nil {
+		if _, err := fmt.Fprintf(output, "deps=%s\n", data); err != nil {
+			return fmt.Errorf("failed to write deps to %s: %w", githubOutputEnvVar, err)
+		}
+	}
+
+	log.Info(fmt.Sprintf("deps=%s", data))
+	return nil
 }

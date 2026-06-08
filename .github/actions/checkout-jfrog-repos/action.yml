@@ -2,38 +2,11 @@ name: 'Checkout JFrog Repositories'
 description: 'Checkout jfrog-cli and optional dependency repositories. build-info-go stays at root.'
 
 inputs:
-  jfrog_cli_repo:
-    description: 'Repository for jfrog-cli override'
-    required: false
-    default: ''
-  jfrog_cli_ref:
-    description: 'Ref for jfrog-cli override'
-    required: false
-    default: ''
-  jfrog_cli_artifactory_repo:
-    description: 'Repository for jfrog-cli-artifactory override'
-    required: false
-    default: ''
-  jfrog_cli_artifactory_ref:
-    description: 'Ref for jfrog-cli-artifactory override'
-    required: false
-    default: ''
-  jfrog_client_go_repo:
-    description: 'Repository for jfrog-client-go override'
-    required: false
-    default: ''
-  jfrog_client_go_ref:
-    description: 'Ref for jfrog-client-go override'
-    required: false
-    default: ''
-  jfrog_cli_core_repo:
-    description: 'Repository for jfrog-cli-core override'
-    required: false
-    default: ''
-  jfrog_cli_core_ref:
-    description: 'Ref for jfrog-cli-core override'
-    required: false
-    default: ''
+  deps:
+    description: >-
+      JSON object produced by the detect-deps tool, holding every repo/ref override
+      (e.g. {"jfrog_cli_repo":"...","jfrog_cli_ref":"...", ...}).
+    required: true
 
 runs:
   using: 'composite'
@@ -41,30 +14,30 @@ runs:
     - name: Checkout jfrog-cli
       uses: actions/checkout@v4
       with:
-        repository: ${{ inputs.jfrog_cli_repo != '' && inputs.jfrog_cli_repo || 'jfrog/jfrog-cli' }}
-        ref: ${{ inputs.jfrog_cli_ref != '' && inputs.jfrog_cli_ref || 'master' }}
+        repository: ${{ fromJson(inputs.deps).jfrog_cli_repo != '' && fromJson(inputs.deps).jfrog_cli_repo || 'jfrog/jfrog-cli' }}
+        ref: ${{ fromJson(inputs.deps).jfrog_cli_ref != '' && fromJson(inputs.deps).jfrog_cli_ref || 'master' }}
         path: jfrog-cli
 
     - name: Checkout jfrog-cli-artifactory
-      if: inputs.jfrog_cli_artifactory_repo != ''
+      if: fromJson(inputs.deps).jfrog_cli_artifactory_repo != ''
       uses: actions/checkout@v4
       with:
-        repository: ${{ inputs.jfrog_cli_artifactory_repo }}
-        ref: ${{ inputs.jfrog_cli_artifactory_ref }}
+        repository: ${{ fromJson(inputs.deps).jfrog_cli_artifactory_repo }}
+        ref: ${{ fromJson(inputs.deps).jfrog_cli_artifactory_ref }}
         path: jfrog-cli-artifactory
 
     - name: Checkout jfrog-client-go
-      if: inputs.jfrog_client_go_repo != ''
+      if: fromJson(inputs.deps).jfrog_client_go_repo != ''
       uses: actions/checkout@v4
       with:
-        repository: ${{ inputs.jfrog_client_go_repo }}
-        ref: ${{ inputs.jfrog_client_go_ref }}
+        repository: ${{ fromJson(inputs.deps).jfrog_client_go_repo }}
+        ref: ${{ fromJson(inputs.deps).jfrog_client_go_ref }}
         path: jfrog-client-go
 
     - name: Checkout jfrog-cli-core
-      if: inputs.jfrog_cli_core_repo != ''
+      if: fromJson(inputs.deps).jfrog_cli_core_repo != ''
       uses: actions/checkout@v4
       with:
-        repository: ${{ inputs.jfrog_cli_core_repo }}
-        ref: ${{ inputs.jfrog_cli_core_ref }}
+        repository: ${{ fromJson(inputs.deps).jfrog_cli_core_repo }}
+        ref: ${{ fromJson(inputs.deps).jfrog_cli_core_ref }}
         path: jfrog-cli-core
