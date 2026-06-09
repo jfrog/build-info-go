@@ -364,6 +364,138 @@ requests = "2.25.1"
 	}
 }
 
+// TestPoetryFlexPackInstalledPackagesFilter verifies that when InstalledPackages
+// is provided (e.g. captured from `poetry run pip list` after a flag-filtered
+// install like `poetry install --only main`), the build-info excludes lockfile
+// entries that are not in the installed set. When InstalledPackages is nil,
+// every lockfile entry is included (legacy behaviour, no regression).
+func TestPoetryFlexPackInstalledPackagesFilter(t *testing.T) {
+	tempDir := t.TempDir()
+
+	pyprojectContent := `[tool.poetry]
+name = "test-project"
+version = "1.0.0"
+description = "Test project"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+requests = "2.31.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "8.0.0"
+`
+	if err := os.WriteFile(filepath.Join(tempDir, "pyproject.toml"), []byte(pyprojectContent), 0644); err != nil {
+		t.Fatalf("Failed to create pyproject.toml: %v", err)
+	}
+
+	// poetry.lock always lists every group's packages — that's what makes the
+	// pre-fix collector report dev packages even after `--only main`.
+	poetryLockContent := `[[package]]
+name = "certifi"
+version = "2024.7.4"
+description = "Mozilla CA bundle"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
+name = "requests"
+version = "2.31.0"
+description = "HTTP for Humans"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+certifi = ">=2017.4.17"
+
+[[package]]
+name = "pytest"
+version = "8.0.0"
+description = "Testing framework"
+category = "dev"
+optional = false
+python-versions = ">=3.8"
+
+[metadata]
+lock-version = "2.0"
+python-versions = "^3.9"
+content-hash = "test-hash"
+`
+	if err := os.WriteFile(filepath.Join(tempDir, "poetry.lock"), []byte(poetryLockContent), 0644); err != nil {
+		t.Fatalf("Failed to create poetry.lock: %v", err)
+	}
+
+	depsByName := func(t *testing.T, cfg flexpack.PoetryConfig) map[string]bool {
+		t.Helper()
+		pf, err := flexpack.NewPoetryFlexPack(cfg)
+		if err != nil {
+			t.Fatalf("NewPoetryFlexPack: %v", err)
+		}
+		bi, err := pf.CollectBuildInfo("test-build", "1")
+		if err != nil {
+			t.Fatalf("CollectBuildInfo: %v", err)
+		}
+		if len(bi.Modules) == 0 {
+			t.Fatal("expected at least one module")
+		}
+		got := map[string]bool{}
+		for _, d := range bi.Modules[0].Dependencies {
+			name := d.Id
+			if i := strings.Index(name, ":"); i > 0 {
+				name = name[:i]
+			}
+			got[name] = true
+		}
+		return got
+	}
+
+	// 1. InstalledPackages nil → legacy behaviour, every lock entry included.
+	all := depsByName(t, flexpack.PoetryConfig{
+		WorkingDirectory:       tempDir,
+		IncludeDevDependencies: true,
+	})
+	for _, want := range []string{"certifi", "requests", "pytest"} {
+		if !all[want] {
+			t.Errorf("legacy path: expected %q in build-info, got %v", want, all)
+		}
+	}
+
+	// 2. InstalledPackages = {certifi, requests} → pytest must be excluded.
+	//    Simulates `poetry install --only main` followed by ground-truth capture.
+	mainOnly := depsByName(t, flexpack.PoetryConfig{
+		WorkingDirectory: tempDir,
+		InstalledPackages: map[string]string{
+			"certifi":  "2024.7.4",
+			"requests": "2.31.0",
+		},
+	})
+	if mainOnly["pytest"] {
+		t.Errorf("ground-truth path: pytest should be excluded when not installed, got %v", mainOnly)
+	}
+	for _, want := range []string{"certifi", "requests"} {
+		if !mainOnly[want] {
+			t.Errorf("ground-truth path: expected %q in build-info, got %v", want, mainOnly)
+		}
+	}
+
+	// 3. Normalisation: installed map uses an underscore-style name; lockfile
+	//    uses hyphenated. Both must resolve to the same package per PEP 503.
+	normalised := depsByName(t, flexpack.PoetryConfig{
+		WorkingDirectory: tempDir,
+		InstalledPackages: map[string]string{
+			"requests": "2.31.0",
+			// "certifi" intentionally absent — must NOT appear in build-info
+		},
+	})
+	if normalised["certifi"] {
+		t.Errorf("expected certifi to be excluded when not installed, got %v", normalised)
+	}
+	if !normalised["requests"] {
+		t.Errorf("expected requests to be included, got %v", normalised)
+	}
+}
+
 func TestPoetryFlexPackErrorHandling(t *testing.T) {
 	// Test with non-existent directory - should fail during creation
 	config := flexpack.PoetryConfig{

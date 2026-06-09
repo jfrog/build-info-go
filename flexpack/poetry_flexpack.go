@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,6 +17,27 @@ import (
 	"github.com/jfrog/gofrog/crypto"
 	"github.com/jfrog/gofrog/log"
 )
+
+// poetryPkgNameNormalize collapses runs of "-", "_", "." into a single "-" per PEP 503.
+var poetryPkgNameNormalize = regexp.MustCompile(`[-_.]+`)
+
+// normalizePoetryPkgName returns the PEP 503-normalised package name (lowercase,
+// runs of [-_.] collapsed to a single "-"). Used to match poetry.lock entries
+// against the InstalledPackages map regardless of casing/separator style.
+func normalizePoetryPkgName(name string) string {
+	return poetryPkgNameNormalize.ReplaceAllString(strings.ToLower(name), "-")
+}
+
+// isInstalled reports whether the given lockfile package was installed by this
+// poetry invocation. When InstalledPackages is nil (no ground-truth set),
+// every package is considered installed (current legacy behaviour).
+func (pf *PoetryFlexPack) isInstalled(pkgName string) bool {
+	if pf.config.InstalledPackages == nil {
+		return true
+	}
+	_, ok := pf.config.InstalledPackages[normalizePoetryPkgName(pkgName)]
+	return ok
+}
 
 // PoetryFlexPack implements the FlexPackManager interface for Poetry package manager
 type PoetryFlexPack struct {
@@ -390,8 +412,13 @@ func (pf *PoetryFlexPack) parseFromFiles() {
 			directDevDeps[depName] = true
 		}
 	}
-	// Process all packages from poetry.lock
+	// Process packages from poetry.lock, filtered by what poetry actually installed
+	// when InstalledPackages is set. This correctly handles --only, --without, --with
+	// and similar poetry install flags without any flag parsing on our side.
 	for _, pkg := range pf.lockFileData.Package {
+		if !pf.isInstalled(pkg.Name) {
+			continue
+		}
 		dep := DependencyInfo{
 			Type:    "python",
 			ID:      fmt.Sprintf("%s:%s", pkg.Name, pkg.Version),
@@ -477,6 +504,9 @@ func (pf *PoetryFlexPack) buildDependencyGraph() {
 		if depName != "python" {
 			for _, pkg := range pf.lockFileData.Package {
 				if strings.EqualFold(pkg.Name, depName) {
+					if !pf.isInstalled(pkg.Name) {
+						break
+					}
 					depKey := fmt.Sprintf("%s:%s", pkg.Name, pkg.Version)
 					pf.dependencyGraph[projectKey] = append(pf.dependencyGraph[projectKey], depKey)
 					break
@@ -488,6 +518,9 @@ func (pf *PoetryFlexPack) buildDependencyGraph() {
 		for depName := range pf.pyprojectData.Tool.Poetry.DevDependencies {
 			for _, pkg := range pf.lockFileData.Package {
 				if strings.EqualFold(pkg.Name, depName) {
+					if !pf.isInstalled(pkg.Name) {
+						break
+					}
 					depKey := fmt.Sprintf("%s:%s", pkg.Name, pkg.Version)
 					pf.dependencyGraph[projectKey] = append(pf.dependencyGraph[projectKey], depKey)
 					break
@@ -495,14 +528,20 @@ func (pf *PoetryFlexPack) buildDependencyGraph() {
 			}
 		}
 	}
-	// Build dependency relationships
+	// Build dependency relationships (skip packages not actually installed)
 	for _, pkg := range pf.lockFileData.Package {
+		if !pf.isInstalled(pkg.Name) {
+			continue
+		}
 		pkgKey := fmt.Sprintf("%s:%s", pkg.Name, pkg.Version)
 		pf.dependencyGraph[pkgKey] = []string{}
 		for depName := range pkg.Dependencies {
 			// Find the version of this dependency in lock file
 			for _, depPkg := range pf.lockFileData.Package {
 				if strings.EqualFold(depPkg.Name, depName) {
+					if !pf.isInstalled(depPkg.Name) {
+						break
+					}
 					depKey := fmt.Sprintf("%s:%s", depPkg.Name, depPkg.Version)
 					pf.dependencyGraph[pkgKey] = append(pf.dependencyGraph[pkgKey], depKey)
 					break
