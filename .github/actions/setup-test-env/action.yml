@@ -1,0 +1,26 @@
+name: 'Setup Test Environment'
+description: 'Checks out the JFrog dependency repositories and prepares the Go build/workspace. Shared by every integration-test job.'
+
+inputs:
+  deps:
+    description: 'JSON object produced by the detect-deps tool with every repo/ref override.'
+    required: true
+  os_name:
+    description: 'The operating system name (ubuntu or windows).'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout all JFrog repositories
+      uses: ./.github/actions/checkout-jfrog-repos
+      with:
+        deps: ${{ inputs.deps }}
+
+    - name: Setup Go with cache
+      uses: jfrog/.github/actions/install-go-with-cache@main
+
+    - name: Setup Go workspace
+      uses: ./.github/actions/setup-go-workspace
+      with:
+        os_name: ${{ inputs.os_name }}
