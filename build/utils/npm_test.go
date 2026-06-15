@@ -461,18 +461,27 @@ func TestCalculateNpmDependenciesListWithoutDependencies(t *testing.T) {
 	cachePath := filepath.Join(tempDir, "tmpcache")
 	npmArgs := []string{"--cache=" + cachePath}
 
-	// Generate package-lock.json (required by 'npm ci') without populating _cacache.
+	// Generate package-lock.json (required by 'npm ci' in real-world usage) without
+	// installing any tarballs. With modern npm this leaves _cacache absent; older npm
+	// (e.g. npm v6 bundled with Node 14) creates _cacache eagerly even on a no-op
+	// install. We force the "missing _cacache" state below to make the test
+	// deterministic across npm versions and to faithfully reproduce a fresh CI
+	// workspace (e.g. a Jenkins agent that wipes node_modules + the npm cache).
 	installArgs := append([]string{"--package-lock-only"}, npmArgs...)
 	_, _, err := RunNpmCmd("npm", tempDir, AppendNpmCommand(installArgs, "install"), logger)
 	require.NoError(t, err)
 
-	// Precondition: the npm cache must NOT contain _cacache. If this ever changes
-	// (e.g. a future npm version starts creating it eagerly), the test would silently
-	// stop exercising the regression path; fail loudly instead.
 	cacachePath := filepath.Join(cachePath, "_cacache")
+	if exists, err := utils.IsDirExists(cacachePath, false); err == nil && exists {
+		require.NoError(t, os.RemoveAll(cacachePath))
+	}
+
+	// Post-condition: _cacache must be absent. This is the precondition for the
+	// regression scenario; if it ever fails, the test would silently stop
+	// exercising the new guard, so fail loudly instead.
 	cacacheExists, err := utils.IsDirExists(cacachePath, false)
 	require.NoError(t, err)
-	require.Falsef(t, cacacheExists, "test precondition violated: '_cacache' must not exist at %q for this regression test to be meaningful", cacachePath)
+	require.Falsef(t, cacacheExists, "could not remove _cacache at %q; regression test would not exercise the fixed code path", cacachePath)
 
 	// The actual regression check.
 	dependencies, err := CalculateNpmDependenciesList("npm", tempDir, "no-deps-project",
