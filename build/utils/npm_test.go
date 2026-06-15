@@ -427,6 +427,60 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	assert.Equal(t, filepath.Join(cachePath, "_cacache"), configCache)
 }
 
+// TestCalculateNpmDependenciesListWithoutDependencies is a regression test for the bug
+// where 'jf npm ci' fails on a project with no dependencies because npm never creates
+// the '_cacache' directory under the npm cache path.
+//
+// Scenario reproduced:
+//   - package.json declares zero dependencies/devDependencies.
+//   - npm cache is pointed at a fresh empty directory (simulates a clean CI workspace,
+//     e.g. a Jenkins agent that wipes the workspace between builds).
+//   - 'npm install --package-lock-only' generates package-lock.json (a real-world
+//     precondition for 'npm ci') but does NOT create '_cacache' because no tarballs
+//     are fetched.
+//
+// Before the fix, CalculateNpmDependenciesList returned the error:
+//
+//	"_cacache folder is not found in '<cache>/_cacache'. Hint: Delete node_modules
+//	 directory and run npm install or npm ci."
+//
+// After the fix it returns no error and an empty dependency list.
+func TestCalculateNpmDependenciesListWithoutDependencies(t *testing.T) {
+	tempDir, cleanup := tests.CreateTempDirWithCallbackAndAssert(t)
+	defer cleanup()
+
+	packageJSON := []byte(`{
+  "name": "no-deps-project",
+  "version": "1.0.0",
+  "dependencies": {},
+  "devDependencies": {}
+}`)
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "package.json"), packageJSON, 0600))
+
+	// Point npm at an empty cache dir inside the project to simulate a fresh CI workspace.
+	cachePath := filepath.Join(tempDir, "tmpcache")
+	npmArgs := []string{"--cache=" + cachePath}
+
+	// Generate package-lock.json (required by 'npm ci') without populating _cacache.
+	installArgs := append([]string{"--package-lock-only"}, npmArgs...)
+	_, _, err := RunNpmCmd("npm", tempDir, AppendNpmCommand(installArgs, "install"), logger)
+	require.NoError(t, err)
+
+	// Precondition: the npm cache must NOT contain _cacache. If this ever changes
+	// (e.g. a future npm version starts creating it eagerly), the test would silently
+	// stop exercising the regression path; fail loudly instead.
+	cacachePath := filepath.Join(cachePath, "_cacache")
+	cacacheExists, err := utils.IsDirExists(cacachePath, false)
+	require.NoError(t, err)
+	require.Falsef(t, cacacheExists, "test precondition violated: '_cacache' must not exist at %q for this regression test to be meaningful", cacachePath)
+
+	// The actual regression check.
+	dependencies, err := CalculateNpmDependenciesList("npm", tempDir, "no-deps-project",
+		NpmTreeDepListParam{Args: npmArgs}, true, logger)
+	assert.NoError(t, err)
+	assert.Empty(t, dependencies)
+}
+
 // This function executes Ci, then validate generating dependencies in two possible scenarios:
 // 1. node_module exists in the project.
 // 2. node_module doesn't exist in the project and generating dependencies needs package-lock.
