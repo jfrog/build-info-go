@@ -500,6 +500,7 @@ func (rf *RubygemsFlexPack) CollectBuildInfo(buildName, buildNumber string) (*en
 		module.Dependencies = append(module.Dependencies, entities.Dependency{
 			Id:          dep.ID,
 			Type:        dep.Type,
+			Repository:  dep.Repository,
 			RequestedBy: rf.requestedByChains[dep.ID],
 			Checksum: entities.Checksum{
 				Sha1:   dep.SHA1,
