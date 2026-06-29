@@ -51,18 +51,19 @@ const (
 )
 
 type BuildInfo struct {
-	Name          string   `json:"name,omitempty"`
-	Number        string   `json:"number,omitempty"`
-	Agent         *Agent   `json:"agent,omitempty"`
-	BuildAgent    *Agent   `json:"buildAgent,omitempty"`
-	Modules       []Module `json:"modules,omitempty"`
-	Started       string   `json:"started,omitempty"`
-	Properties    Env      `json:"properties,omitempty"`
-	Principal     string   `json:"artifactoryPrincipal,omitempty"`
-	BuildUrl      string   `json:"url,omitempty"`
-	Issues        *Issues  `json:"issues,omitempty"`
-	PluginVersion string   `json:"artifactoryPluginVersion,omitempty"`
-	VcsList       []Vcs    `json:"vcs,omitempty"`
+	Name           string   `json:"name,omitempty"`
+	Number         string   `json:"number,omitempty"`
+	Agent          *Agent   `json:"agent,omitempty"`
+	BuildAgent     *Agent   `json:"buildAgent,omitempty"`
+	Modules        []Module `json:"modules,omitempty"`
+	Started        string   `json:"started,omitempty"`
+	DurationMillis int64    `json:"durationMillis,omitempty"`
+	Properties     Env      `json:"properties,omitempty"`
+	Principal      string   `json:"artifactoryPrincipal,omitempty"`
+	BuildUrl       string   `json:"url,omitempty"`
+	Issues         *Issues  `json:"issues,omitempty"`
+	PluginVersion  string   `json:"artifactoryPluginVersion,omitempty"`
+	VcsList        []Vcs    `json:"vcs,omitempty"`
 }
 
 func New() *BuildInfo {
