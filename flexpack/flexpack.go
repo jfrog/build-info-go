@@ -110,6 +110,28 @@ type UVConfig struct {
 	ProjectVersion string
 }
 
+// GemConfig holds configuration specific to RubyGems / Bundler operations
+type GemConfig struct {
+	// WorkingDirectory is the directory where the Gemfile.lock resides
+	WorkingDirectory string
+
+	// LockFilePath overrides the default Gemfile.lock path.
+	LockFilePath string
+
+	// InstalledPackages is the ground-truth set of gems actually installed,
+	// keyed by gem name → version string. When non-nil, only gems present in
+	// this map are included in build-info. This correctly handles bundler group
+	// filtering (--without development test, --with, etc.) without parsing the
+	// Gemfile groups ourselves. When nil, every gem in the lock file is included.
+	InstalledPackages map[string]string
+
+	// ProjectName and ProjectVersion override the module ID. When ProjectName is
+	// empty the working-directory base name is used (Gemfile-only projects have
+	// no inherent name/version).
+	ProjectName    string
+	ProjectVersion string
+}
+
 // GradleConfig holds configuration specific to Gradle operations
 type GradleConfig struct {
 	// WorkingDirectory is the directory where Gradle should operate
