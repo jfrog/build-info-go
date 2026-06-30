@@ -42,3 +42,50 @@ func lastPathSegment(s string) string {
 	}
 	return s
 }
+
+// scopeForDepKinds maps cargo dep_kinds to a build-info scope and decides inclusion.
+// Normal ("") -> "prod", "build" -> "build", "dev" -> "dev" (only if includeDev).
+// A dependency with multiple kinds prefers normal > build > dev.
+func scopeForDepKinds(kinds []CargoDepKind, includeDev bool) (string, bool) {
+	hasNormal, hasBuild, hasDev := false, false, false
+	for _, k := range kinds {
+		switch k.Kind {
+		case "":
+			hasNormal = true
+		case "build":
+			hasBuild = true
+		case "dev":
+			hasDev = true
+		}
+	}
+	switch {
+	case hasNormal:
+		return "prod", true
+	case hasBuild:
+		return "build", true
+	case hasDev:
+		return "dev", includeDev
+	default:
+		return "prod", true
+	}
+}
+
+// buildRequestedBy reverses the resolve graph: dependency id -> parent ids.
+func buildRequestedBy(meta *CargoMetadata) map[string][]string {
+	rb := make(map[string][]string)
+	for _, node := range meta.Resolve.Nodes {
+		for _, childId := range node.Dependencies {
+			rb[childId] = appendUnique(rb[childId], node.Id)
+		}
+	}
+	return rb
+}
+
+func appendUnique(list []string, v string) []string {
+	for _, e := range list {
+		if e == v {
+			return list
+		}
+	}
+	return append(list, v)
+}
