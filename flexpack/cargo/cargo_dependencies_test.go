@@ -95,3 +95,52 @@ func TestResolveChecksumFallsBackToLockfile(t *testing.T) {
 		t.Errorf("expected lockfile sha256 fallback, got %+v", cs)
 	}
 }
+
+func TestParseMetadataExtractsRegistryDepsOnly(t *testing.T) {
+	data, err := os.ReadFile("testdata/metadata.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta, err := parseMetadata(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(meta.Packages) != 2 || meta.Resolve.Root == "" {
+		t.Fatalf("unexpected metadata: %+v", meta)
+	}
+}
+
+func TestParseLockfile(t *testing.T) {
+	m, err := parseLockfile("testdata/Cargo.lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m["serde|1.0.197"] != "3fb1c873e1b9b056a4dc4c0c198b24c3ffa059243875552b2bd0933b1aee4ce2" {
+		t.Errorf("lockfile sha256 mismatch: %v", m)
+	}
+}
+
+func TestCollectDependenciesSkipsWorkspaceAndLocal(t *testing.T) {
+	data, _ := os.ReadFile("testdata/metadata.json")
+	meta, _ := parseMetadata(data)
+	lock, _ := parseLockfile("testdata/Cargo.lock")
+	cf := &CargoFlexPack{config: CargoConfig{}, meta: meta, lockChecksums: lock}
+	t.Setenv("CARGO_HOME", t.TempDir()) // force lockfile fallback
+	if err := cf.collectDependenciesFromMeta(); err != nil {
+		t.Fatal(err)
+	}
+	// only serde is a registry dep; root is workspace-local and skipped
+	if len(cf.dependencies) != 1 {
+		t.Fatalf("expected 1 dependency, got %d: %+v", len(cf.dependencies), cf.dependencies)
+	}
+	dep := cf.dependencies[0]
+	if dep.Id != "serde-1.0.197.crate" {
+		t.Errorf("dep id = %q, want serde-1.0.197.crate", dep.Id)
+	}
+	if dep.Checksum.Sha256 == "" {
+		t.Error("expected sha256 from lockfile")
+	}
+	if len(dep.Scopes) != 1 || dep.Scopes[0] != "prod" {
+		t.Errorf("scopes = %v, want [prod]", dep.Scopes)
+	}
+}
