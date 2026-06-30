@@ -114,6 +114,9 @@ func (cf *CargoFlexPack) GetDependencyGraph() (map[string][]string, error) {
 	if err := cf.ensureInitialized(); err != nil {
 		return nil, err
 	}
+	if cf.meta == nil {
+		return nil, nil
+	}
 	graph := make(map[string][]string)
 	for _, node := range cf.meta.Resolve.Nodes {
 		graph[node.Id] = append([]string(nil), node.Dependencies...)
@@ -124,6 +127,7 @@ func (cf *CargoFlexPack) GetDependencyGraph() (map[string][]string, error) {
 // FlexPackManager interface — minimal implementations (collection happens via CollectBuildInfo).
 func (cf *CargoFlexPack) GetDependency() string { return cf.getProjectId() }
 
+// Note: FlexPackManager methods return no error; an init failure yields empty results.
 func (cf *CargoFlexPack) ParseDependencyToList() []string {
 	_ = cf.ensureInitialized()
 	out := make([]string, 0, len(cf.dependencies))
