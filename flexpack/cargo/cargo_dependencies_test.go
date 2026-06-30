@@ -1,6 +1,10 @@
 package cargo
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestParsePackageId(t *testing.T) {
 	cases := []struct {
@@ -60,5 +64,34 @@ func TestBuildRequestedBy(t *testing.T) {
 	}
 	if len(rb["b 2.0.0 (registry+x)"]) != 1 || rb["b 2.0.0 (registry+x)"][0] != "a 1.0.0 (registry+x)" {
 		t.Errorf("b should be requested by a, got %v", rb["b 2.0.0 (registry+x)"])
+	}
+}
+
+func TestFindCachedCrate(t *testing.T) {
+	home := t.TempDir()
+	cacheDir := filepath.Join(home, "registry", "cache", "index.crates.io-abc123")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cratePath := filepath.Join(cacheDir, "serde-1.0.197.crate")
+	if err := os.WriteFile(cratePath, []byte("dummy"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := findCachedCrate(home, "serde", "1.0.197")
+	if got != cratePath {
+		t.Errorf("findCachedCrate = %q, want %q", got, cratePath)
+	}
+	if findCachedCrate(home, "missing", "9.9.9") != "" {
+		t.Error("expected empty path for missing crate")
+	}
+}
+
+func TestResolveChecksumFallsBackToLockfile(t *testing.T) {
+	cf := &CargoFlexPack{config: CargoConfig{}}
+	// no cached file; cargoHome points at empty temp dir
+	t.Setenv("CARGO_HOME", t.TempDir())
+	cs := cf.resolveChecksum("missing", "9.9.9", "deadbeefsha256")
+	if cs.Sha256 != "deadbeefsha256" || cs.Sha1 != "" || cs.Md5 != "" {
+		t.Errorf("expected lockfile sha256 fallback, got %+v", cs)
 	}
 }

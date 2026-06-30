@@ -1,6 +1,14 @@
 package cargo
 
-import "strings"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/jfrog/build-info-go/entities"
+	"github.com/jfrog/gofrog/crypto"
+	"github.com/jfrog/gofrog/log"
+)
 
 // parsePackageId normalizes a cargo metadata package id into (name, version, source).
 // Handles both the pre-1.77 form "name version (source)" and the >=1.77
@@ -88,4 +96,46 @@ func appendUnique(list []string, v string) []string {
 		}
 	}
 	return append(list, v)
+}
+
+func cargoHome() string {
+	if h := os.Getenv("CARGO_HOME"); h != "" {
+		return h
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".cargo")
+}
+
+// findCachedCrate searches $CARGO_HOME/registry/cache/<registry-hash>/<name>-<version>.crate
+// across all registry-hash subdirectories.
+func findCachedCrate(home, name, version string) string {
+	if home == "" {
+		return ""
+	}
+	pattern := filepath.Join(home, "registry", "cache", "*", name+"-"+version+".crate")
+	matches, err := filepath.Glob(pattern)
+	if err != nil || len(matches) == 0 {
+		return ""
+	}
+	return matches[0]
+}
+
+// resolveChecksum returns checksums for a dependency: local .crate first (all three
+// hashes), else the lockfile sha256, else empty (Artifactory enriches server-side).
+func (cf *CargoFlexPack) resolveChecksum(name, version, lockSha256 string) entities.Checksum {
+	if path := findCachedCrate(cargoHome(), name, version); path != "" {
+		if fd, err := crypto.GetFileDetails(path, true); err == nil {
+			log.Debug("cargo: checksums for " + name + "-" + version + " from local cache")
+			return entities.Checksum{Sha1: fd.Checksum.Sha1, Sha256: fd.Checksum.Sha256, Md5: fd.Checksum.Md5}
+		}
+	}
+	if lockSha256 != "" {
+		log.Debug("cargo: checksum for " + name + "-" + version + " from Cargo.lock (sha256 only)")
+		return entities.Checksum{Sha256: lockSha256}
+	}
+	log.Debug("cargo: no local checksum for " + name + "-" + version + ", leaving for server enrichment")
+	return entities.Checksum{}
 }
