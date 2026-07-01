@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/jfrog/build-info-go/entities"
 )
 
 func TestParsePackageId(t *testing.T) {
@@ -180,5 +182,78 @@ func TestCollectDependenciesSkipsWorkspaceAndLocal(t *testing.T) {
 	}
 	if len(dep.Scopes) != 1 || dep.Scopes[0] != "prod" {
 		t.Errorf("scopes = %v, want [prod]", dep.Scopes)
+	}
+}
+
+func TestTransitiveScope(t *testing.T) {
+	// Build: root (workspace member) depends on "a" (direct);
+	// "a" depends on "b" (indirect/transitive).
+	// Both a and b are registry-sourced normal deps.
+	// Expected: a has scope "prod" (direct), b has scope "transitive" (indirect).
+	meta := &CargoMetadata{
+		WorkspaceMembers: []string{"root 0.1.0 (path+file:///r)"},
+		Resolve: CargoResolve{
+			Root: "root 0.1.0 (path+file:///r)",
+			Nodes: []CargoNode{
+				{
+					Id:           "root 0.1.0 (path+file:///r)",
+					Dependencies: []string{"a 1.0.0 (registry+x)"},
+					Deps: []CargoNodeDep{
+						{
+							Name:     "a",
+							Pkg:      "a 1.0.0 (registry+x)",
+							DepKinds: []CargoDepKind{{Kind: ""}},
+						},
+					},
+				},
+				{
+					Id:           "a 1.0.0 (registry+x)",
+					Dependencies: []string{"b 2.0.0 (registry+x)"},
+					Deps: []CargoNodeDep{
+						{
+							Name:     "b",
+							Pkg:      "b 2.0.0 (registry+x)",
+							DepKinds: []CargoDepKind{{Kind: ""}},
+						},
+					},
+				},
+				{
+					Id:           "b 2.0.0 (registry+x)",
+					Dependencies: []string{},
+				},
+			},
+		},
+	}
+	cf := &CargoFlexPack{config: CargoConfig{}, meta: meta, lockChecksums: map[string]string{}}
+	t.Setenv("CARGO_HOME", t.TempDir())
+	if err := cf.collectDependenciesFromMeta(); err != nil {
+		t.Fatal(err)
+	}
+	if len(cf.dependencies) != 2 {
+		t.Fatalf("expected 2 dependencies, got %d: %+v", len(cf.dependencies), cf.dependencies)
+	}
+
+	// Find deps by id
+	depById := make(map[string]*entities.Dependency)
+	for i := range cf.dependencies {
+		depById[cf.dependencies[i].Id] = &cf.dependencies[i]
+	}
+
+	// Check a: direct, should be "prod"
+	a, ok := depById["a-1.0.0.crate"]
+	if !ok {
+		t.Fatalf("missing a-1.0.0.crate in dependencies")
+	}
+	if len(a.Scopes) != 1 || a.Scopes[0] != "prod" {
+		t.Errorf("a scopes = %v, want [prod]", a.Scopes)
+	}
+
+	// Check b: indirect, should be "transitive"
+	b, ok := depById["b-2.0.0.crate"]
+	if !ok {
+		t.Fatalf("missing b-2.0.0.crate in dependencies")
+	}
+	if len(b.Scopes) != 1 || b.Scopes[0] != "transitive" {
+		t.Errorf("b scopes = %v, want [transitive]", b.Scopes)
 	}
 }

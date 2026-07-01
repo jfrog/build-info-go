@@ -82,6 +82,24 @@ func scopeForDepKinds(kinds []CargoDepKind, includeDev bool) (string, bool) {
 	}
 }
 
+// directDependencyIds returns the set of resolve-node ids that are direct dependencies
+// of the root crate or any workspace member.
+func directDependencyIds(meta *CargoMetadata) map[string]bool {
+	workspace := make(map[string]bool)
+	for _, id := range meta.WorkspaceMembers {
+		workspace[id] = true
+	}
+	direct := make(map[string]bool)
+	for _, node := range meta.Resolve.Nodes {
+		if workspace[node.Id] || node.Id == meta.Resolve.Root {
+			for _, childId := range node.Dependencies {
+				direct[childId] = true
+			}
+		}
+	}
+	return direct
+}
+
 // buildRequestedBy reverses the resolve graph: dependency id -> parent ids.
 func buildRequestedBy(meta *CargoMetadata) map[string][]string {
 	rb := make(map[string][]string)
@@ -204,6 +222,7 @@ func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 		workspace[id] = true
 	}
 	requestedBy := buildRequestedBy(cf.meta)
+	direct := directDependencyIds(cf.meta)
 	// Map id -> the dep_kinds it was pulled in with (union across parents).
 	kindsById := make(map[string][]CargoDepKind)
 	for _, node := range cf.meta.Resolve.Nodes {
@@ -223,6 +242,10 @@ func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 		scope, include := scopeForDepKinds(kindsById[node.Id], cf.config.IncludeDevDependencies)
 		if !include {
 			continue
+		}
+		// Mark indirect production dependencies as "transitive".
+		if scope == "prod" && !direct[node.Id] {
+			scope = "transitive"
 		}
 		dep := entities.Dependency{
 			Id:       name + "-" + version + ".crate",
