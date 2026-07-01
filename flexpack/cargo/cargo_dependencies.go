@@ -188,11 +188,22 @@ func metadataArgs(extra []string) []string {
 	return append(args, extra...)
 }
 
-// countRegistryNodes returns how many resolve nodes are registry-sourced and not workspace members.
-func countRegistryNodes(meta *CargoMetadata) int {
+// countRegistryNodes returns how many resolve nodes the collector should produce for
+// the given includeDev setting: registry-sourced, not workspace members, and passing the
+// same dep-kind inclusion filter as collectDependenciesFromMeta. Applying that filter
+// keeps the reconciliation count aligned with collection (e.g. registry-sourced
+// dev-dependencies are excluded when includeDev is false), so the mismatch warning only
+// fires on genuine dependency loss rather than on every project that has dev-dependencies.
+func countRegistryNodes(meta *CargoMetadata, includeDev bool) int {
 	workspace := make(map[string]bool)
 	for _, id := range meta.WorkspaceMembers {
 		workspace[id] = true
+	}
+	kindsById := make(map[string][]CargoDepKind)
+	for _, node := range meta.Resolve.Nodes {
+		for _, d := range node.Deps {
+			kindsById[d.Pkg] = append(kindsById[d.Pkg], d.DepKinds...)
+		}
 	}
 	n := 0
 	for _, node := range meta.Resolve.Nodes {
@@ -200,9 +211,13 @@ func countRegistryNodes(meta *CargoMetadata) int {
 			continue
 		}
 		_, _, source := parsePackageId(node.Id)
-		if strings.HasPrefix(source, "registry+") {
-			n++
+		if !strings.HasPrefix(source, "registry+") {
+			continue
 		}
+		if _, include := scopeForDepKinds(kindsById[node.Id], includeDev); !include {
+			continue
+		}
+		n++
 	}
 	return n
 }
@@ -294,7 +309,7 @@ func (cf *CargoFlexPack) collectDependencies() error {
 	if err := cf.collectDependenciesFromMeta(); err != nil {
 		return err
 	}
-	expected := countRegistryNodes(cf.meta)
+	expected := countRegistryNodes(cf.meta, cf.config.IncludeDevDependencies)
 	log.Debug(fmt.Sprintf("cargo: reconciliation — collected %d dependencies, %d registry nodes in resolve graph, %d packages in Cargo.lock",
 		len(cf.dependencies), expected, len(cf.lockChecksums)))
 	if len(cf.dependencies) != expected {

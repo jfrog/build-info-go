@@ -154,9 +154,41 @@ func TestCountRegistryNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := countRegistryNodes(meta)
+	got := countRegistryNodes(meta, false)
 	if got != 1 {
-		t.Errorf("countRegistryNodes(meta) = %d, want 1", got)
+		t.Errorf("countRegistryNodes(meta, false) = %d, want 1", got)
+	}
+}
+
+// TestCountRegistryNodesExcludesDevDeps ensures the reconciliation count applies the same
+// dev-dependency filter as collection: a registry-sourced dev-only dependency is counted
+// only when includeDev is true, so the mismatch warning does not fire spuriously.
+func TestCountRegistryNodesExcludesDevDeps(t *testing.T) {
+	root := "root 0.1.0 (path+file:///r)"
+	prod := "serde 1.0.0 (registry+x)"
+	dev := "mockall 0.11.0 (registry+x)"
+	meta := &CargoMetadata{
+		WorkspaceMembers: []string{root},
+		Resolve: CargoResolve{
+			Root: root,
+			Nodes: []CargoNode{
+				{
+					Id: root,
+					Deps: []CargoNodeDep{
+						{Name: "serde", Pkg: prod, DepKinds: []CargoDepKind{{Kind: ""}}},
+						{Name: "mockall", Pkg: dev, DepKinds: []CargoDepKind{{Kind: "dev"}}},
+					},
+				},
+				{Id: prod},
+				{Id: dev},
+			},
+		},
+	}
+	if got := countRegistryNodes(meta, false); got != 1 {
+		t.Errorf("countRegistryNodes(meta, false) = %d, want 1 (dev dep excluded)", got)
+	}
+	if got := countRegistryNodes(meta, true); got != 2 {
+		t.Errorf("countRegistryNodes(meta, true) = %d, want 2 (dev dep included)", got)
 	}
 }
 
