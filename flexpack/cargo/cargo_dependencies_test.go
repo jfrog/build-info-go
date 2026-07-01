@@ -120,6 +120,44 @@ func TestParseLockfile(t *testing.T) {
 	}
 }
 
+func TestMetadataArgs(t *testing.T) {
+	cases := []struct {
+		extra []string
+		want  []string
+	}{
+		{nil, []string{"metadata", "--format-version", "1"}},
+		{[]string{"--all-features"}, []string{"metadata", "--format-version", "1", "--all-features"}},
+		{[]string{"--features", "a,b", "--locked"}, []string{"metadata", "--format-version", "1", "--features", "a,b", "--locked"}},
+	}
+	for _, c := range cases {
+		got := metadataArgs(c.extra)
+		if len(got) != len(c.want) {
+			t.Errorf("metadataArgs(%v) length = %d, want %d", c.extra, len(got), len(c.want))
+			continue
+		}
+		for i, v := range got {
+			if v != c.want[i] {
+				t.Errorf("metadataArgs(%v)[%d] = %q, want %q", c.extra, i, v, c.want[i])
+			}
+		}
+	}
+}
+
+func TestCountRegistryNodes(t *testing.T) {
+	data, err := os.ReadFile("testdata/metadata.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta, err := parseMetadata(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := countRegistryNodes(meta)
+	if got != 1 {
+		t.Errorf("countRegistryNodes(meta) = %d, want 1", got)
+	}
+}
+
 func TestCollectDependenciesSkipsWorkspaceAndLocal(t *testing.T) {
 	data, _ := os.ReadFile("testdata/metadata.json")
 	meta, _ := parseMetadata(data)

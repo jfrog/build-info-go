@@ -164,9 +164,34 @@ func parseLockfile(path string) (map[string]string, error) {
 	return out, nil
 }
 
+// metadataArgs builds the argument list for `cargo metadata`, appending caller-supplied extra args.
+func metadataArgs(extra []string) []string {
+	args := []string{"metadata", "--format-version", "1"}
+	return append(args, extra...)
+}
+
+// countRegistryNodes returns how many resolve nodes are registry-sourced and not workspace members.
+func countRegistryNodes(meta *CargoMetadata) int {
+	workspace := make(map[string]bool)
+	for _, id := range meta.WorkspaceMembers {
+		workspace[id] = true
+	}
+	n := 0
+	for _, node := range meta.Resolve.Nodes {
+		if workspace[node.Id] {
+			continue
+		}
+		_, _, source := parsePackageId(node.Id)
+		if strings.HasPrefix(source, "registry+") {
+			n++
+		}
+	}
+	return n
+}
+
 // runCargoMetadata runs `cargo metadata --format-version 1` in the working dir.
 func (cf *CargoFlexPack) runCargoMetadata() ([]byte, error) {
-	cmd := exec.Command(cf.config.CargoExecutable, "metadata", "--format-version", "1")
+	cmd := exec.Command(cf.config.CargoExecutable, metadataArgs(cf.config.MetadataArgs)...)
 	cmd.Dir = cf.config.WorkingDirectory
 	return cmd.Output()
 }
@@ -243,5 +268,14 @@ func (cf *CargoFlexPack) collectDependencies() error {
 	if cf.meta == nil {
 		return fmt.Errorf("could not obtain cargo metadata in %s", cf.config.WorkingDirectory)
 	}
-	return cf.collectDependenciesFromMeta()
+	if err := cf.collectDependenciesFromMeta(); err != nil {
+		return err
+	}
+	expected := countRegistryNodes(cf.meta)
+	log.Debug(fmt.Sprintf("cargo: reconciliation — collected %d dependencies, %d registry nodes in resolve graph, %d packages in Cargo.lock",
+		len(cf.dependencies), expected, len(cf.lockChecksums)))
+	if len(cf.dependencies) != expected {
+		log.Warn(fmt.Sprintf("cargo: dependency count mismatch — collected %d but resolve graph has %d registry nodes", len(cf.dependencies), expected))
+	}
+	return nil
 }

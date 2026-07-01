@@ -8,6 +8,8 @@ type CargoConfig struct {
 	CargoExecutable string
 	// IncludeDevDependencies includes dev-dependencies when true.
 	IncludeDevDependencies bool
+	// MetadataArgs are extra args appended to `cargo metadata` (already filtered to metadata-valid flags by the caller, e.g. --features/--all-features/--locked).
+	MetadataArgs []string
 }
 
 // CargoMetadata maps `cargo metadata --format-version 1` output.
