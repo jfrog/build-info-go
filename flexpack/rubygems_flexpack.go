@@ -353,6 +353,11 @@ func (rf *RubygemsFlexPack) parseDependencies() {
 
 	rootChildren := rf.collectRootChildren(depInfoMap)
 
+	// Assign scopes from Gemfile groups when available.
+	if rf.config.GemGroups != nil {
+		rf.assignScopes(depInfoMap, fwdGraph, rootChildren)
+	}
+
 	// Reuse the shared chain builder (defined in uv_flexpack.go) — it operates purely
 	// on depInfoMap + fwdGraph keys, so exact gem names work the same as UV's normalised names.
 	buildUvRequestedBy(moduleID, []string{}, rootChildren, depInfoMap, fwdGraph, rf.requestedByChains, entities.RequestedByMaxLength)
@@ -360,6 +365,89 @@ func (rf *RubygemsFlexPack) parseDependencies() {
 	for _, dep := range depInfoMap {
 		rf.dependencies = append(rf.dependencies, *dep)
 	}
+}
+
+// assignScopes classifies dependencies as production/development/test based on Gemfile groups.
+// Direct deps get their scope from GemGroups; transitive deps inherit the "broadest" scope
+// from their parent chain (production > development > test).
+func (rf *RubygemsFlexPack) assignScopes(depInfoMap map[string]*DependencyInfo, fwdGraph map[string][]string, rootChildren []string) {
+	// Assign direct dependency scopes from GemGroups.
+	directScopes := make(map[string][]string) // gem name → scopes
+	for name := range depInfoMap {
+		if groups, ok := rf.config.GemGroups[name]; ok {
+			directScopes[name] = groups
+		}
+	}
+
+	// BFS from root to propagate scopes to transitive deps.
+	// A transitive dep inherits the most restrictive scope of its ancestors.
+	resolved := make(map[string][]string)
+	for _, name := range rootChildren {
+		scopes := directScopes[name]
+		if len(scopes) == 0 {
+			scopes = []string{"production"}
+		}
+		rf.propagateScopes(name, scopes, fwdGraph, depInfoMap, resolved)
+	}
+
+	// Apply resolved scopes to DependencyInfo.
+	for name, dep := range depInfoMap {
+		if scopes, ok := resolved[name]; ok {
+			dep.Scopes = scopes
+		} else {
+			dep.Scopes = []string{"production"}
+		}
+	}
+}
+
+// propagateScopes recursively assigns scopes via BFS. When a dep is reachable from
+// multiple parents with different scopes, it gets all unique scopes (e.g., a gem used
+// by both a dev gem and a prod gem is classified as ["production", "development"]).
+func (rf *RubygemsFlexPack) propagateScopes(name string, scopes []string, fwdGraph map[string][]string, depInfoMap map[string]*DependencyInfo, resolved map[string][]string) {
+	existing := resolved[name]
+	merged := mergeScopes(existing, scopes)
+	if scopesEqual(existing, merged) {
+		return // already resolved with these scopes
+	}
+	resolved[name] = merged
+
+	for _, child := range fwdGraph[name] {
+		if _, ok := depInfoMap[child]; ok {
+			rf.propagateScopes(child, merged, fwdGraph, depInfoMap, resolved)
+		}
+	}
+}
+
+// mergeScopes combines two scope slices, deduplicating entries.
+func mergeScopes(a, b []string) []string {
+	seen := make(map[string]bool)
+	for _, s := range a {
+		seen[s] = true
+	}
+	for _, s := range b {
+		seen[s] = true
+	}
+	var result []string
+	for s := range seen {
+		result = append(result, s)
+	}
+	return result
+}
+
+func scopesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	set := make(map[string]bool, len(a))
+	for _, s := range a {
+		set[s] = true
+	}
+	for _, s := range b {
+		if !set[s] {
+			return false
+		}
+	}
+	return true
 }
 
 // collectRootChildren returns the project's direct dependencies that are present in depInfoMap.
@@ -500,6 +588,7 @@ func (rf *RubygemsFlexPack) CollectBuildInfo(buildName, buildNumber string) (*en
 		module.Dependencies = append(module.Dependencies, entities.Dependency{
 			Id:          dep.ID,
 			Type:        dep.Type,
+			Scopes:      dep.Scopes,
 			Repository:  dep.Repository,
 			RequestedBy: rf.requestedByChains[dep.ID],
 			Checksum: entities.Checksum{

@@ -125,6 +125,12 @@ type GemConfig struct {
 	// Gemfile groups ourselves. When nil, every gem in the lock file is included.
 	InstalledPackages map[string]string
 
+	// GemGroups maps gem names to their Bundler groups (parsed from Gemfile).
+	// Gems with no group are classified as "production". Used to set Scopes on
+	// dependencies for security scanning (e.g., Xray distinguishes prod vs dev).
+	// When nil, no scopes are assigned.
+	GemGroups map[string][]string
+
 	// ProjectName and ProjectVersion override the module ID. When ProjectName is
 	// empty the working-directory base name is used (Gemfile-only projects have
 	// no inherent name/version).
