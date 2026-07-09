@@ -291,7 +291,14 @@ func (b *Build) createBuildInfoFromPartials() (*entities.BuildInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	buildInfo.Started = buildGeneralDetails.Timestamp.Format(entities.TimeFormat)
+	startTime := buildGeneralDetails.Timestamp
+	buildInfo.Started = startTime.Format(entities.TimeFormat)
+	// Record how long the build took from its start until now (build-info generation / publish time).
+	if !startTime.IsZero() {
+		if duration := time.Since(startTime).Milliseconds(); duration > 0 {
+			buildInfo.DurationMillis = duration
+		}
+	}
 	modules, env, vcsList, issues, err := extractBuildInfoData(partials)
 	if err != nil {
 		return nil, err
