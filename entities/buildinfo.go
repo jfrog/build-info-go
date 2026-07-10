@@ -353,11 +353,16 @@ func mergeDependenciesLists(dependenciesToAdd, intoDependencies *[]Dependency) {
 }
 
 func mergeDependencies(dep1, dep2 Dependency) Dependency {
+	repo := dep1.Repository
+	if repo == "" {
+		repo = dep2.Repository
+	}
 	return Dependency{
 		Id:          dep1.Id,
 		Type:        dep1.Type,
 		Scopes:      mergeStringSlices(dep1.Scopes, dep2.Scopes),
 		RequestedBy: mergeRequestedBySlices(dep1.RequestedBy, dep2.RequestedBy),
+		Repository:  repo,
 		Checksum:    dep1.Checksum,
 	}
 }
