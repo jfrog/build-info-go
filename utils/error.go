@@ -8,10 +8,14 @@ import (
 type PackageManager string
 
 const (
-	Npm   PackageManager = "npm"
-	Maven PackageManager = "maven"
-	Pip   PackageManager = "pip"
-	Go    PackageManager = "go"
+	Npm    PackageManager = "npm"
+	Maven  PackageManager = "maven"
+	Pip    PackageManager = "pip"
+	Go     PackageManager = "go"
+	Poetry PackageManager = "poetry"
+	Yarn   PackageManager = "yarn"
+	Pnpm   PackageManager = "pnpm"
+	Uv     PackageManager = "uv"
 )
 
 // ForbiddenError represents a 403 Forbidden error.
@@ -52,6 +56,11 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 	case "go":
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden") ||
 			strings.Contains(strings.ToLower(cmdOutput), " 403")
+	case "poetry":
+		return strings.Contains(strings.ToLower(cmdOutput), "http error 403") ||
+			strings.Contains(strings.ToLower(cmdOutput), "403 client error")
+	case "uv":
+		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")
 	}
 	return false
 }
