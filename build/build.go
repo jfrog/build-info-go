@@ -14,6 +14,7 @@ import (
 	ioutils "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/gofrog/log"
 
+	"github.com/jfrog/build-info-go/utils/cienv"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 
 	"github.com/jfrog/build-info-go/entities"
@@ -296,7 +297,7 @@ func (b *Build) createBuildInfoFromPartials() (*entities.BuildInfo, error) {
 	// Record build duration only when running in a CI environment. Duration is measured from the
 	// build's start (recorded by the first build command) until now - the moment the build-info is
 	// assembled for publishing.
-	if isRunningInCI() && !startTime.IsZero() {
+	if cienv.IsCIRunning() && !startTime.IsZero() {
 		if duration := time.Since(startTime).Milliseconds(); duration > 0 {
 			buildInfo.DurationMillis = duration
 		}
@@ -324,29 +325,6 @@ func (b *Build) createBuildInfoFromPartials() (*entities.BuildInfo, error) {
 	return buildInfo, nil
 }
 
-// ciEnvIndicators are environment variables set by common CI providers. Presence of any of them
-// (in addition to the standard CI=true) indicates the build is running inside a CI pipeline.
-var ciEnvIndicators = []string{
-	"JENKINS_URL",    // Jenkins
-	"GITHUB_ACTIONS", // GitHub Actions
-	"GITLAB_CI",      // GitLab CI
-	"TF_BUILD",       // Azure Pipelines
-	"CIRCLECI",       // CircleCI
-}
-
-// isRunningInCI reports whether the process is running inside a CI environment. It treats the
-// standard CI=true variable (set by most CI systems) or any known provider-specific variable as CI.
-func isRunningInCI() bool {
-	if os.Getenv("CI") == "true" {
-		return true
-	}
-	for _, envVar := range ciEnvIndicators {
-		if os.Getenv(envVar) != "" {
-			return true
-		}
-	}
-	return false
-}
 
 func (b *Build) readPartialBuildInfoFiles() (entities.Partials, error) {
 	var partials entities.Partials

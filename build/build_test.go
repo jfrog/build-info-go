@@ -9,6 +9,7 @@ import (
 
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
+	"github.com/jfrog/build-info-go/utils/cienv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -135,7 +136,8 @@ func TestBuildInfoDurationMillisSkippedOutsideCI(t *testing.T) {
 	defer func() { assert.NoError(t, build.Clean()) }()
 
 	// Ensure no CI markers are present.
-	for _, envVar := range append([]string{"CI"}, ciEnvIndicators...) {
+	t.Setenv("CI", "")
+	for _, envVar := range cienv.CIEnvIndicators {
 		t.Setenv(envVar, "")
 	}
 
