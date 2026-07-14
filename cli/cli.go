@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
@@ -450,6 +451,52 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				} else {
 					return exec.Command("twine", filteredArgs[1:]...).Run()
 				}
+			},
+		},
+		{
+			Name:      "apk",
+			Usage:     "Generate build-info for an Alpine apk project",
+			UsageText: "bi apk [apk command] [command options]",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("apk-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					err = errors.Join(err, bld.Clean())
+				}()
+
+				apkArgs := filterCliFlags(context.Args().Slice(), flags)
+
+				cacheDir, err := os.MkdirTemp("", "bi-apk-cache-*")
+				if err != nil {
+					return fmt.Errorf("failed to create apk cache dir: %w", err)
+				}
+				defer func() { _ = os.RemoveAll(cacheDir) }()
+
+				apkArgs = append([]string{"--cache-dir", cacheDir}, apkArgs...)
+
+				alpineModule := bld.AddAlpineModule("apk-module", "", "")
+				alpineModule.SetCacheDir(filepath.Clean(cacheDir))
+				if err = alpineModule.SnapshotInstalledPackages(); err != nil {
+					return
+				}
+
+				apkCmd := exec.Command("apk", apkArgs...)
+				apkCmd.Stdout = os.Stdout
+				apkCmd.Stderr = os.Stderr
+				if err = apkCmd.Run(); err != nil {
+					return
+				}
+
+				if err = alpineModule.CollectBuildInfo(); err != nil {
+					return
+				}
+
+				return printBuild(bld, context.String(formatFlag))
 			},
 		},
 		{

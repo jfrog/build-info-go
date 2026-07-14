@@ -109,6 +109,11 @@ func (b *Build) AddYarnModule(srcPath string) (*YarnModule, error) {
 	return newYarnModule(srcPath, b)
 }
 
+// AddAlpineModule adds an Alpine module to this Build.
+func (b *Build) AddAlpineModule(id, repoKey, alpineVersion string) *AlpineModule {
+	return newAlpineModule(id, repoKey, alpineVersion, b)
+}
+
 // AddNugetModules adds a Nuget module to this Build. Pass srcPath as an empty string if the root of the Nuget project is the working directory.
 func (b *Build) AddNugetModules(srcPath string) (*DotnetModule, error) {
 	return newDotnetModule(srcPath, b)
