@@ -514,6 +514,26 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				return printBuild(bld, context.String(formatFlag))
 			},
 		},
+		{
+			Name:      "gem",
+			Usage:     "Generate build-info for a RubyGems project",
+			UsageText: "bi gem",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				config := flexpack.GemConfig{
+					WorkingDirectory: ".",
+				}
+				gemFlex, err := flexpack.NewRubygemsFlexPack(config)
+				if err != nil {
+					return fmt.Errorf("failed to create RubyGems instance: %w", err)
+				}
+				buildInfo, err := gemFlex.CollectBuildInfo("gem-build", "1")
+				if err != nil {
+					return fmt.Errorf("failed to collect build info: %w", err)
+				}
+				return printBuildInfo(buildInfo, context.String(formatFlag))
+			},
+		},
 	}
 }
 
