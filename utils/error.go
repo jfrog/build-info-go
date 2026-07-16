@@ -16,6 +16,7 @@ const (
 	Yarn   PackageManager = "yarn"
 	Pnpm   PackageManager = "pnpm"
 	Uv     PackageManager = "uv"
+	Pipenv PackageManager = "pipenv"
 )
 
 // ForbiddenError represents a 403 Forbidden error.
@@ -61,6 +62,8 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 			strings.Contains(strings.ToLower(cmdOutput), "403 client error")
 	case "uv":
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")
+	case "pipenv":
+		return strings.Contains(strings.ToLower(cmdOutput), "http error 403")
 	}
 	return false
 }
