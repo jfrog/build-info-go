@@ -69,8 +69,18 @@ type PoetryConfig struct {
 	// WorkingDirectory is the directory where Poetry should operate
 	WorkingDirectory string
 
-	// IncludeDevDependencies indicates whether to include development dependencies
+	// IncludeDevDependencies indicates whether to include development dependencies.
+	// Only used when InstalledPackages is nil. When InstalledPackages is set the
+	// installed set is the source of truth and this field is ignored.
 	IncludeDevDependencies bool
+
+	// InstalledPackages is the ground-truth set of what poetry actually installed,
+	// keyed by normalised package name (lowercase, [-_.] runs collapsed to "-") →
+	// version string. When non-nil, only packages whose normalised name appears
+	// in this map are included in build-info. This correctly handles --only,
+	// --without, --with and other poetry install flag combinations without any
+	// flag parsing on our side.
+	InstalledPackages map[string]string
 }
 
 // UVConfig holds configuration specific to UV operations

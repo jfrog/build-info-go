@@ -33,8 +33,11 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 		return nil, err
 	}
 	var cacache *cacache
-	if calculateChecksums {
-		// Get local npm cache.
+	// Skip the _cacache lookup when there are no dependencies to checksum.
+	// A project with no dependencies never causes npm to create the _cacache
+	// directory, so requiring it would fail `jf npm ci` on a fresh CI workspace
+	// (e.g. a Jenkins agent) for projects whose package.json has no dependencies.
+	if calculateChecksums && len(dependenciesMap) > 0 {
 		cacheLocation, err := GetNpmConfigCache(srcPath, executablePath, npmParams.Args, log)
 		if err != nil {
 			return nil, err

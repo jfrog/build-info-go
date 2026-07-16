@@ -47,6 +47,13 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 	switch tech {
 	case "npm":
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")
+	case "pnpm":
+		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden") ||
+			strings.Contains(strings.ToLower(cmdOutput), "forbidden - 403") ||
+			strings.Contains(strings.ToLower(cmdOutput), "err_pnpm_fetch_403")
+	case "yarn":
+		return strings.Contains(strings.ToLower(cmdOutput), "403 (forbidden)") ||
+			strings.Contains(strings.ToLower(cmdOutput), "response code: 403")
 	case "maven":
 		return strings.Contains(cmdOutput, "status code: 403") ||
 			strings.Contains(strings.ToLower(cmdOutput), "403 forbidden") ||
