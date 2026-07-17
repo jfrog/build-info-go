@@ -1,0 +1,14 @@
+{
+  "packages": [
+    {"name":"root","version":"0.1.0","id":"root 0.1.0 (path+file:///r)","source":"","manifest_path":"/r/Cargo.toml"},
+    {"name":"serde","version":"1.0.197","id":"serde 1.0.197 (registry+https://github.com/rust-lang/crates.io-index)","source":"registry+https://github.com/rust-lang/crates.io-index","manifest_path":"/c/serde/Cargo.toml"}
+  ],
+  "resolve": {
+    "root": "root 0.1.0 (path+file:///r)",
+    "nodes": [
+      {"id":"root 0.1.0 (path+file:///r)","dependencies":["serde 1.0.197 (registry+https://github.com/rust-lang/crates.io-index)"],"deps":[{"name":"serde","pkg":"serde 1.0.197 (registry+https://github.com/rust-lang/crates.io-index)","dep_kinds":[{"kind":"","target":null}]}]},
+      {"id":"serde 1.0.197 (registry+https://github.com/rust-lang/crates.io-index)","dependencies":[],"deps":[]}
+    ]
+  },
+  "workspace_members": ["root 0.1.0 (path+file:///r)"]
+}
