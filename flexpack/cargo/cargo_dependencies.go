@@ -229,14 +229,25 @@ func (cf *CargoFlexPack) runCargoMetadata() ([]byte, error) {
 	return cmd.Output()
 }
 
-// collectDependenciesFromMeta walks cf.meta and populates cf.dependencies,
-// skipping workspace members and non-registry sources.
+// fileId maps a cargo resolve-node id to the identifier used in build-info: registry crates
+// become "<name>-<version>.crate"; first-party nodes (workspace/root, git, path) use the crate name.
+func fileId(nodeId string) string {
+	name, version, source := parsePackageId(nodeId)
+	if strings.HasPrefix(source, "registry+") {
+		return name + "-" + version + ".crate"
+	}
+	return name
+}
+
+// collectDependenciesFromMeta walks cf.meta and populates cf.dependencies, skipping workspace
+// members and non-registry sources. RequestedBy is computed recursively as full paths from each
+// dependency up to a workspace/root member (matching the Go collector's algorithm), capped at
+// entities.RequestedByMaxLength and cycle-guarded via NodeHasLoop.
 func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 	workspace := make(map[string]bool)
 	for _, id := range cf.meta.WorkspaceMembers {
 		workspace[id] = true
 	}
-	requestedBy := buildRequestedBy(cf.meta)
 	direct := directDependencyIds(cf.meta)
 	// Map id -> the dep_kinds it was pulled in with (union across parents).
 	kindsById := make(map[string][]CargoDepKind)
@@ -245,7 +256,13 @@ func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 			kindsById[d.Pkg] = append(kindsById[d.Pkg], d.DepKinds...)
 		}
 	}
-	cf.dependencies = nil
+
+	// First pass: build included registry dependencies (without RequestedBy), keyed by build-info
+	// id, preserving encounter order for stable output.
+	included := make(map[string]bool) // node id -> included
+	byKey := make(map[string]entities.Dependency)
+	nodeKey := make(map[string]string) // node id -> build-info id
+	var order []string
 	for _, node := range cf.meta.Resolve.Nodes {
 		if workspace[node.Id] {
 			continue
@@ -262,32 +279,74 @@ func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 		if scope == "prod" && !direct[node.Id] {
 			scope = "transitive"
 		}
-		dep := entities.Dependency{
-			Id:       name + "-" + version + ".crate",
+		key := name + "-" + version + ".crate"
+		byKey[key] = entities.Dependency{
+			Id:       key,
 			Type:     "crate",
 			Scopes:   []string{scope},
 			Checksum: cf.resolveChecksum(name, version, cf.lockChecksums[name+"|"+version]),
 		}
-		if parents := requestedBy[node.Id]; len(parents) > 0 {
-			dep.RequestedBy = [][]string{toFilenames(parents)}
+		included[node.Id] = true
+		nodeKey[node.Id] = key
+		order = append(order, key)
+	}
+
+	// Build the dependency graph in build-info-id space (parent -> included children).
+	graph := make(map[string][]string)
+	for _, node := range cf.meta.Resolve.Nodes {
+		parentKey := fileId(node.Id)
+		for _, child := range node.Dependencies {
+			if included[child] {
+				graph[parentKey] = appendUnique(graph[parentKey], nodeKey[child])
+			}
 		}
-		cf.dependencies = append(cf.dependencies, dep)
+	}
+
+	// Seed recursion from every workspace member and the resolve root.
+	roots := make(map[string]bool)
+	for _, id := range cf.meta.WorkspaceMembers {
+		roots[id] = true
+	}
+	if cf.meta.Resolve.Root != "" {
+		roots[cf.meta.Resolve.Root] = true
+	}
+	seededRoots := make(map[string]bool)
+	for _, node := range cf.meta.Resolve.Nodes {
+		if !roots[node.Id] {
+			continue
+		}
+		rootKey := fileId(node.Id)
+		if seededRoots[rootKey] {
+			continue
+		}
+		seededRoots[rootKey] = true
+		populateRequestedBy(rootKey, [][]string{{}}, byKey, graph)
+	}
+
+	cf.dependencies = nil
+	for _, key := range order {
+		cf.dependencies = append(cf.dependencies, byKey[key])
 	}
 	return nil
 }
 
-// toFilenames converts parent package ids to <name>-<version>.crate (root stays as id).
-func toFilenames(ids []string) []string {
-	out := make([]string, 0, len(ids))
-	for _, id := range ids {
-		name, version, source := parsePackageId(id)
-		if strings.HasPrefix(source, "registry+") {
-			out = append(out, name+"-"+version+".crate")
-		} else {
-			out = append(out, name) // workspace/root: use crate name
+// populateRequestedBy recursively records, on each dependency, the paths that pulled it in —
+// each path a chain of ancestor ids ending at a root. Mirrors the Go collector: it prefixes the
+// parent's paths with the parent id onto the child, guarding cycles and capping path count at
+// entities.RequestedByMaxLength.
+func populateRequestedBy(parentID string, parentRequestedBy [][]string, byKey map[string]entities.Dependency, graph map[string][]string) {
+	for _, childKey := range graph[parentID] {
+		child, ok := byKey[childKey]
+		if !ok {
+			continue
 		}
+		if child.NodeHasLoop() || len(child.RequestedBy) >= entities.RequestedByMaxLength {
+			continue
+		}
+		child.UpdateRequestedBy(parentID, parentRequestedBy)
+		byKey[childKey] = child
+		populateRequestedBy(childKey, child.RequestedBy, byKey, graph)
 	}
-	return out
 }
 
 // collectDependencies runs cargo metadata, loads the lockfile, and populates deps.

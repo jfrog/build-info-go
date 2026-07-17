@@ -3,6 +3,7 @@ package cargo
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/jfrog/build-info-go/entities"
@@ -287,5 +288,57 @@ func TestTransitiveScope(t *testing.T) {
 	}
 	if len(b.Scopes) != 1 || b.Scopes[0] != "transitive" {
 		t.Errorf("b scopes = %v, want [transitive]", b.Scopes)
+	}
+
+	// RequestedBy must be recursive full paths to root:
+	//   a  <- [[root]]
+	//   b  <- [[a-1.0.0.crate, root]]
+	wantA := [][]string{{"root"}}
+	if !reflect.DeepEqual(a.RequestedBy, wantA) {
+		t.Errorf("a.RequestedBy = %v, want %v", a.RequestedBy, wantA)
+	}
+	wantB := [][]string{{"a-1.0.0.crate", "root"}}
+	if !reflect.DeepEqual(b.RequestedBy, wantB) {
+		t.Errorf("b.RequestedBy = %v, want %v", b.RequestedBy, wantB)
+	}
+}
+
+// TestRequestedByDiamondPaths verifies multiple paths to a shared transitive dependency.
+// Graph: root -> a, root -> b, a -> d, b -> d. d should carry both paths to root.
+func TestRequestedByDiamondPaths(t *testing.T) {
+	dep := func(name, pkg string) CargoNodeDep {
+		return CargoNodeDep{Name: name, Pkg: pkg, DepKinds: []CargoDepKind{{Kind: ""}}}
+	}
+	meta := &CargoMetadata{
+		WorkspaceMembers: []string{"root 0.1.0 (path+file:///r)"},
+		Resolve: CargoResolve{
+			Root: "root 0.1.0 (path+file:///r)",
+			Nodes: []CargoNode{
+				{Id: "root 0.1.0 (path+file:///r)", Dependencies: []string{"a 1.0.0 (registry+x)", "b 1.0.0 (registry+x)"},
+					Deps: []CargoNodeDep{dep("a", "a 1.0.0 (registry+x)"), dep("b", "b 1.0.0 (registry+x)")}},
+				{Id: "a 1.0.0 (registry+x)", Dependencies: []string{"d 1.0.0 (registry+x)"}, Deps: []CargoNodeDep{dep("d", "d 1.0.0 (registry+x)")}},
+				{Id: "b 1.0.0 (registry+x)", Dependencies: []string{"d 1.0.0 (registry+x)"}, Deps: []CargoNodeDep{dep("d", "d 1.0.0 (registry+x)")}},
+				{Id: "d 1.0.0 (registry+x)", Dependencies: []string{}},
+			},
+		},
+	}
+	cf := &CargoFlexPack{config: CargoConfig{}, meta: meta, lockChecksums: map[string]string{}}
+	t.Setenv("CARGO_HOME", t.TempDir())
+	if err := cf.collectDependenciesFromMeta(); err != nil {
+		t.Fatal(err)
+	}
+	var d *entities.Dependency
+	for i := range cf.dependencies {
+		if cf.dependencies[i].Id == "d-1.0.0.crate" {
+			d = &cf.dependencies[i]
+		}
+	}
+	if d == nil {
+		t.Fatal("missing d-1.0.0.crate")
+	}
+	// Two distinct paths to root, one via a and one via b.
+	want := [][]string{{"a-1.0.0.crate", "root"}, {"b-1.0.0.crate", "root"}}
+	if !reflect.DeepEqual(d.RequestedBy, want) {
+		t.Errorf("d.RequestedBy = %v, want %v", d.RequestedBy, want)
 	}
 }
