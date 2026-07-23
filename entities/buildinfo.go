@@ -48,6 +48,7 @@ const (
 	Conan     ModuleType = "conan"
 	Nix       ModuleType = "nix"
 	Uv        ModuleType = "uv"
+	Alpine    ModuleType = "alpine"
 )
 
 type BuildInfo struct {
