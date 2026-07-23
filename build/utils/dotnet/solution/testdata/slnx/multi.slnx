@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="MyConsoleApp/MyConsoleApp.csproj" />
+  <Folder Name="/lib/">
+    <Project Path="ClassLibrary1/ClassLibrary1.csproj" />
+  </Folder>
+</Solution>
