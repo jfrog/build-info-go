@@ -277,6 +277,120 @@ func TestParseSln(t *testing.T) {
 	}
 }
 
+func TestParseSlnx(t *testing.T) {
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+
+	testdataDir := filepath.Join(pwd, "testdata", "slnx")
+
+	tests := []struct {
+		name     string
+		slnxPath string
+		expected []string
+	}{
+		{"single", filepath.Join(testdataDir, "single.slnx"), []string{
+			`Project("{00000000-0000-0000-0000-000000000000}") = "packagesconfig", "packagesconfig.csproj"`,
+		}},
+		{"multiWithFolder", filepath.Join(testdataDir, "multi.slnx"), []string{
+			`Project("{00000000-0000-0000-0000-000000000000}") = "MyConsoleApp", "MyConsoleApp/MyConsoleApp.csproj"`,
+			`Project("{00000000-0000-0000-0000-000000000000}") = "ClassLibrary1", "ClassLibrary1/ClassLibrary1.csproj"`,
+		}},
+		{"explicitNameInNestedFolders", filepath.Join(testdataDir, "namedproject.slnx"), []string{
+			`Project("{00000000-0000-0000-0000-000000000000}") = "CustomName", "deep/DeepProj.csproj"`,
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			results, err := parseSlnxFile(test.slnxPath)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, results)
+		})
+	}
+}
+
+func TestSlnxProjectNameFromPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{"forwardSlash", "src/MyProject/MyProject.csproj", "MyProject"},
+		{"backslash", `src\MyProject\MyProject.csproj`, "MyProject"},
+		{"noDir", "MyProject.csproj", "MyProject"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, slnxProjectNameFromPath(test.path))
+		})
+	}
+}
+
+// TestGetSlnFilesMatchesSlnx verifies getSlnFiles() picks up '.slnx' files, both when
+// auto-discovering in a directory and when an explicit slnFile is provided.
+func TestGetSlnFilesMatchesSlnx(t *testing.T) {
+	pwd, err := os.Getwd()
+	require.NoError(t, err)
+	testdataDir := filepath.Join(pwd, "testdata", "slnx")
+
+	t.Run("autoDiscover", func(t *testing.T) {
+		sol := solution{path: testdataDir}
+		slnFiles, err := sol.getSlnFiles()
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{
+			filepath.Join(testdataDir, "single.slnx"),
+			filepath.Join(testdataDir, "multi.slnx"),
+			filepath.Join(testdataDir, "namedproject.slnx"),
+		}, slnFiles)
+	})
+
+	t.Run("explicitSlnFile", func(t *testing.T) {
+		sol := solution{path: testdataDir, slnFile: "single.slnx"}
+		slnFiles, err := sol.getSlnFiles()
+		require.NoError(t, err)
+		assert.Equal(t, []string{filepath.Join(testdataDir, "single.slnx")}, slnFiles)
+	})
+}
+
+// TestGetProjectsFromSlnsRoutesSlnxByExtension verifies getProjectsFromSlns() routes
+// '.slnx' files to parseSlnxFile and leaves legacy '.sln' parsing untouched.
+func TestGetProjectsFromSlnsRoutesSlnxByExtension(t *testing.T) {
+	pwd, err := os.Getwd()
+	require.NoError(t, err)
+	testdataDir := filepath.Join(pwd, "testdata", "slnx")
+
+	sol := solution{path: testdataDir, slnFile: "multi.slnx"}
+	results, err := sol.getProjectsFromSlns()
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		`Project("{00000000-0000-0000-0000-000000000000}") = "MyConsoleApp", "MyConsoleApp/MyConsoleApp.csproj"`,
+		`Project("{00000000-0000-0000-0000-000000000000}") = "ClassLibrary1", "ClassLibrary1/ClassLibrary1.csproj"`,
+	}, results)
+}
+
+// TestGetSlnFilesCaseInsensitiveExtension verifies '.sln'/'.slnx' matching (both in
+// auto-discovery and in extension-based parser routing) is case-insensitive, since macOS and
+// Windows filesystems are case-insensitive/case-preserving.
+func TestGetSlnFilesCaseInsensitiveExtension(t *testing.T) {
+	dir := t.TempDir()
+	slnxPath := filepath.Join(dir, "Upper.SLNX")
+	require.NoError(t, os.WriteFile(slnxPath, []byte(`<Solution>
+  <Project Path="proj/proj.csproj" />
+</Solution>`), 0644))
+
+	sol := solution{path: dir}
+	slnFiles, err := sol.getSlnFiles()
+	require.NoError(t, err)
+	require.Equal(t, []string{slnxPath}, slnFiles)
+
+	results, err := sol.getProjectsFromSlns()
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		`Project("{00000000-0000-0000-0000-000000000000}") = "proj", "proj/proj.csproj"`,
+	}, results)
+}
+
 func TestParseProjectLine(t *testing.T) {
 	tests := []struct {
 		name                 string

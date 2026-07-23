@@ -2,6 +2,7 @@ package solution
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"os"
@@ -311,7 +312,7 @@ func (solution *solution) loadSingleProject(project project.Project, log utils.L
 	return nil
 }
 
-// Finds all the projects by reading the content of the sln files.
+// Finds all the projects by reading the content of the sln/slnx files.
 // Returns a slice with all the projects in the solution.
 func (solution *solution) getProjectsFromSlns() ([]string, error) {
 	var allProjects []string
@@ -320,7 +321,11 @@ func (solution *solution) getProjectsFromSlns() ([]string, error) {
 		return nil, err
 	}
 	for _, slnFile := range slnFiles {
-		projects, err := parseSlnFile(slnFile)
+		parseFile := parseSlnFile
+		if strings.EqualFold(filepath.Ext(slnFile), ".slnx") {
+			parseFile = parseSlnxFile
+		}
+		projects, err := parseFile(slnFile)
 		if err != nil {
 			return nil, err
 		}
@@ -329,13 +334,14 @@ func (solution *solution) getProjectsFromSlns() ([]string, error) {
 	return allProjects, nil
 }
 
-// If sln file is not provided, finds all sln files in the directory.
+// If sln file is not provided, finds all sln/slnx files in the directory.
 func (solution *solution) getSlnFiles() (slnFiles []string, err error) {
 	if solution.slnFile != "" {
 		slnFiles = append(slnFiles, filepath.Join(solution.path, solution.slnFile))
 	} else {
 		slnFiles, err = utils.ListFilesByFilterFunc(solution.path, func(filePath string) (bool, error) {
-			return filepath.Ext(filePath) == ".sln", nil
+			ext := filepath.Ext(filePath)
+			return strings.EqualFold(ext, ".sln") || strings.EqualFold(ext, ".slnx"), nil
 		})
 	}
 	return
@@ -381,6 +387,80 @@ func parseSlnFile(slnFile string) ([]string, error) {
 	}
 	projects := projectRegExp.FindAllString(string(content), -1)
 	return projects, nil
+}
+
+// slnxDocument is the XML schema of a '.slnx' solution file.
+// Projects can sit directly under <Solution> or nested inside <Folder>s, which are just
+// organizational and carry no dependency info.
+//
+//	<Solution>
+//	  <Project Path="src/MyProject/MyProject.csproj" />
+//	  <Folder Name="/tests/">
+//	    <Project Path="tests/MyProject.Tests/MyProject.Tests.csproj" />
+//	  </Folder>
+//	</Solution>
+type slnxDocument struct {
+	XMLName  xml.Name      `xml:"Solution"`
+	Projects []slnxProject `xml:"Project"`
+	Folders  []slnxFolder  `xml:"Folder"`
+}
+
+type slnxFolder struct {
+	Projects []slnxProject `xml:"Project"`
+	Folders  []slnxFolder  `xml:"Folder"`
+}
+
+type slnxProject struct {
+	// Path is relative to the .slnx file's directory, using '/' as separator.
+	Path string `xml:"Path,attr"`
+	// Name overrides the display name. If empty, it defaults to the project file's base name.
+	Name string `xml:"Name,attr"`
+}
+
+// collectSlnxProjects recursively collects every <Project>, since folders can nest arbitrarily deep.
+func collectSlnxProjects(projects []slnxProject, folders []slnxFolder) []slnxProject {
+	all := append([]slnxProject{}, projects...)
+	for _, folder := range folders {
+		all = append(all, collectSlnxProjects(folder.Projects, folder.Folders)...)
+	}
+	return all
+}
+
+// parseSlnxFile parses a '.slnx' file and returns synthetic project lines shaped like the
+// legacy '.sln' format ('Project("{guid}") = "Name", "path"'), so parseProjectLine can
+// handle both formats unchanged. The GUID is a placeholder; parseProjectLine ignores it.
+func parseSlnxFile(slnxFile string) ([]string, error) {
+	content, err := os.ReadFile(slnxFile)
+	if err != nil {
+		return nil, err
+	}
+	var doc slnxDocument
+	if err = xml.Unmarshal(content, &doc); err != nil {
+		return nil, err
+	}
+	var lines []string
+	for _, proj := range collectSlnxProjects(doc.Projects, doc.Folders) {
+		if proj.Path == "" {
+			continue
+		}
+		name := proj.Name
+		if name == "" {
+			name = slnxProjectNameFromPath(proj.Path)
+		}
+		lines = append(lines, fmt.Sprintf(`Project("{00000000-0000-0000-0000-000000000000}") = "%s", "%s"`, name, proj.Path))
+	}
+	return lines, nil
+}
+
+// slnxProjectNameFromPath derives a default project name from a Path attribute,
+// e.g. "src/MyProject/MyProject.csproj" -> "MyProject".
+func slnxProjectNameFromPath(projectPath string) string {
+	normalized := strings.ReplaceAll(projectPath, "\\", "/")
+	base := normalized
+	if idx := strings.LastIndex(normalized, "/"); idx != -1 {
+		base = normalized[idx+1:]
+	}
+	return strings.TrimSuffix(base, filepath.Ext(base))
 }
 
 func removeQuotes(value string) string {
