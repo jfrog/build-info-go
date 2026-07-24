@@ -125,6 +125,15 @@ type GradleConfig struct {
 	CommandTimeout time.Duration
 }
 
+// NuGetConfig holds configuration for the NuGet FlexPack implementation.
+type NuGetConfig struct {
+	WorkingDirectory         string
+	ToolchainType            int
+	UseNugetV2               bool
+	AllowInsecureConnections bool
+	RepoName                 string
+}
+
 // IsFlexPackEnabled checks if the FlexPack (native) implementation should be used
 // Returns true if JFROG_RUN_NATIVE environment variable is set to "true"
 func IsFlexPackEnabled() bool {
