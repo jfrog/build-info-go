@@ -42,6 +42,12 @@ type CIVcsInfo struct {
 	Org string
 	// Repo is the repository name (without the org prefix)
 	Repo string
+	// Url is the repository URL (server_url + repo)
+	Url string
+	// Revision is the commit SHA
+	Revision string
+	// Branch is the branch name
+	Branch string
 }
 
 // IsEmpty returns true if no VCS info was detected
