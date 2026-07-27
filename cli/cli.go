@@ -13,9 +13,10 @@ import (
 	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
+	apmflex "github.com/jfrog/build-info-go/flexpack/apm"
 	"github.com/jfrog/build-info-go/flexpack/conan"
-	nixflex "github.com/jfrog/build-info-go/flexpack/nix"
 	gradleflex "github.com/jfrog/build-info-go/flexpack/gradle"
+	nixflex "github.com/jfrog/build-info-go/flexpack/nix"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 	clitool "github.com/urfave/cli/v2"
@@ -324,6 +325,31 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 				buildInfo, err := collector.CollectBuildInfo("nix-build", "1")
 				if err != nil {
 					return fmt.Errorf("failed to collect build info: %w", err)
+				}
+				return printBuildInfo(buildInfo, formatValue)
+			},
+		},
+		{
+			Name:            "apm",
+			Usage:           "Generate build-info for an APM (Agent Package Manager) project",
+			UsageText:       "bi apm",
+			Flags:           flags,
+			SkipFlagParsing: true,
+			Action: func(context *clitool.Context) (err error) {
+				config := apmflex.ApmConfig{
+					WorkingDirectory: ".",
+				}
+				apmFlex, err := apmflex.NewApmFlexPack(config)
+				if err != nil {
+					return fmt.Errorf("failed to create APM instance: %w", err)
+				}
+				buildInfo, err := apmFlex.CollectBuildInfo("apm-build", "1")
+				if err != nil {
+					return fmt.Errorf("failed to collect build info: %w", err)
+				}
+				formatValue, _, err := extractStringFlag(context.Args().Slice(), formatFlag)
+				if err != nil {
+					return err
 				}
 				return printBuildInfo(buildInfo, formatValue)
 			},
