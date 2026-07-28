@@ -19,6 +19,8 @@ runs:
 
     - name: Setup Go with cache
       uses: jfrog/.github/actions/install-go-with-cache@main
+      with:
+        go-version-file: jfrog-cli/go.mod
 
     - name: Setup Go workspace
       uses: ./.github/actions/setup-go-workspace
