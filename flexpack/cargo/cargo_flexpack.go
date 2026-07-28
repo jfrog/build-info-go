@@ -3,6 +3,7 @@ package cargo
 import (
 	"fmt"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -48,14 +49,46 @@ func (cf *CargoFlexPack) getProjectId() string {
 	if cf.meta == nil || cf.meta.Resolve.Root == "" {
 		return "cargo-project"
 	}
-	name, version, _ := parsePackageId(cf.meta.Resolve.Root)
+	return moduleIdForMember(cf.meta.Resolve.Root)
+}
+
+// moduleIdForMember formats a workspace-member package id as the build-info module id
+// "name:version" (or just "name" when the version is unknown).
+func moduleIdForMember(memberPkgId string) string {
+	name, version, _ := parsePackageId(memberPkgId)
 	if version == "" {
 		return name
 	}
 	return name + ":" + version
 }
 
-// buildInfoFromState assembles BuildInfo from already-collected dependencies.
+// buildModules assembles one build-info Module per workspace member — each carrying only the
+// dependencies that member pulls in (via depsForRoots) — mirroring the Maven/Gradle multi-module
+// layout. A single-crate project has exactly one workspace member, so it yields one module,
+// identical to the previous single-module behaviour. When metadata exposes no members at all,
+// it falls back to one module keyed by the resolve root (or "cargo-project").
+func (cf *CargoFlexPack) buildModules() []entities.Module {
+	if cf.meta == nil || len(cf.meta.WorkspaceMembers) == 0 {
+		return []entities.Module{{
+			Id:           cf.getProjectId(),
+			Type:         entities.Cargo,
+			Dependencies: cf.dependencies,
+		}}
+	}
+	members := append([]string(nil), cf.meta.WorkspaceMembers...)
+	sort.Strings(members) // stable module ordering across runs
+	modules := make([]entities.Module, 0, len(members))
+	for _, memberId := range members {
+		modules = append(modules, entities.Module{
+			Id:           moduleIdForMember(memberId),
+			Type:         entities.Cargo,
+			Dependencies: cf.depsForRoots(map[string]bool{memberId: true}),
+		})
+	}
+	return modules
+}
+
+// buildInfoFromState assembles BuildInfo from already-collected metadata, one module per member.
 func (cf *CargoFlexPack) buildInfoFromState(buildName, buildNumber string) (*entities.BuildInfo, error) {
 	bi := &entities.BuildInfo{
 		Name:       buildName,
@@ -63,11 +96,7 @@ func (cf *CargoFlexPack) buildInfoFromState(buildName, buildNumber string) (*ent
 		Started:    time.Now().Format(entities.TimeFormat),
 		Agent:      &entities.Agent{Name: "build-info-go", Version: "1.0.0"},
 		BuildAgent: &entities.Agent{Name: "Cargo", Version: cf.cargoVersion()},
-		Modules: []entities.Module{{
-			Id:           cf.getProjectId(),
-			Type:         entities.Cargo,
-			Dependencies: cf.dependencies,
-		}},
+		Modules:    cf.buildModules(),
 	}
 	return bi, nil
 }

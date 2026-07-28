@@ -193,6 +193,74 @@ func TestCountRegistryNodesExcludesDevDeps(t *testing.T) {
 	}
 }
 
+// TestDevTransitiveDepsExcluded guards the fix for the dev-dependency transitive leak: a crate
+// reachable ONLY through a dev-dependency (rand -> rand_core, where rand is a dev-dep of root) must
+// not appear in build-info when IncludeDevDependencies is false, even though the rand->rand_core
+// edge itself is a normal edge.
+func TestDevTransitiveDepsExcluded(t *testing.T) {
+	root := "root 0.1.0 (path+file:///r)"
+	serde := "serde 1.0.0 (registry+x)"
+	rand := "rand 0.8.0 (registry+x)"
+	randCore := "rand_core 0.6.0 (registry+x)"
+	meta := &CargoMetadata{
+		WorkspaceMembers: []string{root},
+		Resolve: CargoResolve{
+			Root: root,
+			Nodes: []CargoNode{
+				{
+					Id:           root,
+					Dependencies: []string{serde, rand},
+					Deps: []CargoNodeDep{
+						{Name: "serde", Pkg: serde, DepKinds: []CargoDepKind{{Kind: ""}}},
+						{Name: "rand", Pkg: rand, DepKinds: []CargoDepKind{{Kind: "dev"}}},
+					},
+				},
+				{
+					Id:           rand,
+					Dependencies: []string{randCore},
+					Deps:         []CargoNodeDep{{Name: "rand_core", Pkg: randCore, DepKinds: []CargoDepKind{{Kind: ""}}}},
+				},
+				{Id: serde},
+				{Id: randCore},
+			},
+		},
+	}
+	cf := &CargoFlexPack{config: CargoConfig{IncludeDevDependencies: false}, meta: meta}
+	t.Setenv("CARGO_HOME", t.TempDir())
+	if err := cf.collectDependenciesFromMeta(); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, d := range cf.dependencies {
+		got[d.Id] = true
+	}
+	if !got["serde-1.0.0.crate"] {
+		t.Errorf("serde should be included, got %v", got)
+	}
+	if got["rand-0.8.0.crate"] {
+		t.Errorf("rand is a dev-dependency and must be excluded, got %v", got)
+	}
+	if got["rand_core-0.6.0.crate"] {
+		t.Errorf("rand_core is reachable only via the dev-dep rand and must be excluded, got %v", got)
+	}
+	if len(cf.dependencies) != 1 {
+		t.Errorf("expected exactly 1 dependency (serde), got %d: %v", len(cf.dependencies), got)
+	}
+	// Reconciliation count must match the collected count (no spurious mismatch warning).
+	if n := countRegistryNodes(meta, false); n != 1 {
+		t.Errorf("countRegistryNodes(false) = %d, want 1", n)
+	}
+	// With dev included, all three registry crates appear.
+	cfDev := &CargoFlexPack{config: CargoConfig{IncludeDevDependencies: true}, meta: meta}
+	t.Setenv("CARGO_HOME", t.TempDir())
+	if err := cfDev.collectDependenciesFromMeta(); err != nil {
+		t.Fatal(err)
+	}
+	if len(cfDev.dependencies) != 3 {
+		t.Errorf("with dev included expected 3 deps, got %d", len(cfDev.dependencies))
+	}
+}
+
 func TestCollectDependenciesSkipsWorkspaceAndLocal(t *testing.T) {
 	data, _ := os.ReadFile("testdata/metadata.json")
 	meta, _ := parseMetadata(data)
@@ -290,14 +358,15 @@ func TestTransitiveScope(t *testing.T) {
 		t.Errorf("b scopes = %v, want [transitive]", b.Scopes)
 	}
 
-	// RequestedBy must be recursive full paths to root:
-	//   a  <- [[root]]
-	//   b  <- [[a-1.0.0.crate, root]]
-	wantA := [][]string{{"root"}}
+	// RequestedBy must be recursive full paths to root; the root element is the module id
+	// (name:version), matching the Go/npm/yarn/nuget convention:
+	//   a  <- [[root:0.1.0]]
+	//   b  <- [[a-1.0.0.crate, root:0.1.0]]
+	wantA := [][]string{{"root:0.1.0"}}
 	if !reflect.DeepEqual(a.RequestedBy, wantA) {
 		t.Errorf("a.RequestedBy = %v, want %v", a.RequestedBy, wantA)
 	}
-	wantB := [][]string{{"a-1.0.0.crate", "root"}}
+	wantB := [][]string{{"a-1.0.0.crate", "root:0.1.0"}}
 	if !reflect.DeepEqual(b.RequestedBy, wantB) {
 		t.Errorf("b.RequestedBy = %v, want %v", b.RequestedBy, wantB)
 	}
@@ -336,8 +405,8 @@ func TestRequestedByDiamondPaths(t *testing.T) {
 	if d == nil {
 		t.Fatal("missing d-1.0.0.crate")
 	}
-	// Two distinct paths to root, one via a and one via b.
-	want := [][]string{{"a-1.0.0.crate", "root"}, {"b-1.0.0.crate", "root"}}
+	// Two distinct paths to root (module id), one via a and one via b.
+	want := [][]string{{"a-1.0.0.crate", "root:0.1.0"}, {"b-1.0.0.crate", "root:0.1.0"}}
 	if !reflect.DeepEqual(d.RequestedBy, want) {
 		t.Errorf("d.RequestedBy = %v, want %v", d.RequestedBy, want)
 	}

@@ -199,22 +199,24 @@ func countRegistryNodes(meta *CargoMetadata, includeDev bool) int {
 	for _, id := range meta.WorkspaceMembers {
 		workspace[id] = true
 	}
-	kindsById := make(map[string][]CargoDepKind)
-	for _, node := range meta.Resolve.Nodes {
-		for _, d := range node.Deps {
-			kindsById[d.Pkg] = append(kindsById[d.Pkg], d.DepKinds...)
-		}
+	// Seed from every workspace member plus the resolve root, then walk the same kind-aware
+	// reachability the collector uses — so the expected count excludes dev-only subtrees exactly
+	// as collection does, and the mismatch warning only fires on genuine dependency loss.
+	roots := make(map[string]bool)
+	for id := range workspace {
+		roots[id] = true
 	}
+	if meta.Resolve.Root != "" {
+		roots[meta.Resolve.Root] = true
+	}
+	reachable := reachableFrom(meta, roots, includeDev)
 	n := 0
-	for _, node := range meta.Resolve.Nodes {
-		if workspace[node.Id] {
+	for id := range reachable {
+		if workspace[id] {
 			continue
 		}
-		_, _, source := parsePackageId(node.Id)
+		_, _, source := parsePackageId(id)
 		if !strings.HasPrefix(source, "registry+") {
-			continue
-		}
-		if _, include := scopeForDepKinds(kindsById[node.Id], includeDev); !include {
 			continue
 		}
 		n++
@@ -239,20 +241,136 @@ func fileId(nodeId string) string {
 	return name
 }
 
-// collectDependenciesFromMeta walks cf.meta and populates cf.dependencies, skipping workspace
-// members and non-registry sources. RequestedBy is computed recursively as full paths from each
-// dependency up to a workspace/root member (matching the Go collector's algorithm), capped at
-// entities.RequestedByMaxLength and cycle-guarded via NodeHasLoop.
-func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
+// nodeLabel is the identifier a node contributes to a dependency's requestedBy path. Registry
+// crates use their build-info dependency id ("<name>-<version>.crate"); a workspace member or the
+// resolve root uses the module id ("<name>:<version>") — so a requestedBy path terminates at the
+// same id as the module it belongs to, matching the Go/npm/yarn/nuget convention (root element ==
+// module.Id).
+func (cf *CargoFlexPack) nodeLabel(nodeId string, workspace map[string]bool) string {
+	if workspace[nodeId] || nodeId == cf.meta.Resolve.Root {
+		return moduleIdForMember(nodeId)
+	}
+	return fileId(nodeId)
+}
+
+// allRootIds returns the seed set for the whole-project dependency list: every workspace
+// member plus the resolve root (for single-crate projects the two coincide).
+func (cf *CargoFlexPack) allRootIds() map[string]bool {
+	roots := make(map[string]bool)
+	for _, id := range cf.meta.WorkspaceMembers {
+		roots[id] = true
+	}
+	if cf.meta.Resolve.Root != "" {
+		roots[cf.meta.Resolve.Root] = true
+	}
+	return roots
+}
+
+// edgeHasNonDevKind reports whether a resolve edge was pulled in by a normal ("") or build kind.
+// An edge with no dep_kinds recorded (older cargo metadata) is treated as normal.
+func edgeHasNonDevKind(kinds []CargoDepKind) bool {
+	if len(kinds) == 0 {
+		return true
+	}
+	for _, k := range kinds {
+		if k.Kind == "" || k.Kind == "build" {
+			return true
+		}
+	}
+	return false
+}
+
+// childEdges returns the child node ids of a node. When includeDev is false, dev-only edges are
+// skipped, so a package reachable ONLY through a dev-dependency (e.g. a dev-dep's own transitive
+// subtree) is not traversed. Uses node.Deps (which carries dep_kinds); falls back to the flat
+// node.Dependencies list (kind-unaware) when Deps is absent (older cargo metadata).
+func childEdges(node CargoNode, includeDev bool) []string {
+	if len(node.Deps) == 0 {
+		return node.Dependencies
+	}
+	out := make([]string, 0, len(node.Deps))
+	for _, d := range node.Deps {
+		if includeDev || edgeHasNonDevKind(d.DepKinds) {
+			out = append(out, d.Pkg)
+		}
+	}
+	return out
+}
+
+// reachableFrom returns the set of resolve-node ids reachable (transitively) from any id in
+// rootIds. When includeDev is false, dev-only edges are not followed — so a dependency reachable
+// only through a dev-dependency is correctly excluded (matching what a non-test build compiles).
+// Workspace members are traversed through (so a member's deps pulled in via a sibling
+// path-dependency are still reached) but the caller excludes members from the emitted list.
+func reachableFrom(meta *CargoMetadata, rootIds map[string]bool, includeDev bool) map[string]bool {
+	byId := make(map[string]CargoNode, len(meta.Resolve.Nodes))
+	for _, n := range meta.Resolve.Nodes {
+		byId[n.Id] = n
+	}
+	reached := make(map[string]bool)
+	var stack []string
+	for id := range rootIds {
+		stack = append(stack, id)
+	}
+	for len(stack) > 0 {
+		id := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if reached[id] {
+			continue
+		}
+		reached[id] = true
+		for _, child := range childEdges(byId[id], includeDev) {
+			if !reached[child] {
+				stack = append(stack, child)
+			}
+		}
+	}
+	return reached
+}
+
+// depsForRoots builds the build-info dependency list for the subgraph reachable from rootIds:
+// registry-sourced crates only, workspace members skipped, dev-deps filtered per config, scopes
+// computed relative to the roots (direct normal -> "prod", indirect -> "transitive", build ->
+// "build"), and RequestedBy as recursive full paths back up to a root (Go-collector algorithm,
+// capped at entities.RequestedByMaxLength, cycle-guarded via NodeHasLoop).
+//
+// Called once with every member/root for the whole-project list (cf.dependencies) and once per
+// workspace member to build that member's own module — so each module carries the dependencies
+// it actually pulls in, matching Maven/Gradle multi-module build-info.
+func (cf *CargoFlexPack) depsForRoots(rootIds map[string]bool) []entities.Dependency {
+	includeDev := cf.config.IncludeDevDependencies
 	workspace := make(map[string]bool)
 	for _, id := range cf.meta.WorkspaceMembers {
 		workspace[id] = true
 	}
-	direct := directDependencyIds(cf.meta)
-	// Map id -> the dep_kinds it was pulled in with (union across parents).
+	reachable := reachableFrom(cf.meta, rootIds, includeDev)
+
+	// Direct dependencies of the roots themselves (dev edges skipped when includeDev is false).
+	direct := make(map[string]bool)
+	for _, node := range cf.meta.Resolve.Nodes {
+		if !rootIds[node.Id] {
+			continue
+		}
+		for _, childId := range childEdges(node, includeDev) {
+			direct[childId] = true
+		}
+	}
+
+	// Map id -> the dep_kinds it was pulled in with, unioned across edges within the reachable set.
+	// Dev-only edges are ignored when includeDev is false so a crate's scope reflects the non-dev
+	// path that actually reaches it.
 	kindsById := make(map[string][]CargoDepKind)
 	for _, node := range cf.meta.Resolve.Nodes {
+		if !reachable[node.Id] {
+			continue
+		}
 		for _, d := range node.Deps {
+			if !reachable[d.Pkg] {
+				continue
+			}
+			if !includeDev && !edgeHasNonDevKind(d.DepKinds) {
+				continue
+			}
 			kindsById[d.Pkg] = append(kindsById[d.Pkg], d.DepKinds...)
 		}
 	}
@@ -264,7 +382,7 @@ func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 	nodeKey := make(map[string]string) // node id -> build-info id
 	var order []string
 	for _, node := range cf.meta.Resolve.Nodes {
-		if workspace[node.Id] {
+		if !reachable[node.Id] || workspace[node.Id] {
 			continue
 		}
 		name, version, source := parsePackageId(node.Id)
@@ -292,30 +410,27 @@ func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 	}
 
 	// Build the dependency graph in build-info-id space (parent -> included children).
+	// Parent keys use nodeLabel so the root/workspace members appear as their module id.
 	graph := make(map[string][]string)
 	for _, node := range cf.meta.Resolve.Nodes {
-		parentKey := fileId(node.Id)
-		for _, child := range node.Dependencies {
+		if !reachable[node.Id] {
+			continue
+		}
+		parentKey := cf.nodeLabel(node.Id, workspace)
+		for _, child := range childEdges(node, includeDev) {
 			if included[child] {
 				graph[parentKey] = appendUnique(graph[parentKey], nodeKey[child])
 			}
 		}
 	}
 
-	// Seed recursion from every workspace member and the resolve root.
-	roots := make(map[string]bool)
-	for _, id := range cf.meta.WorkspaceMembers {
-		roots[id] = true
-	}
-	if cf.meta.Resolve.Root != "" {
-		roots[cf.meta.Resolve.Root] = true
-	}
+	// Seed recursion from each root (keyed by its module id via nodeLabel).
 	seededRoots := make(map[string]bool)
 	for _, node := range cf.meta.Resolve.Nodes {
-		if !roots[node.Id] {
+		if !rootIds[node.Id] {
 			continue
 		}
-		rootKey := fileId(node.Id)
+		rootKey := cf.nodeLabel(node.Id, workspace)
 		if seededRoots[rootKey] {
 			continue
 		}
@@ -323,10 +438,18 @@ func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 		populateRequestedBy(rootKey, [][]string{{}}, byKey, graph)
 	}
 
-	cf.dependencies = nil
+	deps := make([]entities.Dependency, 0, len(order))
 	for _, key := range order {
-		cf.dependencies = append(cf.dependencies, byKey[key])
+		deps = append(deps, byKey[key])
 	}
+	return deps
+}
+
+// collectDependenciesFromMeta populates cf.dependencies with the whole-project dependency list
+// (every workspace member + resolve root as seeds). Per-module lists are built separately by
+// buildModules via depsForRoots.
+func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
+	cf.dependencies = cf.depsForRoots(cf.allRootIds())
 	return nil
 }
 
