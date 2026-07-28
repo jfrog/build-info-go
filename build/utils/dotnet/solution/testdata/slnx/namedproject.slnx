@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/nested/">
+    <Project Path="deep/DeepProj.csproj" DisplayName="CustomName" />
+  </Folder>
+</Solution>

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="core/core.csproj" />
+  <Project Path="multi/multi.csproj" />
+</Solution>
