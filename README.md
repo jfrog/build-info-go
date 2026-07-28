@@ -3,7 +3,7 @@
 ![Introduction gif](images/dark.gif#gh-dark-mode-only)
 ![Introduction gif](images/light.gif#gh-light-mode-only)
 
-# Build Info Go
+# Build Info Go test
 
 [![Scanned by Frogbot](https://raw.github.com/jfrog/frogbot/master/images/frogbot-badge.svg)](https://github.com/jfrog/frogbot#readme)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jfrog/build-info-go)](https://goreportcard.com/report/github.com/jfrog/build-info-go)
