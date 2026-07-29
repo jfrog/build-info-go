@@ -53,6 +53,12 @@ func (extractor *packagesExtractor) ChildrenMap() (map[string][]string, error) {
 	return extractor.childrenMap, nil
 }
 
+// ProjectVersion returns an empty string: packages.config projects do not record the
+// project's own version in the dependency source.
+func (extractor *packagesExtractor) ProjectVersion() string {
+	return ""
+}
+
 // Create new packages.config extractor
 func (extractor *packagesExtractor) new(dependenciesSource string, log utils.Log) (Extractor, error) {
 	newExtractor := &packagesExtractor{allDependencies: map[string]*buildinfo.Dependency{}, childrenMap: map[string][]string{}}

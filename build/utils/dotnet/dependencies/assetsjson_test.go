@@ -2,14 +2,87 @@ package dependencies
 
 import (
 	"encoding/json"
-	"github.com/jfrog/build-info-go/utils"
-	"github.com/stretchr/testify/assert"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/jfrog/build-info-go/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var logger = utils.NewDefaultLogger(utils.INFO)
+
+func TestAssetsDependenciesRetainedWithoutCachedPackage(t *testing.T) {
+	assetsObj := assets{
+		Libraries: map[string]library{
+			"Missing.Package/1.2.3": {
+				Path:  "missing.package/1.2.3",
+				Files: []string{"missing.package.1.2.3.nupkg.sha512"},
+			},
+		},
+		Project: project{Restore: restore{PackagesPath: t.TempDir()}},
+	}
+
+	allDependencies, err := assetsObj.getAllDependencies(logger)
+	require.NoError(t, err)
+	require.Contains(t, allDependencies, "missing.package")
+	assert.Equal(t, "Missing.Package:1.2.3", allDependencies["missing.package"].Id)
+	assert.Empty(t, allDependencies["missing.package"].Checksum.Sha1)
+	assert.Empty(t, allDependencies["missing.package"].Checksum.Sha256)
+	assert.Empty(t, allDependencies["missing.package"].Checksum.Md5)
+}
+
+func TestAssetsDependenciesChecksumsAndPrivateScope(t *testing.T) {
+	packagesPath := t.TempDir()
+	packagePath := filepath.Join(packagesPath, "private.package", "4.5.6", "private.package.4.5.6.nupkg")
+	require.NoError(t, os.MkdirAll(filepath.Dir(packagePath), 0o755))
+	require.NoError(t, os.WriteFile(packagePath, []byte("package contents"), 0o600))
+
+	assetsObj := assets{
+		Libraries: map[string]library{
+			"Private.Package/4.5.6": {
+				Path:  "private.package/4.5.6",
+				Files: []string{"private.package.4.5.6.nupkg.sha512"},
+			},
+			"Public.Package/7.8.9": {
+				Path:  "public.package/7.8.9",
+				Files: []string{"public.package.7.8.9.nupkg.sha512"},
+			},
+		},
+		Project: project{
+			Restore: restore{PackagesPath: packagesPath},
+			Frameworks: map[string]framework{
+				"net8.0": {
+					Dependencies: map[string]dependency{
+						"Private.Package": {SuppressParent: "All"},
+						"Public.Package":  {},
+					},
+				},
+			},
+		},
+	}
+
+	allDependencies, err := assetsObj.getAllDependencies(logger)
+	require.NoError(t, err)
+
+	privateDependency := allDependencies["private.package"]
+	require.NotNil(t, privateDependency)
+	assert.Equal(t, []string{privateScope}, privateDependency.Scopes)
+	assert.NotEmpty(t, privateDependency.Checksum.Sha1)
+	assert.NotEmpty(t, privateDependency.Checksum.Sha256)
+	assert.NotEmpty(t, privateDependency.Checksum.Md5)
+
+	publicDependency := allDependencies["public.package"]
+	require.NotNil(t, publicDependency)
+	assert.Empty(t, publicDependency.Scopes)
+}
+
+func TestAssetsExtractorProjectVersion(t *testing.T) {
+	extractor := &assetsExtractor{assets: &assets{Project: project{Version: "2.3.4"}}}
+	assert.Equal(t, "2.3.4", extractor.ProjectVersion())
+}
 
 func TestJson(t *testing.T) {
 	content := []byte(`{

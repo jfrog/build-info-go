@@ -27,6 +27,10 @@ type Extractor interface {
 	DirectDependencies() ([]string, error)
 	// Dependencies relations map
 	ChildrenMap() (map[string][]string, error)
+	// ProjectVersion returns the project's own package version when the dependency source
+	// exposes it (project.assets.json), or an empty string when it is unavailable
+	// (e.g. legacy packages.config projects).
+	ProjectVersion() string
 
 	new(dependenciesSource string, log utils.Log) (Extractor, error)
 }

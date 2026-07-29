@@ -2,6 +2,8 @@ package nuget
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	buildinfosolution "github.com/jfrog/build-info-go/build/utils/dotnet/solution"
 	"github.com/jfrog/build-info-go/entities"
@@ -27,13 +29,40 @@ func NewNuGetFlexPack(config buildinfoflex.NuGetConfig, log utils.Log) (*NuGetFl
 	return &NuGetFlexPack{config: config, log: log}, nil
 }
 
-// CollectBuildInfo parses the solution/project in WorkingDirectory and returns a populated BuildInfo.
+// CollectBuildInfo parses the solution/project selected by TargetPath, or falls back to
+// WorkingDirectory when the native command did not receive an explicit target.
 func (n *NuGetFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entities.BuildInfo, error) {
-	sol, err := buildinfosolution.Load(n.config.WorkingDirectory, "", "", n.log)
+	workingDirectory := n.config.WorkingDirectory
+	targetPath := n.config.TargetPath
+	if targetPath != "" && !filepath.IsAbs(targetPath) {
+		targetPath = filepath.Join(workingDirectory, targetPath)
+	}
+
+	var (
+		sol buildinfosolution.Solution
+		err error
+	)
+	if strings.HasSuffix(strings.ToLower(filepath.Ext(targetPath)), "proj") {
+		sol, err = buildinfosolution.LoadProject(targetPath, n.log)
+	} else {
+		solutionFile := ""
+		if targetPath != "" {
+			if strings.EqualFold(filepath.Ext(targetPath), ".sln") {
+				workingDirectory = filepath.Dir(targetPath)
+				solutionFile = filepath.Base(targetPath)
+			} else {
+				workingDirectory = targetPath
+			}
+		}
+		sol, err = buildinfosolution.Load(workingDirectory, solutionFile, "", n.log)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("load NuGet solution: %w", err)
 	}
-	bi, err := sol.BuildInfo("", n.log)
+	// Honor the user-supplied --module override; when empty, default each module ID to the
+	// fixed "<Name>:<Version>" form (falling back to the project name when no version is
+	// available). BuildInfo's legacy project-name default is intentionally not used here.
+	bi, err := sol.BuildInfoWithNameVersionModuleId(n.config.Module, n.log)
 	if err != nil {
 		return nil, fmt.Errorf("collect NuGet build info: %w", err)
 	}

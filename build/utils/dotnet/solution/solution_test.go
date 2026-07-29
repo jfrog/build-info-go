@@ -412,3 +412,24 @@ func TestLoadMixed(t *testing.T) {
 		}
 	}
 }
+
+func TestGetNameVersionModuleId(t *testing.T) {
+	tests := []struct {
+		name             string
+		moduleOverride   string
+		projectName      string
+		projectVersion   string
+		expectedModuleID string
+	}{
+		{name: "name and version default", projectName: "My.Package", projectVersion: "1.2.3", expectedModuleID: "My.Package:1.2.3"},
+		{name: "module override wins", moduleOverride: "custom-module", projectName: "My.Package", projectVersion: "1.2.3", expectedModuleID: "custom-module"},
+		{name: "missing version falls back to name", projectName: "Legacy.Package", expectedModuleID: "Legacy.Package"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := getNameVersionModuleId(test.moduleOverride, test.projectName, test.projectVersion)
+			assert.Equal(t, test.expectedModuleID, actual)
+		})
+	}
+}

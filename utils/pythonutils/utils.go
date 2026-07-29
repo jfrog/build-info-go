@@ -18,7 +18,6 @@ const (
 	Pipenv PythonTool = "pipenv"
 	Poetry PythonTool = "poetry"
 	Twine  PythonTool = "twine"
-	UV     PythonTool = "uv"
 
 	startDownloadingPattern = `^\s*Downloading\s`
 	downloadingCaptureGroup = `[^\s]*`

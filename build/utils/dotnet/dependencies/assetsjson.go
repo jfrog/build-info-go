@@ -2,7 +2,6 @@ package dependencies
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -47,6 +46,11 @@ func (extractor *assetsExtractor) AllDependencies(log utils.Log) (map[string]*bu
 
 func (extractor *assetsExtractor) ChildrenMap() (map[string][]string, error) {
 	return extractor.assets.getChildrenMap(), nil
+}
+
+// ProjectVersion returns the project's own version as recorded in project.assets.json.
+func (extractor *assetsExtractor) ProjectVersion() string {
+	return extractor.assets.Project.Version
 }
 
 // Create new assets json extractor.
@@ -112,53 +116,82 @@ func (assets *assets) getDirectDependencies() []string {
 func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.Dependency, error) {
 	dependencies := map[string]*buildinfo.Dependency{}
 	packagesPath := assets.Project.Restore.PackagesPath
+	// project.assets.json is the source of truth for the dependency graph. Dependencies are
+	// recorded even when their .nupkg is absent from the local cache (e.g. a custom
+	// NUGET_PACKAGES path or the SDK fallback folder); checksums are added when the file is
+	// available. This prevents dependencies from being silently dropped (jfrog-cli#600, #1796).
+	privateDeps := assets.getPrivateDependencyNames()
 	for dependencyId, library := range assets.Libraries {
 		if library.Type == "project" {
 			continue
 		}
-		nupkgFileName, err := library.getNupkgFileName()
+		dependencyName := getDependencyName(dependencyId)
+		dependency := &buildinfo.Dependency{Id: getDependencyIdForBuildInfo(dependencyId)}
+
+		checksum, err := assets.dependencyChecksum(packagesPath, library, log)
 		if err != nil {
 			return nil, err
 		}
-		nupkgFilePath := filepath.Join(packagesPath, library.Path, nupkgFileName)
-		exists, err := utils.IsFileExists(nupkgFilePath, false)
-		if err != nil {
-			return nil, err
-		}
-		if !exists {
-			if assets.isPackagePartOfTargetDependencies(library.Path) {
-				log.Warn("The file", nupkgFilePath, "doesn't exist in the NuGet cache directory but it does exist as a target in the assets files."+absentNupkgWarnMsg)
-				continue
-			}
-			return nil, errors.New("The file " + nupkgFilePath + " doesn't exist in the NuGet cache directory.")
-		}
-		fileDetails, err := crypto.GetFileDetails(nupkgFilePath, true)
-		if err != nil {
-			return nil, err
+		if checksum != nil {
+			dependency.Checksum = *checksum
 		}
 
-		dependencyName := getDependencyName(dependencyId)
-		dependencies[dependencyName] = &buildinfo.Dependency{Id: getDependencyIdForBuildInfo(dependencyId), Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}}
+		// Map PrivateAssets=all references (suppressParent="all" in project.assets.json) to the
+		// "private" build-info scope.
+		if privateDeps[dependencyName] {
+			dependency.Scopes = []string{privateScope}
+		}
+
+		dependencies[dependencyName] = dependency
 	}
 
 	return dependencies, nil
 }
 
-// If the package is included in the targets section of the assets.json file,
-// then this is a .NET dependency that shouldn't be included in the build-info dependencies list
-// (it come with the SDK).
-// Those files are located in the following path: C:\Program Files\dotnet\sdk\NuGetFallbackFolder
-func (assets *assets) isPackagePartOfTargetDependencies(nugetPackageName string) bool {
-	for _, dependencies := range assets.Targets {
-		for dependencyId := range dependencies {
-			// The package names in the targets section of the assets.json file are
-			// case insensitive.
-			if strings.EqualFold(dependencyId, nugetPackageName) {
-				return true
+const privateScope = "private"
+
+// dependencyChecksum computes the SHA1/SHA256/MD5 for a library's .nupkg when it exists in the
+// local cache. It returns nil (without error) when the package file cannot be located, so the
+// dependency is still recorded from project.assets.json but without checksums.
+func (assets *assets) dependencyChecksum(packagesPath string, library library, log utils.Log) (*buildinfo.Checksum, error) {
+	nupkgFileName, err := library.getNupkgFileName()
+	if err != nil {
+		// The library entry does not reference a .nupkg file name; record without checksums.
+		log.Debug("Could not determine nupkg file name for", library.Path, "-", err.Error())
+		return nil, nil
+	}
+	nupkgFilePath := filepath.Join(packagesPath, library.Path, nupkgFileName)
+	exists, err := utils.IsFileExists(nupkgFilePath, false)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		log.Warn("The file", nupkgFilePath, "doesn't exist in the NuGet cache directory."+absentNupkgWarnMsg)
+		return nil, nil
+	}
+	fileDetails, err := crypto.GetFileDetails(nupkgFilePath, true)
+	if err != nil {
+		return nil, err
+	}
+	return &buildinfo.Checksum{
+		Sha1:   fileDetails.Checksum.Sha1,
+		Sha256: fileDetails.Checksum.Sha256,
+		Md5:    fileDetails.Checksum.Md5,
+	}, nil
+}
+
+// getPrivateDependencyNames returns the set of direct dependency names that are declared with
+// PrivateAssets=all, recorded as suppressParent="All" on the framework dependency entries.
+func (assets *assets) getPrivateDependencyNames() map[string]bool {
+	private := map[string]bool{}
+	for _, framework := range assets.Project.Frameworks {
+		for name, dep := range framework.Dependencies {
+			if strings.EqualFold(dep.SuppressParent, "all") {
+				private[strings.ToLower(name)] = true
 			}
 		}
 	}
-	return false
+	return private
 }
 
 // Dependencies-id in assets is built in form of: <package-name>/<version>.
@@ -215,4 +248,7 @@ type framework struct {
 type dependency struct {
 	Target  string `json:"target"`
 	Version string `json:"version,omitempty"`
+	// SuppressParent is set to "All" in project.assets.json when the PackageReference uses
+	// PrivateAssets=all; it is mapped to the "private" build-info dependency scope.
+	SuppressParent string `json:"suppressParent,omitempty"`
 }

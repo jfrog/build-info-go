@@ -19,6 +19,11 @@ import (
 
 type Solution interface {
 	BuildInfo(module string, log utils.Log) (*buildinfo.BuildInfo, error)
+	// BuildInfoWithNameVersionModuleId behaves like BuildInfo but, when no module override is
+	// given, defaults each module ID to the fixed "<Name>:<Version>" form using the project's
+	// own version (from project.assets.json). Used by the FlexPack path; BuildInfo retains the
+	// legacy project-name default to avoid changing existing 'jf rt nuget/dotnet' build-info.
+	BuildInfoWithNameVersionModuleId(module string, log utils.Log) (*buildinfo.BuildInfo, error)
 	Marshal() ([]byte, error)
 	GetProjects() []project.Project
 	GetDependenciesSources() []string
@@ -42,6 +47,22 @@ func Load(path, slnFile, excludePattern string, log utils.Log) (Solution, error)
 	return solution, err
 }
 
+// LoadProject loads only the explicitly selected project, rather than discovering every
+// solution or project below its directory.
+func LoadProject(projectFilePath string, log utils.Log) (Solution, error) {
+	projectDirectory := filepath.Dir(projectFilePath)
+	projectName := strings.TrimSuffix(filepath.Base(projectFilePath), filepath.Ext(projectFilePath))
+	solution := &solution{path: projectDirectory}
+	selectedProjects := []project.Project{project.CreateProject(projectName, projectDirectory)}
+	if err := solution.getDependenciesSources(selectedProjects); err != nil {
+		return solution, err
+	}
+	if err := solution.loadProjects(selectedProjects, log); err != nil {
+		return solution, err
+	}
+	return solution, nil
+}
+
 type solution struct {
 	path string
 	// If there are more than one sln files in the directory,
@@ -52,6 +73,16 @@ type solution struct {
 }
 
 func (solution *solution) BuildInfo(moduleName string, log utils.Log) (*buildinfo.BuildInfo, error) {
+	return solution.buildInfo(moduleName, false, log)
+}
+
+// BuildInfoWithNameVersionModuleId builds build-info using the fixed "<Name>:<Version>" module
+// ID default (see the Solution interface documentation).
+func (solution *solution) BuildInfoWithNameVersionModuleId(moduleName string, log utils.Log) (*buildinfo.BuildInfo, error) {
+	return solution.buildInfo(moduleName, true, log)
+}
+
+func (solution *solution) buildInfo(moduleName string, useNameVersionModuleId bool, log utils.Log) (*buildinfo.BuildInfo, error) {
 	build := &buildinfo.BuildInfo{}
 	var modules []buildinfo.Module
 	for _, currProject := range solution.projects {
@@ -70,7 +101,11 @@ func (solution *solution) BuildInfo(moduleName string, log utils.Log) (*buildinf
 		}
 
 		// Create module
-		module := buildinfo.Module{Id: getModuleId(moduleName, currProject.Name()), Type: buildinfo.Nuget}
+		moduleID := getModuleId(moduleName, currProject.Name())
+		if useNameVersionModuleId {
+			moduleID = getNameVersionModuleId(moduleName, currProject.Name(), projectVersion(currProject))
+		}
+		module := buildinfo.Module{Id: moduleID, Type: buildinfo.Nuget}
 
 		// Populate requestedBy field
 		// Seed all direct dependencies with the module path
@@ -117,6 +152,28 @@ func getModuleId(customModuleID, projectName string) string {
 		return customModuleID
 	}
 	return projectName
+}
+
+// getNameVersionModuleId returns the module ID as the fixed "<Name>:<Version>" form. It falls
+// back to the project name when the version is unavailable (e.g. legacy packages.config
+// projects), and always yields to a user-supplied module override.
+func getNameVersionModuleId(customModuleID, projectName, projectVersion string) string {
+	if customModuleID != "" {
+		return customModuleID
+	}
+	if projectVersion != "" {
+		return projectName + ":" + projectVersion
+	}
+	return projectName
+}
+
+// projectVersion safely returns the project's own version via its dependency extractor,
+// or an empty string when no extractor/version is available.
+func projectVersion(currProject project.Project) string {
+	if extractor := currProject.Extractor(); extractor != nil {
+		return extractor.ProjectVersion()
+	}
+	return ""
 }
 
 // Populate requested by field for the input dependencies.
