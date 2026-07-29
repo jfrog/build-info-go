@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +22,7 @@ const (
 	classworldsConfFileName         = "classworlds.conf"
 	PropertiesTempFolderName        = "properties"
 	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
-	MavenExtractorDependencyVersion = "2.43.6"
+	MavenExtractorDependencyVersion = "2.43.9"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -374,7 +375,11 @@ func (config *mvnRunConfig) runCmd() (err error) {
 
 // To always have color in Maven's output, add "-Dstyle.color=always" to the command line arguments
 func addColorToCmdOutput(command *exec.Cmd) {
-	if term.IsTerminal(int(os.Stderr.Fd())) {
+	fd := os.Stderr.Fd()
+	if fd > math.MaxInt {
+		return
+	}
+	if term.IsTerminal(int(fd)) {
 		shouldAddColor := true
 		for _, arg := range command.Args {
 			if strings.Contains(arg, "-Dstyle.color") {

@@ -18,6 +18,9 @@ func TestGetYarnDependencyKeyFromLocator(t *testing.T) {
 		{"@babel/highlight@npm:7.14.0", "@babel/highlight@npm:7.14.0"},
 		{"fsevents@patch:fsevents@npm%3A2.3.2#builtin<compat/fsevents>::version=2.3.2&hash=11e9ea", "fsevents@patch:fsevents@npm%3A2.3.2#builtin<compat/fsevents>::version=2.3.2&hash=11e9ea"},
 		{"follow-redirects@virtual:c192f6b3b32cd5d11a443145a3883a70c04cbd7c813b53085dbaf50263735f1162f10fdbddd53c24e162ec3bc#npm:1.14.1", "follow-redirects@npm:1.14.1"},
+		// Yarn Berry patch: protocol combined with a virtual package produces a locator with two '#' delimiters.
+		// Only the virtual hash segment (up to the first '#') must be stripped; the rest is the actual map key.
+		{"mobx-react@virtual:abc123def456#patch:mobx-react@npm:6.3.1#./patches/mobx-react.patch", "mobx-react@patch:mobx-react@npm:6.3.1#./patches/mobx-react.patch"},
 	}
 
 	for _, testCase := range testCases {
@@ -235,4 +238,71 @@ func TestSplitNameAndVersion(t *testing.T) {
 	incorrectFormatPackageName := "json:1.2.3"
 	_, _, err := splitNameAndVersion(incorrectFormatPackageName)
 	assert.Error(t, err)
+}
+
+func TestIsYarnWorkspaceProject(t *testing.T) {
+	executablePath, err := GetYarnExecutable()
+	assert.NoError(t, err)
+
+	testDataPath := filepath.Join("..", "testdata", "yarn")
+
+	// v2 project is a plain (non-workspace) project — expects false.
+	nonWorkspacePath := filepath.Join(testDataPath, "v2", "project")
+	isWorkspace, err := IsYarnWorkspaceProject(executablePath, nonWorkspacePath)
+	assert.NoError(t, err)
+	assert.False(t, isWorkspace, "plain yarn project should not be detected as workspace")
+}
+
+func TestExtractLocatorProtocol(t *testing.T) {
+	testCases := []struct {
+		locator          string
+		expectedProtocol string
+	}{
+		{"xml@npm:1.0.1", "npm"},
+		{"pkg-a@workspace:packages/pkg-a", "workspace"},
+		{"@scope/pkg@workspace:.", "workspace"},
+		{"local-lib@link:./local-lib", "link"},
+		{"filelib@file:./filelib.tgz", "file"},
+		{"portallib@portal:./portallib", "portal"},
+		{"left-pad@patch:left-pad@npm%3A1.3.0#./patch.patch", "patch"},
+		{"left-pad@https://github.com/stevemao/left-pad.git#commit=abc", "https"},
+		{"left-pad@git+https://github.com/stevemao/left-pad.git#commit=abc", "git+https"},
+	}
+	for _, tc := range testCases {
+		assert.Equal(t, tc.expectedProtocol, extractLocatorProtocol(tc.locator), "locator: %s", tc.locator)
+	}
+}
+
+func TestIsWorkspaceLocator(t *testing.T) {
+	assert.True(t, IsWorkspaceLocator("pkg-a@workspace:packages/pkg-a"))
+	assert.True(t, IsWorkspaceLocator("@scope/pkg@workspace:."))
+	assert.True(t, IsWorkspaceLocator("root@workspace:."))
+	assert.False(t, IsWorkspaceLocator("xml@npm:1.0.1"))
+	assert.False(t, IsWorkspaceLocator("local-lib@link:./local-lib"))
+	assert.False(t, IsWorkspaceLocator(""))
+	assert.False(t, IsWorkspaceLocator("x"))
+}
+
+func TestIsNonRegistryLocator(t *testing.T) {
+	registryCases := []string{
+		"xml@npm:1.0.1",
+		"@babel/highlight@npm:7.14.0",
+	}
+	for _, l := range registryCases {
+		assert.False(t, IsNonRegistryLocator(l), "expected registry: %s", l)
+	}
+
+	nonRegistryCases := []string{
+		"pkg-a@workspace:packages/pkg-a",
+		"local-lib@link:./local-lib",
+		"filelib@file:./filelib.tgz",
+		"portallib@portal:./portallib",
+		"left-pad@patch:left-pad@npm%3A1.3.0#./p.patch",
+		"left-pad@git+https://github.com/stevemao/left-pad.git#commit=abc",
+		"pkg@git+ssh://github.com/org/repo",
+		"left-pad@https://github.com/stevemao/left-pad.git#commit=abc",
+	}
+	for _, l := range nonRegistryCases {
+		assert.True(t, IsNonRegistryLocator(l), "expected non-registry: %s", l)
+	}
 }

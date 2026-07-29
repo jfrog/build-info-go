@@ -1,0 +1,34 @@
+name: 'Setup Go Workspace'
+description: 'Initializes Go workspace for Unix and Windows to use local module overrides'
+
+inputs:
+  os_name:
+    description: 'The operating system name (ubuntu or windows)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Go workspace (Unix)
+      if: inputs.os_name == 'ubuntu'
+      shell: bash
+      run: |
+        go work init
+        go work use .
+        go work use ./jfrog-cli
+        [ -d "./jfrog-cli-artifactory" ] && go work use ./jfrog-cli-artifactory || true
+        [ -d "./jfrog-cli-core" ] && go work use ./jfrog-cli-core || true
+        [ -d "./jfrog-client-go" ] && go work use ./jfrog-client-go || true
+        cat go.work
+
+    - name: Setup Go workspace (Windows)
+      if: inputs.os_name == 'windows'
+      shell: pwsh
+      run: |
+        go work init
+        go work use .
+        go work use ./jfrog-cli
+        if (Test-Path "./jfrog-cli-artifactory") { go work use ./jfrog-cli-artifactory }
+        if (Test-Path "./jfrog-cli-core") { go work use ./jfrog-cli-core }
+        if (Test-Path "./jfrog-client-go") { go work use ./jfrog-client-go }
+        Get-Content go.work

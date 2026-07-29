@@ -105,12 +105,20 @@ func GetYarnExecutable() (string, error) {
 // log - The logger.
 // allowPartialResults - If true, the function will allow some errors to occur without failing the flow and will generate partial results.
 func GetYarnDependencies(executablePath, srcPath string, packageInfo *PackageInfo, log utils.Log, allowPartialResults bool) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
-	executableVersionStr, err := GetVersion(executablePath, srcPath)
-	if err != nil {
-		return
+	return GetYarnDependenciesWithVersion(executablePath, srcPath, packageInfo, "", log, allowPartialResults)
+}
+
+// GetYarnDependenciesWithVersion is the same as GetYarnDependencies but accepts a pre-fetched
+// yarn version string to avoid re-running 'yarn --version'. Pass an empty string to fetch it.
+func GetYarnDependenciesWithVersion(executablePath, srcPath string, packageInfo *PackageInfo, yarnVersion string, log utils.Log, allowPartialResults bool) (dependenciesMap map[string]*YarnDependency, root *YarnDependency, err error) {
+	if yarnVersion == "" {
+		yarnVersion, err = GetVersion(executablePath, srcPath)
+		if err != nil {
+			return
+		}
 	}
 
-	isV2AndAbove := version.NewVersion(executableVersionStr).Compare(yarnV2Version) <= 0
+	isV2AndAbove := version.NewVersion(yarnVersion).Compare(yarnV2Version) <= 0
 
 	// Run 'yarn info or list'
 	responseStr, errStr, err := runYarnInfoOrList(executablePath, srcPath, isV2AndAbove)
@@ -264,6 +272,29 @@ func buildYarnV2DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 }
 
 // Depending on the Yarn version currently in use for the project, this function runs the command that retrieves the project's dependencies
+// IsYarnWorkspaceProject returns true when the project at srcPath is a yarn workspace
+// (monorepo). It runs `yarn workspaces list --json` and checks whether the output
+// contains more than one entry — a workspace project always lists the root plus at
+// least one member, while a plain project lists only the root.
+// Only meaningful for yarn v2+; v1 does not support the command.
+func IsYarnWorkspaceProject(executablePath, srcPath string) (bool, error) {
+	command := exec.Command(executablePath, "workspaces", "list", "--json")
+	command.Dir = srcPath
+	var outBuffer, errBuffer bytes.Buffer
+	command.Stdout = &outBuffer
+	command.Stderr = &errBuffer
+	if err := command.Run(); err != nil {
+		stderr := strings.TrimSpace(errBuffer.String())
+		if stderr != "" {
+			return false, fmt.Errorf("failed to run 'yarn workspaces list': %w\nstderr: %s", err, stderr)
+		}
+		return false, fmt.Errorf("failed to run 'yarn workspaces list': %w", err)
+	}
+	output := strings.TrimSpace(outBuffer.String())
+	lines := strings.Split(output, "\n")
+	return len(lines) > 1, nil
+}
+
 func runYarnInfoOrList(executablePath string, srcPath string, v2AndAbove bool) (outResult, errResult string, err error) {
 	var command *exec.Cmd
 	if v2AndAbove {
@@ -294,14 +325,24 @@ func runYarnInfoOrList(executablePath string, srcPath string, v2AndAbove bool) (
 // Yarn dependency locator usually looks like this: package-name@npm:1.2.3, which is used as the key in the dependencies map.
 // But sometimes it points to a virtual package, so it looks different: package-name@virtual:[ID of virtual package]#npm:1.2.3.
 // In this case we need to omit the part of the virtual package ID, to get the key as it is found in the dependencies map.
+// When the patch: protocol is also involved, the locator may contain multiple '#' delimiters, e.g.:
+// pkg@virtual:HASH#patch:pkg@npm:1.0.0#./patches/pkg.patch
+// We must strip only up to the FIRST '#' after '@virtual:' to preserve the full protocol+path suffix as the map key.
 func GetYarnDependencyKeyFromLocator(yarnDepLocator string) string {
 	virtualIndex := strings.Index(yarnDepLocator, "@virtual:")
 	if virtualIndex == -1 {
 		return yarnDepLocator
 	}
 
-	hashSignIndex := strings.LastIndex(yarnDepLocator, "#")
-	return yarnDepLocator[:virtualIndex+1] + yarnDepLocator[hashSignIndex+1:]
+	// Search for the first '#' starting from the '@virtual:' segment, not the last '#' in the whole string.
+	// Using LastIndex breaks locators that use the patch: protocol, which itself contains a '#' separator
+	// (e.g. pkg@virtual:HASH#patch:pkg@npm:1.0.0#./file.patch → last '#' points to './file.patch', not 'patch:…').
+	virtualSegment := yarnDepLocator[virtualIndex:]
+	firstHashIndex := strings.Index(virtualSegment, "#")
+	if firstHashIndex == -1 {
+		return yarnDepLocator
+	}
+	return yarnDepLocator[:virtualIndex+1] + virtualSegment[firstHashIndex+1:]
 }
 
 // buildYarn1Root builds the root of the project's dependency tree (from direct dependencies in package.json)
@@ -399,4 +440,54 @@ type YarnDepDetails struct {
 type YarnDependencyPointer struct {
 	Descriptor string `json:"descriptor,omitempty"`
 	Locator    string `json:"locator,omitempty"`
+}
+
+// extractLocatorProtocol returns the protocol portion of a yarn locator, e.g. "npm",
+// "workspace", "link", "file", "portal", "patch", "git+https", "https".
+// Locator format: <name>@<protocol>:<rest>  (scoped: @scope/name@<protocol>:<rest>)
+func extractLocatorProtocol(locator string) string {
+	if len(locator) < 2 {
+		return ""
+	}
+	// skip leading '@' for scoped packages — find second '@'
+	atIdx := strings.Index(locator[1:], "@")
+	if atIdx < 0 {
+		return ""
+	}
+	after := locator[atIdx+2:] // everything after the version-separator '@'
+	colonIdx := strings.Index(after, ":")
+	if colonIdx < 0 {
+		return after
+	}
+	return after[:colonIdx]
+}
+
+// IsWorkspaceLocator reports whether locator points to a local yarn workspace member.
+func IsWorkspaceLocator(locator string) bool {
+	return extractLocatorProtocol(locator) == "workspace"
+}
+
+// nonRegistryProtocols lists yarn locator protocols that resolve from local disk or
+// VCS rather than an npm registry / Artifactory.
+var nonRegistryProtocols = map[string]bool{
+	"workspace": true,
+	"link":      true,
+	"file":      true,
+	"portal":    true,
+	"patch":     true,
+	"git+https": true,
+	"git+ssh":   true,
+	"https":     true, // raw URL dep
+}
+
+// IsNonRegistryLocator returns true when locator resolves from a source other than
+// an npm registry (e.g. local path, git, patch). Such deps have no Artifactory
+// checksum and should be excluded from build-info emission.
+func IsNonRegistryLocator(locator string) bool {
+	return nonRegistryProtocols[extractLocatorProtocol(locator)]
+}
+
+// ExtractLocatorProtocol is the exported form for use in log messages.
+func ExtractLocatorProtocol(locator string) string {
+	return extractLocatorProtocol(locator)
 }

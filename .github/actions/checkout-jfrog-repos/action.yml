@@ -1,0 +1,43 @@
+name: 'Checkout JFrog Repositories'
+description: 'Checkout jfrog-cli and optional dependency repositories. build-info-go stays at root.'
+
+inputs:
+  deps:
+    description: >-
+      JSON object produced by the detect-deps tool, holding every repo/ref override
+      (e.g. {"jfrog_cli_repo":"...","jfrog_cli_ref":"...", ...}).
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout jfrog-cli
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ fromJson(inputs.deps).jfrog_cli_repo != '' && fromJson(inputs.deps).jfrog_cli_repo || 'jfrog/jfrog-cli' }}
+        ref: ${{ fromJson(inputs.deps).jfrog_cli_ref != '' && fromJson(inputs.deps).jfrog_cli_ref || 'master' }}
+        path: jfrog-cli
+
+    - name: Checkout jfrog-cli-artifactory
+      if: fromJson(inputs.deps).jfrog_cli_artifactory_repo != ''
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ fromJson(inputs.deps).jfrog_cli_artifactory_repo }}
+        ref: ${{ fromJson(inputs.deps).jfrog_cli_artifactory_ref }}
+        path: jfrog-cli-artifactory
+
+    - name: Checkout jfrog-client-go
+      if: fromJson(inputs.deps).jfrog_client_go_repo != ''
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ fromJson(inputs.deps).jfrog_client_go_repo }}
+        ref: ${{ fromJson(inputs.deps).jfrog_client_go_ref }}
+        path: jfrog-client-go
+
+    - name: Checkout jfrog-cli-core
+      if: fromJson(inputs.deps).jfrog_cli_core_repo != ''
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ fromJson(inputs.deps).jfrog_cli_core_repo }}
+        ref: ${{ fromJson(inputs.deps).jfrog_cli_core_ref }}
+        path: jfrog-cli-core

@@ -151,22 +151,22 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 
 	runTest := func() [][]string {
 		dependencies := map[string]*buildinfo.Dependency{
-			"depa": {Id: "depA:1"},
-			"depb": {Id: "depB:1"},
-			"depc": {Id: "depC:1"},
-			"depd": {Id: "depD:1"},
+			"depa:1": {Id: "depA:1"},
+			"depb:1": {Id: "depB:1"},
+			"depc:1": {Id: "depC:1"},
+			"depd:1": {Id: "depD:1"},
 		}
 
 		// depA and depB are direct deps, both depend on depC
 		// depC depends on depD
-		directDependencies := []string{"depb", "depa"}
+		directDependencies := []string{"depb:1", "depa:1"}
 		sort.Strings(directDependencies)
 
 		childrenMap := map[string][]string{
-			"depa": {"depc"},
-			"depb": {"depc"},
-			"depc": {"depd"},
-			"depd": {},
+			"depa:1": {"depc:1"},
+			"depb:1": {"depc:1"},
+			"depc:1": {"depd:1"},
+			"depd:1": {},
 		}
 		for key, children := range childrenMap {
 			sort.Strings(children)
@@ -182,7 +182,7 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 		}
 
 		// Sort the results for comparison
-		result := dependencies["depd"].RequestedBy
+		result := dependencies["depd:1"].RequestedBy
 		sortRequestedByPaths(result)
 		return result
 	}
@@ -200,6 +200,27 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 		{"depC:1", "depB:1", "TestModule"},
 	}
 	assert.Equal(t, expected, firstResult)
+}
+
+func TestPopulateRequestedByLegacyNameOnlyFallback(t *testing.T) {
+	// packagesExtractor (packages.config) keys childrenMap by name only, not name:version.
+	// populateRequestedBy must fall back to a name-only lookup when the name:version key
+	// is absent, so that legacy projects still get correct RequestedBy paths.
+	dependencies := map[string]*buildinfo.Dependency{
+		"newtonsoft.json:9.0.1": {Id: "Newtonsoft.Json:9.0.1"},
+		"log4net:2.0.8":         {Id: "log4net:2.0.8"},
+	}
+
+	// packages.config extractor produces name-only children map keys
+	childrenMap := map[string][]string{
+		"newtonsoft.json": {"log4net:2.0.8"},
+	}
+
+	dependencies["newtonsoft.json:9.0.1"].RequestedBy = [][]string{{"TestModule"}}
+	populateRequestedBy(*dependencies["newtonsoft.json:9.0.1"], dependencies, childrenMap)
+
+	require.Len(t, dependencies["log4net:2.0.8"].RequestedBy, 1)
+	assert.Equal(t, []string{"Newtonsoft.Json:9.0.1", "TestModule"}, dependencies["log4net:2.0.8"].RequestedBy[0])
 }
 
 func TestEmptySolution(t *testing.T) {
@@ -401,12 +422,12 @@ func TestLoadMixed(t *testing.T) {
 			assert.Equal(t, filepath.Join(wd, "tmp", "multi", "multi"), project.RootPath())
 			direct, err := project.Extractor().DirectDependencies()
 			require.NoError(t, err)
-			assert.ElementsMatch(t, []string{"newtonsoft.json"}, direct)
+			assert.ElementsMatch(t, []string{"newtonsoft.json:9.0.1"}, direct)
 		case "core":
 			assert.Equal(t, filepath.Join(wd, "tmp", "multi", "core"), project.RootPath())
 			direct, err := project.Extractor().DirectDependencies()
 			require.NoError(t, err)
-			assert.ElementsMatch(t, []string{"newtonsoft.json"}, direct)
+			assert.ElementsMatch(t, []string{"newtonsoft.json:9.0.1"}, direct)
 		default:
 			t.Errorf("Unexpected project name: %s", project.Name())
 		}

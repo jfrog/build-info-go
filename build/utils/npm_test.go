@@ -427,6 +427,69 @@ func TestGetConfigCacheNpmIntegration(t *testing.T) {
 	assert.Equal(t, filepath.Join(cachePath, "_cacache"), configCache)
 }
 
+// TestCalculateNpmDependenciesListWithoutDependencies is a regression test for the bug
+// where 'jf npm ci' fails on a project with no dependencies because npm never creates
+// the '_cacache' directory under the npm cache path.
+//
+// Scenario reproduced:
+//   - package.json declares zero dependencies/devDependencies.
+//   - npm cache is pointed at a fresh empty directory (simulates a clean CI workspace,
+//     e.g. a Jenkins agent that wipes the workspace between builds).
+//   - 'npm install --package-lock-only' generates package-lock.json (a real-world
+//     precondition for 'npm ci') but does NOT create '_cacache' because no tarballs
+//     are fetched.
+//
+// Before the fix, CalculateNpmDependenciesList returned the error:
+//
+//	"_cacache folder is not found in '<cache>/_cacache'. Hint: Delete node_modules
+//	 directory and run npm install or npm ci."
+//
+// After the fix it returns no error and an empty dependency list.
+func TestCalculateNpmDependenciesListWithoutDependencies(t *testing.T) {
+	tempDir, cleanup := tests.CreateTempDirWithCallbackAndAssert(t)
+	defer cleanup()
+
+	packageJSON := []byte(`{
+  "name": "no-deps-project",
+  "version": "1.0.0",
+  "dependencies": {},
+  "devDependencies": {}
+}`)
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "package.json"), packageJSON, 0600))
+
+	// Point npm at an empty cache dir inside the project to simulate a fresh CI workspace.
+	cachePath := filepath.Join(tempDir, "tmpcache")
+	npmArgs := []string{"--cache=" + cachePath}
+
+	// Generate package-lock.json (required by 'npm ci' in real-world usage) without
+	// installing any tarballs. With modern npm this leaves _cacache absent; older npm
+	// (e.g. npm v6 bundled with Node 14) creates _cacache eagerly even on a no-op
+	// install. We force the "missing _cacache" state below to make the test
+	// deterministic across npm versions and to faithfully reproduce a fresh CI
+	// workspace (e.g. a Jenkins agent that wipes node_modules + the npm cache).
+	installArgs := append([]string{"--package-lock-only"}, npmArgs...)
+	_, _, err := RunNpmCmd("npm", tempDir, AppendNpmCommand(installArgs, "install"), logger)
+	require.NoError(t, err)
+
+	cacachePath := filepath.Join(cachePath, "_cacache")
+	if exists, err := utils.IsDirExists(cacachePath, false); err == nil && exists {
+		require.NoError(t, os.RemoveAll(cacachePath))
+	}
+
+	// Post-condition: _cacache must be absent. This is the precondition for the
+	// regression scenario; if it ever fails, the test would silently stop
+	// exercising the new guard, so fail loudly instead.
+	cacacheExists, err := utils.IsDirExists(cacachePath, false)
+	require.NoError(t, err)
+	require.Falsef(t, cacacheExists, "could not remove _cacache at %q; regression test would not exercise the fixed code path", cacachePath)
+
+	// The actual regression check.
+	dependencies, err := CalculateNpmDependenciesList("npm", tempDir, "no-deps-project",
+		NpmTreeDepListParam{Args: npmArgs}, true, logger)
+	assert.NoError(t, err)
+	assert.Empty(t, dependencies)
+}
+
 // This function executes Ci, then validate generating dependencies in two possible scenarios:
 // 1. node_module exists in the project.
 // 2. node_module doesn't exist in the project and generating dependencies needs package-lock.

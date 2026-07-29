@@ -84,16 +84,77 @@ func TestGitHubActionsProvider_GetVcsInfo(t *testing.T) {
 		name       string
 		owner      string
 		repository string
+		serverURL  string
+		sha        string
+		ref        string
+		headRef    string
 		expected   CIVcsInfo
 	}{
 		{
-			name:       "Standard org/repo format",
+			name:       "Standard org/repo format with url revision branch",
 			owner:      "jfrog",
 			repository: "jfrog/jfrog-client-go",
+			serverURL:  "https://github.com",
+			sha:        "abc123",
+			ref:        "refs/heads/main",
 			expected: CIVcsInfo{
 				Provider: GitHubProviderName,
 				Org:      "jfrog",
 				Repo:     "jfrog-client-go",
+				Url:      "https://github.com/jfrog/jfrog-client-go",
+				Revision: "abc123",
+				Branch:   "main",
+			},
+		},
+		{
+			name:       "Pull request event - GITHUB_HEAD_REF takes precedence",
+			owner:      "jfrog",
+			repository: "jfrog/jfrog-client-go",
+			serverURL:  "https://github.com",
+			sha:        "def456",
+			ref:        "refs/pull/42/merge",
+			headRef:    "feature-branch-1",
+			expected: CIVcsInfo{
+				Provider: GitHubProviderName,
+				Org:      "jfrog",
+				Repo:     "jfrog-client-go",
+				Url:      "https://github.com/jfrog/jfrog-client-go",
+				Revision: "def456",
+				Branch:   "feature-branch-1",
+			},
+		},
+		{
+			name:       "Push event - no GITHUB_HEAD_REF falls back to GITHUB_REF",
+			owner:      "jfrog",
+			repository: "jfrog/jfrog-client-go",
+			serverURL:  "https://github.com",
+			sha:        "abc123",
+			ref:        "refs/heads/develop",
+			headRef:    "",
+			expected: CIVcsInfo{
+				Provider: GitHubProviderName,
+				Org:      "jfrog",
+				Repo:     "jfrog-client-go",
+				Url:      "https://github.com/jfrog/jfrog-client-go",
+				Revision: "abc123",
+				Branch:   "develop",
+			},
+		},
+		{
+			name:       "Tag event - no GITHUB_HEAD_REF uses raw ref",
+			owner:      "jfrog",
+			repository: "jfrog/jfrog-client-go",
+			serverURL:  "https://github.com",
+			sha:        "abc123",
+			ref:        "refs/tags/v1.0.0",
+			headRef:    "",
+			expected: CIVcsInfo{
+				Provider: GitHubProviderName,
+				Org:      "jfrog",
+				Repo:     "jfrog-client-go",
+				Url:      "https://github.com/jfrog/jfrog-client-go",
+				Revision: "abc123",
+				Branch:   "refs/tags/v1.0.0",
 			},
 		},
 		{
@@ -132,10 +193,34 @@ func TestGitHubActionsProvider_GetVcsInfo(t *testing.T) {
 				unsetEnvForTest(t, GitHubRepositoryEnvVar)
 			}
 
+			if tt.serverURL != "" {
+				setEnvForTest(t, GitHubServerURLEnvVar, tt.serverURL)
+			} else {
+				unsetEnvForTest(t, GitHubServerURLEnvVar)
+			}
+			if tt.sha != "" {
+				setEnvForTest(t, GitHubSHAEnvVar, tt.sha)
+			} else {
+				unsetEnvForTest(t, GitHubSHAEnvVar)
+			}
+			if tt.ref != "" {
+				setEnvForTest(t, GitHubRefEnvVar, tt.ref)
+			} else {
+				unsetEnvForTest(t, GitHubRefEnvVar)
+			}
+			if tt.headRef != "" {
+				setEnvForTest(t, GitHubHeadRefEnvVar, tt.headRef)
+			} else {
+				unsetEnvForTest(t, GitHubHeadRefEnvVar)
+			}
+
 			info := provider.GetVcsInfo()
 			assert.Equal(t, tt.expected.Provider, info.Provider)
 			assert.Equal(t, tt.expected.Org, info.Org)
 			assert.Equal(t, tt.expected.Repo, info.Repo)
+			assert.Equal(t, tt.expected.Url, info.Url)
+			assert.Equal(t, tt.expected.Revision, info.Revision)
+			assert.Equal(t, tt.expected.Branch, info.Branch)
 		})
 	}
 }
@@ -148,6 +233,11 @@ func TestGitHubActionsIntegration(t *testing.T) {
 	setEnvForTest(t, GitHubRunIDEnvVar, "123456")
 	setEnvForTest(t, GitHubRepositoryOwnerEnvVar, "jfrog")
 	setEnvForTest(t, GitHubRepositoryEnvVar, "jfrog/jfrog-client-go")
+	setEnvForTest(t, GitHubServerURLEnvVar, "https://github.com")
+	setEnvForTest(t, GitHubSHAEnvVar, "abc123def")
+	setEnvForTest(t, GitHubRefEnvVar, "refs/heads/main")
+	// Ensure GITHUB_HEAD_REF is not set (simulating a push event, not PR)
+	unsetEnvForTest(t, GitHubHeadRefEnvVar)
 
 	// Should detect GitHub Actions
 	assert.True(t, IsRunningInCI())
@@ -160,4 +250,7 @@ func TestGitHubActionsIntegration(t *testing.T) {
 	assert.Equal(t, "github", info.Provider)
 	assert.Equal(t, "jfrog", info.Org)
 	assert.Equal(t, "jfrog-client-go", info.Repo)
+	assert.Equal(t, "https://github.com/jfrog/jfrog-client-go", info.Url)
+	assert.Equal(t, "abc123def", info.Revision)
+	assert.Equal(t, "main", info.Branch)
 }

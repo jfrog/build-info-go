@@ -14,6 +14,7 @@ import (
 	ioutils "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/gofrog/log"
 
+	"github.com/jfrog/build-info-go/utils/cienv"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 
 	"github.com/jfrog/build-info-go/entities"
@@ -291,7 +292,16 @@ func (b *Build) createBuildInfoFromPartials() (*entities.BuildInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	buildInfo.Started = buildGeneralDetails.Timestamp.Format(entities.TimeFormat)
+	startTime := buildGeneralDetails.Timestamp
+	buildInfo.Started = startTime.Format(entities.TimeFormat)
+	// Record build duration only when running in a CI environment. Duration is measured from the
+	// build's start (recorded by the first build command) until now - the moment the build-info is
+	// assembled for publishing.
+	if cienv.IsCIRunning() && !startTime.IsZero() {
+		if duration := time.Since(startTime).Milliseconds(); duration > 0 {
+			buildInfo.DurationMillis = duration
+		}
+	}
 	modules, env, vcsList, issues, err := extractBuildInfoData(partials)
 	if err != nil {
 		return nil, err
@@ -314,6 +324,7 @@ func (b *Build) createBuildInfoFromPartials() (*entities.BuildInfo, error) {
 	}
 	return buildInfo, nil
 }
+
 
 func (b *Build) readPartialBuildInfoFiles() (entities.Partials, error) {
 	var partials entities.Partials

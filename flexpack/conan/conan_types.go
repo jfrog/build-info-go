@@ -4,11 +4,17 @@ package conan
 
 // ConanConfig represents configuration for Conan FlexPack
 type ConanConfig struct {
-	WorkingDirectory string
-	ConanExecutable  string
-	Profile          string
-	Settings         map[string]string
-	Options          map[string]string
+	WorkingDirectory       string
+	RecipeFilePath         string // Optional absolute path to the directory or file containing the conanfile (.py/.txt). When empty, WorkingDirectory is used.
+	ConanExecutable        string
+	Profile                string
+	Settings               map[string]string
+	Options                map[string]string
+	ProjectNameOverride    string   // Optional override for project name
+	ProjectVersionOverride string   // Optional override for project version
+	UserOverride           string   // Optional override for user
+	ChannelOverride        string   // Optional override for channel
+	ConanArgs              []string // Original Conan CLI args (needed for --requires/--tool-requires when no conanfile exists)
 }
 
 // ConanGraphOutput represents the output of 'conan graph info --format=json'
@@ -74,4 +80,3 @@ type ConanInspectOutput struct {
 	User    string `json:"user"`
 	Channel string `json:"channel"`
 }
-

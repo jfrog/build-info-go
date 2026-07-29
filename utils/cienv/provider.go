@@ -33,8 +33,8 @@ const (
 )
 
 // CIVcsInfo contains VCS information extracted from CI environment variables.
-// This is used to populate vcs.provider, vcs.org, and vcs.repo properties
-// on uploaded artifacts and in build info.
+// This is used to populate vcs.provider, vcs.org, vcs.repo, vcs.url, vcs.revision,
+// and vcs.branch properties on uploaded artifacts and in build info.
 type CIVcsInfo struct {
 	// Provider is the VCS provider name (e.g., "github", "gitlab", "bitbucket")
 	Provider string
@@ -42,6 +42,12 @@ type CIVcsInfo struct {
 	Org string
 	// Repo is the repository name (without the org prefix)
 	Repo string
+	// Url is the repository URL (server_url + repo)
+	Url string
+	// Revision is the commit SHA
+	Revision string
+	// Branch is the branch name
+	Branch string
 }
 
 // IsEmpty returns true if no VCS info was detected

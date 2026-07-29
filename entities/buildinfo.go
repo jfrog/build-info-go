@@ -46,21 +46,24 @@ const (
 	Terraform ModuleType = "terraform"
 	Helm      ModuleType = "helm"
 	Conan     ModuleType = "conan"
+	Nix       ModuleType = "nix"
+	Uv        ModuleType = "uv"
 )
 
 type BuildInfo struct {
-	Name          string   `json:"name,omitempty"`
-	Number        string   `json:"number,omitempty"`
-	Agent         *Agent   `json:"agent,omitempty"`
-	BuildAgent    *Agent   `json:"buildAgent,omitempty"`
-	Modules       []Module `json:"modules,omitempty"`
-	Started       string   `json:"started,omitempty"`
-	Properties    Env      `json:"properties,omitempty"`
-	Principal     string   `json:"artifactoryPrincipal,omitempty"`
-	BuildUrl      string   `json:"url,omitempty"`
-	Issues        *Issues  `json:"issues,omitempty"`
-	PluginVersion string   `json:"artifactoryPluginVersion,omitempty"`
-	VcsList       []Vcs    `json:"vcs,omitempty"`
+	Name           string   `json:"name,omitempty"`
+	Number         string   `json:"number,omitempty"`
+	Agent          *Agent   `json:"agent,omitempty"`
+	BuildAgent     *Agent   `json:"buildAgent,omitempty"`
+	Modules        []Module `json:"modules,omitempty"`
+	Started        string   `json:"started,omitempty"`
+	DurationMillis int64    `json:"durationMillis,omitempty"`
+	Properties     Env      `json:"properties,omitempty"`
+	Principal      string   `json:"artifactoryPrincipal,omitempty"`
+	BuildUrl       string   `json:"url,omitempty"`
+	Issues         *Issues  `json:"issues,omitempty"`
+	PluginVersion  string   `json:"artifactoryPluginVersion,omitempty"`
+	VcsList        []Vcs    `json:"vcs,omitempty"`
 }
 
 func New() *BuildInfo {
@@ -270,9 +273,14 @@ func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
 	for _, newArtifact := range *mergeArtifacts {
 		exists := false
 
-		// PRIORITY 1: Check SHA1 - if checksums match, artifact already exists (skip it)
-		for _, existingArtifact := range *intoArtifacts {
+		// PRIORITY 1: Check SHA1 - if checksums match, prefer the artifact with a real path.
+		// path="." means the artifact was recorded locally before upload; a non-"." path
+		// means it was confirmed in Artifactory. Always keep the richer entry.
+		for i, existingArtifact := range *intoArtifacts {
 			if newArtifact.Sha1 == existingArtifact.Sha1 {
+				if existingArtifact.Path == "." && newArtifact.Path != "." {
+					(*intoArtifacts)[i] = newArtifact
+				}
 				exists = true
 				break
 			}
