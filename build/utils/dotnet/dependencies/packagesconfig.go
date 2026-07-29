@@ -104,7 +104,11 @@ func (extractor *packagesExtractor) extract(packagesConfig *packagesConfig, glob
 			extractor.allDependencies[id] = pack.dependency
 			extractor.childrenMap[id] = pack.getDependencies()
 		} else {
+			// project.assets.json-based projects are recorded even when the nupkg is absent from
+			// the local cache (see getAllDependencies); packages.config projects must not be
+			// dropped either, or the dependency silently disappears from the build info.
 			log.Warn(fmt.Sprintf("The following NuGet package %s with version %s was not found in the NuGet cache %s."+absentNupkgWarnMsg, nuget.Id, nuget.Version, globalPackagesCache))
+			extractor.allDependencies[id] = &buildinfo.Dependency{Id: nuget.Id + ":" + nuget.Version, Scopes: developmentDependencyScope(nuget)}
 		}
 	}
 	return nil
@@ -223,7 +227,11 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	if err != nil {
 		return nil, err
 	}
-	nPackage.dependency = &buildinfo.Dependency{Id: nuget.Id + ":" + nuget.Version, Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}}
+	nPackage.dependency = &buildinfo.Dependency{
+		Id:       nuget.Id + ":" + nuget.Version,
+		Scopes:   developmentDependencyScope(nuget),
+		Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Sha256: fileDetails.Checksum.Sha256, Md5: fileDetails.Checksum.Md5},
+	}
 
 	// Nuspec file that holds the metadata for the package.
 	nuspecPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, "nuspec"}, "."))
@@ -303,6 +311,19 @@ type packagesConfig struct {
 type xmlPackage struct {
 	Id      string `xml:"id,attr"`
 	Version string `xml:"version,attr"`
+	// DevelopmentDependency mirrors PackageReference's PrivateAssets="all": the package is a
+	// build-time-only dependency (e.g. an analyzer) that should not flow to consumers.
+	DevelopmentDependency string `xml:"developmentDependency,attr"`
+}
+
+// developmentDependencyScope maps packages.config's developmentDependency="true" attribute to
+// the "private" build-info dependency scope, mirroring project.assets.json's PrivateAssets=all
+// handling in getPrivateDependencyNames.
+func developmentDependencyScope(nuget xmlPackage) []string {
+	if strings.EqualFold(nuget.DevelopmentDependency, "true") {
+		return []string{privateScope}
+	}
+	return nil
 }
 
 type nuspec struct {

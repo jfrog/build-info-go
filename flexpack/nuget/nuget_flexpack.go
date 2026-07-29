@@ -47,7 +47,8 @@ func (n *NuGetFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entiti
 	} else {
 		solutionFile := ""
 		if targetPath != "" {
-			if strings.EqualFold(filepath.Ext(targetPath), ".sln") {
+			ext := filepath.Ext(targetPath)
+			if strings.EqualFold(ext, ".sln") || strings.EqualFold(ext, ".slnx") {
 				workingDirectory = filepath.Dir(targetPath)
 				solutionFile = filepath.Base(targetPath)
 			} else {

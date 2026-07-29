@@ -44,8 +44,11 @@ func isPackageFile(name string) bool {
 }
 
 // newArtifactFromFile builds an entities.Artifact for a local NuGet package file,
-// computing checksums and deriving its normalized-layout deployment path
-// "<id>/<version>/<file>". The artifact type is set to "nupkg" or "snupkg".
+// computing checksums and deriving its deployment path. Artifactory's NuGet push API
+// (used by both "dotnet nuget push" and "nuget push") always stores the package flat at
+// the repository root as "<file>", regardless of the NuGet client protocol version used
+// for restore; there is no "<id>/<version>/<file>" subfolder layout to account for.
+// The artifact type is set to "nupkg" or "snupkg".
 func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 	name := filepath.Base(fullPath)
 	artifactType := packageArtifactType(name)
@@ -56,15 +59,10 @@ func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 	if err != nil {
 		return entities.Artifact{}, fmt.Errorf("compute checksum for %s: %w", name, err)
 	}
-	pkgID, version := parseNupkgFilename(name)
-	path := name
-	if pkgID != "" && version != "" {
-		path = pkgID + "/" + version + "/" + name
-	}
 	return entities.Artifact{
 		Name:                   name,
 		Type:                   artifactType,
-		Path:                   path,
+		Path:                   name,
 		OriginalDeploymentRepo: repoName,
 		Checksum: entities.Checksum{
 			Sha1:   details.Checksum.Sha1,

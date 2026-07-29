@@ -2,6 +2,7 @@ package solution
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"os"
@@ -51,9 +52,8 @@ func Load(path, slnFile, excludePattern string, log utils.Log) (Solution, error)
 // solution or project below its directory.
 func LoadProject(projectFilePath string, log utils.Log) (Solution, error) {
 	projectDirectory := filepath.Dir(projectFilePath)
-	projectName := strings.TrimSuffix(filepath.Base(projectFilePath), filepath.Ext(projectFilePath))
 	solution := &solution{path: projectDirectory}
-	selectedProjects := []project.Project{project.CreateProject(projectName, projectDirectory)}
+	selectedProjects := []project.Project{project.CreateProject(projectFilePath)}
 	if err := solution.getDependenciesSources(selectedProjects); err != nil {
 		return solution, err
 	}
@@ -103,7 +103,10 @@ func (solution *solution) buildInfo(moduleName string, useNameVersionModuleId bo
 		// Create module
 		moduleID := getModuleId(moduleName, currProject.Name())
 		if useNameVersionModuleId {
-			moduleID = getNameVersionModuleId(moduleName, currProject.Name(), projectVersion(currProject))
+			// Use PackageID rather than Name: it's what pack/push embed in the produced .nupkg's
+			// file name, so restore's module here matches the module pack/push produce later for
+			// the same project instead of splitting into two disconnected modules.
+			moduleID = getNameVersionModuleId(moduleName, currProject.PackageID(), projectVersion(currProject))
 		}
 		module := buildinfo.Module{Id: moduleID, Type: buildinfo.Nuget}
 
@@ -154,17 +157,17 @@ func getModuleId(customModuleID, projectName string) string {
 	return projectName
 }
 
-// getNameVersionModuleId returns the module ID as the fixed "<Name>:<Version>" form. It falls
-// back to the project name when the version is unavailable (e.g. legacy packages.config
+// getNameVersionModuleId returns the module ID as the fixed "<PackageID>:<Version>" form. It
+// falls back to the bare packageID when the version is unavailable (e.g. legacy packages.config
 // projects), and always yields to a user-supplied module override.
-func getNameVersionModuleId(customModuleID, projectName, projectVersion string) string {
+func getNameVersionModuleId(customModuleID, packageID, projectVersion string) string {
 	if customModuleID != "" {
 		return customModuleID
 	}
 	if projectVersion != "" {
-		return projectName + ":" + projectVersion
+		return packageID + ":" + projectVersion
 	}
-	return projectName
+	return packageID
 }
 
 // projectVersion safely returns the project's own version via its dependency extractor,
@@ -259,17 +262,129 @@ func (solution *solution) DependenciesSourcesAndProjectsPathExist() bool {
 }
 
 func (solution *solution) getProjectsListFromSlns(excludePattern string, log utils.Log) ([]project.Project, error) {
+	// Resolve modern '.slnx' solutions (XML format) independently of classic '.sln' ones: the two
+	// use unrelated file formats and are handled by separate parsers below.
+	slnxProjects, err := solution.getProjectsFromSlnx(excludePattern, log)
+	if err != nil {
+		return nil, err
+	}
+
 	slnProjects, err := solution.getProjectsFromSlns()
 	if err != nil {
 		return nil, err
 	}
-	if slnProjects != nil {
-		if len(excludePattern) > 0 {
-			log.Debug(fmt.Sprintf("Testing to exclude projects by pattern: %s", excludePattern))
-		}
-		return solution.parseProjectsFromSolutionFile(slnProjects, excludePattern, log)
+	if slnProjects == nil {
+		// No classic '.sln' file was found/provided.
+		return slnxProjects, nil
 	}
-	return nil, nil
+	if len(excludePattern) > 0 {
+		log.Debug(fmt.Sprintf("Testing to exclude projects by pattern: %s", excludePattern))
+	}
+	classicProjects, err := solution.parseProjectsFromSolutionFile(slnProjects, excludePattern, log)
+	if err != nil {
+		return nil, err
+	}
+	if slnxProjects == nil {
+		return classicProjects, nil
+	}
+	return append(slnxProjects, classicProjects...), nil
+}
+
+// getProjectsFromSlnx discovers '.slnx' files (the modern XML solution format, the default
+// produced by 'dotnet new sln' on recent SDKs) and resolves their referenced projects, applying
+// the same exclude-pattern and '.*proj' suffix filtering as the classic '.sln' path. Returns nil
+// (not an empty slice) when no '.slnx' file is found/given or none of its projects survive
+// filtering, matching getProjectsFromSlns's nil-signals-"none found" convention that callers rely
+// on to decide whether to fall back to single-directory project discovery.
+func (solution *solution) getProjectsFromSlnx(excludePattern string, log utils.Log) ([]project.Project, error) {
+	slnxFiles, err := solution.getSlnxFiles()
+	if err != nil {
+		return nil, err
+	}
+	if len(slnxFiles) == 0 {
+		return nil, nil
+	}
+	var projects []project.Project
+	for _, slnxFile := range slnxFiles {
+		relPaths, err := parseSlnxFile(slnxFile)
+		if err != nil {
+			return nil, err
+		}
+		for _, relPath := range relPaths {
+			projFilePath := filepath.Join(solution.path, filepath.FromSlash(relPath))
+			displayName := strings.TrimSuffix(filepath.Base(projFilePath), filepath.Ext(projFilePath))
+			if exclude, excludeErr := isProjectExcluded(projFilePath, excludePattern); excludeErr != nil {
+				log.Error(excludeErr)
+				continue
+			} else if exclude {
+				log.Debug(fmt.Sprintf("Skipping a project \"%s\", since the path '%s' is excluded", displayName, projFilePath))
+				continue
+			}
+			if !strings.HasSuffix(filepath.Ext(projFilePath), "proj") {
+				log.Debug(fmt.Sprintf("Skipping a project \"%s\", since it doesn't have a '.*proj' file path.", displayName))
+				continue
+			}
+			projects = append(projects, project.CreateProject(projFilePath))
+		}
+	}
+	return projects, nil
+}
+
+// getSlnxFiles mirrors getSlnFiles but discovers '.slnx' files instead of classic '.sln' ones.
+func (solution *solution) getSlnxFiles() (slnxFiles []string, err error) {
+	if solution.slnFile != "" {
+		if strings.EqualFold(filepath.Ext(solution.slnFile), ".slnx") {
+			slnxFiles = append(slnxFiles, filepath.Join(solution.path, solution.slnFile))
+		}
+		return
+	}
+	return utils.ListFilesByFilterFunc(solution.path, func(filePath string) (bool, error) {
+		return strings.EqualFold(filepath.Ext(filePath), ".slnx"), nil
+	})
+}
+
+// slnxDocument mirrors the '.slnx' XML schema's <Project Path="..."/> entries, including those
+// nested inside <Folder> elements used to organize the solution explorer view.
+type slnxDocument struct {
+	Projects []slnxProjectEntry `xml:"Project"`
+	Folders  []slnxFolder       `xml:"Folder"`
+}
+
+type slnxFolder struct {
+	Projects []slnxProjectEntry `xml:"Project"`
+	Folders  []slnxFolder       `xml:"Folder"`
+}
+
+type slnxProjectEntry struct {
+	Path string `xml:"Path,attr"`
+}
+
+// parseSlnxFile reads a '.slnx' solution file and returns the relative paths (using the '.slnx'
+// spec's own forward-slash convention) of every referenced project, including those nested
+// inside <Folder> elements.
+func parseSlnxFile(slnxPath string) ([]string, error) {
+	content, err := os.ReadFile(slnxPath)
+	if err != nil {
+		return nil, err
+	}
+	var doc slnxDocument
+	if err := xml.Unmarshal(content, &doc); err != nil {
+		return nil, err
+	}
+	var paths []string
+	collectSlnxProjectPaths(doc.Projects, doc.Folders, &paths)
+	return paths, nil
+}
+
+func collectSlnxProjectPaths(projects []slnxProjectEntry, folders []slnxFolder, out *[]string) {
+	for _, p := range projects {
+		if p.Path != "" {
+			*out = append(*out, p.Path)
+		}
+	}
+	for _, f := range folders {
+		collectSlnxProjectPaths(f.Projects, f.Folders, out)
+	}
 }
 
 func (solution *solution) loadProjects(slnProjects []project.Project, log utils.Log) error {
@@ -308,7 +423,7 @@ func (solution *solution) parseProjectsFromSolutionFile(slnProjects []string, ex
 			log.Debug(fmt.Sprintf("Skipping a project \"%s\", since it doesn't have a '.*proj' file path.", projectName))
 			continue
 		}
-		projects = append(projects, project.CreateProject(projectName, filepath.Dir(projFilePath)))
+		projects = append(projects, project.CreateProject(projFilePath))
 	}
 	return projects, nil
 }
@@ -330,9 +445,7 @@ func (solution *solution) loadSingleProjectFromDir(log utils.Log) error {
 	}
 
 	if len(projFiles) == 1 {
-		projectName := strings.TrimSuffix(filepath.Base(projFiles[0]), filepath.Ext(projFiles[0]))
-		projectDir := filepath.Dir(projFiles[0])
-		return solution.loadSingleProject(project.CreateProject(projectName, projectDir), log)
+		return solution.loadSingleProject(project.CreateProject(projFiles[0]), log)
 	}
 	log.Warn(fmt.Sprintf("expecting 1 'proj' file but fuond %d files in path: %s", len(projFiles), solution.path))
 	return nil

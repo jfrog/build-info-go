@@ -18,6 +18,70 @@ import (
 
 var logger = utils.NewDefaultLogger(utils.INFO)
 
+// TestParseSlnxFile verifies '.slnx' (the modern XML solution format) project references are
+// extracted correctly, including a project nested inside a <Folder> element.
+func TestParseSlnxFile(t *testing.T) {
+	dir := t.TempDir()
+	slnxPath := filepath.Join(dir, "Multi.slnx")
+	require.NoError(t, os.WriteFile(slnxPath, []byte(`<Solution>
+  <Project Path="ProjectA/ProjectA.csproj" />
+  <Folder Name="/Nested/">
+    <Project Path="ProjectB/ProjectB.csproj" />
+  </Folder>
+</Solution>`), 0o600))
+
+	paths, err := parseSlnxFile(slnxPath)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"ProjectA/ProjectA.csproj", "ProjectB/ProjectB.csproj"}, paths)
+}
+
+// TestGetProjectsFromSlnxOnly verifies that getProjectsListFromSlns resolves every project
+// referenced by a '.slnx' file into a distinct project.Project, instead of returning nil (which
+// would silently fall back to single-directory discovery and yield an empty build info — the
+// bug this covers) or flattening the solution's projects into one.
+func TestGetProjectsFromSlnxOnly(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "ProjectA"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "ProjectB"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ProjectA", "ProjectA.csproj"), []byte("<Project/>"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ProjectB", "ProjectB.csproj"), []byte("<Project/>"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Multi.slnx"), []byte(`<Solution>
+  <Project Path="ProjectA/ProjectA.csproj" />
+  <Project Path="ProjectB/ProjectB.csproj" />
+</Solution>`), 0o600))
+
+	sol := &solution{path: dir, slnFile: "Multi.slnx"}
+	projects, err := sol.getProjectsListFromSlns("", logger)
+	require.NoError(t, err)
+	require.Len(t, projects, 2)
+
+	var names []string
+	for _, p := range projects {
+		names = append(names, p.Name())
+	}
+	assert.ElementsMatch(t, []string{"ProjectA", "ProjectB"}, names)
+}
+
+// TestGetProjectsFromSlnxExcludePattern verifies the exclude pattern is honored for '.slnx'
+// projects, matching the classic '.sln' path's behavior.
+func TestGetProjectsFromSlnxExcludePattern(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "ProjectA"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "ProjectB"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ProjectA", "ProjectA.csproj"), []byte("<Project/>"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ProjectB", "ProjectB.csproj"), []byte("<Project/>"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Multi.slnx"), []byte(`<Solution>
+  <Project Path="ProjectA/ProjectA.csproj" />
+  <Project Path="ProjectB/ProjectB.csproj" />
+</Solution>`), 0o600))
+
+	sol := &solution{path: dir, slnFile: "Multi.slnx"}
+	projects, err := sol.getProjectsListFromSlns("ProjectB", logger)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	assert.Equal(t, "ProjectA", projects[0].Name())
+}
+
 func TestSortRequestedByPaths(t *testing.T) {
 	tests := []struct {
 		name     string
