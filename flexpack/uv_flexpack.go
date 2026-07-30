@@ -66,8 +66,9 @@ type UVDependencyEdge struct {
 // UVPyProjectToml reads only [project] (PEP 621) — UV format, not Poetry
 type UVPyProjectToml struct {
 	Project struct {
-		Name    string `toml:"name"`
-		Version string `toml:"version"`
+		Name    string   `toml:"name"`
+		Version string   `toml:"version"`
+		Dynamic []string `toml:"dynamic"`
 	} `toml:"project"`
 }
 
@@ -78,6 +79,7 @@ type UVFlexPack struct {
 	pyprojectData     *UVPyProjectToml
 	projectName       string
 	projectVersion    string
+	versionIsDynamic  bool // true when pyproject.toml declares `dynamic = ["version"]`
 	parsed            bool
 	dependencies      []DependencyInfo
 	depGraph          map[string][]string   // dep ID ("name:version") -> []dep IDs
@@ -97,6 +99,13 @@ func NewUVFlexPack(config UVConfig) (*UVFlexPack, error) {
 	}
 	if err := uf.loadUvLock(); err != nil {
 		log.Debug("Failed to load uv.lock, dependency collection will be empty: " + err.Error())
+	}
+	if uf.projectVersion == "" && uf.versionIsDynamic {
+		if resolved := uf.resolveDynamicVersion(); resolved != "" {
+			uf.projectVersion = resolved
+		} else {
+			return nil, fmt.Errorf("failed to load pyproject.toml: project declares dynamic = [\"version\"] but the resolved version could not be found in uv.lock (checked the workspace root package); make sure the project is locked via `uv lock`")
+		}
 	}
 	return uf, nil
 }
@@ -122,13 +131,42 @@ func (uf *UVFlexPack) loadPyProjectToml() error {
 	}
 	uf.projectName = uf.pyprojectData.Project.Name
 	uf.projectVersion = uf.pyprojectData.Project.Version
+	uf.versionIsDynamic = isVersionDynamic(uf.pyprojectData.Project.Dynamic)
 	if uf.projectName == "" {
 		return fmt.Errorf("project name not found in pyproject.toml (checked [project.name])")
 	}
-	if uf.projectVersion == "" {
+	// A dynamic version (PEP 621 `dynamic = ["version"]`, e.g. via hatch-vcs) is resolved
+	// later from uv.lock once it's loaded — see resolveDynamicVersion.
+	if uf.projectVersion == "" && !uf.versionIsDynamic {
 		return fmt.Errorf("project version not found in pyproject.toml (checked [project.version])")
 	}
 	return nil
+}
+
+// isVersionDynamic reports whether "version" appears in a PEP 621 [project.dynamic] list.
+func isVersionDynamic(dynamic []string) bool {
+	for _, field := range dynamic {
+		if field == "version" {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveDynamicVersion looks up the version uv resolved for the workspace root package
+// (source.virtual/editable/directory == ".") in the already-parsed uv.lock. uv resolves
+// dynamic versions (e.g. via hatch-vcs) at lock time, so the lock file's root entry carries
+// the real version even though pyproject.toml itself only declares `dynamic = ["version"]`.
+// Returns "" if uv.lock wasn't loaded or has no root package entry.
+func (uf *UVFlexPack) resolveDynamicVersion() string {
+	if uf.lockFileData == nil {
+		return ""
+	}
+	rootPkg := findRootPackage(uf.lockFileData.Packages)
+	if rootPkg == nil {
+		return ""
+	}
+	return rootPkg.Version
 }
 
 // loadUvLock reads and parses the lock file. Uses LockFilePath if set (for PEP 723

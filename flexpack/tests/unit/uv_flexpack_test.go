@@ -787,3 +787,95 @@ func TestUvErrorHandling(t *testing.T) {
 		}
 	})
 }
+
+// dynamicPyproject returns a pyproject.toml declaring `dynamic = ["version"]`,
+// e.g. as produced by hatch-vcs, with no static [project.version].
+func dynamicPyproject(name string) string {
+	return "[project]\nname = \"" + name + "\"\ndynamic = [\"version\"]\n" +
+		"[tool.hatch.version]\nsource = \"vcs\"\n"
+}
+
+func TestUvDynamicVersionResolvedFromLock(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject("my-app"),
+		"uv.lock":        minimalUvLock("my-app"),
+	})
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for dynamic version: %v", err)
+	}
+
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	if len(buildInfo.Modules) == 0 {
+		t.Fatal("Expected at least one module")
+	}
+	// minimalUvLock's root package entry is version "1.0.0" — that's what uv resolved
+	// the dynamic version to at lock time, so it must be reflected in the module ID.
+	if buildInfo.Modules[0].Id != "my-app:1.0.0" {
+		t.Errorf("Expected module ID 'my-app:1.0.0', got '%s'", buildInfo.Modules[0].Id)
+	}
+}
+
+func TestUvDynamicVersionErrors(t *testing.T) {
+	t.Run("dynamic version but no uv.lock", func(t *testing.T) {
+		tempDir := t.TempDir()
+		writeTempFiles(t, tempDir, map[string]string{
+			"pyproject.toml": dynamicPyproject("my-app"),
+		})
+
+		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+		if err == nil {
+			t.Fatal("Expected error when dynamic version can't be resolved without uv.lock")
+		}
+	})
+
+	t.Run("dynamic version but uv.lock has no root package entry", func(t *testing.T) {
+		tempDir := t.TempDir()
+		// A lock file with only a third-party dependency and no root ("virtual"/"editable"/
+		// "directory" == ".") entry — e.g. malformed or stale relative to pyproject.toml.
+		uvLockContent := `version = 1
+
+[[package]]
+name = "requests"
+version = "2.31.0"
+source = { registry = "https://pypi.org/simple" }
+`
+		writeTempFiles(t, tempDir, map[string]string{
+			"pyproject.toml": dynamicPyproject("my-app"),
+			"uv.lock":        uvLockContent,
+		})
+
+		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+		if err == nil {
+			t.Fatal("Expected error when uv.lock has no root package entry to resolve the dynamic version from")
+		}
+	})
+}
+
+func TestUvStaticVersionUnaffectedByDynamicField(t *testing.T) {
+	// A project that declares dynamic = ["version"] alongside dependency collection
+	// still using a plain static pyproject.toml (no dynamic field at all) must behave
+	// exactly as before: unchanged error and success paths.
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": minimalPyproject("my-app"),
+		"uv.lock":        minimalUvLock("my-app"),
+	})
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for static version: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	if buildInfo.Modules[0].Id != "my-app:1.0.0" {
+		t.Errorf("Expected module ID 'my-app:1.0.0', got '%s'", buildInfo.Modules[0].Id)
+	}
+}
