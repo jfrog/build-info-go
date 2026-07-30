@@ -795,7 +795,13 @@ func dynamicPyproject(name string) string {
 		"[tool.hatch.version]\nsource = \"vcs\"\n"
 }
 
-func TestUvDynamicVersionResolvedFromLock(t *testing.T) {
+// TestUvDynamicVersionResolvedFromLockFallback covers the (currently unobserved in real uv
+// output, but cheap and harmless to support) case where uv.lock's root package entry does
+// carry an explicit version. The realistic sources — dist/ artifacts and installed packages —
+// are covered by TestUvDynamicVersionResolvedFromDist and
+// TestUvDynamicVersionResolvedFromInstalledPackages below; real `uv lock` output was verified
+// to never populate a version on the root/editable [[package]] entry, static or dynamic.
+func TestUvDynamicVersionResolvedFromLockFallback(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTempFiles(t, tempDir, map[string]string{
 		"pyproject.toml": dynamicPyproject("my-app"),
@@ -814,15 +820,73 @@ func TestUvDynamicVersionResolvedFromLock(t *testing.T) {
 	if len(buildInfo.Modules) == 0 {
 		t.Fatal("Expected at least one module")
 	}
-	// minimalUvLock's root package entry is version "1.0.0" — that's what uv resolved
-	// the dynamic version to at lock time, so it must be reflected in the module ID.
 	if buildInfo.Modules[0].Id != "my-app:1.0.0" {
 		t.Errorf("Expected module ID 'my-app:1.0.0', got '%s'", buildInfo.Modules[0].Id)
 	}
 }
 
+// TestUvDynamicVersionResolvedFromDist covers `jf uv build`/`jf uv publish`: by the time
+// build-info collection runs for those commands, `uv build`/`uv publish` has already
+// succeeded, so dist/ is guaranteed to contain the built wheel/sdist whose filename encodes
+// the real backend-resolved version. This is the exact scenario from the reported bug
+// (jfrog/jfrog-cli#3624): a hatch-vcs project with no uv.lock root version at all.
+func TestUvDynamicVersionResolvedFromDist(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject("my-app"),
+	})
+	distDir := filepath.Join(tempDir, "dist")
+	if err := os.MkdirAll(distDir, 0755); err != nil {
+		t.Fatalf("Failed to create dist dir: %v", err)
+	}
+	// Real hatch-vcs-resolved version, e.g. a dev build a few commits past the last tag.
+	writeTempFiles(t, distDir, map[string]string{
+		"my_app-1.2.4.dev0+g6df800799.d20260730-py3-none-any.whl": "",
+		"my_app-1.2.4.dev0+g6df800799.d20260730.tar.gz":           "",
+	})
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for dynamic version resolved from dist/: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:1.2.4.dev0+g6df800799.d20260730"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
+	}
+}
+
+// TestUvDynamicVersionResolvedFromInstalledPackages covers `jf uv sync`/`add`/`install`/
+// `remove`: those commands install the project itself into the venv, and `uv pip list`
+// (already collected into UVConfig.InstalledPackages) reports its resolved version.
+func TestUvDynamicVersionResolvedFromInstalledPackages(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject("my-app"),
+	})
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
+		WorkingDirectory:  tempDir,
+		InstalledPackages: map[string]string{"my-app": "1.2.4.dev0+g6df800799.d20260730"},
+	})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for dynamic version resolved from installed packages: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:1.2.4.dev0+g6df800799.d20260730"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
+	}
+}
+
 func TestUvDynamicVersionErrors(t *testing.T) {
-	t.Run("dynamic version but no uv.lock", func(t *testing.T) {
+	t.Run("dynamic version but no uv.lock, dist/, or installed packages", func(t *testing.T) {
 		tempDir := t.TempDir()
 		writeTempFiles(t, tempDir, map[string]string{
 			"pyproject.toml": dynamicPyproject("my-app"),
@@ -830,7 +894,7 @@ func TestUvDynamicVersionErrors(t *testing.T) {
 
 		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 		if err == nil {
-			t.Fatal("Expected error when dynamic version can't be resolved without uv.lock")
+			t.Fatal("Expected error when dynamic version can't be resolved from any source")
 		}
 	})
 
@@ -853,6 +917,25 @@ source = { registry = "https://pypi.org/simple" }
 		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 		if err == nil {
 			t.Fatal("Expected error when uv.lock has no root package entry to resolve the dynamic version from")
+		}
+	})
+
+	t.Run("dynamic version but dist/ has only unrelated packages", func(t *testing.T) {
+		tempDir := t.TempDir()
+		writeTempFiles(t, tempDir, map[string]string{
+			"pyproject.toml": dynamicPyproject("my-app"),
+		})
+		distDir := filepath.Join(tempDir, "dist")
+		if err := os.MkdirAll(distDir, 0755); err != nil {
+			t.Fatalf("Failed to create dist dir: %v", err)
+		}
+		writeTempFiles(t, distDir, map[string]string{
+			"other_package-2.0.0-py3-none-any.whl": "",
+		})
+
+		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+		if err == nil {
+			t.Fatal("Expected error when dist/ contains no artifact matching this project's name")
 		}
 	})
 }

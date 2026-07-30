@@ -104,7 +104,7 @@ func NewUVFlexPack(config UVConfig) (*UVFlexPack, error) {
 		if resolved := uf.resolveDynamicVersion(); resolved != "" {
 			uf.projectVersion = resolved
 		} else {
-			return nil, fmt.Errorf("failed to load pyproject.toml: project declares dynamic = [\"version\"] but the resolved version could not be found in uv.lock (checked the workspace root package); make sure the project is locked via `uv lock`")
+			return nil, fmt.Errorf("failed to load pyproject.toml: project declares dynamic = [\"version\"] but the resolved version could not be found (checked uv.lock's workspace root package, installed packages, and dist/ artifacts); build or install the project first so the backend (e.g. hatch-vcs) can resolve it")
 		}
 	}
 	return uf, nil
@@ -153,20 +153,81 @@ func isVersionDynamic(dynamic []string) bool {
 	return false
 }
 
-// resolveDynamicVersion looks up the version uv resolved for the workspace root package
-// (source.virtual/editable/directory == ".") in the already-parsed uv.lock. uv resolves
-// dynamic versions (e.g. via hatch-vcs) at lock time, so the lock file's root entry carries
-// the real version even though pyproject.toml itself only declares `dynamic = ["version"]`.
-// Returns "" if uv.lock wasn't loaded or has no root package entry.
+// resolveDynamicVersion finds the backend-resolved version for a project whose
+// pyproject.toml only declares `dynamic = ["version"]` (e.g. via hatch-vcs). uv.lock's
+// workspace root package entry ([[package]] with source.virtual/editable/directory == ".")
+// does NOT carry a version field in practice — verified empirically against real `uv lock`
+// output, which omits it entirely for the root/editable entry regardless of a static or
+// dynamic pyproject.toml version. The real resolved version instead shows up in whichever
+// of these the current uv invocation already produced, checked in order:
+//  1. uv.lock's root package version, in case a future uv release (or another tool) does
+//     populate it — cheap to check, correct if present.
+//  2. UVConfig.InstalledPackages (populated from `uv pip list` for sync/install/add/remove),
+//     which includes the project's own resolved version once it's installed into the venv.
+//  3. dist/*.whl or dist/*.tar.gz filenames, which encode the resolved version and are
+//     guaranteed to exist by the time build-info collection runs for build/publish (both
+//     only reach this point after `uv build`/`uv publish` already succeeded).
+//
+// Returns "" if none of these have anything to offer.
 func (uf *UVFlexPack) resolveDynamicVersion() string {
-	if uf.lockFileData == nil {
+	if uf.lockFileData != nil {
+		if rootPkg := findRootPackage(uf.lockFileData.Packages); rootPkg != nil && rootPkg.Version != "" {
+			return rootPkg.Version
+		}
+	}
+	if uf.config.InstalledPackages != nil {
+		if version, ok := uf.config.InstalledPackages[normalizeName(uf.projectName)]; ok && version != "" {
+			return version
+		}
+	}
+	return uf.resolveVersionFromDist()
+}
+
+// distNameRe matches runs of the characters PEP 427/625 filename escaping collapses to "_".
+var distNameRe = regexp.MustCompile(`[-_.]+`)
+
+// escapeDistName mirrors the distribution-name escaping wheel/sdist filenames use
+// (packaging.utils.disk_filename-style): lowercase, with runs of -_. collapsed to a single "_".
+func escapeDistName(name string) string {
+	return distNameRe.ReplaceAllString(strings.ToLower(name), "_")
+}
+
+// resolveVersionFromDist scans WorkingDirectory/dist for a wheel or sdist filename
+// belonging to this project and extracts its version. Since the project name is already
+// known, the escaped-name prefix unambiguously bounds where the version substring starts,
+// avoiding the general "which hyphen is the name/version boundary" ambiguity of parsing
+// wheel/sdist filenames blind.
+func (uf *UVFlexPack) resolveVersionFromDist() string {
+	entries, err := os.ReadDir(filepath.Join(uf.config.WorkingDirectory, "dist"))
+	if err != nil {
 		return ""
 	}
-	rootPkg := findRootPackage(uf.lockFileData.Packages)
-	if rootPkg == nil {
-		return ""
+	prefix := escapeDistName(uf.projectName) + "-"
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		lower := strings.ToLower(entry.Name())
+		var stripped string
+		switch {
+		case strings.HasSuffix(lower, ".whl"):
+			stripped = strings.TrimSuffix(lower, ".whl")
+		case strings.HasSuffix(lower, ".tar.gz"):
+			stripped = strings.TrimSuffix(lower, ".tar.gz")
+		default:
+			continue
+		}
+		if !strings.HasPrefix(stripped, prefix) {
+			continue
+		}
+		// Wheel filenames continue with -{build tag}?-{python tag}-{abi tag}-{platform tag};
+		// sdist filenames end right after the version. Either way the version is the first
+		// "-"-delimited segment after the name prefix (PEP 440 versions never contain "-").
+		if version := strings.SplitN(stripped[len(prefix):], "-", 2)[0]; version != "" {
+			return version
+		}
 	}
-	return rootPkg.Version
+	return ""
 }
 
 // loadUvLock reads and parses the lock file. Uses LockFilePath if set (for PEP 723
