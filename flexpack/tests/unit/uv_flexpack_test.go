@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/jfrog/build-info-go/flexpack"
 )
@@ -885,20 +886,32 @@ func TestUvDynamicVersionResolvedFromInstalledPackages(t *testing.T) {
 	}
 }
 
-func TestUvDynamicVersionErrors(t *testing.T) {
-	t.Run("dynamic version but no uv.lock, dist/, or installed packages", func(t *testing.T) {
+// TestUvDynamicVersionFallsBackToEmptyVersion covers the case where a dynamic version can't
+// be resolved from any source at all. This must NOT fail collector construction — that would
+// throw away dependency and artifact collection too, just because one field is unknown. It
+// mirrors the existing PEP 723 inline-script tolerance (see loadPyProjectToml): an empty
+// version still produces a usable "name:" module ID.
+func TestUvDynamicVersionFallsBackToEmptyVersion(t *testing.T) {
+	t.Run("no uv.lock, dist/, or installed packages", func(t *testing.T) {
 		tempDir := t.TempDir()
 		writeTempFiles(t, tempDir, map[string]string{
 			"pyproject.toml": dynamicPyproject("my-app"),
 		})
 
-		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
-		if err == nil {
-			t.Fatal("Expected error when dynamic version can't be resolved from any source")
+		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+		if err != nil {
+			t.Fatalf("Expected constructor to succeed with an empty fallback version, got: %v", err)
+		}
+		buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+		if err != nil {
+			t.Fatalf("CollectBuildInfo failed: %v", err)
+		}
+		if want := "my-app:"; buildInfo.Modules[0].Id != want {
+			t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
 		}
 	})
 
-	t.Run("dynamic version but uv.lock has no root package entry", func(t *testing.T) {
+	t.Run("uv.lock has no root package entry", func(t *testing.T) {
 		tempDir := t.TempDir()
 		// A lock file with only a third-party dependency and no root ("virtual"/"editable"/
 		// "directory" == ".") entry — e.g. malformed or stale relative to pyproject.toml.
@@ -914,13 +927,20 @@ source = { registry = "https://pypi.org/simple" }
 			"uv.lock":        uvLockContent,
 		})
 
-		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
-		if err == nil {
-			t.Fatal("Expected error when uv.lock has no root package entry to resolve the dynamic version from")
+		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+		if err != nil {
+			t.Fatalf("Expected constructor to succeed with an empty fallback version, got: %v", err)
+		}
+		buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+		if err != nil {
+			t.Fatalf("CollectBuildInfo failed: %v", err)
+		}
+		if want := "my-app:"; buildInfo.Modules[0].Id != want {
+			t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
 		}
 	})
 
-	t.Run("dynamic version but dist/ has only unrelated packages", func(t *testing.T) {
+	t.Run("dist/ has only unrelated packages", func(t *testing.T) {
 		tempDir := t.TempDir()
 		writeTempFiles(t, tempDir, map[string]string{
 			"pyproject.toml": dynamicPyproject("my-app"),
@@ -933,11 +953,55 @@ source = { registry = "https://pypi.org/simple" }
 			"other_package-2.0.0-py3-none-any.whl": "",
 		})
 
-		_, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
-		if err == nil {
-			t.Fatal("Expected error when dist/ contains no artifact matching this project's name")
+		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+		if err != nil {
+			t.Fatalf("Expected constructor to succeed with an empty fallback version, got: %v", err)
+		}
+		buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+		if err != nil {
+			t.Fatalf("CollectBuildInfo failed: %v", err)
+		}
+		if want := "my-app:"; buildInfo.Modules[0].Id != want {
+			t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
 		}
 	})
+}
+
+// TestUvDynamicVersionResolvedFromDistPrefersNewestOnMismatch covers dist/ accumulating
+// artifacts across multiple builds (uv does not clean dist/ between `uv build` runs): a
+// stale wheel from an older version alongside a freshly built sdist for the current version.
+// The most recently modified matching file must win, not whichever os.ReadDir happens to
+// return first.
+func TestUvDynamicVersionResolvedFromDistPrefersNewestOnMismatch(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject("my-app"),
+	})
+	distDir := filepath.Join(tempDir, "dist")
+	if err := os.MkdirAll(distDir, 0755); err != nil {
+		t.Fatalf("Failed to create dist dir: %v", err)
+	}
+	writeTempFiles(t, distDir, map[string]string{
+		"my_app-1.2.3-py3-none-any.whl": "", // stale, from an earlier build
+		"my_app-1.2.4.dev0+abc.tar.gz":  "", // fresh, from the current build
+	})
+	staleTime := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(distDir, "my_app-1.2.3-py3-none-any.whl"), staleTime, staleTime); err != nil {
+		t.Fatalf("Failed to set stale mtime: %v", err)
+	}
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:1.2.4.dev0+abc"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected module ID %q (from the freshly built artifact), got %q", want, buildInfo.Modules[0].Id)
+	}
 }
 
 func TestUvStaticVersionUnaffectedByDynamicField(t *testing.T) {

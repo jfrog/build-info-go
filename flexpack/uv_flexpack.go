@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/jfrog/build-info-go/entities"
@@ -104,7 +105,12 @@ func NewUVFlexPack(config UVConfig) (*UVFlexPack, error) {
 		if resolved := uf.resolveDynamicVersion(); resolved != "" {
 			uf.projectVersion = resolved
 		} else {
-			return nil, fmt.Errorf("failed to load pyproject.toml: project declares dynamic = [\"version\"] but the resolved version could not be found (checked uv.lock's workspace root package, installed packages, and dist/ artifacts); build or install the project first so the backend (e.g. hatch-vcs) can resolve it")
+			// Same tolerance as the PEP 723 inline-script case above: an empty version
+			// still yields a usable "name:" module ID, and failing outright here would
+			// throw away dependency/artifact collection too, not just the version.
+			log.Warn("UV: project declares dynamic = [\"version\"] but the resolved version could not be found " +
+				"(checked uv.lock's workspace root package, installed packages, and dist/ artifacts); " +
+				"build info will use an empty version in the module ID")
 		}
 	}
 	return uf, nil
@@ -192,17 +198,24 @@ func escapeDistName(name string) string {
 	return distNameRe.ReplaceAllString(strings.ToLower(name), "_")
 }
 
-// resolveVersionFromDist scans WorkingDirectory/dist for a wheel or sdist filename
-// belonging to this project and extracts its version. Since the project name is already
-// known, the escaped-name prefix unambiguously bounds where the version substring starts,
-// avoiding the general "which hyphen is the name/version boundary" ambiguity of parsing
-// wheel/sdist filenames blind.
+// resolveVersionFromDist scans WorkingDirectory/dist for wheel/sdist filenames belonging to
+// this project and extracts the resolved version. Since the project name is already known,
+// the escaped-name prefix unambiguously bounds where the version substring starts, avoiding
+// the general "which hyphen is the name/version boundary" ambiguity of parsing wheel/sdist
+// filenames blind.
+//
+// A single `uv build` produces both a wheel and an sdist for the same version, but uv does
+// not clean dist/ between builds — it can accumulate artifacts from earlier versions too.
+// When matching filenames disagree on version, the most recently modified one wins, since
+// that's the artifact the build/publish invocation currently in progress just produced.
 func (uf *UVFlexPack) resolveVersionFromDist() string {
 	entries, err := os.ReadDir(filepath.Join(uf.config.WorkingDirectory, "dist"))
 	if err != nil {
 		return ""
 	}
 	prefix := escapeDistName(uf.projectName) + "-"
+	var bestVersion string
+	var bestModTime time.Time
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -223,11 +236,20 @@ func (uf *UVFlexPack) resolveVersionFromDist() string {
 		// Wheel filenames continue with -{build tag}?-{python tag}-{abi tag}-{platform tag};
 		// sdist filenames end right after the version. Either way the version is the first
 		// "-"-delimited segment after the name prefix (PEP 440 versions never contain "-").
-		if version := strings.SplitN(stripped[len(prefix):], "-", 2)[0]; version != "" {
-			return version
+		version := strings.SplitN(stripped[len(prefix):], "-", 2)[0]
+		if version == "" {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if bestVersion == "" || info.ModTime().After(bestModTime) {
+			bestVersion = version
+			bestModTime = info.ModTime()
 		}
 	}
-	return ""
+	return bestVersion
 }
 
 // loadUvLock reads and parses the lock file. Uses LockFilePath if set (for PEP 723
