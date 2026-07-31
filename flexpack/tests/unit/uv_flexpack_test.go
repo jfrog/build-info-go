@@ -1,6 +1,9 @@
 package unit
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,6 +44,55 @@ func writeTempFiles(t *testing.T, dir string, files map[string]string) {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
 			t.Fatalf("Failed to write %s: %v", name, err)
 		}
+	}
+}
+
+// writeTestWheel creates a minimal but real wheel (zip) at path containing just a
+// "{name}.dist-info/METADATA" entry, mirroring what a real build backend writes.
+func writeTestWheel(t *testing.T, path, name, version string) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	zw := zip.NewWriter(f)
+	w, err := zw.Create(name + ".dist-info/METADATA")
+	if err != nil {
+		t.Fatalf("Failed to add METADATA entry: %v", err)
+	}
+	if _, err := w.Write([]byte("Metadata-Version: 2.4\nName: " + name + "\nVersion: " + version + "\n\n")); err != nil {
+		t.Fatalf("Failed to write METADATA: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("Failed to close wheel zip: %v", err)
+	}
+}
+
+// writeTestSdist creates a minimal but real sdist (tar.gz) at path containing just a
+// top-level "PKG-INFO" file, mirroring what a real build backend writes.
+func writeTestSdist(t *testing.T, path, name, version string) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+	content := []byte("Metadata-Version: 2.4\nName: " + name + "\nVersion: " + version + "\n\n")
+	hdr := &tar.Header{Name: name + "-" + version + "/PKG-INFO", Mode: 0644, Size: int64(len(content))}
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatalf("Failed to write tar header: %v", err)
+	}
+	if _, err := tw.Write(content); err != nil {
+		t.Fatalf("Failed to write PKG-INFO: %v", err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("Failed to close tar writer: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("Failed to close gzip writer: %v", err)
 	}
 }
 
@@ -828,9 +880,10 @@ func TestUvDynamicVersionResolvedFromLockFallback(t *testing.T) {
 
 // TestUvDynamicVersionResolvedFromDist covers `jf uv build`/`jf uv publish`: by the time
 // build-info collection runs for those commands, `uv build`/`uv publish` has already
-// succeeded, so dist/ is guaranteed to contain the built wheel/sdist whose filename encodes
-// the real backend-resolved version. This is the exact scenario from the reported bug
-// (jfrog/jfrog-cli#3624): a hatch-vcs project with no uv.lock root version at all.
+// succeeded, so dist/ is guaranteed to contain a wheel/sdist whose embedded package metadata
+// (METADATA/PKG-INFO) records the real backend-resolved version. This is the exact scenario
+// from the reported bug (jfrog/jfrog-cli#3624): a hatch-vcs project with no uv.lock root
+// version at all.
 func TestUvDynamicVersionResolvedFromDist(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTempFiles(t, tempDir, map[string]string{
@@ -841,10 +894,9 @@ func TestUvDynamicVersionResolvedFromDist(t *testing.T) {
 		t.Fatalf("Failed to create dist dir: %v", err)
 	}
 	// Real hatch-vcs-resolved version, e.g. a dev build a few commits past the last tag.
-	writeTempFiles(t, distDir, map[string]string{
-		"my_app-1.2.4.dev0+g6df800799.d20260730-py3-none-any.whl": "",
-		"my_app-1.2.4.dev0+g6df800799.d20260730.tar.gz":           "",
-	})
+	const version = "1.2.4.dev0+g6df800799.d20260730"
+	writeTestWheel(t, filepath.Join(distDir, "my_app-"+version+"-py3-none-any.whl"), "my-app", version)
+	writeTestSdist(t, filepath.Join(distDir, "my_app-"+version+".tar.gz"), "my-app", version)
 
 	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 	if err != nil {
@@ -854,7 +906,7 @@ func TestUvDynamicVersionResolvedFromDist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CollectBuildInfo failed: %v", err)
 	}
-	want := "my-app:1.2.4.dev0+g6df800799.d20260730"
+	want := "my-app:" + version
 	if buildInfo.Modules[0].Id != want {
 		t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
 	}
@@ -949,9 +1001,9 @@ source = { registry = "https://pypi.org/simple" }
 		if err := os.MkdirAll(distDir, 0755); err != nil {
 			t.Fatalf("Failed to create dist dir: %v", err)
 		}
-		writeTempFiles(t, distDir, map[string]string{
-			"other_package-2.0.0-py3-none-any.whl": "",
-		})
+		// A real, valid wheel — just for a different package. Its Name field in METADATA
+		// must be checked against, not just its filename, or this would false-match.
+		writeTestWheel(t, filepath.Join(distDir, "other_package-2.0.0-py3-none-any.whl"), "other-package", "2.0.0")
 
 		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
 		if err != nil {
@@ -981,10 +1033,8 @@ func TestUvDynamicVersionResolvedFromDistPrefersNewestOnMismatch(t *testing.T) {
 	if err := os.MkdirAll(distDir, 0755); err != nil {
 		t.Fatalf("Failed to create dist dir: %v", err)
 	}
-	writeTempFiles(t, distDir, map[string]string{
-		"my_app-1.2.3-py3-none-any.whl": "", // stale, from an earlier build
-		"my_app-1.2.4.dev0+abc.tar.gz":  "", // fresh, from the current build
-	})
+	writeTestWheel(t, filepath.Join(distDir, "my_app-1.2.3-py3-none-any.whl"), "my-app", "1.2.3")         // stale, from an earlier build
+	writeTestSdist(t, filepath.Join(distDir, "my_app-1.2.4.dev0+abc.tar.gz"), "my-app", "1.2.4.dev0+abc") // fresh, from the current build
 	staleTime := time.Now().Add(-time.Hour)
 	if err := os.Chtimes(filepath.Join(distDir, "my_app-1.2.3-py3-none-any.whl"), staleTime, staleTime); err != nil {
 		t.Fatalf("Failed to set stale mtime: %v", err)
@@ -1001,6 +1051,37 @@ func TestUvDynamicVersionResolvedFromDistPrefersNewestOnMismatch(t *testing.T) {
 	want := "my-app:1.2.4.dev0+abc"
 	if buildInfo.Modules[0].Id != want {
 		t.Errorf("Expected module ID %q (from the freshly built artifact), got %q", want, buildInfo.Modules[0].Id)
+	}
+}
+
+// TestUvDynamicVersionSkipsUnreadableDistArchive covers a corrupt or partially-written
+// archive in dist/ (e.g. an interrupted build) sitting next to a good one — reading package
+// metadata must skip files it can't open rather than erroring the whole resolution.
+func TestUvDynamicVersionSkipsUnreadableDistArchive(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject("my-app"),
+	})
+	distDir := filepath.Join(tempDir, "dist")
+	if err := os.MkdirAll(distDir, 0755); err != nil {
+		t.Fatalf("Failed to create dist dir: %v", err)
+	}
+	writeTempFiles(t, distDir, map[string]string{
+		"my_app-1.2.3-py3-none-any.whl": "not a real zip file",
+	})
+	writeTestSdist(t, filepath.Join(distDir, "my_app-1.2.3.tar.gz"), "my-app", "1.2.3")
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:1.2.3"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected the valid sdist's version %q despite the corrupt wheel, got %q", want, buildInfo.Modules[0].Id)
 	}
 }
 

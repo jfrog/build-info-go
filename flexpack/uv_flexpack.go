@@ -1,7 +1,12 @@
 package flexpack
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bufio"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -189,55 +194,44 @@ func (uf *UVFlexPack) resolveDynamicVersion() string {
 	return uf.resolveVersionFromDist()
 }
 
-// distNameRe matches runs of the characters PEP 427/625 filename escaping collapses to "_".
-var distNameRe = regexp.MustCompile(`[-_.]+`)
-
-// escapeDistName mirrors the distribution-name escaping wheel/sdist filenames use
-// (packaging.utils.disk_filename-style): lowercase, with runs of -_. collapsed to a single "_".
-func escapeDistName(name string) string {
-	return distNameRe.ReplaceAllString(strings.ToLower(name), "_")
-}
-
-// resolveVersionFromDist scans WorkingDirectory/dist for wheel/sdist filenames belonging to
-// this project and extracts the resolved version. Since the project name is already known,
-// the escaped-name prefix unambiguously bounds where the version substring starts, avoiding
-// the general "which hyphen is the name/version boundary" ambiguity of parsing wheel/sdist
-// filenames blind.
+// resolveVersionFromDist scans WorkingDirectory/dist for wheel/sdist archives belonging to
+// this project and returns the resolved version. `uv version` refuses outright to report a
+// dynamic version under any circumstance (verified empirically: it errors even right after a
+// successful build or sync), so there's no CLI command to ask — but the build backend already
+// wrote the real, resolved version into the archive's own package metadata (wheel: a
+// `*.dist-info/METADATA` entry; sdist: a top-level `PKG-INFO` file), the same metadata that
+// would be published to the index. Reading that directly is strictly more reliable than
+// parsing it out of the filename: no PEP 427/625 name-escaping to get right, and the archive's
+// declared Name is checked against the project name instead of assumed from a prefix match.
 //
-// A single `uv build` produces both a wheel and an sdist for the same version, but uv does
-// not clean dist/ between builds — it can accumulate artifacts from earlier versions too.
-// When matching filenames disagree on version, the most recently modified one wins, since
-// that's the artifact the build/publish invocation currently in progress just produced.
+// A single `uv build` produces both a wheel and an sdist for the same version, but uv does not
+// clean dist/ between builds — it can accumulate archives from earlier versions too. When
+// matching archives disagree on version, the most recently modified one wins, since that's the
+// artifact the build/publish invocation currently in progress just produced.
 func (uf *UVFlexPack) resolveVersionFromDist() string {
 	entries, err := os.ReadDir(filepath.Join(uf.config.WorkingDirectory, "dist"))
 	if err != nil {
 		return ""
 	}
-	prefix := escapeDistName(uf.projectName) + "-"
+	wantName := normalizeName(uf.projectName)
 	var bestVersion string
 	var bestModTime time.Time
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
+		path := filepath.Join(uf.config.WorkingDirectory, "dist", entry.Name())
 		lower := strings.ToLower(entry.Name())
-		var stripped string
+		var name, version string
 		switch {
 		case strings.HasSuffix(lower, ".whl"):
-			stripped = strings.TrimSuffix(lower, ".whl")
+			name, version = readWheelMetadata(path)
 		case strings.HasSuffix(lower, ".tar.gz"):
-			stripped = strings.TrimSuffix(lower, ".tar.gz")
+			name, version = readSdistMetadata(path)
 		default:
 			continue
 		}
-		if !strings.HasPrefix(stripped, prefix) {
-			continue
-		}
-		// Wheel filenames continue with -{build tag}?-{python tag}-{abi tag}-{platform tag};
-		// sdist filenames end right after the version. Either way the version is the first
-		// "-"-delimited segment after the name prefix (PEP 440 versions never contain "-").
-		version := strings.SplitN(stripped[len(prefix):], "-", 2)[0]
-		if version == "" {
+		if version == "" || normalizeName(name) != wantName {
 			continue
 		}
 		info, err := entry.Info()
@@ -250,6 +244,78 @@ func (uf *UVFlexPack) resolveVersionFromDist() string {
 		}
 	}
 	return bestVersion
+}
+
+// readWheelMetadata extracts Name/Version from a wheel's `*.dist-info/METADATA` entry.
+// Returns ("", "") if the file can't be read as a wheel or has no readable metadata.
+func readWheelMetadata(path string) (name, version string) {
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		return "", ""
+	}
+	defer func() { _ = r.Close() }()
+	for _, f := range r.File {
+		if !strings.HasSuffix(f.Name, ".dist-info/METADATA") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return "", ""
+		}
+		defer func() { _ = rc.Close() }()
+		return parsePackageMetadata(rc)
+	}
+	return "", ""
+}
+
+// readSdistMetadata extracts Name/Version from an sdist's top-level `PKG-INFO` file.
+// Returns ("", "") if the file can't be read as a gzipped tarball or has no PKG-INFO.
+func readSdistMetadata(path string) (name, version string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", ""
+	}
+	defer func() { _ = f.Close() }()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return "", ""
+	}
+	defer func() { _ = gz.Close() }()
+	tr := tar.NewReader(gz)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			return "", ""
+		}
+		if err != nil {
+			return "", ""
+		}
+		// PKG-INFO sits directly under the single top-level "{name}-{version}/" directory.
+		if strings.HasSuffix(hdr.Name, "/PKG-INFO") || hdr.Name == "PKG-INFO" {
+			return parsePackageMetadata(tr)
+		}
+	}
+}
+
+// parsePackageMetadata reads Name/Version from a PEP 566 core-metadata document (email-header
+// style: "Key: value" lines followed by a blank line, then an optional free-text description).
+// Header parsing stops at the first blank line so header-like text inside the description
+// (e.g. a changelog entry starting with "Version:") is never mistaken for a real field.
+func parsePackageMetadata(r io.Reader) (name, version string) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			break
+		}
+		switch {
+		case name == "" && strings.HasPrefix(line, "Name:"):
+			name = strings.TrimSpace(strings.TrimPrefix(line, "Name:"))
+		case version == "" && strings.HasPrefix(line, "Version:"):
+			version = strings.TrimSpace(strings.TrimPrefix(line, "Version:"))
+		}
+	}
+	return name, version
 }
 
 // loadUvLock reads and parses the lock file. Uses LockFilePath if set (for PEP 723
