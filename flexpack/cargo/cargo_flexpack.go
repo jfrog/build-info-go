@@ -62,11 +62,18 @@ func moduleIdForMember(memberPkgId string) string {
 	return name + ":" + version
 }
 
-// buildModules assembles one build-info Module per workspace member — each carrying only the
-// dependencies that member pulls in (via depsForRoots) — mirroring the Maven/Gradle multi-module
-// layout. A single-crate project has exactly one workspace member, so it yields one module,
-// identical to the previous single-module behaviour. When metadata exposes no members at all,
-// it falls back to one module keyed by the resolve root (or "cargo-project").
+// buildModules assembles one build-info Module per workspace member that is actually part of
+// this build — each carrying only the dependencies that member pulls in (via depsForRoots) —
+// mirroring the Maven/Gradle multi-module layout. Selection precedence:
+//  1. cf.config.SelectedPackages (populated from the user's cargo -p/--package flags) — only
+//     those members are emitted, so `cargo build -p X --features Y` no longer lists sibling
+//     members that were not compiled.
+//  2. cargo metadata's workspace_default_members (cargo >= 1.71), which respects the crate's
+//     own [workspace.default-members] setting — same crates cargo would build by default.
+//  3. All workspace members (older cargo / no signal available).
+//
+// When metadata exposes no members at all, it falls back to one module keyed by the resolve root
+// (or "cargo-project").
 func (cf *CargoFlexPack) buildModules() []entities.Module {
 	if cf.meta == nil || len(cf.meta.WorkspaceMembers) == 0 {
 		return []entities.Module{{
@@ -75,7 +82,7 @@ func (cf *CargoFlexPack) buildModules() []entities.Module {
 			Dependencies: cf.dependencies,
 		}}
 	}
-	members := append([]string(nil), cf.meta.WorkspaceMembers...)
+	members := cf.compiledMembers()
 	sort.Strings(members) // stable module ordering across runs
 	modules := make([]entities.Module, 0, len(members))
 	for _, memberId := range members {
@@ -86,6 +93,36 @@ func (cf *CargoFlexPack) buildModules() []entities.Module {
 		})
 	}
 	return modules
+}
+
+// compiledMembers returns the workspace-member package ids the current build actually compiles.
+// Precedence matches buildModules' docstring. If SelectedPackages names something that isn't a
+// workspace member (e.g. user typo), it is silently dropped rather than returned as a phantom
+// module.
+func (cf *CargoFlexPack) compiledMembers() []string {
+	memberById := make(map[string]string, len(cf.meta.WorkspaceMembers))
+	for _, id := range cf.meta.WorkspaceMembers {
+		name, _, _ := parsePackageId(id)
+		memberById[name] = id
+	}
+	if len(cf.config.SelectedPackages) > 0 {
+		out := make([]string, 0, len(cf.config.SelectedPackages))
+		for _, name := range cf.config.SelectedPackages {
+			if id, ok := memberById[name]; ok {
+				out = append(out, id)
+			} else {
+				log.Debug("cargo: -p " + name + " does not match any workspace member; skipping")
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+		// Fall through: none matched — better to emit all members than an empty build-info.
+	}
+	if len(cf.meta.WorkspaceDefaultMembers) > 0 {
+		return append([]string(nil), cf.meta.WorkspaceDefaultMembers...)
+	}
+	return append([]string(nil), cf.meta.WorkspaceMembers...)
 }
 
 // buildInfoFromState assembles BuildInfo from already-collected metadata, one module per member.

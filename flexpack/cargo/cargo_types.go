@@ -10,6 +10,11 @@ type CargoConfig struct {
 	IncludeDevDependencies bool
 	// MetadataArgs are extra args appended to `cargo metadata` (already filtered to metadata-valid flags by the caller, e.g. --features/--all-features/--locked).
 	MetadataArgs []string
+	// SelectedPackages narrows build-info modules to just these workspace members (by their
+	// package name — no version). Populated by the CLI from user-supplied -p/--package flags on
+	// the underlying cargo command. When empty, cargo metadata's workspace_default_members is
+	// used; older cargo (<1.71) that lacks that field falls back to all workspace members.
+	SelectedPackages []string
 }
 
 // CargoMetadata maps `cargo metadata --format-version 1` output.
@@ -17,6 +22,10 @@ type CargoMetadata struct {
 	Packages         []CargoPackage `json:"packages"`
 	Resolve          CargoResolve   `json:"resolve"`
 	WorkspaceMembers []string       `json:"workspace_members"`
+	// WorkspaceDefaultMembers lists the members cargo would build by default when no -p is
+	// given — respects the [workspace.default-members] setting. Added in cargo 1.71; older
+	// cargo omits the field, in which case callers fall back to WorkspaceMembers.
+	WorkspaceDefaultMembers []string `json:"workspace_default_members"`
 }
 
 type CargoPackage struct {

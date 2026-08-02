@@ -32,9 +32,11 @@ func TestParsePackageId(t *testing.T) {
 }
 
 func TestScopeForDepKinds(t *testing.T) {
-	prod, inc := scopeForDepKinds([]CargoDepKind{{Kind: ""}}, false)
-	if !inc || prod != "prod" {
-		t.Errorf("normal dep: got (%q,%v), want (prod,true)", prod, inc)
+	// Cargo's dep_kind names are surfaced verbatim: "" -> "normal", "build" -> "build",
+	// "dev" -> "dev". No synthesized labels like "prod" or "transitive".
+	normal, inc := scopeForDepKinds([]CargoDepKind{{Kind: ""}}, false)
+	if !inc || normal != "normal" {
+		t.Errorf("normal dep: got (%q,%v), want (normal,true)", normal, inc)
 	}
 	build, inc := scopeForDepKinds([]CargoDepKind{{Kind: "build"}}, false)
 	if !inc || build != "build" {
@@ -281,16 +283,15 @@ func TestCollectDependenciesSkipsWorkspaceAndLocal(t *testing.T) {
 	if dep.Checksum.Sha256 == "" {
 		t.Error("expected sha256 from lockfile")
 	}
-	if len(dep.Scopes) != 1 || dep.Scopes[0] != "prod" {
-		t.Errorf("scopes = %v, want [prod]", dep.Scopes)
+	if len(dep.Scopes) != 1 || dep.Scopes[0] != "normal" {
+		t.Errorf("scopes = %v, want [normal]", dep.Scopes)
 	}
 }
 
-func TestTransitiveScope(t *testing.T) {
-	// Build: root (workspace member) depends on "a" (direct);
-	// "a" depends on "b" (indirect/transitive).
-	// Both a and b are registry-sourced normal deps.
-	// Expected: a has scope "prod" (direct), b has scope "transitive" (indirect).
+func TestNormalDepScope(t *testing.T) {
+	// Both direct and indirect normal deps carry cargo's own dep-kind name ("normal") — no
+	// synthesized "transitive" marker, matching what the user sees in Cargo.toml and cargo tree.
+	// RequestedBy lists only the direct parent as a single-element path, no chain to root.
 	meta := &CargoMetadata{
 		WorkspaceMembers: []string{"root 0.1.0 (path+file:///r)"},
 		Resolve: CargoResolve{
@@ -340,33 +341,32 @@ func TestTransitiveScope(t *testing.T) {
 		depById[cf.dependencies[i].Id] = &cf.dependencies[i]
 	}
 
-	// Check a: direct, should be "prod"
+	// Both a (direct) and b (indirect) carry cargo's own kind "normal".
 	a, ok := depById["a-1.0.0.crate"]
 	if !ok {
 		t.Fatalf("missing a-1.0.0.crate in dependencies")
 	}
-	if len(a.Scopes) != 1 || a.Scopes[0] != "prod" {
-		t.Errorf("a scopes = %v, want [prod]", a.Scopes)
+	if len(a.Scopes) != 1 || a.Scopes[0] != "normal" {
+		t.Errorf("a scopes = %v, want [normal]", a.Scopes)
 	}
 
-	// Check b: indirect, should be "transitive"
 	b, ok := depById["b-2.0.0.crate"]
 	if !ok {
 		t.Fatalf("missing b-2.0.0.crate in dependencies")
 	}
-	if len(b.Scopes) != 1 || b.Scopes[0] != "transitive" {
-		t.Errorf("b scopes = %v, want [transitive]", b.Scopes)
+	if len(b.Scopes) != 1 || b.Scopes[0] != "normal" {
+		t.Errorf("b scopes = %v, want [normal]", b.Scopes)
 	}
 
-	// RequestedBy must be recursive full paths to root; the root element is the module id
-	// (name:version), matching the Go/npm/yarn/nuget convention:
-	//   a  <- [[root:0.1.0]]
-	//   b  <- [[a-1.0.0.crate, root:0.1.0]]
+	// RequestedBy records only the direct parent, one single-element path per parent — same
+	// convention as pnpm. No chains to root; the module id does not appear at the end.
+	//   a  <- [[root:0.1.0]]        (root is a's direct parent, so it appears once)
+	//   b  <- [[a-1.0.0.crate]]     (a is b's direct parent; root does NOT appear)
 	wantA := [][]string{{"root:0.1.0"}}
 	if !reflect.DeepEqual(a.RequestedBy, wantA) {
 		t.Errorf("a.RequestedBy = %v, want %v", a.RequestedBy, wantA)
 	}
-	wantB := [][]string{{"a-1.0.0.crate", "root:0.1.0"}}
+	wantB := [][]string{{"a-1.0.0.crate"}}
 	if !reflect.DeepEqual(b.RequestedBy, wantB) {
 		t.Errorf("b.RequestedBy = %v, want %v", b.RequestedBy, wantB)
 	}
@@ -405,8 +405,8 @@ func TestRequestedByDiamondPaths(t *testing.T) {
 	if d == nil {
 		t.Fatal("missing d-1.0.0.crate")
 	}
-	// Two distinct paths to root (module id), one via a and one via b.
-	want := [][]string{{"a-1.0.0.crate", "root:0.1.0"}, {"b-1.0.0.crate", "root:0.1.0"}}
+	// Two direct-parent paths, one per direct requester (a and b). No root at the end.
+	want := [][]string{{"a-1.0.0.crate"}, {"b-1.0.0.crate"}}
 	if !reflect.DeepEqual(d.RequestedBy, want) {
 		t.Errorf("d.RequestedBy = %v, want %v", d.RequestedBy, want)
 	}

@@ -82,14 +82,101 @@ func TestBuildModulesPerWorkspaceMember(t *testing.T) {
 		return out
 	}
 	appDeps := scopesById(bi.Modules[0])
-	if len(appDeps) != 2 || appDeps["serde-1.0.0.crate"] != "prod" || appDeps["cc-1.0.0.crate"] != "build" {
-		t.Errorf("app module deps = %v, want serde=prod, cc=build (2 total)", appDeps)
+	if len(appDeps) != 2 || appDeps["serde-1.0.0.crate"] != "normal" || appDeps["cc-1.0.0.crate"] != "build" {
+		t.Errorf("app module deps = %v, want serde=normal, cc=build (2 total)", appDeps)
 	}
 	libDeps := scopesById(bi.Modules[1])
-	if len(libDeps) != 1 || libDeps["serde-1.0.0.crate"] != "prod" {
-		t.Errorf("lib module deps = %v, want serde=prod (1 total)", libDeps)
+	if len(libDeps) != 1 || libDeps["serde-1.0.0.crate"] != "normal" {
+		t.Errorf("lib module deps = %v, want serde=normal (1 total)", libDeps)
 	}
 	if bi.Modules[0].Type != entities.Cargo || bi.Modules[1].Type != entities.Cargo {
 		t.Errorf("module types must be cargo")
+	}
+}
+
+// TestBuildModulesRespectsSelectedPackages verifies that when the CLI narrows the compilation
+// to specific -p packages, only those workspace members produce build-info modules — sibling
+// members that were not compiled must not appear. This is the fix for the ripgrep/grep-index
+// bug where `cargo build -p grep-pcre2 --features pcre2` listed grep-index (never compiled).
+func TestBuildModulesRespectsSelectedPackages(t *testing.T) {
+	app := "app 0.1.0 (path+file:///ws/app)"
+	lib := "lib 0.1.0 (path+file:///ws/lib)"
+	unused := "unused 0.1.0 (path+file:///ws/unused)"
+	serde := "serde 1.0.0 (registry+x)"
+	dep := func(name, pkg, kind string) CargoNodeDep {
+		return CargoNodeDep{Name: name, Pkg: pkg, DepKinds: []CargoDepKind{{Kind: kind}}}
+	}
+	meta := &CargoMetadata{
+		WorkspaceMembers: []string{app, lib, unused},
+		Resolve: CargoResolve{
+			Nodes: []CargoNode{
+				{Id: app, Deps: []CargoNodeDep{dep("serde", serde, "")}},
+				{Id: lib, Deps: []CargoNodeDep{dep("serde", serde, "")}},
+				{Id: unused, Deps: []CargoNodeDep{dep("serde", serde, "")}},
+				{Id: serde},
+			},
+		},
+	}
+	cf := &CargoFlexPack{
+		config:        CargoConfig{SelectedPackages: []string{"app"}},
+		meta:          meta,
+		lockChecksums: map[string]string{},
+	}
+	t.Setenv("CARGO_HOME", t.TempDir())
+	if err := cf.collectDependenciesFromMeta(); err != nil {
+		t.Fatal(err)
+	}
+	bi, err := cf.buildInfoFromState("ws-build", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bi.Modules) != 1 {
+		t.Fatalf("expected 1 module (app only), got %d: %+v", len(bi.Modules), bi.Modules)
+	}
+	if bi.Modules[0].Id != "app:0.1.0" {
+		t.Errorf("module id = %q, want app:0.1.0", bi.Modules[0].Id)
+	}
+}
+
+// TestBuildModulesUsesWorkspaceDefaultMembers verifies that when the CLI doesn't specify -p and
+// cargo (>=1.71) exposes workspace_default_members, only default members produce modules —
+// respecting [workspace.default-members] in Cargo.toml. Older cargo lacks the field, in which
+// case buildModules falls back to all workspace members (covered by
+// TestBuildModulesPerWorkspaceMember above).
+func TestBuildModulesUsesWorkspaceDefaultMembers(t *testing.T) {
+	app := "app 0.1.0 (path+file:///ws/app)"
+	lib := "lib 0.1.0 (path+file:///ws/lib)"
+	skipped := "skipped 0.1.0 (path+file:///ws/skipped)"
+	serde := "serde 1.0.0 (registry+x)"
+	dep := func(name, pkg, kind string) CargoNodeDep {
+		return CargoNodeDep{Name: name, Pkg: pkg, DepKinds: []CargoDepKind{{Kind: kind}}}
+	}
+	meta := &CargoMetadata{
+		WorkspaceMembers:        []string{app, lib, skipped},
+		WorkspaceDefaultMembers: []string{app, lib}, // skipped not in default set
+		Resolve: CargoResolve{
+			Nodes: []CargoNode{
+				{Id: app, Deps: []CargoNodeDep{dep("serde", serde, "")}},
+				{Id: lib, Deps: []CargoNodeDep{dep("serde", serde, "")}},
+				{Id: skipped, Deps: []CargoNodeDep{dep("serde", serde, "")}},
+				{Id: serde},
+			},
+		},
+	}
+	cf := &CargoFlexPack{config: CargoConfig{}, meta: meta, lockChecksums: map[string]string{}}
+	t.Setenv("CARGO_HOME", t.TempDir())
+	if err := cf.collectDependenciesFromMeta(); err != nil {
+		t.Fatal(err)
+	}
+	bi, err := cf.buildInfoFromState("ws-build", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bi.Modules) != 2 {
+		t.Fatalf("expected 2 modules (app + lib, skipped omitted), got %d: %+v", len(bi.Modules), bi.Modules)
+	}
+	ids := []string{bi.Modules[0].Id, bi.Modules[1].Id}
+	if ids[0] != "app:0.1.0" || ids[1] != "lib:0.1.0" {
+		t.Errorf("module ids = %v, want [app:0.1.0 lib:0.1.0]", ids)
 	}
 }

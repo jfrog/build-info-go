@@ -55,9 +55,11 @@ func lastPathSegment(s string) string {
 	return s
 }
 
-// scopeForDepKinds maps cargo dep_kinds to a build-info scope and decides inclusion.
-// Normal ("") -> "prod", "build" -> "build", "dev" -> "dev" (only if includeDev).
-// A dependency with multiple kinds prefers normal > build > dev.
+// scopeForDepKinds maps cargo dep_kinds to a build-info scope and decides inclusion,
+// using cargo's own dep-kind names verbatim ("normal", "build", "dev") rather than a
+// renaming layer. Cargo represents a normal dependency with an empty Kind, which we
+// surface as "normal" so build-info readers see the same vocabulary as `cargo tree`
+// and Cargo.toml. A dependency with multiple kinds prefers normal > build > dev.
 func scopeForDepKinds(kinds []CargoDepKind, includeDev bool) (string, bool) {
 	hasNormal, hasBuild, hasDev := false, false, false
 	for _, k := range kinds {
@@ -72,32 +74,14 @@ func scopeForDepKinds(kinds []CargoDepKind, includeDev bool) (string, bool) {
 	}
 	switch {
 	case hasNormal:
-		return "prod", true
+		return "normal", true
 	case hasBuild:
 		return "build", true
 	case hasDev:
 		return "dev", includeDev
 	default:
-		return "prod", true
+		return "normal", true
 	}
-}
-
-// directDependencyIds returns the set of resolve-node ids that are direct dependencies
-// of the root crate or any workspace member.
-func directDependencyIds(meta *CargoMetadata) map[string]bool {
-	workspace := make(map[string]bool)
-	for _, id := range meta.WorkspaceMembers {
-		workspace[id] = true
-	}
-	direct := make(map[string]bool)
-	for _, node := range meta.Resolve.Nodes {
-		if workspace[node.Id] || node.Id == meta.Resolve.Root {
-			for _, childId := range node.Dependencies {
-				direct[childId] = true
-			}
-		}
-	}
-	return direct
 }
 
 // buildRequestedBy reverses the resolve graph: dependency id -> parent ids.
@@ -330,9 +314,10 @@ func reachableFrom(meta *CargoMetadata, rootIds map[string]bool, includeDev bool
 
 // depsForRoots builds the build-info dependency list for the subgraph reachable from rootIds:
 // registry-sourced crates only, workspace members skipped, dev-deps filtered per config, scopes
-// computed relative to the roots (direct normal -> "prod", indirect -> "transitive", build ->
-// "build"), and RequestedBy as recursive full paths back up to a root (Go-collector algorithm,
-// capped at entities.RequestedByMaxLength, cycle-guarded via NodeHasLoop).
+// taken verbatim from cargo's dep_kinds ("normal"/"build"/"dev"), and RequestedBy as a list of
+// single-element paths — one per direct parent — matching the pnpm/conan/poetry/maven convention
+// (no full chains, no root at the end). Cycle-guarded via NodeHasLoop, capped at
+// entities.RequestedByMaxLength.
 //
 // Called once with every member/root for the whole-project list (cf.dependencies) and once per
 // workspace member to build that member's own module — so each module carries the dependencies
@@ -344,17 +329,6 @@ func (cf *CargoFlexPack) depsForRoots(rootIds map[string]bool) []entities.Depend
 		workspace[id] = true
 	}
 	reachable := reachableFrom(cf.meta, rootIds, includeDev)
-
-	// Direct dependencies of the roots themselves (dev edges skipped when includeDev is false).
-	direct := make(map[string]bool)
-	for _, node := range cf.meta.Resolve.Nodes {
-		if !rootIds[node.Id] {
-			continue
-		}
-		for _, childId := range childEdges(node, includeDev) {
-			direct[childId] = true
-		}
-	}
 
 	// Map id -> the dep_kinds it was pulled in with, unioned across edges within the reachable set.
 	// Dev-only edges are ignored when includeDev is false so a crate's scope reflects the non-dev
@@ -393,10 +367,6 @@ func (cf *CargoFlexPack) depsForRoots(rootIds map[string]bool) []entities.Depend
 		if !include {
 			continue
 		}
-		// Mark indirect production dependencies as "transitive".
-		if scope == "prod" && !direct[node.Id] {
-			scope = "transitive"
-		}
 		key := name + "-" + version + ".crate"
 		byKey[key] = entities.Dependency{
 			Id:       key,
@@ -409,33 +379,42 @@ func (cf *CargoFlexPack) depsForRoots(rootIds map[string]bool) []entities.Depend
 		order = append(order, key)
 	}
 
-	// Build the dependency graph in build-info-id space (parent -> included children).
-	// Parent keys use nodeLabel so the root/workspace members appear as their module id.
-	graph := make(map[string][]string)
+	// Second pass: for every edge parent -> child within the reachable subgraph where the child
+	// is an included registry dep, record the parent as a direct requester of that child. Each
+	// direct parent contributes one single-element path. Parents that are workspace members or
+	// the resolve root are labelled by their module id via nodeLabel; registry parents by the
+	// same "<name>-<version>.crate" build-info id used elsewhere.
 	for _, node := range cf.meta.Resolve.Nodes {
 		if !reachable[node.Id] {
 			continue
 		}
-		parentKey := cf.nodeLabel(node.Id, workspace)
-		for _, child := range childEdges(node, includeDev) {
-			if included[child] {
-				graph[parentKey] = appendUnique(graph[parentKey], nodeKey[child])
+		parentLabel := cf.nodeLabel(node.Id, workspace)
+		for _, childId := range childEdges(node, includeDev) {
+			childKey, ok := nodeKey[childId]
+			if !ok {
+				continue
 			}
+			child := byKey[childKey]
+			if parentLabel == child.Id {
+				continue // cargo can list the same node in its own edge list on cycles; skip self-parents
+			}
+			if len(child.RequestedBy) >= entities.RequestedByMaxLength {
+				continue
+			}
+			// Deduplicate: skip if this parent already recorded.
+			already := false
+			for _, path := range child.RequestedBy {
+				if len(path) == 1 && path[0] == parentLabel {
+					already = true
+					break
+				}
+			}
+			if already {
+				continue
+			}
+			child.RequestedBy = append(child.RequestedBy, []string{parentLabel})
+			byKey[childKey] = child
 		}
-	}
-
-	// Seed recursion from each root (keyed by its module id via nodeLabel).
-	seededRoots := make(map[string]bool)
-	for _, node := range cf.meta.Resolve.Nodes {
-		if !rootIds[node.Id] {
-			continue
-		}
-		rootKey := cf.nodeLabel(node.Id, workspace)
-		if seededRoots[rootKey] {
-			continue
-		}
-		seededRoots[rootKey] = true
-		populateRequestedBy(rootKey, [][]string{{}}, byKey, graph)
 	}
 
 	deps := make([]entities.Dependency, 0, len(order))
@@ -451,25 +430,6 @@ func (cf *CargoFlexPack) depsForRoots(rootIds map[string]bool) []entities.Depend
 func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 	cf.dependencies = cf.depsForRoots(cf.allRootIds())
 	return nil
-}
-
-// populateRequestedBy recursively records, on each dependency, the paths that pulled it in —
-// each path a chain of ancestor ids ending at a root. Mirrors the Go collector: it prefixes the
-// parent's paths with the parent id onto the child, guarding cycles and capping path count at
-// entities.RequestedByMaxLength.
-func populateRequestedBy(parentID string, parentRequestedBy [][]string, byKey map[string]entities.Dependency, graph map[string][]string) {
-	for _, childKey := range graph[parentID] {
-		child, ok := byKey[childKey]
-		if !ok {
-			continue
-		}
-		if child.NodeHasLoop() || len(child.RequestedBy) >= entities.RequestedByMaxLength {
-			continue
-		}
-		child.UpdateRequestedBy(parentID, parentRequestedBy)
-		byKey[childKey] = child
-		populateRequestedBy(childKey, child.RequestedBy, byKey, graph)
-	}
 }
 
 // collectDependencies runs cargo metadata, loads the lockfile, and populates deps.
