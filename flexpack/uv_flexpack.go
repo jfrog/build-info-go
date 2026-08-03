@@ -21,20 +21,20 @@ import (
 
 // UVLockFile represents the top-level structure of uv.lock
 type UVLockFile struct {
-	Version  int          `toml:"version"`
-	Revision int          `toml:"revision"`
-	Packages []UVPackage  `toml:"package"`
+	Version  int         `toml:"version"`
+	Revision int         `toml:"revision"`
+	Packages []UVPackage `toml:"package"`
 }
 
 // UVPackage represents a [[package]] entry in uv.lock
 type UVPackage struct {
-	Name            string                         `toml:"name"`
-	Version         string                         `toml:"version"`
-	Source          UVSource                       `toml:"source"`
-	Dependencies    []UVDependencyEdge             `toml:"dependencies"`
-	DevDependencies map[string][]UVDependencyEdge  `toml:"dev-dependencies"`
-	Sdist           *UVArtifact                    `toml:"sdist"`
-	Wheels          []UVArtifact                   `toml:"wheels"`
+	Name            string                        `toml:"name"`
+	Version         string                        `toml:"version"`
+	Source          UVSource                      `toml:"source"`
+	Dependencies    []UVDependencyEdge            `toml:"dependencies"`
+	DevDependencies map[string][]UVDependencyEdge `toml:"dev-dependencies"`
+	Sdist           *UVArtifact                   `toml:"sdist"`
+	Wheels          []UVArtifact                  `toml:"wheels"`
 }
 
 // UVSource is an inline table with exactly one key identifying the source type.
@@ -56,7 +56,7 @@ func (s UVSource) IsWorkspacePackage() bool {
 type UVArtifact struct {
 	URL        string `toml:"url"`
 	Path       string `toml:"path"`
-	Hash       string `toml:"hash"`        // "sha256:<hex>"; absent for git
+	Hash       string `toml:"hash"` // "sha256:<hex>"; absent for git
 	Size       int64  `toml:"size"`
 	UploadTime string `toml:"upload-time"` // ISO 8601; may be absent (revision < 3)
 }
@@ -175,9 +175,10 @@ func isVersionDynamic(dynamic []string) bool {
 //     populate it — cheap to check, correct if present.
 //  2. UVConfig.InstalledPackages (populated from `uv pip list` for sync/install/add/remove),
 //     which includes the project's own resolved version once it's installed into the venv.
-//  3. dist/*.whl or dist/*.tar.gz filenames, which encode the resolved version and are
-//     guaranteed to exist by the time build-info collection runs for build/publish (both
-//     only reach this point after `uv build`/`uv publish` already succeeded).
+//  3. dist/*.whl or dist/*.tar.gz archives — build/publish only reach this point after
+//     `uv build`/`uv publish` already succeeded, and each archive's own embedded package
+//     metadata (wheel: *.dist-info/METADATA; sdist: top-level PKG-INFO) records the version
+//     the backend resolved for it — see resolveVersionFromDist.
 //
 // Returns "" if none of these have anything to offer.
 func (uf *UVFlexPack) resolveDynamicVersion() string {
@@ -187,8 +188,16 @@ func (uf *UVFlexPack) resolveDynamicVersion() string {
 		}
 	}
 	if uf.config.InstalledPackages != nil {
-		if version, ok := uf.config.InstalledPackages[normalizeName(uf.projectName)]; ok && version != "" {
-			return version
+		// Compare via normalizeName on both sides rather than indexing by a normalized key
+		// directly: callers (e.g. jfrog-cli-artifactory's uvInstalledPackages) build this map
+		// with their own lowercase/underscore-only normalization, which doesn't collapse dots
+		// or repeated separators the way full PEP 503 normalization does — a project name
+		// containing "." would silently never match a plain map lookup.
+		want := normalizeName(uf.projectName)
+		for pkgName, pkgVersion := range uf.config.InstalledPackages {
+			if pkgVersion != "" && normalizeName(pkgName) == want {
+				return pkgVersion
+			}
 		}
 	}
 	return uf.resolveVersionFromDist()
@@ -290,8 +299,12 @@ func readSdistMetadata(path string) (name, version string) {
 		if err != nil {
 			return "", ""
 		}
-		// PKG-INFO sits directly under the single top-level "{name}-{version}/" directory.
-		if strings.HasSuffix(hdr.Name, "/PKG-INFO") || hdr.Name == "PKG-INFO" {
+		// The authoritative PKG-INFO sits directly under the single top-level
+		// "{name}-{version}/" directory — i.e. exactly one path separator. A deeper match
+		// (e.g. "{name}-{version}/{name}.egg-info/PKG-INFO", which some sdists accidentally
+		// bundle) belongs to a nested, possibly stale build artifact and must be skipped, even
+		// if tar ordering happens to list it before the real top-level one.
+		if hdr.Name == "PKG-INFO" || (strings.Count(hdr.Name, "/") == 1 && strings.HasSuffix(hdr.Name, "/PKG-INFO")) {
 			return parsePackageMetadata(tr)
 		}
 	}

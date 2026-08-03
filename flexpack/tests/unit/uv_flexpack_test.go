@@ -841,10 +841,10 @@ func TestUvErrorHandling(t *testing.T) {
 	})
 }
 
-// dynamicPyproject returns a pyproject.toml declaring `dynamic = ["version"]`,
-// e.g. as produced by hatch-vcs, with no static [project.version].
-func dynamicPyproject(name string) string {
-	return "[project]\nname = \"" + name + "\"\ndynamic = [\"version\"]\n" +
+// dynamicPyproject returns a pyproject.toml for project "my-app" declaring
+// `dynamic = ["version"]`, e.g. as produced by hatch-vcs, with no static [project.version].
+func dynamicPyproject() string {
+	return "[project]\nname = \"my-app\"\ndynamic = [\"version\"]\n" +
 		"[tool.hatch.version]\nsource = \"vcs\"\n"
 }
 
@@ -857,7 +857,7 @@ func dynamicPyproject(name string) string {
 func TestUvDynamicVersionResolvedFromLockFallback(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": dynamicPyproject("my-app"),
+		"pyproject.toml": dynamicPyproject(),
 		"uv.lock":        minimalUvLock("my-app"),
 	})
 
@@ -887,7 +887,7 @@ func TestUvDynamicVersionResolvedFromLockFallback(t *testing.T) {
 func TestUvDynamicVersionResolvedFromDist(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": dynamicPyproject("my-app"),
+		"pyproject.toml": dynamicPyproject(),
 	})
 	distDir := filepath.Join(tempDir, "dist")
 	if err := os.MkdirAll(distDir, 0755); err != nil {
@@ -918,7 +918,7 @@ func TestUvDynamicVersionResolvedFromDist(t *testing.T) {
 func TestUvDynamicVersionResolvedFromInstalledPackages(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": dynamicPyproject("my-app"),
+		"pyproject.toml": dynamicPyproject(),
 	})
 
 	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
@@ -947,7 +947,7 @@ func TestUvDynamicVersionFallsBackToEmptyVersion(t *testing.T) {
 	t.Run("no uv.lock, dist/, or installed packages", func(t *testing.T) {
 		tempDir := t.TempDir()
 		writeTempFiles(t, tempDir, map[string]string{
-			"pyproject.toml": dynamicPyproject("my-app"),
+			"pyproject.toml": dynamicPyproject(),
 		})
 
 		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
@@ -975,7 +975,7 @@ version = "2.31.0"
 source = { registry = "https://pypi.org/simple" }
 `
 		writeTempFiles(t, tempDir, map[string]string{
-			"pyproject.toml": dynamicPyproject("my-app"),
+			"pyproject.toml": dynamicPyproject(),
 			"uv.lock":        uvLockContent,
 		})
 
@@ -995,7 +995,7 @@ source = { registry = "https://pypi.org/simple" }
 	t.Run("dist/ has only unrelated packages", func(t *testing.T) {
 		tempDir := t.TempDir()
 		writeTempFiles(t, tempDir, map[string]string{
-			"pyproject.toml": dynamicPyproject("my-app"),
+			"pyproject.toml": dynamicPyproject(),
 		})
 		distDir := filepath.Join(tempDir, "dist")
 		if err := os.MkdirAll(distDir, 0755); err != nil {
@@ -1027,7 +1027,7 @@ source = { registry = "https://pypi.org/simple" }
 func TestUvDynamicVersionResolvedFromDistPrefersNewestOnMismatch(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": dynamicPyproject("my-app"),
+		"pyproject.toml": dynamicPyproject(),
 	})
 	distDir := filepath.Join(tempDir, "dist")
 	if err := os.MkdirAll(distDir, 0755); err != nil {
@@ -1060,7 +1060,7 @@ func TestUvDynamicVersionResolvedFromDistPrefersNewestOnMismatch(t *testing.T) {
 func TestUvDynamicVersionSkipsUnreadableDistArchive(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTempFiles(t, tempDir, map[string]string{
-		"pyproject.toml": dynamicPyproject("my-app"),
+		"pyproject.toml": dynamicPyproject(),
 	})
 	distDir := filepath.Join(tempDir, "dist")
 	if err := os.MkdirAll(distDir, 0755); err != nil {
@@ -1082,6 +1082,103 @@ func TestUvDynamicVersionSkipsUnreadableDistArchive(t *testing.T) {
 	want := "my-app:1.2.3"
 	if buildInfo.Modules[0].Id != want {
 		t.Errorf("Expected the valid sdist's version %q despite the corrupt wheel, got %q", want, buildInfo.Modules[0].Id)
+	}
+}
+
+// writeTestSdistWithEntries creates a tar.gz at path with the given entries written in
+// order, each as a plain file. Used to control tar entry ordering precisely, unlike
+// writeTestSdist which always writes a single well-formed top-level PKG-INFO.
+func writeTestSdistWithEntries(t *testing.T, path string, entries map[string]string, order []string) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+	for _, name := range order {
+		content := []byte(entries[name])
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0644, Size: int64(len(content))}); err != nil {
+			t.Fatalf("Failed to write tar header for %s: %v", name, err)
+		}
+		if _, err := tw.Write(content); err != nil {
+			t.Fatalf("Failed to write %s: %v", name, err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("Failed to close tar writer: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("Failed to close gzip writer: %v", err)
+	}
+}
+
+// TestUvDynamicVersionIgnoresNestedEggInfoPkgInfo covers an sdist that accidentally bundles
+// a nested *.egg-info/PKG-INFO (a known historical setuptools quirk) alongside the real
+// top-level PKG-INFO, with the nested (stale) one appearing FIRST in tar order. The nested
+// entry must be ignored — only the top-level "{name}-{version}/PKG-INFO" is authoritative.
+func TestUvDynamicVersionIgnoresNestedEggInfoPkgInfo(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject(),
+	})
+	distDir := filepath.Join(tempDir, "dist")
+	if err := os.MkdirAll(distDir, 0755); err != nil {
+		t.Fatalf("Failed to create dist dir: %v", err)
+	}
+	staleMetadata := "Metadata-Version: 2.4\nName: my-app\nVersion: 0.0.1-stale\n\n"
+	realMetadata := "Metadata-Version: 2.4\nName: my-app\nVersion: 1.2.3\n\n"
+	writeTestSdistWithEntries(t, filepath.Join(distDir, "my_app-1.2.3.tar.gz"),
+		map[string]string{
+			"my_app-1.2.3/my_app.egg-info/PKG-INFO": staleMetadata, // nested, listed first
+			"my_app-1.2.3/PKG-INFO":                 realMetadata,  // top-level, authoritative
+		},
+		[]string{"my_app-1.2.3/my_app.egg-info/PKG-INFO", "my_app-1.2.3/PKG-INFO"},
+	)
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:1.2.3"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected the top-level PKG-INFO's version %q, got %q (picked up the nested egg-info instead?)", want, buildInfo.Modules[0].Id)
+	}
+}
+
+// TestUvDynamicVersionResolvedFromInstalledPackagesWithDottedName covers a project name
+// containing "." (common for Python namespace packages, e.g. zope.interface). Callers like
+// jfrog-cli-artifactory's uvInstalledPackages build UVConfig.InstalledPackages with only
+// ToLower + "_"->"-" (dots untouched), not full PEP 503 normalization — the lookup must still
+// match despite that mismatch, comparing both sides through the same normalization.
+func TestUvDynamicVersionResolvedFromInstalledPackagesWithDottedName(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": "[project]\nname = \"my.app\"\ndynamic = [\"version\"]\n" +
+			"[tool.hatch.version]\nsource = \"vcs\"\n",
+	})
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
+		WorkingDirectory: tempDir,
+		// Mirrors jfrog-cli-artifactory's uvInstalledPackages key format: lowercase + "_"->"-"
+		// only — "my.app" stays "my.app", it is NOT collapsed to "my-app".
+		InstalledPackages: map[string]string{"my.app": "1.2.4.dev0+g6df800799.d20260730"},
+	})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for dotted project name: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my.app:1.2.4.dev0+g6df800799.d20260730"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
 	}
 }
 
