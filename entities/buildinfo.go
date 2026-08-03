@@ -31,6 +31,13 @@ const (
 	BuildInfoEnvPrefix   = "buildInfo.env."
 	RequestedByMaxLength = 15
 
+	// MavenBuildModeProperty records which Maven integration produced the build info; it is stamped
+	// with MavenBuildModeNative by the native (FlexPack) collector and MavenBuildModeLegacy by the
+	// legacy build-info-extractor path, giving both a single comparable marker in the published JSON.
+	MavenBuildModeProperty = BuildInfoEnvPrefix + "JFROG_MAVEN_MODE"
+	MavenBuildModeNative   = "native"
+	MavenBuildModeLegacy   = "legacy"
+
 	// Build type
 	Build ModuleType = "build"
 
@@ -106,6 +113,20 @@ func (targetBuildInfo *BuildInfo) Append(buildInfo *BuildInfo) {
 		}
 		if !exists {
 			targetBuildInfo.Modules = append(targetBuildInfo.Modules, newModule)
+		}
+	}
+	// Carry over properties set by the appended build info (e.g. a build-mode marker recorded by the
+	// collector). Existing values on the target win, so this only fills gaps and never clobbers env
+	// already assembled from partials.
+	if len(buildInfo.Properties) == 0 {
+		return
+	}
+	if targetBuildInfo.Properties == nil {
+		targetBuildInfo.Properties = make(Env)
+	}
+	for key, value := range buildInfo.Properties {
+		if _, exists := targetBuildInfo.Properties[key]; !exists {
+			targetBuildInfo.Properties[key] = value
 		}
 	}
 }
