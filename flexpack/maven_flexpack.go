@@ -73,10 +73,10 @@ type MavenConfig struct {
 const mavenDepsFileName = "maven-deps.json"
 
 // mavenDependencyPluginTreeGoal is the fully-qualified plugin coordinate used to invoke the
-// dependency:tree goal. The plugin version is pinned so `-DoutputType=json` is honored — older
-// versions (< 3.0.0) that some Maven installs still bind by default silently ignore the option and
-// write plain-text output, which the JSON parser then rejects.
-const mavenDependencyPluginTreeGoal = "org.apache.maven.plugins:maven-dependency-plugin:3.6.1:tree"
+// dependency:tree goal. The version is pinned because `-DoutputType=json` was only added in
+// maven-dependency-plugin 3.7.0; older versions silently write plain-text output which the JSON
+// parser then rejects. 3.8.1 (current latest) is used to also pick up bug fixes.
+const mavenDependencyPluginTreeGoal = "org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree"
 
 // MavenPOM represents the structure of pom.xml file
 type MavenPOM struct {
