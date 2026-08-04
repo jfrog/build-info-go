@@ -72,6 +72,12 @@ type MavenConfig struct {
 // module (root aggregator included).
 const mavenDepsFileName = "maven-deps.json"
 
+// mavenDependencyPluginTreeGoal is the fully-qualified plugin coordinate used to invoke the
+// dependency:tree goal. The plugin version is pinned so `-DoutputType=json` is honored — older
+// versions (< 3.0.0) that some Maven installs still bind by default silently ignore the option and
+// write plain-text output, which the JSON parser then rejects.
+const mavenDependencyPluginTreeGoal = "org.apache.maven.plugins:maven-dependency-plugin:3.6.1:tree"
+
 // MavenPOM represents the structure of pom.xml file
 type MavenPOM struct {
 	XMLName      xml.Name `xml:"project"`
@@ -243,7 +249,7 @@ func (mf *MavenFlexPack) parseWithMavenDependencyTree() error {
 		}
 	}()
 
-	args := []string{"dependency:tree", "-DoutputType=json", "-DoutputFile=maven-deps.json"}
+	args := []string{mavenDependencyPluginTreeGoal, "-DoutputType=json", "-DoutputFile=maven-deps.json"}
 	if mf.config.SkipTests {
 		args = append(args, "-DskipTests")
 	}
@@ -638,9 +644,10 @@ func (mf *MavenFlexPack) collectModules() ([]entities.Module, error) {
 // generateReactorDependencyTrees runs `mvn dependency:tree` at the project root and returns the path
 // of every maven-deps.json produced (one per reactor module). Maven overwrites the file for every
 // module that participates, and collectModules removes them all when done, so no separate stale-file
-// sweep is needed.
+// sweep is needed. The plugin version is pinned so `-DoutputType=json` is honored — older 2.x
+// versions silently write plain-text output which JSON parsing then rejects.
 func (mf *MavenFlexPack) generateReactorDependencyTrees() ([]string, error) {
-	args := []string{"dependency:tree", "-DoutputType=json", "-DoutputFile=" + mavenDepsFileName}
+	args := []string{mavenDependencyPluginTreeGoal, "-DoutputType=json", "-DoutputFile=" + mavenDepsFileName}
 	if mf.config.SkipTests {
 		args = append(args, "-DskipTests")
 	}
