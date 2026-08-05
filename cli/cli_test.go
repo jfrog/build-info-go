@@ -31,3 +31,21 @@ func TestExtractStringFlag(t *testing.T) {
 		assert.Equal(t, testCase.expectedFilteredArgs, actualFilteredArgs)
 	}
 }
+
+func TestExtractApkPackageNames(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{name: "add with packages", args: []string{"add", "curl", "wget"}, want: []string{"curl", "wget"}},
+		{name: "skips flags", args: []string{"add", "--no-cache", "curl"}, want: []string{"curl"}},
+		{name: "upgrade", args: []string{"upgrade", "openssl"}, want: []string{"openssl"}},
+		{name: "empty", args: nil, want: nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, extractApkPackageNames(tc.args))
+		})
+	}
+}
