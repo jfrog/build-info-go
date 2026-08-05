@@ -147,9 +147,9 @@ func (uf *UVFlexPack) loadPyProjectToml() error {
 		return fmt.Errorf("project name not found in pyproject.toml (checked [project.name])")
 	}
 	// A dynamic version (PEP 621 `dynamic = ["version"]`, e.g. via hatch-vcs) is resolved
-	// later from uv.lock once it's loaded — see resolveDynamicVersion.
+	// later, once uv.lock/dist/installed-packages state is available — see resolveDynamicVersion.
 	if uf.projectVersion == "" && !uf.versionIsDynamic {
-		return fmt.Errorf("project version not found in pyproject.toml (checked [project.version])")
+		return fmt.Errorf("project version not found in pyproject.toml (checked [project.version] and [project.dynamic] for \"version\")")
 	}
 	return nil
 }
