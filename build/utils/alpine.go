@@ -17,6 +17,7 @@ const apkInstalledDB = "/lib/apk/db/installed"
 
 var apkArchiveNamePattern = regexp.MustCompile(`^(.+)-([^-]+-r\d+)\.apk$`)
 
+// AlpinePackage holds metadata for one installed or downloaded APK package.
 type AlpinePackage struct {
 	Name     string
 	Version  string
@@ -29,10 +30,12 @@ type AlpinePackage struct {
 	Files    []string
 }
 
+// ID returns the Build Info dependency id in "name:version" form.
 func (p AlpinePackage) ID() string {
 	return p.Name + ":" + p.Version
 }
 
+// ListInstalledPackages reads /lib/apk/db/installed and returns the installed packages.
 func ListInstalledPackages() ([]AlpinePackage, error) {
 	pkgs, err := parseInstalledDB(apkInstalledDB)
 	if err != nil {
@@ -137,6 +140,7 @@ func parseDependencySpec(spec string) string {
 	return strings.TrimSpace(name)
 }
 
+// BuildProviderIndex maps package names and virtual provide tokens to the real package name that satisfies them.
 func BuildProviderIndex(pkgs []AlpinePackage) map[string]string {
 	index := make(map[string]string, len(pkgs)*2)
 	for _, pkg := range pkgs {
@@ -154,6 +158,7 @@ func BuildProviderIndex(pkgs []AlpinePackage) map[string]string {
 	return index
 }
 
+// ResolveDependencyProvider resolves a Depends/Provides token to the package name that provides it.
 func ResolveDependencyProvider(depToken string, providers map[string]string) string {
 	if depToken == "" {
 		return ""
@@ -161,6 +166,8 @@ func ResolveDependencyProvider(depToken string, providers map[string]string) str
 	return providers[depToken]
 }
 
+// ChecksumsFromCache computes checksums for a package from a matching .apk archive under cacheDir.
+// Returns an empty map when cacheDir is empty or no matching archive is found.
 func ChecksumsFromCache(pkg AlpinePackage, cacheDir string) (map[crypto.Algorithm]string, error) {
 	if cacheDir == "" {
 		return map[crypto.Algorithm]string{}, nil
@@ -180,6 +187,7 @@ func ChecksumsFromCache(pkg AlpinePackage, cacheDir string) (map[crypto.Algorith
 	return checksums, nil
 }
 
+// PackagesFromArchivesDir parses package name/version pairs from *.apk filenames in dir.
 func PackagesFromArchivesDir(dir string) ([]AlpinePackage, error) {
 	if dir == "" {
 		return nil, nil
@@ -206,6 +214,7 @@ func PackagesFromArchivesDir(dir string) ([]AlpinePackage, error) {
 	return pkgs, nil
 }
 
+// BuildDepGraph builds a forward dependency graph of package name -> resolved child package names.
 func BuildDepGraph(pkgs []AlpinePackage, providers map[string]string) map[string][]string {
 	graph := make(map[string][]string, len(pkgs))
 	for _, pkg := range pkgs {
@@ -229,6 +238,7 @@ func BuildDepGraph(pkgs []AlpinePackage, providers map[string]string) map[string
 	return graph
 }
 
+// DiffAlpinePackages returns packages present in after but not in before, keyed by name-version.
 func DiffAlpinePackages(before, after []AlpinePackage) []AlpinePackage {
 	beforeSet := make(map[string]struct{}, len(before))
 	for _, p := range before {
