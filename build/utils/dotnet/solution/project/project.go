@@ -37,6 +37,19 @@ func CreateProject(projectFilePath string) Project {
 	}
 }
 
+// CreateProjectFromDir creates a Project for a standalone dependencies source (e.g. a bare
+// packages.config) that has no enclosing *proj file. The directory's own base name stands in
+// for both the project name and its NuGet package ID, since there's no project file to read
+// PackageId/AssemblyName from.
+func CreateProjectFromDir(dirPath string) Project {
+	name := filepath.Base(dirPath)
+	return &project{
+		name:      name,
+		rootPath:  dirPath,
+		packageID: name,
+	}
+}
+
 // msbuildPropertyGroup captures the subset of a <PropertyGroup> element relevant to resolving
 // a project's NuGet package identity. Condition attributes on PropertyGroup/PackageId (e.g.
 // per-configuration overrides) are intentionally not evaluated; the first non-empty value found

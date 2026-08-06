@@ -138,10 +138,23 @@ func (solution *solution) buildInfo(moduleName string, useNameVersionModuleId bo
 			// If dependency has no RequestedBy field, it means that the dependency not accessible in the current project.
 			// In that case, the dependency is assumed to be under a project which is referenced by this project.
 			// We therefore don't include the dependency in the build-info.
-			if len(dep.RequestedBy) > 0 {
-				sortRequestedByPaths(dep.RequestedBy)
-				module.Dependencies = append(module.Dependencies, *dep)
+			if len(dep.RequestedBy) == 0 {
+				continue
 			}
+			// Every path was seeded/propagated to always terminate in module.Id (see above), so
+			// callers can tell which dependencies belong to this project. That's redundant in the
+			// emitted chain itself though - a dependency's RequestedBy should only describe the
+			// other packages that pulled it in, not the enclosing module it's already listed
+			// under. Strip it before emitting, dropping paths that become empty (a direct
+			// dependency, requested by nothing but the module itself). Scoped to the FlexPack
+			// module-ID convention only ("<PackageID>:<Version>", matching Maven/Gradle FlexPack's
+			// requestedBy shape) - BuildInfo's legacy project-name default keeps its existing
+			// requestedBy shape so 'jf rt nuget'/'jf rt dotnet' output doesn't change.
+			if useNameVersionModuleId {
+				dep.RequestedBy = stripModuleFromRequestedBy(dep.RequestedBy, module.Id)
+			}
+			sortRequestedByPaths(dep.RequestedBy)
+			module.Dependencies = append(module.Dependencies, *dep)
 		}
 
 		modules = append(modules, module)
@@ -205,6 +218,25 @@ func populateRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap 
 			populateRequestedBy(*childDep, dependenciesMap, childrenMap)
 		}
 	}
+}
+
+// stripModuleFromRequestedBy removes the trailing module ID from each path, dropping any path
+// that becomes empty as a result. Every path is guaranteed to end in moduleId by construction
+// (see populateRequestedBy/the direct-dependency seeding above).
+func stripModuleFromRequestedBy(paths [][]string, moduleId string) [][]string {
+	var stripped [][]string
+	for _, path := range paths {
+		if len(path) == 0 {
+			continue
+		}
+		if path[len(path)-1] == moduleId {
+			path = path[:len(path)-1]
+		}
+		if len(path) > 0 {
+			stripped = append(stripped, path)
+		}
+	}
+	return stripped
 }
 
 // sortRequestedByPaths sorts RequestedBy paths for deterministic output.
@@ -447,6 +479,21 @@ func (solution *solution) loadSingleProjectFromDir(log utils.Log) error {
 	if len(projFiles) == 1 {
 		return solution.loadSingleProject(project.CreateProject(projFiles[0]), log)
 	}
+	if len(projFiles) == 0 {
+		// A standalone dependencies source (e.g. packages.config) with no enclosing *proj file -
+		// synthesize a project from the directory itself so its dependencies still get collected,
+		// instead of silently producing zero modules. Matched strictly (source's immediate parent
+		// must be this exact directory) rather than via the generic subdir-name heuristic below:
+		// that heuristic checks whether the *directory's own name* appears in a source's path,
+		// which is always true here since this directory's name is a path-prefix component of
+		// everything nested under it (e.g. testdata fixtures for unrelated projects).
+		lowerDir := strings.ToLower(solution.path)
+		for _, source := range solution.dependenciesSources {
+			if strings.ToLower(filepath.Dir(source)) == lowerDir {
+				return solution.loadProjectWithSource(project.CreateProjectFromDir(solution.path), source, log)
+			}
+		}
+	}
 	log.Warn(fmt.Sprintf("expecting 1 'proj' file but fuond %d files in path: %s", len(projFiles), solution.path))
 	return nil
 }
@@ -471,6 +518,10 @@ func (solution *solution) loadSingleProject(project project.Project, log utils.L
 		log.Debug(fmt.Sprintf("Project dependencies were not found for project: %s", project.Name()))
 		return nil
 	}
+	return solution.loadProjectWithSource(project, dependenciesSource, log)
+}
+
+func (solution *solution) loadProjectWithSource(project project.Project, dependenciesSource string, log utils.Log) error {
 	proj, err := project.Load(dependenciesSource, log)
 	if err != nil {
 		return err
