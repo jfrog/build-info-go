@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jfrog/gofrog/crypto"
 	"github.com/jfrog/gofrog/log"
@@ -15,7 +16,11 @@ import (
 
 const apkInstalledDB = "/lib/apk/db/installed"
 
-var apkArchiveNamePattern = regexp.MustCompile(`^(.+)-([^-]+-r\d+)\.apk$`)
+// apk writes cached archives as <name>-<version>.<8-hex-char-content-hash>.apk
+// (e.g. curl-8.12.1-r0.1a7564c8.apk), not the bare <name>-<version>.apk the
+// pattern originally assumed — that never matched a single real cache entry.
+// The hash segment is made optional so both forms are recognized.
+var apkArchiveNamePattern = regexp.MustCompile(`^(.+)-([^-]+-r\d+)(?:\.[0-9a-f]{8})?\.apk$`)
 
 // AlpinePackage holds metadata for one installed or downloaded APK package.
 type AlpinePackage struct {
@@ -166,6 +171,13 @@ func ResolveDependencyProvider(depToken string, providers map[string]string) str
 	return providers[depToken]
 }
 
+// checksumGlobRetries and checksumGlobRetryDelay absorb the rare case where a package
+// archive apk just wrote to cacheDir isn't visible yet to this glob on the first try.
+const (
+	checksumGlobRetries    = 3
+	checksumGlobRetryDelay = 50 * time.Millisecond
+)
+
 // ChecksumsFromCache computes checksums for a package from a matching .apk archive under cacheDir.
 // Returns an empty map when cacheDir is empty or no matching archive is found.
 func ChecksumsFromCache(pkg AlpinePackage, cacheDir string) (map[crypto.Algorithm]string, error) {
@@ -173,9 +185,17 @@ func ChecksumsFromCache(pkg AlpinePackage, cacheDir string) (map[crypto.Algorith
 		return map[crypto.Algorithm]string{}, nil
 	}
 	pattern := filepath.Join(cacheDir, fmt.Sprintf("%s-%s*.apk", pkg.Name, pkg.Version))
-	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		return nil, err
+	var matches []string
+	var err error
+	for attempt := 1; attempt <= checksumGlobRetries; attempt++ {
+		matches, err = filepath.Glob(pattern)
+		if err != nil {
+			return nil, err
+		}
+		if len(matches) > 0 || attempt == checksumGlobRetries {
+			break
+		}
+		time.Sleep(checksumGlobRetryDelay)
 	}
 	if len(matches) == 0 {
 		return map[crypto.Algorithm]string{}, nil

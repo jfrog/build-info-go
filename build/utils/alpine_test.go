@@ -97,7 +97,9 @@ func TestPackagesFromArchivesDir(t *testing.T) {
 	for _, name := range []string{
 		"curl-8.5.0-r0.apk",
 		"ca-certificates-bundle-20240226-r0.apk", // dashes in the package name
-		"APKINDEX.a1b2c3.tar.gz",                 // index, not a package
+		// apk's real --cache-dir output: <name>-<version>.<8-hex-char-content-hash>.apk.
+		"libcurl-8.12.1-r0.915f2596.apk",
+		"APKINDEX.a1b2c3.tar.gz", // index, not a package
 		"notes.txt",
 	} {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("x"), 0644))
@@ -105,7 +107,7 @@ func TestPackagesFromArchivesDir(t *testing.T) {
 
 	pkgs, err := PackagesFromArchivesDir(dir)
 	require.NoError(t, err)
-	require.Len(t, pkgs, 2, "only .apk archives with a parsable name must be returned")
+	require.Len(t, pkgs, 3, "only .apk archives with a parsable name must be returned")
 
 	byName := make(map[string]string, len(pkgs))
 	for _, pkg := range pkgs {
@@ -114,6 +116,8 @@ func TestPackagesFromArchivesDir(t *testing.T) {
 	assert.Equal(t, "8.5.0-r0", byName["curl"])
 	assert.Equal(t, "20240226-r0", byName["ca-certificates-bundle"],
 		"the version must be split on the -r<revision> suffix, not the first dash")
+	assert.Equal(t, "8.12.1-r0", byName["libcurl"],
+		"the real apk cache filename format (with a content-hash segment before .apk) must be recognized")
 }
 
 func TestPackagesFromArchivesDir_EmptyAndMissing(t *testing.T) {
