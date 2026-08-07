@@ -569,3 +569,9 @@ func TestBuildInfoAppend_MavenSnapshotScenario(t *testing.T) {
 	assert.Len(t, buildInfo1.Modules[0].Artifacts, 1, "Should have 1 artifact")
 	assert.Equal(t, "deploy-sha", buildInfo1.Modules[0].Artifacts[0].Sha1, "Should have newer SHA1")
 }
+
+func TestCargoModuleType(t *testing.T) {
+	if Cargo != "cargo" {
+		t.Fatalf("expected Cargo module type to be %q, got %q", "cargo", Cargo)
+	}
+}
