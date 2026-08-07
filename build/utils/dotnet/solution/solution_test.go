@@ -30,9 +30,12 @@ func TestParseSlnxFile(t *testing.T) {
   </Folder>
 </Solution>`), 0o600))
 
-	paths, err := parseSlnxFile(slnxPath)
+	lines, err := parseSlnxFile(slnxPath)
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"ProjectA/ProjectA.csproj", "ProjectB/ProjectB.csproj"}, paths)
+	assert.ElementsMatch(t, []string{
+		`Project("{00000000-0000-0000-0000-000000000000}") = "ProjectA", "ProjectA/ProjectA.csproj"`,
+		`Project("{00000000-0000-0000-0000-000000000000}") = "ProjectB", "ProjectB/ProjectB.csproj"`,
+	}, lines)
 }
 
 // TestGetProjectsFromSlnxOnly verifies that getProjectsListFromSlns resolves every project
@@ -341,6 +344,147 @@ func TestParseSln(t *testing.T) {
 	}
 }
 
+func TestParseSlnx(t *testing.T) {
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+
+	testdataDir := filepath.Join(pwd, "testdata", "slnx")
+
+	tests := []struct {
+		name     string
+		slnxPath string
+		expected []string
+	}{
+		{"single", filepath.Join(testdataDir, "single.slnx"), []string{
+			`Project("{00000000-0000-0000-0000-000000000000}") = "packagesconfig", "packagesconfig.csproj"`,
+		}},
+		{"multiWithFolder", filepath.Join(testdataDir, "multi.slnx"), []string{
+			`Project("{00000000-0000-0000-0000-000000000000}") = "MyConsoleApp", "MyConsoleApp/MyConsoleApp.csproj"`,
+			`Project("{00000000-0000-0000-0000-000000000000}") = "ClassLibrary1", "ClassLibrary1/ClassLibrary1.csproj"`,
+		}},
+		{"explicitDisplayNameInFolder", filepath.Join(testdataDir, "namedproject.slnx"), []string{
+			`Project("{00000000-0000-0000-0000-000000000000}") = "CustomName", "deep/DeepProj.csproj"`,
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			results, err := parseSlnxFile(test.slnxPath)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, results)
+		})
+	}
+}
+
+func TestSlnxProjectNameFromPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{"forwardSlash", "src/MyProject/MyProject.csproj", "MyProject"},
+		{"backslash", `src\MyProject\MyProject.csproj`, "MyProject"},
+		{"noDir", "MyProject.csproj", "MyProject"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, slnxProjectNameFromPath(test.path))
+		})
+	}
+}
+
+// TestGetSlnFilesMatchesSlnx verifies getSlnFiles() picks up '.slnx' files, both when
+// auto-discovering in a directory and when an explicit slnFile is provided.
+func TestGetSlnFilesMatchesSlnx(t *testing.T) {
+	pwd, err := os.Getwd()
+	require.NoError(t, err)
+	testdataDir := filepath.Join(pwd, "testdata", "slnx")
+
+	t.Run("autoDiscover", func(t *testing.T) {
+		sol := solution{path: testdataDir}
+		slnFiles, err := sol.getSlnFiles()
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{
+			filepath.Join(testdataDir, "single.slnx"),
+			filepath.Join(testdataDir, "multi.slnx"),
+			filepath.Join(testdataDir, "namedproject.slnx"),
+		}, slnFiles)
+	})
+
+	t.Run("explicitSlnFile", func(t *testing.T) {
+		sol := solution{path: testdataDir, slnFile: "single.slnx"}
+		slnFiles, err := sol.getSlnFiles()
+		require.NoError(t, err)
+		assert.Equal(t, []string{filepath.Join(testdataDir, "single.slnx")}, slnFiles)
+	})
+}
+
+// TestGetSlnFilesPrefersSlnxOverSln verifies that when a directory contains both a legacy
+// '.sln' and its migrated '.slnx' counterpart (e.g. after 'dotnet sln migrate' leaves the old
+// '.sln' behind), auto-discovery only picks up the '.slnx', so the same projects aren't parsed
+// twice.
+func TestGetSlnFilesPrefersSlnxOverSln(t *testing.T) {
+	dir := t.TempDir()
+	slnxPath := filepath.Join(dir, "MySolution.slnx")
+	require.NoError(t, os.WriteFile(slnxPath, []byte(`<Solution>
+  <Project Path="proj/proj.csproj" />
+</Solution>`), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "MySolution.sln"), []byte(`Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "proj", "proj\proj.csproj", "{11111111-1111-1111-1111-111111111111}"
+EndProject
+`), 0644))
+
+	sol := solution{path: dir}
+	slnFiles, err := sol.getSlnFiles()
+	require.NoError(t, err)
+	assert.Equal(t, []string{slnxPath}, slnFiles)
+
+	results, err := sol.getProjectsFromSlns()
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		`Project("{00000000-0000-0000-0000-000000000000}") = "proj", "proj/proj.csproj"`,
+	}, results, "expected the project to be parsed once, from the '.slnx', not duplicated from the '.sln'")
+}
+
+// TestGetProjectsFromSlnsRoutesSlnxByExtension verifies getProjectsFromSlns() routes
+// '.slnx' files to parseSlnxFile and leaves legacy '.sln' parsing untouched.
+func TestGetProjectsFromSlnsRoutesSlnxByExtension(t *testing.T) {
+	pwd, err := os.Getwd()
+	require.NoError(t, err)
+	testdataDir := filepath.Join(pwd, "testdata", "slnx")
+
+	sol := solution{path: testdataDir, slnFile: "multi.slnx"}
+	results, err := sol.getProjectsFromSlns()
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		`Project("{00000000-0000-0000-0000-000000000000}") = "MyConsoleApp", "MyConsoleApp/MyConsoleApp.csproj"`,
+		`Project("{00000000-0000-0000-0000-000000000000}") = "ClassLibrary1", "ClassLibrary1/ClassLibrary1.csproj"`,
+	}, results)
+}
+
+// TestGetSlnFilesCaseInsensitiveExtension verifies '.sln'/'.slnx' matching (both in
+// auto-discovery and in extension-based parser routing) is case-insensitive, since macOS and
+// Windows filesystems are case-insensitive/case-preserving.
+func TestGetSlnFilesCaseInsensitiveExtension(t *testing.T) {
+	dir := t.TempDir()
+	slnxPath := filepath.Join(dir, "Upper.SLNX")
+	require.NoError(t, os.WriteFile(slnxPath, []byte(`<Solution>
+  <Project Path="proj/proj.csproj" />
+</Solution>`), 0644))
+
+	sol := solution{path: dir}
+	slnFiles, err := sol.getSlnFiles()
+	require.NoError(t, err)
+	require.Equal(t, []string{slnxPath}, slnFiles)
+
+	results, err := sol.getProjectsFromSlns()
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		`Project("{00000000-0000-0000-0000-000000000000}") = "proj", "proj/proj.csproj"`,
+	}, results)
+}
+
 func TestParseProjectLine(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -516,5 +660,50 @@ func TestGetNameVersionModuleId(t *testing.T) {
 			actual := getNameVersionModuleId(test.moduleOverride, test.projectName, test.projectVersion)
 			assert.Equal(t, test.expectedModuleID, actual)
 		})
+	}
+}
+
+// TestLoadSlnx is the end-to-end counterpart to TestLoadMixed for the '.slnx' format: it exercises
+// the full Load(...) path (auto-discovering dependency sources, running project extractors) with
+// an explicit '.slnx' file, not just parseSlnxFile() in isolation.
+func TestLoadSlnx(t *testing.T) {
+	// Prepare
+	log := utils.NewDefaultLogger(utils.INFO)
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	testdataDir := filepath.Join(wd, "testdata")
+
+	// Run 'nuget restore' (multi) / 'dotnet restore' (core) command before testing 'Load()' functionality.
+	assert.NoError(t, utils.CopyDir(filepath.Join(testdataDir, "multi"), filepath.Join(wd, "tmp", "multi-slnx"), true, nil))
+	defer func() {
+		assert.NoError(t, utils.RemoveTempDir(filepath.Join(wd, "tmp")))
+	}()
+	nugetCmd := exec.Command("nuget", "restore", filepath.Join(wd, "tmp", "multi-slnx", "multi.sln"))
+	assert.NoError(t, nugetCmd.Run())
+
+	solution := solution{path: filepath.Join(wd, "tmp", "multi-slnx"), slnFile: "multi.slnx"}
+	solutions, err := Load(solution.path, solution.slnFile, "", log)
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(solutions.GetProjects()))
+	assert.ElementsMatch(t, solutions.GetDependenciesSources(), []string{
+		filepath.Join(wd, "tmp", "multi-slnx", "multi", "packages.config"),
+		filepath.Join(wd, "tmp", "multi-slnx", "core", "obj", "project.assets.json"),
+	})
+
+	for _, project := range solutions.GetProjects() {
+		switch project.Name() {
+		case "multi":
+			assert.Equal(t, filepath.Join(wd, "tmp", "multi-slnx", "multi"), project.RootPath())
+			direct, err := project.Extractor().DirectDependencies()
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []string{"newtonsoft.json"}, direct)
+		case "core":
+			assert.Equal(t, filepath.Join(wd, "tmp", "multi-slnx", "core"), project.RootPath())
+			direct, err := project.Extractor().DirectDependencies()
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []string{"newtonsoft.json:9.0.1"}, direct)
+		default:
+			t.Errorf("Unexpected project name: %s", project.Name())
+		}
 	}
 }
