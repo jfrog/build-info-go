@@ -125,6 +125,21 @@ type GradleConfig struct {
 	CommandTimeout time.Duration
 }
 
+// NuGetConfig holds configuration for the NuGet FlexPack implementation.
+type NuGetConfig struct {
+	WorkingDirectory string
+	// TargetPath is the optional solution, project, or directory passed to the native restore command.
+	// Relative paths are resolved from WorkingDirectory.
+	TargetPath               string
+	ToolchainType            int
+	UseNugetV2               bool
+	AllowInsecureConnections bool
+	RepoName                 string
+	// Module is the optional user-supplied build-info module ID override (--module).
+	// When set, it is used as the module ID instead of the per-project default.
+	Module string
+}
+
 // IsFlexPackEnabled checks if the FlexPack (native) implementation should be used
 // Returns true if JFROG_RUN_NATIVE environment variable is set to "true"
 func IsFlexPackEnabled() bool {
