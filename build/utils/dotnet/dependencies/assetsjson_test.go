@@ -29,9 +29,9 @@ func TestAssetsDependenciesRetainedWithoutCachedPackage(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, allDependencies, "missing.package:1.2.3")
 	assert.Equal(t, "Missing.Package:1.2.3", allDependencies["missing.package:1.2.3"].Id)
-	assert.Empty(t, allDependencies["missing.package:1.2.3"].Checksum.Sha1)
-	assert.Empty(t, allDependencies["missing.package:1.2.3"].Checksum.Sha256)
-	assert.Empty(t, allDependencies["missing.package:1.2.3"].Checksum.Md5)
+	assert.Empty(t, allDependencies["missing.package:1.2.3"].Sha1)
+	assert.Empty(t, allDependencies["missing.package:1.2.3"].Sha256)
+	assert.Empty(t, allDependencies["missing.package:1.2.3"].Md5)
 }
 
 func TestAssetsDependenciesChecksumsAndPrivateScope(t *testing.T) {
