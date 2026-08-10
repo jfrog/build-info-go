@@ -383,7 +383,12 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 			return err
 		}
 		// The dependency name is a key in the object, which is not always available inside the value.
-		npmLsDependency.Name = string(key)
+		// When the value does hold a name, it takes precedence over the key: aliased dependencies
+		// (e.g. "strip-ansi-cjs": "npm:strip-ansi@^6.0.1") are keyed by their alias, while the real
+		// registry package name is the one reported inside the value.
+		if npmLsDependency.Name == "" {
+			npmLsDependency.Name = string(key)
+		}
 
 		// Some old npm versions store the git hash in the version field. We'll extract it to be used as the version.
 		if isGitDependency(npmLsDependency.Version) {
