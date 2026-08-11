@@ -280,7 +280,7 @@ func TestCollectDependenciesSkipsWorkspaceAndLocal(t *testing.T) {
 	if dep.Id != "serde-1.0.197.crate" {
 		t.Errorf("dep id = %q, want serde-1.0.197.crate", dep.Id)
 	}
-	if dep.Checksum.Sha256 == "" {
+	if dep.Sha256 == "" {
 		t.Error("expected sha256 from lockfile")
 	}
 	if len(dep.Scopes) != 1 || dep.Scopes[0] != "normal" {

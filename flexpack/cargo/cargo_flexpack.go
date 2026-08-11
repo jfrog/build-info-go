@@ -167,9 +167,9 @@ func (cf *CargoFlexPack) GetProjectDependencies() ([]flexpack.DependencyInfo, er
 		out = append(out, flexpack.DependencyInfo{
 			ID:     d.Id,
 			Type:   "crate",
-			SHA1:   d.Checksum.Sha1,
-			SHA256: d.Checksum.Sha256,
-			MD5:    d.Checksum.Md5,
+			SHA1:   d.Sha1,
+			SHA256: d.Sha256,
+			MD5:    d.Md5,
 			Scopes: d.Scopes,
 		})
 	}
@@ -208,7 +208,7 @@ func (cf *CargoFlexPack) CalculateChecksum() []map[string]interface{} {
 	out := make([]map[string]interface{}, 0, len(cf.dependencies))
 	for _, d := range cf.dependencies {
 		out = append(out, map[string]interface{}{
-			"id": d.Id, "sha1": d.Checksum.Sha1, "sha256": d.Checksum.Sha256, "md5": d.Checksum.Md5,
+			"id": d.Id, "sha1": d.Sha1, "sha256": d.Sha256, "md5": d.Md5,
 		})
 	}
 	return out
