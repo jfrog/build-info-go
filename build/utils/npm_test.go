@@ -618,6 +618,23 @@ func TestParseDependenciesEdgeCases(t *testing.T) {
 			shouldBeSkipped:  false,
 			expectParseError: false,
 		},
+		{
+			// Aliased dependency, e.g. "strip-ansi-cjs": "npm:strip-ansi@^6.0.1".
+			// The key is the alias, while "name" holds the real registry package.
+			name:             "Aliased dependency is identified by its real name",
+			inputJson:        `{"strip-ansi-cjs":{"name": "strip-ansi", "version": "6.0.1", "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz"}}`,
+			expectedId:       "strip-ansi:6.0.1",
+			shouldBeSkipped:  false,
+			expectParseError: false,
+		},
+		{
+			// Scoped alias, e.g. "cliui-cjs": "npm:@isaacs/cliui@^8.0.2".
+			name:             "Aliased scoped dependency is identified by its real name",
+			inputJson:        `{"cliui-cjs":{"name": "@isaacs/cliui", "version": "8.0.2", "resolved": "https://registry.npmjs.org/@isaacs/cliui/-/cliui-8.0.2.tgz"}}`,
+			expectedId:       "@isaacs/cliui:8.0.2",
+			shouldBeSkipped:  false,
+			expectParseError: false,
+		},
 	}
 
 	for _, tc := range testcases {

@@ -14,6 +14,7 @@ import (
 	ioutils "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/gofrog/log"
 
+	"github.com/jfrog/build-info-go/utils/cienv"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 
 	"github.com/jfrog/build-info-go/entities"
@@ -106,6 +107,11 @@ func (b *Build) AddPythonModule(srcPath string, tool pythonutils.PythonTool) (*P
 // AddYarnModule adds a Yarn module to this Build. Pass srcPath as an empty string if the root of the Yarn project is the working directory.
 func (b *Build) AddYarnModule(srcPath string) (*YarnModule, error) {
 	return newYarnModule(srcPath, b)
+}
+
+// AddAlpineModule adds an Alpine APK module to this Build.
+func (b *Build) AddAlpineModule(id, repoKey, alpineVersion string) *AlpineModule {
+	return newAlpineModule(id, repoKey, alpineVersion, b)
 }
 
 // AddNugetModules adds a Nuget module to this Build. Pass srcPath as an empty string if the root of the Nuget project is the working directory.
@@ -291,7 +297,16 @@ func (b *Build) createBuildInfoFromPartials() (*entities.BuildInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	buildInfo.Started = buildGeneralDetails.Timestamp.Format(entities.TimeFormat)
+	startTime := buildGeneralDetails.Timestamp
+	buildInfo.Started = startTime.Format(entities.TimeFormat)
+	// Record build duration only when running in a CI environment. Duration is measured from the
+	// build's start (recorded by the first build command) until now - the moment the build-info is
+	// assembled for publishing.
+	if cienv.IsCIRunning() && !startTime.IsZero() {
+		if duration := time.Since(startTime).Milliseconds(); duration > 0 {
+			buildInfo.DurationMillis = duration
+		}
+	}
 	modules, env, vcsList, issues, err := extractBuildInfoData(partials)
 	if err != nil {
 		return nil, err
@@ -314,6 +329,7 @@ func (b *Build) createBuildInfoFromPartials() (*entities.BuildInfo, error) {
 	}
 	return buildInfo, nil
 }
+
 
 func (b *Build) readPartialBuildInfoFiles() (entities.Partials, error) {
 	var partials entities.Partials
