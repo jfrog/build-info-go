@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
@@ -14,8 +15,8 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
 	"github.com/jfrog/build-info-go/flexpack/conan"
-	nixflex "github.com/jfrog/build-info-go/flexpack/nix"
 	gradleflex "github.com/jfrog/build-info-go/flexpack/gradle"
+	nixflex "github.com/jfrog/build-info-go/flexpack/nix"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/jfrog/build-info-go/utils/pythonutils"
 	clitool "github.com/urfave/cli/v2"
@@ -453,6 +454,54 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 			},
 		},
 		{
+			Name:      "apk",
+			Usage:     "Generate build-info for an Alpine apk project",
+			UsageText: "bi apk [apk command] [command options]",
+			Flags:     flags,
+			Action: func(context *clitool.Context) (err error) {
+				service := build.NewBuildInfoService()
+				service.SetLogger(logger)
+				bld, err := service.GetOrCreateBuild("apk-build", "1")
+				if err != nil {
+					return
+				}
+				defer func() {
+					err = errors.Join(err, bld.Clean())
+				}()
+
+				apkArgs := filterCliFlags(context.Args().Slice(), flags)
+				requestedPkgs := extractApkPackageNames(apkArgs)
+
+				cacheDir, err := os.MkdirTemp("", "bi-apk-cache-*")
+				if err != nil {
+					return fmt.Errorf("failed to create apk cache dir: %w", err)
+				}
+				defer func() { _ = os.RemoveAll(cacheDir) }()
+
+				apkArgs = append([]string{"--cache-dir", cacheDir}, apkArgs...)
+
+				alpineModule := bld.AddAlpineModule("apk-module", "", "")
+				alpineModule.SetCacheDir(filepath.Clean(cacheDir))
+				alpineModule.SetRequestedPackages(requestedPkgs)
+				if err = alpineModule.SnapshotInstalledPackages(); err != nil {
+					return
+				}
+
+				apkCmd := exec.Command("apk", apkArgs...)
+				apkCmd.Stdout = os.Stdout
+				apkCmd.Stderr = os.Stderr
+				if err = apkCmd.Run(); err != nil {
+					return
+				}
+
+				if err = alpineModule.CollectBuildInfo(); err != nil {
+					return
+				}
+
+				return printBuild(bld, context.String(formatFlag))
+			},
+		},
+		{
 			Name:      "poetry",
 			Usage:     "Generate build-info for a Poetry project",
 			UsageText: "bi poetry",
@@ -629,6 +678,30 @@ func filterCliFlags(allArgs []string, cliFlags []clitool.Flag) []string {
 		}
 	}
 	return filteredArgs
+}
+
+func extractApkPackageNames(args []string) []string {
+	apkCommands := map[string]struct{}{
+		"add": {}, "del": {}, "delete": {}, "fix": {}, "upgrade": {},
+		"update": {}, "info": {}, "search": {}, "policy": {}, "cache": {},
+		"version": {}, "index": {}, "fetch": {}, "audit": {}, "verify": {},
+		"manifest": {}, "dot": {}, "list": {}, "convdb": {}, "adbdump": {},
+	}
+	var pkgs []string
+	seenCommand := false
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if !seenCommand {
+			if _, isCmd := apkCommands[arg]; isCmd {
+				seenCommand = true
+				continue
+			}
+		}
+		pkgs = append(pkgs, arg)
+	}
+	return pkgs
 }
 
 func hasFlag(flagsList []clitool.Flag, arg string) bool {
