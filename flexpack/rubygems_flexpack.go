@@ -360,7 +360,7 @@ func (rf *RubygemsFlexPack) parseDependencies() {
 
 	// Reuse the shared chain builder (defined in uv_flexpack.go) — it operates purely
 	// on depInfoMap + fwdGraph keys, so exact gem names work the same as UV's normalised names.
-	buildUvRequestedBy(moduleID, []string{}, rootChildren, depInfoMap, fwdGraph, rf.requestedByChains, entities.RequestedByMaxLength)
+	buildRequestedByChains(moduleID, []string{}, rootChildren, depInfoMap, fwdGraph, rf.requestedByChains, entities.RequestedByMaxLength)
 
 	for _, dep := range depInfoMap {
 		rf.dependencies = append(rf.dependencies, *dep)
@@ -434,16 +434,22 @@ func mergeScopes(a, b []string) []string {
 	return result
 }
 
+// scopesEqual reports whether a and b hold the same scopes, ignoring order.
+//
+// Occurrences are counted rather than merely tested for membership. A membership check
+// treats ["a", "a", "b"] and ["b", "b", "a"] as equal, because they have the same length
+// and draw from the same distinct values, which would suppress a genuine scope update.
 func scopesEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	set := make(map[string]bool, len(a))
+	remaining := make(map[string]int, len(a))
 	for _, s := range a {
-		set[s] = true
+		remaining[s]++
 	}
 	for _, s := range b {
-		if !set[s] {
+		remaining[s]--
+		if remaining[s] < 0 {
 			return false
 		}
 	}
