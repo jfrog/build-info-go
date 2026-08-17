@@ -14,16 +14,30 @@ import (
 	"github.com/jfrog/gofrog/log"
 )
 
+// cargo-specific string constants surfaced across parsing, id-building and metadata invocation.
+// cargoMetadataFormatVersion pins the stable schema (1) that build-info-go targets; cargo has
+// not stabilised a v2 as of writing, so a hard-coded "1" is intentional — the const gives a
+// single edit-point if that ever changes. cargoRegistrySourcePrefix / crateFileSuffix name the
+// literals cargo uses in resolve-node source strings and in the artifact filename convention.
+const (
+	cargoMetadataFormatVersion = "1"
+	cargoRegistrySourcePrefix  = "registry+"
+	crateFileSuffix            = ".crate"
+)
+
 // parsePackageId normalizes a cargo metadata package id into (name, version, source).
 // Handles both the pre-1.77 form "name version (source)" and the >=1.77
 // PackageIdSpec form "source#name@version" or "source#version".
 func parsePackageId(id string) (name, version, source string) {
 	id = strings.TrimSpace(id)
-	// New PackageIdSpec form: contains '#'.
-	if hashIdx := strings.LastIndex(id, "#"); hashIdx != -1 {
+	// New PackageIdSpec form: contains '#'. LastIndex guarantees 0 <= hashIdx < len(id), so
+	// id[:hashIdx] is always in range; id[hashIdx+1:] is also in range (len(id) at worst,
+	// yielding an empty spec). The explicit hashIdx+1 <= len(id) guard is there for the reader
+	// so the bound is obvious at the call site, not because Go slicing needs it.
+	if hashIdx := strings.LastIndex(id, "#"); hashIdx != -1 && hashIdx+1 <= len(id) {
 		source = id[:hashIdx]
 		spec := id[hashIdx+1:]
-		if at := strings.LastIndex(spec, "@"); at != -1 {
+		if at := strings.LastIndex(spec, "@"); at != -1 && at+1 <= len(spec) {
 			// "name@version"
 			return spec[:at], spec[at+1:], source
 		}
@@ -32,9 +46,12 @@ func parsePackageId(id string) (name, version, source string) {
 		name = lastPathSegment(source)
 		return name, version, source
 	}
-	// Old form: "name version (source)".
+	// Old form: "name version (source)". openParen+2 addresses the first char AFTER " (";
+	// len(id)-1 is the trailing ')'. The explicit openParen+2 <= len(id)-1 guard rejects the
+	// degenerate "x ()"-style input where the source would be an empty substring — same reason
+	// as above: the reader shouldn't have to prove slice bounds in their head.
 	openParen := strings.Index(id, " (")
-	if openParen != -1 && strings.HasSuffix(id, ")") {
+	if openParen != -1 && strings.HasSuffix(id, ")") && openParen+2 <= len(id)-1 {
 		source = id[openParen+2 : len(id)-1]
 		id = id[:openParen]
 	}
@@ -61,6 +78,12 @@ func lastPathSegment(s string) string {
 // surface as "normal" so build-info readers see the same vocabulary as `cargo tree`
 // and Cargo.toml. A dependency with multiple kinds prefers normal > build > dev.
 func scopeForDepKinds(kinds []CargoDepKind, includeDev bool) (string, bool) {
+	// hasNormal/hasBuild/hasDev accumulate: they are set to true and never back to false, so a
+	// later iteration can only re-assert an existing true. That is why the loop has no `break`
+	// or per-kind `continue` — a dependency may appear multiple times with different Kind values
+	// (a crate can be BOTH a normal AND a dev dependency), and we need to know every kind that
+	// pulled it in so the normal>build>dev precedence below picks the strongest one, not the
+	// first one cargo happened to emit.
 	hasNormal, hasBuild, hasDev := false, false, false
 	for _, k := range kinds {
 		switch k.Kind {
@@ -134,15 +157,12 @@ func findCachedCrate(home, name, version string) string {
 func (cf *CargoFlexPack) resolveChecksum(name, version, lockSha256 string) entities.Checksum {
 	if path := findCachedCrate(cargoHome(), name, version); path != "" {
 		if fd, err := crypto.GetFileDetails(path, true); err == nil {
-			log.Debug("cargo: checksums for " + name + "-" + version + " from local cache")
 			return entities.Checksum{Sha1: fd.Checksum.Sha1, Sha256: fd.Checksum.Sha256, Md5: fd.Checksum.Md5}
 		}
 	}
 	if lockSha256 != "" {
-		log.Debug("cargo: checksum for " + name + "-" + version + " from Cargo.lock (sha256 only)")
 		return entities.Checksum{Sha256: lockSha256}
 	}
-	log.Debug("cargo: no local checksum for " + name + "-" + version + ", leaving for server enrichment")
 	return entities.Checksum{}
 }
 
@@ -167,8 +187,10 @@ func parseLockfile(path string) (map[string]string, error) {
 }
 
 // metadataArgs builds the argument list for `cargo metadata`, appending caller-supplied extra args.
+// The --format-version is pinned to cargoMetadataFormatVersion (currently "1"); cargo has not
+// stabilised any other value, so hard-coding it via the const is intentional.
 func metadataArgs(extra []string) []string {
-	args := []string{"metadata", "--format-version", "1"}
+	args := []string{"metadata", "--format-version", cargoMetadataFormatVersion}
 	return append(args, extra...)
 }
 
@@ -179,15 +201,13 @@ func metadataArgs(extra []string) []string {
 // dev-dependencies are excluded when includeDev is false), so the mismatch warning only
 // fires on genuine dependency loss rather than on every project that has dev-dependencies.
 func countRegistryNodes(meta *CargoMetadata, includeDev bool) int {
+	// One pass over WorkspaceMembers seeds both maps: `workspace` is the exclusion set (workspace
+	// members are not counted in the registry-node total), and `roots` is the seed for the
+	// kind-aware reachability walk. Splitting them into two ranges is equivalent but wasted work.
 	workspace := make(map[string]bool)
+	roots := make(map[string]bool)
 	for _, id := range meta.WorkspaceMembers {
 		workspace[id] = true
-	}
-	// Seed from every workspace member plus the resolve root, then walk the same kind-aware
-	// reachability the collector uses — so the expected count excludes dev-only subtrees exactly
-	// as collection does, and the mismatch warning only fires on genuine dependency loss.
-	roots := make(map[string]bool)
-	for id := range workspace {
 		roots[id] = true
 	}
 	if meta.Resolve.Root != "" {
@@ -200,7 +220,7 @@ func countRegistryNodes(meta *CargoMetadata, includeDev bool) int {
 			continue
 		}
 		_, _, source := parsePackageId(id)
-		if !strings.HasPrefix(source, "registry+") {
+		if !strings.HasPrefix(source, cargoRegistrySourcePrefix) {
 			continue
 		}
 		n++
@@ -219,8 +239,8 @@ func (cf *CargoFlexPack) runCargoMetadata() ([]byte, error) {
 // become "<name>-<version>.crate"; first-party nodes (workspace/root, git, path) use the crate name.
 func fileId(nodeId string) string {
 	name, version, source := parsePackageId(nodeId)
-	if strings.HasPrefix(source, "registry+") {
-		return name + "-" + version + ".crate"
+	if strings.HasPrefix(source, cargoRegistrySourcePrefix) {
+		return name + "-" + version + crateFileSuffix
 	}
 	return name
 }
@@ -360,14 +380,14 @@ func (cf *CargoFlexPack) depsForRoots(rootIds map[string]bool) []entities.Depend
 			continue
 		}
 		name, version, source := parsePackageId(node.Id)
-		if !strings.HasPrefix(source, "registry+") {
+		if !strings.HasPrefix(source, cargoRegistrySourcePrefix) {
 			continue // skip git/path/local sources
 		}
 		scope, include := scopeForDepKinds(kindsById[node.Id], cf.config.IncludeDevDependencies)
 		if !include {
 			continue
 		}
-		key := name + "-" + version + ".crate"
+		key := name + "-" + version + crateFileSuffix
 		byKey[key] = entities.Dependency{
 			Id:       key,
 			Type:     "crate",
@@ -396,7 +416,13 @@ func (cf *CargoFlexPack) depsForRoots(rootIds map[string]bool) []entities.Depend
 			}
 			child := byKey[childKey]
 			if parentLabel == child.Id {
-				continue // cargo can list the same node in its own edge list on cycles; skip self-parents
+				// Self-parent guard: cargo's resolve graph occasionally lists a node in its own edge
+				// list when a build/dev-dependency cycles back to the same crate (e.g. a proc-macro
+				// crate that dev-depends on itself for its integration tests). Without this skip we
+				// would record "foo-1.0.0.crate" as a requestedBy of itself, which is meaningless in
+				// build-info and clutters the UI. Reachability already prevents infinite recursion;
+				// this guard is purely about not emitting the self-edge in the output.
+				continue
 			}
 			if len(child.RequestedBy) >= entities.RequestedByMaxLength {
 				continue
