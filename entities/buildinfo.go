@@ -48,6 +48,7 @@ const (
 	Conan     ModuleType = "conan"
 	Nix       ModuleType = "nix"
 	Uv        ModuleType = "uv"
+	Gem       ModuleType = "gem"
 	Apk       ModuleType = "apk"
 )
 
@@ -354,11 +355,19 @@ func mergeDependenciesLists(dependenciesToAdd, intoDependencies *[]Dependency) {
 }
 
 func mergeDependencies(dep1, dep2 Dependency) Dependency {
+	// Prefer whichever side actually resolved a repository: two records for the same
+	// dependency ID can come from calls with different visibility into Artifactory (e.g.
+	// a `gem build` merge, which has none of its own, with a prior install that does).
+	repo := dep1.Repository
+	if repo == "" {
+		repo = dep2.Repository
+	}
 	return Dependency{
 		Id:          dep1.Id,
 		Type:        dep1.Type,
 		Scopes:      mergeStringSlices(dep1.Scopes, dep2.Scopes),
 		RequestedBy: mergeRequestedBySlices(dep1.RequestedBy, dep2.RequestedBy),
+		Repository:  repo,
 		Checksum:    dep1.Checksum,
 	}
 }
