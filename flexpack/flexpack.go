@@ -115,20 +115,27 @@ type GemConfig struct {
 	// WorkingDirectory is the directory where the Gemfile.lock resides
 	WorkingDirectory string
 
-	// LockFilePath overrides the default Gemfile.lock path.
+	// LockFilePath overrides the default Gemfile.lock location. Since the dependency
+	// graph is now read live from Bundler rather than parsed from disk, this is used to
+	// derive a BUNDLE_GEMFILE override (by stripping the ".lock" suffix) for the Bundler
+	// invocation, for projects whose Gemfile is not in WorkingDirectory.
 	LockFilePath string
+
+	// BundleExecutable overrides the bundler executable used to query the dependency
+	// graph natively (default: "bundle"). Mainly useful for testing.
+	BundleExecutable string
 
 	// InstalledPackages is the ground-truth set of gems actually installed,
 	// keyed by gem name → version string. When non-nil, only gems present in
 	// this map are included in build-info. This correctly handles bundler group
 	// filtering (--without development test, --with, etc.) without parsing the
-	// Gemfile groups ourselves. When nil, every gem in the lock file is included.
+	// Gemfile groups ourselves. When nil, every gem Bundler resolved is included.
 	InstalledPackages map[string]string
 
-	// GemGroups maps gem names to their Bundler groups (parsed from Gemfile).
-	// Gems with no group are classified as "production". Used to set Scopes on
-	// dependencies for security scanning (e.g., Xray distinguishes prod vs dev).
-	// When nil, no scopes are assigned.
+	// GemGroups optionally overrides the Bundler group(s) reported live for a given gem
+	// name. Bundler's own groups are used by default; set an entry here only to force a
+	// different classification for a specific gem. Used to set Scopes on dependencies
+	// for security scanning (e.g., Xray distinguishes prod vs dev).
 	GemGroups map[string][]string
 
 	// ProjectName and ProjectVersion override the module ID. When ProjectName is

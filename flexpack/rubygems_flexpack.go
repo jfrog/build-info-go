@@ -1,7 +1,7 @@
 package flexpack
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,50 +12,75 @@ import (
 	"github.com/jfrog/gofrog/log"
 )
 
-// gemSourceType identifies where a gem spec originated in the lock file.
-type gemSourceType string
+// gemDepType is the build-info dependency/artifact type for RubyGems packages.
+const gemDepType = "gem"
 
-const (
-	gemSourceGEM  gemSourceType = "GEM"
-	gemSourceGIT  gemSourceType = "GIT"
-	gemSourcePATH gemSourceType = "PATH"
+// bundlerSelfGemName is Bundler's own gem. It is always present in
+// Bundler.definition.specs (Bundler depends on itself to run), but it is never a real
+// project dependency, so it is filtered out of the collected dependency set.
+const bundlerSelfGemName = "bundler"
 
-	// gemDepType is the build-info dependency/artifact type for RubyGems packages.
-	gemDepType = "gem"
-)
-
-// gemSpec represents a single resolved gem in the lock file's "specs:" section.
-type gemSpec struct {
-	name    string
-	version string
-	deps    []string      // names of the gem's direct dependencies
-	source  gemSourceType // GEM / GIT / PATH
-	remote  string        // remote URL (GEM) or repo (GIT/PATH); not in Artifactory for GIT/PATH
+// bundlerGemSpec mirrors one entry of the JSON array emitted by
+// bundlerDependencyGraphScript: a single resolved gem from Bundler's own dependency graph.
+type bundlerGemSpec struct {
+	Name    string   `json:"name"`
+	Version string   `json:"version"`
+	Deps    []string `json:"deps"`
+	// Groups is non-nil only for gems declared directly in the Gemfile (i.e. present in
+	// Bundler.definition.dependencies). Transitive gems get no group of their own and
+	// inherit one from their parent chain (see assignScopes/propagateScopes).
+	Groups []string `json:"groups"`
+	// Source is "GEM" (registry), "GIT", or "PATH".
+	Source string `json:"source"`
+	// Remote is the git/path location for GIT/PATH gems; empty for registry gems.
+	Remote string `json:"remote"`
 }
 
-// RubygemsLockFile is the parsed representation of a Gemfile.lock.
-type RubygemsLockFile struct {
-	// specs is keyed by exact gem name → resolved spec.
-	specs map[string]*gemSpec
-	// directDeps are the gem names declared in the DEPENDENCIES section
-	// (i.e. the gems requested directly by the project's Gemfile).
-	directDeps []string
-	// bundlerVersion is read from the "BUNDLED WITH" section, if present.
-	bundlerVersion string
-}
+// bundlerDependencyGraphScript asks Bundler itself, via its own public Definition API,
+// for the resolved dependency graph, each direct dependency's Gemfile groups, and each
+// gem's source. This is read straight from Bundler.definition rather than by parsing
+// Gemfile.lock: Bundler owns that file's on-disk format and may change it across
+// versions, while Definition's public API is Bundler's own stable contract.
+const bundlerDependencyGraphScript = `
+require "bundler"
+require "json"
+
+definition = Bundler.definition
+direct_groups = {}
+definition.dependencies.each { |dep| direct_groups[dep.name] = dep.groups.map(&:to_s) }
+
+gems = definition.specs.map do |spec|
+  git_source  = spec.source.is_a?(Bundler::Source::Git)
+  path_source = !git_source && spec.source.is_a?(Bundler::Source::Path)
+  # Match Gemfile.lock's own "name (version-platform)" convention for platform-specific
+  # gems (e.g. native extensions like nokogiri): spec.version alone drops the platform.
+  platform = spec.platform.to_s
+  version  = platform == "ruby" ? spec.version.to_s : "#{spec.version}-#{platform}"
+  {
+    name:    spec.name,
+    version: version,
+    deps:    spec.dependencies.select { |d| d.type == :runtime }.map(&:name),
+    groups:  direct_groups[spec.name],
+    source:  git_source ? "GIT" : (path_source ? "PATH" : "GEM"),
+    remote:  git_source ? spec.source.uri : (path_source ? spec.source.path.to_s : nil),
+  }
+end
+
+puts JSON.generate(gems)
+`
 
 // RubygemsFlexPack implements FlexPackManager and BuildInfoCollector for RubyGems / Bundler.
-// Gemfile.lock is lock-file driven (like uv.lock), so this mirrors the UV FlexPack:
 //   - dep ID:      "name:version"   (e.g. "rake:13.0.6")
 //   - dep type:    "gem"
 //   - requestedBy: full chain back to the root module
-//   - no scopes:   Gemfile groups are not represented in the lock specs section
+//   - scopes:      Bundler's own Gemfile group names (e.g. "default", "development"),
+//     read live from Bundler rather than a hardcoded label.
 //
-// Gemfile.lock carries no checksums, so sha1/sha256/md5 enrichment is left to the
-// JFrog CLI layer (Artifactory AQL), exactly like UV.
+// Bundler's dependency graph carries no checksums, so sha1/sha256/md5 enrichment is left
+// to the JFrog CLI layer (Artifactory AQL).
 type RubygemsFlexPack struct {
 	config            GemConfig
-	lockFileData      *RubygemsLockFile
+	bundlerGems       []bundlerGemSpec
 	projectName       string
 	projectVersion    string
 	parsed            bool
@@ -66,6 +91,9 @@ type RubygemsFlexPack struct {
 
 // NewRubygemsFlexPack creates a new RubygemsFlexPack instance.
 func NewRubygemsFlexPack(config GemConfig) (*RubygemsFlexPack, error) {
+	if config.BundleExecutable == "" {
+		config.BundleExecutable = "bundle"
+	}
 	rf := &RubygemsFlexPack{
 		config:            config,
 		dependencies:      []DependencyInfo{},
@@ -73,9 +101,11 @@ func NewRubygemsFlexPack(config GemConfig) (*RubygemsFlexPack, error) {
 		requestedByChains: make(map[string][][]string),
 	}
 	rf.resolveProjectIdentity()
-	if err := rf.loadGemfileLock(); err != nil {
-		log.Debug("Failed to load Gemfile.lock, dependency collection will be empty: " + err.Error())
+	gems, err := rf.loadBundlerDependencyGraph()
+	if err != nil {
+		log.Debug("Failed to query Bundler dependency graph, dependency collection will be empty: " + err.Error())
 	}
+	rf.bundlerGems = gems
 	return rf, nil
 }
 
@@ -94,201 +124,37 @@ func (rf *RubygemsFlexPack) resolveProjectIdentity() {
 	}
 }
 
-// gemLockPath returns the path of the Gemfile.lock to parse.
-func (rf *RubygemsFlexPack) gemLockPath() string {
-	if rf.config.LockFilePath != "" {
-		return rf.config.LockFilePath
+// loadBundlerDependencyGraph runs bundlerDependencyGraphScript via Bundler and decodes
+// its JSON output.
+func (rf *RubygemsFlexPack) loadBundlerDependencyGraph() ([]bundlerGemSpec, error) {
+	cmd := exec.Command(rf.config.BundleExecutable, "exec", "ruby", "-e", bundlerDependencyGraphScript) // #nosec G204 -- executable is operator-configured, not user input
+	cmd.Dir = rf.config.WorkingDirectory
+	if gemfile := rf.gemfileOverride(); gemfile != "" {
+		cmd.Env = append(os.Environ(), "BUNDLE_GEMFILE="+gemfile)
 	}
-	return filepath.Join(rf.config.WorkingDirectory, "Gemfile.lock")
-}
 
-// loadGemfileLock reads and parses the Gemfile.lock.
-func (rf *RubygemsFlexPack) loadGemfileLock() error {
-	lockPath := rf.gemLockPath()
-	data, err := os.ReadFile(lockPath)
+	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to read Gemfile.lock: %w", err)
+		if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) > 0 {
+			return nil, fmt.Errorf("bundler dependency graph query failed: %w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
+		return nil, fmt.Errorf("bundler dependency graph query failed: %w", err)
 	}
-	rf.lockFileData = parseGemfileLock(string(data))
-	return nil
+
+	var gems []bundlerGemSpec
+	if err := json.Unmarshal(output, &gems); err != nil {
+		return nil, fmt.Errorf("failed to parse Bundler dependency graph output: %w", err)
+	}
+	return gems, nil
 }
 
-// parseGemfileLock parses the indentation-based Gemfile.lock format.
-//
-// Layout:
-//
-//	GEM
-//	  remote: https://rubygems.org/
-//	  specs:
-//	    rake (13.0.6)
-//	    rspec (3.12.0)
-//	      rspec-core (~> 3.12.0)
-//	  ...
-//	PLATFORMS
-//	  ruby
-//	DEPENDENCIES
-//	  rake
-//	  rspec
-//	BUNDLED WITH
-//	   2.4.10
-//
-// GIT and PATH blocks follow the same "specs:" structure as GEM.
-func parseGemfileLock(content string) *RubygemsLockFile {
-	lock := &RubygemsLockFile{
-		specs: make(map[string]*gemSpec),
+// gemfileOverride derives a Gemfile path from LockFilePath (stripping the ".lock"
+// suffix), for BUNDLE_GEMFILE, when LockFilePath is set.
+func (rf *RubygemsFlexPack) gemfileOverride() string {
+	if rf.config.LockFilePath == "" {
+		return ""
 	}
-
-	var (
-		currentSection gemSourceType
-		currentRemote  string
-		inSpecs        bool
-		inDeps         bool
-		inBundledWith  bool
-		currentSpec    *gemSpec
-	)
-
-	scanner := bufio.NewScanner(strings.NewReader(content))
-	// Gemfile.lock lines are short; default buffer is sufficient but raise it to be safe.
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-	for scanner.Scan() {
-		rawLine := scanner.Text()
-		if strings.TrimSpace(rawLine) == "" {
-			// Blank line ends the current spec context but section headers reset state anyway.
-			currentSpec = nil
-			continue
-		}
-
-		indent := countLeadingSpaces(rawLine)
-		line := strings.TrimRight(rawLine, " \t")
-		trimmed := strings.TrimSpace(line)
-
-		// Section headers sit at column 0.
-		if indent == 0 {
-			inSpecs = false
-			inDeps = false
-			inBundledWith = false
-			currentSpec = nil
-			currentRemote = ""
-			switch trimmed {
-			case "GEM":
-				currentSection = gemSourceGEM
-			case "GIT":
-				currentSection = gemSourceGIT
-			case "PATH":
-				currentSection = gemSourcePATH
-			case "DEPENDENCIES":
-				currentSection = ""
-				inDeps = true
-			case "BUNDLED WITH":
-				currentSection = ""
-				inBundledWith = true
-			default:
-				// PLATFORMS, RUBY VERSION, CHECKSUMS, etc. — ignored.
-				currentSection = ""
-			}
-			continue
-		}
-
-		// DEPENDENCIES entries are indented by 2 spaces: "name", "name (constraint)", "name!".
-		if inDeps {
-			name := gemDependencyName(trimmed)
-			if name != "" {
-				lock.directDeps = append(lock.directDeps, name)
-			}
-			continue
-		}
-
-		// BUNDLED WITH holds a single indented version line.
-		if inBundledWith {
-			lock.bundlerVersion = trimmed
-			continue
-		}
-
-		// Inside a GEM/GIT/PATH block.
-		if currentSection != "" {
-			switch {
-			case strings.HasPrefix(trimmed, "remote:"):
-				currentRemote = strings.TrimSpace(strings.TrimPrefix(trimmed, "remote:"))
-				continue
-			case trimmed == "specs:":
-				inSpecs = true
-				continue
-			case !inSpecs:
-				// revision:, ref:, branch:, glob:, etc. — metadata we don't need.
-				continue
-			}
-
-			// Within "specs:": indent 4 = spec, indent 6+ = that spec's dependency.
-			if indent <= 4 {
-				name, version := parseSpecLine(trimmed)
-				if name == "" {
-					continue
-				}
-				spec := &gemSpec{
-					name:    name,
-					version: version,
-					source:  currentSection,
-					remote:  currentRemote,
-				}
-				lock.specs[name] = spec
-				currentSpec = spec
-			} else if currentSpec != nil {
-				depName := gemDependencyName(trimmed)
-				if depName != "" {
-					currentSpec.deps = append(currentSpec.deps, depName)
-				}
-			}
-		}
-	}
-
-	return lock
-}
-
-// countLeadingSpaces returns the number of leading space characters.
-func countLeadingSpaces(s string) int {
-	count := 0
-	for _, r := range s {
-		if r == ' ' {
-			count++
-			continue
-		}
-		break
-	}
-	return count
-}
-
-// parseSpecLine parses "name (version)" → name, version. The version may carry a
-// platform suffix, e.g. "nokogiri (1.13.9-x86_64-linux)"; the full string is kept.
-func parseSpecLine(line string) (name, version string) {
-	open := strings.Index(line, " (")
-	if open == -1 {
-		return strings.TrimSpace(line), ""
-	}
-	name = strings.TrimSpace(line[:open])
-	rest := line[open+2:]
-	if closeIdx := strings.LastIndex(rest, ")"); closeIdx != -1 {
-		version = strings.TrimSpace(rest[:closeIdx])
-	}
-	return name, version
-}
-
-// gemDependencyName extracts the gem name from a dependency line, stripping any
-// version constraint in parentheses and the trailing "!" pin marker.
-//
-//	"rspec-core (~> 3.12.0)" → "rspec-core"
-//	"rails (>= 6.0, < 7)"    → "rails"
-//	"my_gem!"                → "my_gem"
-func gemDependencyName(line string) string {
-	name := line
-	if open := strings.Index(name, " ("); open != -1 {
-		name = name[:open]
-	} else if open := strings.Index(name, "("); open != -1 {
-		name = name[:open]
-	}
-	name = strings.TrimSpace(name)
-	name = strings.TrimSuffix(name, "!")
-	return strings.TrimSpace(name)
+	return strings.TrimSuffix(rf.config.LockFilePath, ".lock")
 }
 
 // ensureParsed builds the dependency model exactly once.
@@ -300,18 +166,28 @@ func (rf *RubygemsFlexPack) ensureParsed() {
 	rf.parsed = true
 }
 
-// parseDependencies populates rf.dependencies, rf.depGraph and rf.requestedByChains.
+// parseDependencies populates rf.dependencies, rf.depGraph and rf.requestedByChains from
+// the gems reported by Bundler.
 func (rf *RubygemsFlexPack) parseDependencies() {
-	if rf.lockFileData == nil {
+	if len(rf.bundlerGems) == 0 {
 		return
 	}
 
 	moduleID := rf.moduleID()
 
+	specByName := make(map[string]*bundlerGemSpec, len(rf.bundlerGems))
+	for i := range rf.bundlerGems {
+		spec := &rf.bundlerGems[i]
+		if spec.Name == bundlerSelfGemName {
+			continue
+		}
+		specByName[spec.Name] = spec
+	}
+
 	// Build dep info map keyed by exact gem name. When InstalledPackages is provided,
 	// only the gems actually installed are included (handles bundler group filtering).
-	depInfoMap := make(map[string]*DependencyInfo)
-	for name, spec := range rf.lockFileData.specs {
+	depInfoMap := make(map[string]*DependencyInfo, len(specByName))
+	for name, spec := range specByName {
 		if rf.config.InstalledPackages != nil {
 			if _, ok := rf.config.InstalledPackages[name]; !ok {
 				continue
@@ -320,43 +196,42 @@ func (rf *RubygemsFlexPack) parseDependencies() {
 		// GIT/PATH gems are not stored in Artifactory; flag them so the CLI layer
 		// can skip checksum enrichment for them.
 		directURL := ""
-		if spec.source == gemSourceGIT || spec.source == gemSourcePATH {
-			directURL = spec.remote
+		if spec.Source == "GIT" || spec.Source == "PATH" {
+			directURL = spec.Remote
 		}
 		depInfoMap[name] = &DependencyInfo{
-			ID:        fmt.Sprintf("%s:%s", spec.name, spec.version),
-			Name:      spec.name,
-			Version:   spec.version,
+			ID:        fmt.Sprintf("%s:%s", spec.Name, spec.Version),
+			Name:      spec.Name,
+			Version:   spec.Version,
 			Type:      gemDepType,
 			DirectURL: directURL,
 		}
 	}
 
-	// Forward graph (name → child names) limited to gems present in depInfoMap.
+	// Forward graph (name → child names) limited to gems present in depInfoMap, plus the
+	// Gemfile groups Bundler reported for direct dependencies.
 	fwdGraph := make(map[string][]string, len(depInfoMap))
+	directGroups := make(map[string][]string)
 	for name, info := range depInfoMap {
-		spec := rf.lockFileData.specs[name]
-		if spec == nil {
-			continue
-		}
+		spec := specByName[name]
 		var children []string
 		var childIDs []string
-		for _, child := range spec.deps {
-			if _, ok := depInfoMap[child]; ok {
+		for _, child := range spec.Deps {
+			if childInfo, ok := depInfoMap[child]; ok {
 				children = append(children, child)
-				childIDs = append(childIDs, depInfoMap[child].ID)
+				childIDs = append(childIDs, childInfo.ID)
 			}
 		}
 		fwdGraph[name] = children
 		rf.depGraph[info.ID] = childIDs
+
+		if spec.Groups != nil {
+			directGroups[name] = spec.Groups
+		}
 	}
 
-	rootChildren := rf.collectRootChildren(depInfoMap)
-
-	// Assign scopes from Gemfile groups when available.
-	if rf.config.GemGroups != nil {
-		rf.assignScopes(depInfoMap, fwdGraph, rootChildren)
-	}
+	rootChildren := rf.collectRootChildren(depInfoMap, directGroups)
+	rf.assignScopes(depInfoMap, fwdGraph, rootChildren, directGroups)
 
 	// Reuse the shared chain builder (defined in uv_flexpack.go) — it operates purely
 	// on depInfoMap + fwdGraph keys, so exact gem names work the same as UV's normalised names.
@@ -367,25 +242,26 @@ func (rf *RubygemsFlexPack) parseDependencies() {
 	}
 }
 
-// assignScopes classifies dependencies as production/development/test based on Gemfile groups.
-// Direct deps get their scope from GemGroups; transitive deps inherit the "broadest" scope
-// from their parent chain (production > development > test).
-func (rf *RubygemsFlexPack) assignScopes(depInfoMap map[string]*DependencyInfo, fwdGraph map[string][]string, rootChildren []string) {
-	// Assign direct dependency scopes from GemGroups.
-	directScopes := make(map[string][]string) // gem name → scopes
-	for name := range depInfoMap {
-		if groups, ok := rf.config.GemGroups[name]; ok {
-			directScopes[name] = groups
-		}
+// assignScopes classifies dependencies using Bundler's own Gemfile group names.
+// Direct deps get their scope from directGroups (as reported live by Bundler); transitive
+// deps inherit the union of scopes from their parent chain. An explicit GemGroups entry
+// in the config, when present, overrides Bundler's own value for that gem.
+func (rf *RubygemsFlexPack) assignScopes(depInfoMap map[string]*DependencyInfo, fwdGraph map[string][]string, rootChildren []string, directGroups map[string][]string) {
+	scopesByName := make(map[string][]string, len(directGroups))
+	for name, groups := range directGroups {
+		scopesByName[name] = groups
+	}
+	for name, groups := range rf.config.GemGroups {
+		scopesByName[name] = groups
 	}
 
-	// BFS from root to propagate scopes to transitive deps.
-	// A transitive dep inherits the most restrictive scope of its ancestors.
+	// BFS from root to propagate scopes to transitive deps. A transitive dep inherits
+	// the union of scopes of its ancestors.
 	resolved := make(map[string][]string)
 	for _, name := range rootChildren {
-		scopes := directScopes[name]
+		scopes := scopesByName[name]
 		if len(scopes) == 0 {
-			scopes = []string{"production"}
+			scopes = []string{"default"}
 		}
 		rf.propagateScopes(name, scopes, fwdGraph, depInfoMap, resolved)
 	}
@@ -395,14 +271,14 @@ func (rf *RubygemsFlexPack) assignScopes(depInfoMap map[string]*DependencyInfo, 
 		if scopes, ok := resolved[name]; ok {
 			dep.Scopes = scopes
 		} else {
-			dep.Scopes = []string{"production"}
+			dep.Scopes = []string{"default"}
 		}
 	}
 }
 
 // propagateScopes recursively assigns scopes via BFS. When a dep is reachable from
 // multiple parents with different scopes, it gets all unique scopes (e.g., a gem used
-// by both a dev gem and a prod gem is classified as ["production", "development"]).
+// by both a dev gem and a default gem is classified as ["default", "development"]).
 func (rf *RubygemsFlexPack) propagateScopes(name string, scopes []string, fwdGraph map[string][]string, depInfoMap map[string]*DependencyInfo, resolved map[string][]string) {
 	existing := resolved[name]
 	merged := mergeScopes(existing, scopes)
@@ -456,15 +332,14 @@ func scopesEqual(a, b []string) bool {
 	return true
 }
 
-// collectRootChildren returns the project's direct dependencies that are present in depInfoMap.
-// Falls back to every gem when the DEPENDENCIES section is empty/unparsed.
-func (rf *RubygemsFlexPack) collectRootChildren(depInfoMap map[string]*DependencyInfo) []string {
+// collectRootChildren returns the project's direct dependencies: gems Bundler reported
+// a Gemfile group for. Falls back to every gem when none were identified as direct
+// (e.g. the dependency graph query failed to report any groups).
+func (rf *RubygemsFlexPack) collectRootChildren(depInfoMap map[string]*DependencyInfo, directGroups map[string][]string) []string {
 	var rootChildren []string
-	seen := make(map[string]bool)
-	for _, name := range rf.lockFileData.directDeps {
-		if _, ok := depInfoMap[name]; ok && !seen[name] {
+	for name := range depInfoMap {
+		if _, ok := directGroups[name]; ok {
 			rootChildren = append(rootChildren, name)
-			seen[name] = true
 		}
 	}
 	if len(rootChildren) == 0 {
@@ -527,7 +402,6 @@ func (rf *RubygemsFlexPack) CalculateChecksum() []map[string]interface{} {
 }
 
 // CalculateScopes returns the unique set of scopes across all dependencies.
-// RubyGems lock specs carry no group/scope information, so this is typically empty.
 func (rf *RubygemsFlexPack) CalculateScopes() []string {
 	rf.ensureParsed()
 	scopesMap := make(map[string]bool)
