@@ -49,6 +49,7 @@ const (
 	Nix       ModuleType = "nix"
 	Uv        ModuleType = "uv"
 	Gem       ModuleType = "gem"
+	Apk       ModuleType = "apk"
 )
 
 type BuildInfo struct {

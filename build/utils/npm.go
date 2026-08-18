@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/jfrog/gofrog/crypto"
@@ -119,13 +120,23 @@ func CalculateDependenciesMap(executablePath, srcPath, moduleId string, npmListP
 		}
 	}
 	parseFunc := parseNpmLsDependencyFunc(npmVersion)
+	// Dependencies that npm never resolved (e.g. an unmet peer dependency) and that therefore
+	// carry no locator we can hash into a version. They're excluded from dependenciesMap below;
+	// collect their names here so they're still visible to the caller instead of vanishing silently.
+	var unresolvedDeps []string
 	// Parse the dependencies json object.
-	return dependenciesMap, jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
+	if err := jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) (err error) {
 		if string(key) == "dependencies" {
-			err = parseDependencies(value, []string{moduleId}, dependenciesMap, parseFunc, log)
+			err = parseDependencies(value, []string{moduleId}, dependenciesMap, parseFunc, &unresolvedDeps, log)
 		}
 		return err
-	})
+	}); err != nil {
+		return nil, err
+	}
+	if len(unresolvedDeps) > 0 {
+		printMissingDependenciesWarning("unresolved dependency", unresolvedDeps, log)
+	}
+	return dependenciesMap, nil
 }
 
 func runNpmLsWithNodeModules(executablePath, srcPath string, npmArgs []string, log utils.Log) (data []byte) {
@@ -266,11 +277,11 @@ type npmLsDependency struct {
 	InBundle  bool
 	Dev       bool
 	Optional  bool
-	// Missing peer dependency in npm version 7/8
+	// Missing dependency in npm version 7/8 (not peer-specific)
 	Missing bool
-	// Problems with missing peer dependency in npm version 7/8
+	// Problems with missing dependency in npm version 7/8 (not peer-specific)
 	Problems []string
-	// Missing  peer dependency in npm version 6
+	// Missing peer dependency in npm version 6
 	// Bound to 'legacyNpmLsDependency' struct
 	PeerMissing interface{}
 }
@@ -349,10 +360,38 @@ func extractUrlFromProblems(problems []string, packageName string) string {
 			if idx := strings.Index(url, ","); idx > 0 {
 				url = url[:idx]
 			}
-			return strings.TrimSpace(url)
+			url = strings.TrimSpace(url)
+			// npm reports any missing dependency via this same "missing: name@X" shape.
+			if !isNonRegistryLocator(url) {
+				return ""
+			}
+			return url
 		}
 	}
 	return ""
+}
+
+// bareGitHubShorthandWithRef matches npm's un-prefixed "owner/repo#ref" shorthand
+// (e.g. "expressjs/express#v4.18.0"). The ref is required: without one, "owner/repo"
+// has nothing to pin a version to and would only fabricate a hash — same as "github:owner/repo#ref".
+var bareGitHubShorthandWithRef = regexp.MustCompile(`^[\w.-]+/[\w.-]+#.+$`)
+
+// isNonRegistryLocator reports whether s is a fetchable locator (URL, git, file)
+// rather than a semver range or npm alias spec.
+func isNonRegistryLocator(s string) bool {
+	if strings.Contains(s, "://") {
+		return true
+	}
+	lower := strings.ToLower(s)
+	// git+ and git: are listed for readability but never reach this loop in practice —
+	// real npm git specs using either always include "://" right after (git+ssh://,
+	// git+https://, git://), so the check above already catches them first.
+	for _, prefix := range []string{"git+", "git:", "file:", "github:", "gitlab:", "bitbucket:", "gist:"} {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	return bareGitHubShorthandWithRef.MatchString(s)
 }
 
 func (nld *npmLsDependency) getScopes() (scopes []string) {
@@ -371,7 +410,9 @@ func (nld *npmLsDependency) getScopes() (scopes []string) {
 }
 
 // Parses npm dependencies recursively and adds the collected dependencies to the given dependencies map.
-func parseDependencies(data []byte, pathToRoot []string, dependencies map[string]*dependencyInfo, parseFunc func(data []byte) (*npmLsDependency, error), log utils.Log) error {
+// Dependencies that npm never resolved (missing, with no locator to hash into a version) are excluded
+// from dependencies and their names appended to unresolvedDeps instead, so the caller can still report them.
+func parseDependencies(data []byte, pathToRoot []string, dependencies map[string]*dependencyInfo, parseFunc func(data []byte) (*npmLsDependency, error), unresolvedDeps *[]string, log utils.Log) error {
 	return jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
 		if string(value) == "{}" {
 			// Skip missing optional dependency.
@@ -383,7 +424,12 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 			return err
 		}
 		// The dependency name is a key in the object, which is not always available inside the value.
-		npmLsDependency.Name = string(key)
+		// When the value does hold a name, it takes precedence over the key: aliased dependencies
+		// (e.g. "strip-ansi-cjs": "npm:strip-ansi@^6.0.1") are keyed by their alias, while the real
+		// registry package name is the one reported inside the value.
+		if npmLsDependency.Name == "" {
+			npmLsDependency.Name = string(key)
+		}
 
 		// Some old npm versions store the git hash in the version field. We'll extract it to be used as the version.
 		if isGitDependency(npmLsDependency.Version) {
@@ -421,7 +467,13 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 				}
 			case npmLsDependency.Missing || npmLsDependency.Problems != nil:
 				// Skip missing peer dependency.
-				log.Debug(fmt.Sprintf("%s is missing, this may be the result of an peer dependency.", key))
+				log.Debug(fmt.Sprintf("%s is missing and has no resolvable locator (e.g. an unmet peer dependency).", key))
+				// The same name can turn up once per sibling package that's missing it
+				// (e.g. a peer several packages all require but none of them installed) —
+				// dedupe here so one real problem doesn't get reported as several.
+				if !slices.Contains(*unresolvedDeps, npmLsDependency.Name) {
+					*unresolvedDeps = append(*unresolvedDeps, npmLsDependency.Name)
+				}
 				return nil
 			default:
 				return errors.New("failed to parse '" + string(value) + "' from npm ls output.")
@@ -433,7 +485,7 @@ func parseDependencies(data []byte, pathToRoot []string, dependencies map[string
 			return err
 		}
 		if len(transitive) > 0 {
-			if err := parseDependencies(transitive, append([]string{npmLsDependency.id()}, pathToRoot...), dependencies, parseFunc, log); err != nil {
+			if err := parseDependencies(transitive, append([]string{npmLsDependency.id()}, pathToRoot...), dependencies, parseFunc, unresolvedDeps, log); err != nil {
 				return err
 			}
 		}
