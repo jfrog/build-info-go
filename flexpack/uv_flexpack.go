@@ -1,12 +1,18 @@
 package flexpack
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bufio"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/jfrog/build-info-go/entities"
@@ -15,20 +21,20 @@ import (
 
 // UVLockFile represents the top-level structure of uv.lock
 type UVLockFile struct {
-	Version  int          `toml:"version"`
-	Revision int          `toml:"revision"`
-	Packages []UVPackage  `toml:"package"`
+	Version  int         `toml:"version"`
+	Revision int         `toml:"revision"`
+	Packages []UVPackage `toml:"package"`
 }
 
 // UVPackage represents a [[package]] entry in uv.lock
 type UVPackage struct {
-	Name            string                         `toml:"name"`
-	Version         string                         `toml:"version"`
-	Source          UVSource                       `toml:"source"`
-	Dependencies    []UVDependencyEdge             `toml:"dependencies"`
-	DevDependencies map[string][]UVDependencyEdge  `toml:"dev-dependencies"`
-	Sdist           *UVArtifact                    `toml:"sdist"`
-	Wheels          []UVArtifact                   `toml:"wheels"`
+	Name            string                        `toml:"name"`
+	Version         string                        `toml:"version"`
+	Source          UVSource                      `toml:"source"`
+	Dependencies    []UVDependencyEdge            `toml:"dependencies"`
+	DevDependencies map[string][]UVDependencyEdge `toml:"dev-dependencies"`
+	Sdist           *UVArtifact                   `toml:"sdist"`
+	Wheels          []UVArtifact                  `toml:"wheels"`
 }
 
 // UVSource is an inline table with exactly one key identifying the source type.
@@ -50,7 +56,7 @@ func (s UVSource) IsWorkspacePackage() bool {
 type UVArtifact struct {
 	URL        string `toml:"url"`
 	Path       string `toml:"path"`
-	Hash       string `toml:"hash"`        // "sha256:<hex>"; absent for git
+	Hash       string `toml:"hash"` // "sha256:<hex>"; absent for git
 	Size       int64  `toml:"size"`
 	UploadTime string `toml:"upload-time"` // ISO 8601; may be absent (revision < 3)
 }
@@ -66,8 +72,9 @@ type UVDependencyEdge struct {
 // UVPyProjectToml reads only [project] (PEP 621) — UV format, not Poetry
 type UVPyProjectToml struct {
 	Project struct {
-		Name    string `toml:"name"`
-		Version string `toml:"version"`
+		Name    string   `toml:"name"`
+		Version string   `toml:"version"`
+		Dynamic []string `toml:"dynamic"`
 	} `toml:"project"`
 }
 
@@ -78,6 +85,7 @@ type UVFlexPack struct {
 	pyprojectData     *UVPyProjectToml
 	projectName       string
 	projectVersion    string
+	versionIsDynamic  bool // true when pyproject.toml declares `dynamic = ["version"]`
 	parsed            bool
 	dependencies      []DependencyInfo
 	depGraph          map[string][]string   // dep ID ("name:version") -> []dep IDs
@@ -97,6 +105,18 @@ func NewUVFlexPack(config UVConfig) (*UVFlexPack, error) {
 	}
 	if err := uf.loadUvLock(); err != nil {
 		log.Debug("Failed to load uv.lock, dependency collection will be empty: " + err.Error())
+	}
+	if uf.projectVersion == "" && uf.versionIsDynamic {
+		if resolved := uf.resolveDynamicVersion(); resolved != "" {
+			uf.projectVersion = resolved
+		} else {
+			// Same tolerance as the PEP 723 inline-script case above: an empty version
+			// still yields a usable "name:" module ID, and failing outright here would
+			// throw away dependency/artifact collection too, not just the version.
+			log.Warn("UV: project declares dynamic = [\"version\"] but the resolved version could not be found " +
+				"(checked uv.lock's workspace root package, installed packages, and dist/ artifacts); " +
+				"build info will use an empty version in the module ID")
+		}
 	}
 	return uf, nil
 }
@@ -122,13 +142,193 @@ func (uf *UVFlexPack) loadPyProjectToml() error {
 	}
 	uf.projectName = uf.pyprojectData.Project.Name
 	uf.projectVersion = uf.pyprojectData.Project.Version
+	uf.versionIsDynamic = isVersionDynamic(uf.pyprojectData.Project.Dynamic)
 	if uf.projectName == "" {
 		return fmt.Errorf("project name not found in pyproject.toml (checked [project.name])")
 	}
-	if uf.projectVersion == "" {
-		return fmt.Errorf("project version not found in pyproject.toml (checked [project.version])")
+	// A dynamic version (PEP 621 `dynamic = ["version"]`, e.g. via hatch-vcs) is resolved
+	// later, once uv.lock/dist/installed-packages state is available — see resolveDynamicVersion.
+	if uf.projectVersion == "" && !uf.versionIsDynamic {
+		return fmt.Errorf("project version not found in pyproject.toml (checked [project.version] and [project.dynamic] for \"version\")")
 	}
 	return nil
+}
+
+// isVersionDynamic reports whether "version" appears in a PEP 621 [project.dynamic] list.
+func isVersionDynamic(dynamic []string) bool {
+	for _, field := range dynamic {
+		if field == "version" {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveDynamicVersion finds the backend-resolved version for a project whose
+// pyproject.toml only declares `dynamic = ["version"]` (e.g. via hatch-vcs). uv.lock's
+// workspace root package entry ([[package]] with source.virtual/editable/directory == ".")
+// does NOT carry a version field in practice — verified empirically against real `uv lock`
+// output, which omits it entirely for the root/editable entry regardless of a static or
+// dynamic pyproject.toml version. The real resolved version instead shows up in whichever
+// of these the current uv invocation already produced, checked in order:
+//  1. uv.lock's root package version, in case a future uv release (or another tool) does
+//     populate it — cheap to check, correct if present.
+//  2. UVConfig.InstalledPackages (populated from `uv pip list` for sync/install/add/remove),
+//     which includes the project's own resolved version once it's installed into the venv.
+//  3. dist/*.whl or dist/*.tar.gz archives — build/publish only reach this point after
+//     `uv build`/`uv publish` already succeeded, and each archive's own embedded package
+//     metadata (wheel: *.dist-info/METADATA; sdist: top-level PKG-INFO) records the version
+//     the backend resolved for it — see resolveVersionFromDist.
+//
+// Returns "" if none of these have anything to offer.
+func (uf *UVFlexPack) resolveDynamicVersion() string {
+	if uf.lockFileData != nil {
+		if rootPkg := findRootPackage(uf.lockFileData.Packages); rootPkg != nil && rootPkg.Version != "" {
+			return rootPkg.Version
+		}
+	}
+	if uf.config.InstalledPackages != nil {
+		// Compare via normalizeName on both sides rather than indexing by a normalized key
+		// directly: callers (e.g. jfrog-cli-artifactory's uvInstalledPackages) build this map
+		// with their own lowercase/underscore-only normalization, which doesn't collapse dots
+		// or repeated separators the way full PEP 503 normalization does — a project name
+		// containing "." would silently never match a plain map lookup.
+		want := normalizeName(uf.projectName)
+		for pkgName, pkgVersion := range uf.config.InstalledPackages {
+			if pkgVersion != "" && normalizeName(pkgName) == want {
+				return pkgVersion
+			}
+		}
+	}
+	return uf.resolveVersionFromDist()
+}
+
+// resolveVersionFromDist scans WorkingDirectory/dist for wheel/sdist archives belonging to
+// this project and returns the resolved version. `uv version` refuses outright to report a
+// dynamic version under any circumstance (verified empirically: it errors even right after a
+// successful build or sync), so there's no CLI command to ask — but the build backend already
+// wrote the real, resolved version into the archive's own package metadata (wheel: a
+// `*.dist-info/METADATA` entry; sdist: a top-level `PKG-INFO` file), the same metadata that
+// would be published to the index. Reading that directly is strictly more reliable than
+// parsing it out of the filename: no PEP 427/625 name-escaping to get right, and the archive's
+// declared Name is checked against the project name instead of assumed from a prefix match.
+//
+// A single `uv build` produces both a wheel and an sdist for the same version, but uv does not
+// clean dist/ between builds — it can accumulate archives from earlier versions too. When
+// matching archives disagree on version, the most recently modified one wins, since that's the
+// artifact the build/publish invocation currently in progress just produced.
+func (uf *UVFlexPack) resolveVersionFromDist() string {
+	entries, err := os.ReadDir(filepath.Join(uf.config.WorkingDirectory, "dist"))
+	if err != nil {
+		return ""
+	}
+	wantName := normalizeName(uf.projectName)
+	var bestVersion string
+	var bestModTime time.Time
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		path := filepath.Join(uf.config.WorkingDirectory, "dist", entry.Name())
+		lower := strings.ToLower(entry.Name())
+		var name, version string
+		switch {
+		case strings.HasSuffix(lower, ".whl"):
+			name, version = readWheelMetadata(path)
+		case strings.HasSuffix(lower, ".tar.gz"):
+			name, version = readSdistMetadata(path)
+		default:
+			continue
+		}
+		if version == "" || normalizeName(name) != wantName {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if bestVersion == "" || info.ModTime().After(bestModTime) {
+			bestVersion = version
+			bestModTime = info.ModTime()
+		}
+	}
+	return bestVersion
+}
+
+// readWheelMetadata extracts Name/Version from a wheel's `*.dist-info/METADATA` entry.
+// Returns ("", "") if the file can't be read as a wheel or has no readable metadata.
+func readWheelMetadata(path string) (name, version string) {
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		return "", ""
+	}
+	defer func() { _ = r.Close() }()
+	for _, f := range r.File {
+		if !strings.HasSuffix(f.Name, ".dist-info/METADATA") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return "", ""
+		}
+		defer func() { _ = rc.Close() }()
+		return parsePackageMetadata(rc)
+	}
+	return "", ""
+}
+
+// readSdistMetadata extracts Name/Version from an sdist's top-level `PKG-INFO` file.
+// Returns ("", "") if the file can't be read as a gzipped tarball or has no PKG-INFO.
+func readSdistMetadata(path string) (name, version string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", ""
+	}
+	defer func() { _ = f.Close() }()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return "", ""
+	}
+	defer func() { _ = gz.Close() }()
+	tr := tar.NewReader(gz)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			return "", ""
+		}
+		if err != nil {
+			return "", ""
+		}
+		// The authoritative PKG-INFO sits directly under the single top-level
+		// "{name}-{version}/" directory — i.e. exactly one path separator. A deeper match
+		// (e.g. "{name}-{version}/{name}.egg-info/PKG-INFO", which some sdists accidentally
+		// bundle) belongs to a nested, possibly stale build artifact and must be skipped, even
+		// if tar ordering happens to list it before the real top-level one.
+		if hdr.Name == "PKG-INFO" || (strings.Count(hdr.Name, "/") == 1 && strings.HasSuffix(hdr.Name, "/PKG-INFO")) {
+			return parsePackageMetadata(tr)
+		}
+	}
+}
+
+// parsePackageMetadata reads Name/Version from a PEP 566 core-metadata document (email-header
+// style: "Key: value" lines followed by a blank line, then an optional free-text description).
+// Header parsing stops at the first blank line so header-like text inside the description
+// (e.g. a changelog entry starting with "Version:") is never mistaken for a real field.
+func parsePackageMetadata(r io.Reader) (name, version string) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			break
+		}
+		switch {
+		case name == "" && strings.HasPrefix(line, "Name:"):
+			name = strings.TrimSpace(strings.TrimPrefix(line, "Name:"))
+		case version == "" && strings.HasPrefix(line, "Version:"):
+			version = strings.TrimSpace(strings.TrimPrefix(line, "Version:"))
+		}
+	}
+	return name, version
 }
 
 // loadUvLock reads and parses the lock file. Uses LockFilePath if set (for PEP 723
