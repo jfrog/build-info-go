@@ -241,6 +241,22 @@ func TestAppend(t *testing.T) {
 	assert.True(t, results)
 }
 
+func TestAppendProperties(t *testing.T) {
+	t.Run("fills gaps without clobbering", func(t *testing.T) {
+		target := BuildInfo{Properties: Env{"keep": "target", "shared": "target-wins"}}
+		source := BuildInfo{Properties: Env{"shared": "source-loses", "added": "source"}}
+		target.Append(&source)
+		assert.Equal(t, Env{"keep": "target", "shared": "target-wins", "added": "source"}, target.Properties)
+	})
+
+	t.Run("initializes nil target properties", func(t *testing.T) {
+		target := BuildInfo{}
+		source := BuildInfo{Properties: Env{MavenBuildModeProperty: MavenBuildModeNative}}
+		target.Append(&source)
+		assert.Equal(t, MavenBuildModeNative, target.Properties[MavenBuildModeProperty])
+	})
+}
+
 func TestToCycloneDxBOM(t *testing.T) {
 	dependencyA := Dependency{Id: "dependency-a", Checksum: Checksum{Sha1: "dependency-a-sha"}, RequestedBy: [][]string{{"dependency-c"}}}
 	dependencyB := Dependency{Id: "dependency-b", Checksum: Checksum{Sha1: "dependency-b-sha"}, RequestedBy: [][]string{{"dependency-b"}, {"dependency-c"}}}
