@@ -48,9 +48,12 @@ func isPackageFile(name string) bool {
 //
 // Primary packages (.nupkg) are stored flat at the repository root: "<id>.<version>.nupkg".
 //
-// Symbol packages (.snupkg and legacy .symbols.nupkg) are pushed via the
-// /api/nuget/v2/<repo>/symbolpackage endpoint, which stores them as:
-// "symbolpackage/<id>.<version>.nupkg" — a subfolder with the extension renamed to .nupkg.
+// Modern symbol packages (.snupkg) are pushed via the /api/nuget/v2/<repo>/symbolpackage
+// endpoint and stored as: "symbolpackage/<id>.<version>.nupkg".
+//
+// Legacy symbol packages (.symbols.nupkg) are pushed via the regular package endpoint and
+// stored flat at the repository root as "<id>.<version>.nupkg" (extension renamed by Artifactory
+// based on nuspec content; the ".symbols" segment is dropped).
 func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 	name := filepath.Base(fullPath)
 	artifactType := packageArtifactType(name)
@@ -61,9 +64,17 @@ func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 	if err != nil {
 		return entities.Artifact{}, fmt.Errorf("compute checksum for %s: %w", name, err)
 	}
-	path := name
-	if artifactType == artifactTypeSnupkg {
+	lower := strings.ToLower(name)
+	var path string
+	switch {
+	case strings.HasSuffix(lower, snupkgExtension):
+		// .snupkg → symbolpackage/<id>.<version>.nupkg
 		path = "symbolpackage/" + snupkgStorageName(name)
+	case strings.HasSuffix(lower, legacySymbolsSuffix):
+		// .symbols.nupkg → flat at root as <id>.<version>.nupkg
+		path = snupkgStorageName(name)
+	default:
+		path = name
 	}
 	return entities.Artifact{
 		Name:                   name,
