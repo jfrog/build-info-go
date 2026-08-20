@@ -220,9 +220,10 @@ func populateRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap 
 	}
 }
 
-// stripModuleFromRequestedBy removes the trailing module ID from each path, dropping any path
-// that becomes empty as a result. Every path is guaranteed to end in moduleId by construction
-// (see populateRequestedBy/the direct-dependency seeding above).
+// stripModuleFromRequestedBy removes the trailing module ID from each path, consistent with
+// npm/Go/Maven FlexPack: transitive deps show only the intermediate package chain, while
+// direct deps (whose path was just [moduleId]) keep the module as their sole requester so
+// requestedBy is never empty for a dependency that is reachable from the module.
 func stripModuleFromRequestedBy(paths [][]string, moduleId string) [][]string {
 	var stripped [][]string
 	for _, path := range paths {
@@ -230,9 +231,15 @@ func stripModuleFromRequestedBy(paths [][]string, moduleId string) [][]string {
 			continue
 		}
 		if path[len(path)-1] == moduleId {
-			path = path[:len(path)-1]
-		}
-		if len(path) > 0 {
+			inner := path[:len(path)-1]
+			if len(inner) == 0 {
+				// Direct dependency: path was [moduleId] only. Keep it so the module is
+				// recorded as the requester, matching npm/Go behaviour for direct deps.
+				stripped = append(stripped, path)
+			} else {
+				stripped = append(stripped, inner)
+			}
+		} else {
 			stripped = append(stripped, path)
 		}
 	}
