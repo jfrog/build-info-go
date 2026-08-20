@@ -138,7 +138,8 @@ func TestParseDependencies(t *testing.T) {
 		{"shopify-liquid:1.d7.9", [][]string{{"xpm:0.1.1", "@jfrog/npm_scoped:1.0.0", "root"}}},
 	}
 	dependencies := make(map[string]*dependencyInfo)
-	err = parseDependencies(dependenciesJsonList, []string{"root"}, dependencies, npmLsDependencyParser, utils.NewDefaultLogger(utils.INFO))
+	var unresolvedDeps []string
+	err = parseDependencies(dependenciesJsonList, []string{"root"}, dependencies, npmLsDependencyParser, &unresolvedDeps, utils.NewDefaultLogger(utils.INFO))
 	assert.NoError(t, err)
 	assert.Equal(t, len(expectedDependenciesList), len(dependencies))
 	for _, eDependency := range expectedDependenciesList {
@@ -151,6 +152,23 @@ func TestParseDependencies(t *testing.T) {
 		}
 		assert.True(t, found, "The expected dependency:", eDependency, "is missing from the actual dependencies list:\n", dependencies)
 	}
+}
+
+func TestParseDependencies_UnresolvedDepsDeduplicated(t *testing.T) {
+	inputJson := `{
+		"pkg-a": {"version": "1.0.0", "dependencies": {
+			"react": {"problems": ["missing: react@^18.0.0, required by pkg-a@1.0.0"]}
+		}},
+		"pkg-b": {"version": "1.0.0", "dependencies": {
+			"react": {"problems": ["missing: react@^18.0.0, required by pkg-b@1.0.0"]}
+		}}
+	}`
+	depsMap := make(map[string]*dependencyInfo)
+	var unresolvedDeps []string
+	err := parseDependencies([]byte(inputJson), []string{"root"}, depsMap, npmLsDependencyParser, &unresolvedDeps, &utils.NullLog{})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"react"}, unresolvedDeps,
+		"expected 'react' to be reported once even though it is missing under two different parents")
 }
 
 func TestAppendScopes(t *testing.T) {
@@ -549,12 +567,13 @@ func TestFilterUniqueArgs(t *testing.T) {
 
 func TestParseDependenciesEdgeCases(t *testing.T) {
 	testcases := []struct {
-		name                string
-		inputJson           string
-		expectedId          string
-		shouldBeSkipped     bool
-		expectParseError    bool
-		expectedRequestedBy [][]string
+		name                   string
+		inputJson              string
+		expectedId             string
+		shouldBeSkipped        bool
+		expectParseError       bool
+		expectedRequestedBy    [][]string
+		expectedUnresolvedName string
 	}{
 		{
 			name:             "Git URL with hash in resolved",
@@ -594,10 +613,11 @@ func TestParseDependenciesEdgeCases(t *testing.T) {
 			expectParseError: false,
 		},
 		{
-			name:             "No version and no resolved, but missing",
-			inputJson:        `{"bad-pkg":{"missing": true}}`,
-			shouldBeSkipped:  true,
-			expectParseError: false,
+			name:                   "No version and no resolved, but missing",
+			inputJson:              `{"bad-pkg":{"missing": true}}`,
+			shouldBeSkipped:        true,
+			expectParseError:       false,
+			expectedUnresolvedName: "bad-pkg",
 		},
 		{
 			name:             "No version and no resolved, not missing",
@@ -606,10 +626,61 @@ func TestParseDependenciesEdgeCases(t *testing.T) {
 			expectParseError: true,
 		},
 		{
-			name:             "Missing peer dependency",
-			inputJson:        `{"peer-pkg":{"missing": true}}`,
-			shouldBeSkipped:  true,
+			name:                   "Missing dependency with no problems array",
+			inputJson:              `{"peer-pkg":{"missing": true}}`,
+			shouldBeSkipped:        true,
+			expectParseError:       false,
+			expectedUnresolvedName: "peer-pkg",
+		},
+		{
+			// npm reports this identical shape for a missing peer, prod, or dev dependency;
+			// react/react-dom here just mirrors the ticket's actual repro (an unmet peer).
+			name:                   "Missing dependency with semver range in problems",
+			inputJson:              `{"react":{"problems": ["missing: react@^18.2.0, required by react-dom@18.2.0"]}}`,
+			shouldBeSkipped:        true,
+			expectParseError:       false,
+			expectedUnresolvedName: "react",
+		},
+		{
+			name:      "Missing dependency with git locator in problems",
+			inputJson: `{"my-private-package":{"problems": ["missing: my-private-package@git+ssh://git@github.com/my-org/my-private-package.git#v1.0.0, required by root"]}}`,
+			expectedId: func() string {
+				return "my-private-package:v1.0.0"
+			}(),
+			shouldBeSkipped:  false,
 			expectParseError: false,
+		},
+		{
+			name:                   "Missing dependency with bare GitHub shorthand, no ref, in problems",
+			inputJson:              `{"express":{"problems": ["missing: express@expressjs/express, required by react-dom@18.2.0"]}}`,
+			shouldBeSkipped:        true,
+			expectParseError:       false,
+			expectedUnresolvedName: "express",
+		},
+		{
+			name:             "Missing dependency with bare GitHub shorthand and ref in problems",
+			inputJson:        `{"express":{"problems": ["missing: express@expressjs/express#v4.18.0, required by react-dom@18.2.0"]}}`,
+			expectedId:       "express:v4.18.0",
+			shouldBeSkipped:  false,
+			expectParseError: false,
+		},
+		{
+			// The literal "peer dependency" scenario: a peer pinned to an exact version that
+			// was never installed. X here is a bare version, not a range and not a locator.
+			name:                   "Missing peer dependency with exact pinned version in problems",
+			inputJson:              `{"left-pad":{"problems": ["missing: left-pad@2.5.3, required by pkg-a@1.0.0"]}}`,
+			shouldBeSkipped:        true,
+			expectParseError:       false,
+			expectedUnresolvedName: "left-pad",
+		},
+		{
+			// Same mechanism, but the requirer relationship is an ordinary (non-peer) dependency,
+			// not a peer — proves the skip isn't peer-specific (see Finding #1/#2 discussion).
+			name:                   "Missing non-peer dependency with semver range in problems",
+			inputJson:              `{"lodash":{"problems": ["missing: lodash@^4.17.0, required by pkg-a@1.0.0"]}}`,
+			shouldBeSkipped:        true,
+			expectParseError:       false,
+			expectedUnresolvedName: "lodash",
 		},
 		{
 			name:             "Regular dependency is not affected",
@@ -641,7 +712,8 @@ func TestParseDependenciesEdgeCases(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			depsMap := make(map[string]*dependencyInfo)
 			parseFunc := npmLsDependencyParser
-			err := parseDependencies([]byte(tc.inputJson), []string{"root"}, depsMap, parseFunc, &utils.NullLog{})
+			var unresolvedDeps []string
+			err := parseDependencies([]byte(tc.inputJson), []string{"root"}, depsMap, parseFunc, &unresolvedDeps, &utils.NullLog{})
 
 			if tc.expectParseError {
 				assert.Error(t, err)
@@ -651,6 +723,9 @@ func TestParseDependenciesEdgeCases(t *testing.T) {
 
 			if tc.shouldBeSkipped {
 				assert.Empty(t, depsMap, "Expected dependency to be skipped, but it was added")
+				if tc.expectedUnresolvedName != "" {
+					assert.Contains(t, unresolvedDeps, tc.expectedUnresolvedName, "Expected skipped dependency to be reported as unresolved")
+				}
 			} else {
 				assert.Len(t, depsMap, 1, "Expected exactly one dependency")
 				// Check if the key exists
@@ -660,6 +735,34 @@ func TestParseDependenciesEdgeCases(t *testing.T) {
 					assert.Equal(t, tc.expectedId, depInfo.Id, "Dependency ID mismatch")
 				}
 			}
+		})
+	}
+}
+
+func TestNpmIsNonRegistryLocator(t *testing.T) {
+	testcases := []struct {
+		name     string
+		spec     string
+		expected bool
+	}{
+		{"semver range is not a locator", "^18.2.0", false},
+		{"npm alias spec is not a locator", "npm:strip-ansi@^6.0.1", false},
+		{"exact pinned version is not a locator", "2.5.3", false},
+		{"github: prefix is a locator", "github:expressjs/express", true},
+		{"gitlab: prefix is a locator", "gitlab:owner/repo", true},
+		{"bitbucket: prefix is a locator", "bitbucket:owner/repo", true},
+		{"gist: prefix is a locator", "gist:abc123", true},
+		{"file: path is a locator", "file:../shared/my-local-pkg", true},
+		{"git+ssh URL is a locator", "git+ssh://git@github.com/org/repo.git#v1.0.0", true},
+		{"git+https URL is a locator", "git+https://github.com/org/repo.git", true},
+		{"bare git:// URL is a locator", "git://github.com/org/repo.git", true},
+		{"tarball URL is a locator", "https://example.com/pkg-1.0.0.tgz", true},
+		{"bare GitHub shorthand without a ref is not a locator", "expressjs/express", false},
+		{"bare GitHub shorthand with a ref is a locator", "expressjs/express#v4.18.0", true},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, isNonRegistryLocator(tc.spec))
 		})
 	}
 }

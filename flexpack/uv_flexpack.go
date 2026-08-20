@@ -272,7 +272,7 @@ func (uf *UVFlexPack) parseDependencies() {
 	// Build requestedBy chains using pip's recursive DFS approach.
 	// Results go into uf.requestedByChains (map[string][][]string), NOT into DependencyInfo.RequestedBy.
 	// This keeps the shared DependencyInfo type ([]string) unchanged for poetry/maven.
-	buildUvRequestedBy(moduleID, []string{}, rootChildren, depInfoMap, fwdGraph, uf.requestedByChains, entities.RequestedByMaxLength)
+	buildRequestedByChains(moduleID, []string{}, rootChildren, depInfoMap, fwdGraph, uf.requestedByChains, entities.RequestedByMaxLength)
 
 	for _, dep := range depInfoMap {
 		uf.dependencies = append(uf.dependencies, *dep)
@@ -498,11 +498,13 @@ func computeMainReachable(directMainDeps map[string]bool, pkgByName map[string]*
 	return reachable
 }
 
-// buildUvRequestedBy recursively builds requestedBy chains matching pip/pipenv format.
+// buildRequestedByChains recursively builds requestedBy chains matching pip/pipenv format.
+// Shared by every lock-file-driven FlexPack (UV, RubyGems, ...) — it operates purely on
+// depInfoMap/fwdGraph keys, so it has no package-manager-specific assumptions baked in.
 // Results are written into chains (dep ID → [][]string), not into DependencyInfo.
 // parentID is the current parent's "name:version" ID.
 // parentChain is the chain from parentID back to the root (not including parentID itself).
-func buildUvRequestedBy(parentID string, parentChain []string, children []string, depInfoMap map[string]*DependencyInfo, fwdGraph map[string][]string, chains map[string][][]string, maxDepth int) {
+func buildRequestedByChains(parentID string, parentChain []string, children []string, depInfoMap map[string]*DependencyInfo, fwdGraph map[string][]string, chains map[string][][]string, maxDepth int) {
 	for _, childName := range children {
 		child, ok := depInfoMap[childName]
 		if !ok {
@@ -523,7 +525,7 @@ func buildUvRequestedBy(parentID string, parentChain []string, children []string
 		}
 		if !hasCycle {
 			chains[child.ID] = append(chains[child.ID], newChain)
-			buildUvRequestedBy(child.ID, newChain, fwdGraph[childName], depInfoMap, fwdGraph, chains, maxDepth)
+			buildRequestedByChains(child.ID, newChain, fwdGraph[childName], depInfoMap, fwdGraph, chains, maxDepth)
 		}
 	}
 }
