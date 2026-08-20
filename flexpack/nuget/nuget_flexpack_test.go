@@ -68,8 +68,9 @@ func TestFindNupkgArtifactsIncludesSymbols(t *testing.T) {
 	}
 
 	assertArtifact(t, artifactsByName["My.Package.1.0.0.nupkg"], "nupkg", "My.Package.1.0.0.nupkg")
-	assertArtifact(t, artifactsByName["My.Package.1.0.0.snupkg"], "snupkg", "My.Package.1.0.0.snupkg")
-	assertArtifact(t, artifactsByName["Legacy.2.1.0.symbols.nupkg"], "snupkg", "Legacy.2.1.0.symbols.nupkg")
+	// snupkg is stored by Artifactory at symbolpackage/<id>.<version>.nupkg (not flat at root).
+	assertArtifact(t, artifactsByName["My.Package.1.0.0.snupkg"], "snupkg", "symbolpackage/My.Package.1.0.0.nupkg")
+	assertArtifact(t, artifactsByName["Legacy.2.1.0.symbols.nupkg"], "snupkg", "symbolpackage/Legacy.2.1.0.nupkg")
 }
 
 func TestCollectPushArtifactsUsesOnlyExplicitArguments(t *testing.T) {
