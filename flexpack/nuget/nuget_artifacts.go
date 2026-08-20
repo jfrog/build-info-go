@@ -44,11 +44,13 @@ func isPackageFile(name string) bool {
 }
 
 // newArtifactFromFile builds an entities.Artifact for a local NuGet package file,
-// computing checksums and deriving its deployment path. Artifactory's NuGet push API
-// (used by both "dotnet nuget push" and "nuget push") always stores the package flat at
-// the repository root as "<file>", regardless of the NuGet client protocol version used
-// for restore; there is no "<id>/<version>/<file>" subfolder layout to account for.
-// The artifact type is set to "nupkg" or "snupkg".
+// computing checksums and deriving its Artifactory storage path.
+//
+// Primary packages (.nupkg) are stored flat at the repository root: "<id>.<version>.nupkg".
+//
+// Symbol packages (.snupkg and legacy .symbols.nupkg) are pushed via the
+// /api/nuget/v2/<repo>/symbolpackage endpoint, which stores them as:
+// "symbolpackage/<id>.<version>.nupkg" — a subfolder with the extension renamed to .nupkg.
 func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 	name := filepath.Base(fullPath)
 	artifactType := packageArtifactType(name)
@@ -59,10 +61,14 @@ func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 	if err != nil {
 		return entities.Artifact{}, fmt.Errorf("compute checksum for %s: %w", name, err)
 	}
+	path := name
+	if artifactType == artifactTypeSnupkg {
+		path = "symbolpackage/" + snupkgStorageName(name)
+	}
 	return entities.Artifact{
 		Name:                   name,
 		Type:                   artifactType,
-		Path:                   name,
+		Path:                   path,
 		OriginalDeploymentRepo: repoName,
 		Checksum: entities.Checksum{
 			Sha1:   details.Checksum.Sha1,
@@ -70,6 +76,21 @@ func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 			Md5:    details.Checksum.Md5,
 		},
 	}, nil
+}
+
+// snupkgStorageName converts a symbol package filename to the name Artifactory uses when
+// storing it: the .snupkg or .symbols.nupkg extension is replaced with .nupkg.
+// E.g. "Foo.1.0.0.snupkg" → "Foo.1.0.0.nupkg", "Foo.1.0.0.symbols.nupkg" → "Foo.1.0.0.nupkg".
+func snupkgStorageName(name string) string {
+	lower := strings.ToLower(name)
+	switch {
+	case strings.HasSuffix(lower, snupkgExtension):
+		return name[:len(name)-len(snupkgExtension)] + nupkgExtension
+	case strings.HasSuffix(lower, legacySymbolsSuffix):
+		return name[:len(name)-len(legacySymbolsSuffix)] + nupkgExtension
+	default:
+		return name
+	}
 }
 
 // BuildArtifactModules groups uploaded/packed artifacts into build-info modules.
