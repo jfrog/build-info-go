@@ -132,16 +132,53 @@ func TestQuoteArgsForLog(t *testing.T) {
 	}
 }
 
+func TestStripPropertyQuotes(t *testing.T) {
+	tests := []struct {
+		input    []string
+		expected []string
+	}{
+		{
+			input:    []string{"clean", "-Dparam=value", "build", "-Pkey=value"},
+			expected: []string{"clean", "-Dparam=value", "build", "-Pkey=value"},
+		},
+		{
+			// Quotes already stripped by the shell, value has no surrounding quotes: left as-is.
+			input:    []string{"-Ddeploy.test.property=test test"},
+			expected: []string{"-Ddeploy.test.property=test test"},
+		},
+		{
+			// Quotes still present in the raw arg (e.g. on Windows, where cmd.exe/PowerShell don't strip
+			// single quotes the way bash/zsh do): stripped.
+			input:    []string{"-Ddeploy.test.property='test test'"},
+			expected: []string{"-Ddeploy.test.property=test test"},
+		},
+		{
+			input:    []string{`-Pkey="value with spaces"`},
+			expected: []string{"-Pkey=value with spaces"},
+		},
+		{
+			// Mismatched quote pair: left as-is.
+			input:    []string{`-Dparam='value"`},
+			expected: []string{`-Dparam='value"`},
+		},
+	}
+
+	for _, test := range tests {
+		result := stripPropertyQuotes(test.input)
+		assert.Equal(t, test.expected, result)
+	}
+}
+
 func TestGetCmdDoesNotQuotePropertyValues(t *testing.T) {
 	config := &gradleRunConfig{
 		gradle: "gradle",
-		tasks:  []string{"artifactoryPublish", "-Ddeploy.test.property=test test"},
+		tasks:  []string{"artifactoryPublish", "-Ddeploy.test.property='test test'"},
 		logger: utils.NewDefaultLogger(utils.INFO),
 	}
 
 	cmd := config.GetCmd()
 
-	// exec.Command runs the process directly, without a shell, so a quoted value here would be passed to Gradle
-	// literally as 'test test', quotes included, instead of being stripped.
+	// exec.Command runs the process directly, without a shell, so quotes around the value would be passed to
+	// Gradle literally, instead of being stripped, if we didn't strip them ourselves.
 	assert.Equal(t, []string{"gradle", "artifactoryPublish", "-Ddeploy.test.property=test test"}, cmd.Args)
 }

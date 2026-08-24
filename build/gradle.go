@@ -262,9 +262,38 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 	if config.extractorPropsFile != "" {
 		cmd = append(cmd, fmt.Sprintf("-D%s=%s", extractorPropsDir, config.extractorPropsFile))
 	}
-	cmd = append(cmd, config.tasks...)
+	cmd = append(cmd, stripPropertyQuotes(config.tasks)...)
 	config.logger.Info("Running gradle command:", strings.Join(quoteArgsForLog(cmd), " "))
 	return exec.Command(cmd[0], cmd[1:]...)
+}
+
+// stripPropertyQuotes removes a matching pair of leading/trailing quote characters (' or ") from system/project
+// property values, e.g., -Dkey='val ue' => -Dkey=val ue.
+// On Windows, cmd.exe and PowerShell don't strip single quotes from arguments the way bash/zsh do, so a value
+// quoted on the command line can still reach this process with the quotes literally part of the string. Left
+// as-is, they'd be passed straight through to Gradle, and end up uploaded to Artifactory as part of the value.
+func stripPropertyQuotes(tasks []string) []string {
+	strippedTasks := make([]string, len(tasks))
+	for i, task := range tasks {
+		if isSystemOrProjectProperty(task) {
+			task = unquoteProperty(task)
+		}
+		strippedTasks[i] = task
+	}
+	return strippedTasks
+}
+
+// Strips a matching pair of leading/trailing single or double quotes from a system or project property's value.
+func unquoteProperty(task string) string {
+	parts := strings.SplitN(task, "=", 2)
+	value := parts[1]
+	if len(value) >= 2 {
+		first, last := value[0], value[len(value)-1]
+		if (first == '\'' && last == '\'') || (first == '"' && last == '"') {
+			value = value[1 : len(value)-1]
+		}
+	}
+	return parts[0] + "=" + value
 }
 
 // quoteArgsForLog returns a copy of args with system/project property values wrapped in quotes when they contain
