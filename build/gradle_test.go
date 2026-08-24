@@ -103,7 +103,7 @@ func TestParseGradleVersion(t *testing.T) {
 	}
 }
 
-func TestFormatCommandProperties(t *testing.T) {
+func TestQuoteArgsForLog(t *testing.T) {
 	tests := []struct {
 		input    []string
 		expected []string
@@ -127,7 +127,21 @@ func TestFormatCommandProperties(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := formatCommandProperties(test.input)
+		result := quoteArgsForLog(test.input)
 		assert.ElementsMatch(t, test.expected, result)
 	}
+}
+
+func TestGetCmdDoesNotQuotePropertyValues(t *testing.T) {
+	config := &gradleRunConfig{
+		gradle: "gradle",
+		tasks:  []string{"artifactoryPublish", "-Ddeploy.test.property=test test"},
+		logger: utils.NewDefaultLogger(utils.INFO),
+	}
+
+	cmd := config.GetCmd()
+
+	// exec.Command runs the process directly, without a shell, so a quoted value here would be passed to Gradle
+	// literally as 'test test', quotes included, instead of being stripped.
+	assert.Equal(t, []string{"gradle", "artifactoryPublish", "-Ddeploy.test.property=test test"}, cmd.Args)
 }

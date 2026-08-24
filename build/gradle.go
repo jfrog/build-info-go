@@ -260,26 +260,27 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 	}
 	// Add BUILDINFO_PROPFILE system property if extractor properties file exists
 	if config.extractorPropsFile != "" {
-		jvmProp := fmt.Sprintf("-D%s=%s", extractorPropsDir, config.extractorPropsFile)
-		if strings.Contains(config.extractorPropsFile, " ") {
-			jvmProp = fmt.Sprintf("-D%s='%s'", extractorPropsDir, config.extractorPropsFile)
-		}
-		cmd = append(cmd, jvmProp)
+		cmd = append(cmd, fmt.Sprintf("-D%s=%s", extractorPropsDir, config.extractorPropsFile))
 	}
-	cmd = append(cmd, formatCommandProperties(config.tasks)...)
-	config.logger.Info("Running gradle command:", strings.Join(cmd, " "))
+	cmd = append(cmd, config.tasks...)
+	config.logger.Info("Running gradle command:", strings.Join(quoteArgsForLog(cmd), " "))
 	return exec.Command(cmd[0], cmd[1:]...)
 }
 
-func formatCommandProperties(tasks []string) []string {
-	var cmdArgs []string
-	for _, task := range tasks {
-		if isSystemOrProjectProperty(task) {
-			task = quotePropertyIfNeeded(task)
+// quoteArgsForLog returns a copy of args with system/project property values wrapped in quotes when they contain
+// spaces, e.g., -Dkey=val ue => -Dkey='val ue', purely to make the printed command readable.
+// This must never be used to build the actual arguments passed to exec.Command: those are executed directly,
+// without going through a shell, so added quote characters would be passed through literally instead of being
+// stripped, corrupting the property value.
+func quoteArgsForLog(args []string) []string {
+	logArgs := make([]string, len(args))
+	for i, arg := range args {
+		if isSystemOrProjectProperty(arg) {
+			arg = quotePropertyIfNeeded(arg)
 		}
-		cmdArgs = append(cmdArgs, task)
+		logArgs[i] = arg
 	}
-	return cmdArgs
+	return logArgs
 }
 
 func isSystemOrProjectProperty(task string) bool {
