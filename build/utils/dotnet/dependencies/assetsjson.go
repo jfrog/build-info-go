@@ -156,7 +156,7 @@ func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.D
 			continue
 		}
 		dependencyKey := strings.ToLower(getDependencyIdForBuildInfo(dependencyId))
-		dependency := &buildinfo.Dependency{Id: getDependencyIdForBuildInfo(dependencyId)}
+		dependency := &buildinfo.Dependency{Id: getDependencyIdForBuildInfo(dependencyId), Type: nupkgType}
 
 		checksum, err := assets.dependencyChecksum(packagesPath, library, log)
 		if err != nil {
@@ -167,9 +167,11 @@ func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.D
 		}
 
 		// Map PrivateAssets=all references (suppressParent="all" in project.assets.json) to the
-		// "private" build-info scope.
+		// "private" build-info scope; all other packages are compile-time dependencies.
 		if privateDeps[getDependencyName(dependencyId)] {
 			dependency.Scopes = []string{privateScope}
+		} else {
+			dependency.Scopes = []string{compileScope}
 		}
 
 		dependencies[dependencyKey] = dependency
@@ -178,7 +180,11 @@ func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.D
 	return dependencies, nil
 }
 
-const privateScope = "private"
+const (
+	privateScope = "private"
+	compileScope = "compile"
+	nupkgType    = "nupkg"
+)
 
 // dependencyChecksum computes the SHA1/SHA256/MD5 for a library's .nupkg when it exists in the
 // local cache. It returns nil (without error) when the package file cannot be located, so the

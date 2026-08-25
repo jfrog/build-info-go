@@ -108,7 +108,7 @@ func (extractor *packagesExtractor) extract(packagesConfig *packagesConfig, glob
 			// the local cache (see getAllDependencies); packages.config projects must not be
 			// dropped either, or the dependency silently disappears from the build info.
 			log.Warn(fmt.Sprintf("The following NuGet package %s with version %s was not found in the NuGet cache %s."+absentNupkgWarnMsg, nuget.Id, nuget.Version, globalPackagesCache))
-			extractor.allDependencies[id] = &buildinfo.Dependency{Id: nuget.Id + ":" + nuget.Version, Scopes: developmentDependencyScope(nuget)}
+			extractor.allDependencies[id] = &buildinfo.Dependency{Id: nuget.Id + ":" + nuget.Version, Type: nupkgType, Scopes: developmentDependencyScope(nuget)}
 		}
 	}
 	return nil
@@ -229,6 +229,7 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	}
 	nPackage.dependency = &buildinfo.Dependency{
 		Id:       nuget.Id + ":" + nuget.Version,
+		Type:     nupkgType,
 		Scopes:   developmentDependencyScope(nuget),
 		Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Sha256: fileDetails.Checksum.Sha256, Md5: fileDetails.Checksum.Md5},
 	}
@@ -317,13 +318,13 @@ type xmlPackage struct {
 }
 
 // developmentDependencyScope maps packages.config's developmentDependency="true" attribute to
-// the "private" build-info dependency scope, mirroring project.assets.json's PrivateAssets=all
-// handling in getPrivateDependencyNames.
+// the "private" build-info scope, mirroring project.assets.json's PrivateAssets=all handling.
+// All other packages are compile-time dependencies.
 func developmentDependencyScope(nuget xmlPackage) []string {
 	if strings.EqualFold(nuget.DevelopmentDependency, "true") {
 		return []string{privateScope}
 	}
-	return nil
+	return []string{compileScope}
 }
 
 type nuspec struct {
