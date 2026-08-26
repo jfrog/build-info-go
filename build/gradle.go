@@ -296,14 +296,7 @@ func unquoteProperty(task string) string {
 	if len(parts) < 2 {
 		return task
 	}
-	value := parts[1]
-	if len(value) >= 2 {
-		first, last := value[0], value[len(value)-1]
-		if (first == '\'' && last == '\'') || (first == '"' && last == '"') {
-			value = value[1 : len(value)-1]
-		}
-	}
-	return parts[0] + "=" + value
+	return parts[0] + "=" + utils.StripSurroundingQuotes(parts[1])
 }
 
 // quoteArgsForLog returns a copy of args with system/project property values wrapped in quotes when they contain
