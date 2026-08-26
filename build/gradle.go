@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
@@ -269,10 +270,16 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 
 // stripPropertyQuotes removes a matching pair of leading/trailing quote characters (' or ") from system/project
 // property values, e.g., -Dkey='val ue' => -Dkey=val ue.
-// On Windows, cmd.exe and PowerShell don't strip single quotes from arguments the way bash/zsh do, so a value
-// quoted on the command line can still reach this process with the quotes literally part of the string. Left
-// as-is, they'd be passed straight through to Gradle, and end up uploaded to Artifactory as part of the value.
+// This is only needed on Windows: cmd.exe and PowerShell don't strip single quotes from arguments the way
+// bash/zsh do, so a value quoted on the command line can still reach this process with the quotes literally
+// part of the string. Left as-is, they'd be passed straight through to Gradle, and end up uploaded to
+// Artifactory as part of the value. On other platforms the shell has already stripped shell-level quoting by
+// the time this process sees the argument, so any quotes still present were typed deliberately as part of the
+// value and must be left alone.
 func stripPropertyQuotes(tasks []string) []string {
+	if runtime.GOOS != "windows" {
+		return tasks
+	}
 	strippedTasks := make([]string, len(tasks))
 	for i, task := range tasks {
 		if isSystemOrProjectProperty(task) {
@@ -286,6 +293,9 @@ func stripPropertyQuotes(tasks []string) []string {
 // Strips a matching pair of leading/trailing single or double quotes from a system or project property's value.
 func unquoteProperty(task string) string {
 	parts := strings.SplitN(task, "=", 2)
+	if len(parts) < 2 {
+		return task
+	}
 	value := parts[1]
 	if len(value) >= 2 {
 		first, last := value[0], value[len(value)-1]

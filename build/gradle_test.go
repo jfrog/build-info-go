@@ -3,6 +3,7 @@ package build
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/jfrog/build-info-go/utils"
@@ -132,6 +133,26 @@ func TestQuoteArgsForLog(t *testing.T) {
 	}
 }
 
+func TestUnquoteProperty(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{input: "-Dparam=value", expected: "-Dparam=value"},
+		{input: "-Ddeploy.test.property=test test", expected: "-Ddeploy.test.property=test test"},
+		{input: "-Ddeploy.test.property='test test'", expected: "-Ddeploy.test.property=test test"},
+		{input: `-Pkey="value with spaces"`, expected: "-Pkey=value with spaces"},
+		// Mismatched quote pair: left as-is.
+		{input: `-Dparam='value"`, expected: `-Dparam='value"`},
+		// No '=' at all: returned unchanged rather than panicking on the missing value part.
+		{input: "-Dparam", expected: "-Dparam"},
+	}
+
+	for _, test := range tests {
+		assert.Equal(t, test.expected, unquoteProperty(test.input))
+	}
+}
+
 func TestStripPropertyQuotes(t *testing.T) {
 	tests := []struct {
 		input    []string
@@ -148,7 +169,7 @@ func TestStripPropertyQuotes(t *testing.T) {
 		},
 		{
 			// Quotes still present in the raw arg (e.g. on Windows, where cmd.exe/PowerShell don't strip
-			// single quotes the way bash/zsh do): stripped.
+			// single quotes the way bash/zsh do): stripped only on Windows.
 			input:    []string{"-Ddeploy.test.property='test test'"},
 			expected: []string{"-Ddeploy.test.property=test test"},
 		},
@@ -165,7 +186,13 @@ func TestStripPropertyQuotes(t *testing.T) {
 
 	for _, test := range tests {
 		result := stripPropertyQuotes(test.input)
-		assert.Equal(t, test.expected, result)
+		if runtime.GOOS == "windows" {
+			assert.Equal(t, test.expected, result)
+		} else {
+			// On non-Windows platforms the shell already stripped shell-level quoting, so any quotes
+			// still present in the argument were typed deliberately and must be left untouched.
+			assert.Equal(t, test.input, result)
+		}
 	}
 }
 
@@ -178,7 +205,12 @@ func TestGetCmdDoesNotQuotePropertyValues(t *testing.T) {
 
 	cmd := config.GetCmd()
 
+	expectedValue := "'test test'"
+	if runtime.GOOS == "windows" {
+		// Pre-existing quotes are only stripped on Windows, where the shell doesn't strip them itself.
+		expectedValue = "test test"
+	}
 	// exec.Command runs the process directly, without a shell, so quotes around the value would be passed to
 	// Gradle literally, instead of being stripped, if we didn't strip them ourselves.
-	assert.Equal(t, []string{"gradle", "artifactoryPublish", "-Ddeploy.test.property=test test"}, cmd.Args)
+	assert.Equal(t, []string{"gradle", "artifactoryPublish", "-Ddeploy.test.property=" + expectedValue}, cmd.Args)
 }
