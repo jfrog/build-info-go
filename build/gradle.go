@@ -299,8 +299,8 @@ func unquoteProperty(task string) string {
 	return parts[0] + "=" + utils.StripSurroundingQuotes(parts[1])
 }
 
-// quoteArgsForLog returns a copy of args with system/project property values wrapped in quotes when they contain
-// spaces, e.g., -Dkey=val ue => -Dkey='val ue', purely to make the printed command readable.
+// quoteArgsForLog returns a copy of args with system/project property values wrapped in quotes, e.g.,
+// -Dkey=val ue => -Dkey='val ue', purely to make the printed command's property boundaries unambiguous.
 // This must never be used to build the actual arguments passed to exec.Command: those are executed directly,
 // without going through a shell, so added quote characters would be passed through literally instead of being
 // stripped, corrupting the property value.
@@ -308,7 +308,7 @@ func quoteArgsForLog(args []string) []string {
 	logArgs := make([]string, len(args))
 	for i, arg := range args {
 		if isSystemOrProjectProperty(arg) {
-			arg = quotePropertyIfNeeded(arg)
+			arg = quoteProperty(arg)
 		}
 		logArgs[i] = arg
 	}
@@ -320,14 +320,13 @@ func isSystemOrProjectProperty(task string) bool {
 	return hasPropertiesFlag && strings.Contains(task, "=")
 }
 
-// Wraps system or project property value in quotes if its value contain spaces, e.g., -Dkey=val ue => -Dkey='val ue'
-func quotePropertyIfNeeded(task string) string {
+// Wraps a system or project property's value in quotes, e.g., -Dkey=val ue => -Dkey='val ue'
+func quoteProperty(task string) string {
 	parts := strings.SplitN(task, "=", 2)
-	if strings.Contains(parts[1], " ") {
-		return fmt.Sprintf(`%s='%s'`, parts[0], parts[1])
+	if len(parts) < 2 {
+		return task
 	}
-
-	return task
+	return fmt.Sprintf(`%s='%s'`, parts[0], parts[1])
 }
 
 func (config *gradleRunConfig) runCmd(stdout, stderr io.Writer) error {
