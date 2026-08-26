@@ -42,7 +42,7 @@ func (n *NuGetFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entiti
 		sol buildinfosolution.Solution
 		err error
 	)
-	if strings.HasSuffix(strings.ToLower(filepath.Ext(targetPath)), "proj") {
+	if isProjectFile(targetPath) {
 		sol, err = buildinfosolution.LoadProject(targetPath, n.log)
 	} else {
 		solutionFile := ""
@@ -96,22 +96,46 @@ func (n *NuGetFlexPack) GetProjectDependencies() ([]buildinfoflex.DependencyInfo
 }
 
 // GetDependencyGraph returns a parent→children map derived from RequestedBy chains.
+// Each child appears at most once per parent (duplicate edges are eliminated).
 func (n *NuGetFlexPack) GetDependencyGraph() (map[string][]string, error) {
 	bi, err := n.CollectBuildInfo("", "")
 	if err != nil {
 		return nil, err
 	}
-	graph := make(map[string][]string)
+	// Use a set internally to dedup edges before building the final slice map.
+	edgeSets := make(map[string]map[string]struct{})
 	for _, mod := range bi.Modules {
 		for _, d := range mod.Dependencies {
 			for _, chain := range d.RequestedBy {
 				if len(chain) > 0 && chain[0] != "" {
-					graph[chain[0]] = append(graph[chain[0]], d.Id)
+					parent := chain[0]
+					if edgeSets[parent] == nil {
+						edgeSets[parent] = make(map[string]struct{})
+					}
+					edgeSets[parent][d.Id] = struct{}{}
 				}
 			}
 		}
 	}
+	graph := make(map[string][]string, len(edgeSets))
+	for parent, children := range edgeSets {
+		childSlice := make([]string, 0, len(children))
+		for child := range children {
+			childSlice = append(childSlice, child)
+		}
+		graph[parent] = childSlice
+	}
 	return graph, nil
+}
+
+// isProjectFile reports whether path is a .NET project file by its extension.
+// The set is explicit to avoid matching unrelated formats (e.g. ".aproj", ".xproj").
+func isProjectFile(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".csproj", ".fsproj", ".vbproj", ".proj":
+		return true
+	}
+	return false
 }
 
 // flattenRequestedBy converts [][]string requestedBy chains into []string (first element of each chain).

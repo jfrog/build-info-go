@@ -248,12 +248,34 @@ func resolvePushPackagePaths(workingDir string, pushArgs []string) ([]string, er
 // pack command produces or refreshes.
 type PackageSnapshot map[string]time.Time
 
-// SnapshotPackageFiles walks root recursively and records every existing NuGet package file
-// with its modification time. Missing roots yield an empty snapshot rather than an error.
-func SnapshotPackageFiles(root string) (PackageSnapshot, error) {
+// SnapshotPackageFiles records every existing NuGet package file in the standard output
+// directories (bin/, obj/, artifacts/) under root, plus any additional directories supplied
+// in extraDirs. Scoping to known output directories avoids walking the entire source tree,
+// which may contain large numbers of source and cache files. Missing directories yield an
+// empty snapshot rather than an error.
+func SnapshotPackageFiles(root string, extraDirs ...string) (PackageSnapshot, error) {
 	snapshot := make(PackageSnapshot)
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	dirs := []string{
+		filepath.Join(root, "bin"),
+		filepath.Join(root, "obj"),
+		filepath.Join(root, "artifacts"),
+	}
+	dirs = append(dirs, extraDirs...)
+	for _, dir := range dirs {
+		if err := snapshotDir(snapshot, dir); err != nil {
+			return nil, fmt.Errorf("snapshot package files under %s: %w", dir, err)
+		}
+	}
+	return snapshot, nil
+}
+
+// snapshotDir walks dir and records package files into snapshot. Missing dirs are skipped.
+func snapshotDir(snapshot PackageSnapshot, dir string) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			if os.IsNotExist(err) {
+				return filepath.SkipDir
+			}
 			return err
 		}
 		if info.IsDir() || !isPackageFile(info.Name()) {
@@ -266,18 +288,14 @@ func SnapshotPackageFiles(root string) (PackageSnapshot, error) {
 		snapshot[abs] = info.ModTime()
 		return nil
 	})
-	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("snapshot package files under %s: %w", root, err)
-	}
-	return snapshot, nil
 }
 
-// CollectPackedArtifacts returns artifacts for package files under root that are new or were
-// modified relative to the "before" snapshot. This deterministically captures the output of a
-// pack command (including custom --output directories and bin/<Configuration> defaults) without
-// depending on a single directory and without including pre-existing, unrelated packages.
-func CollectPackedArtifacts(root string, before PackageSnapshot, repoName string) ([]entities.Artifact, error) {
-	after, err := SnapshotPackageFiles(root)
+// CollectPackedArtifacts returns artifacts for package files that are new or were modified
+// relative to the "before" snapshot. It scans the same set of directories as the "before"
+// snapshot: the standard output directories (bin/, obj/, artifacts/) under root plus any
+// extraDirs (e.g. a custom --output directory passed to the pack command).
+func CollectPackedArtifacts(root string, before PackageSnapshot, repoName string, extraDirs ...string) ([]entities.Artifact, error) {
+	after, err := SnapshotPackageFiles(root, extraDirs...)
 	if err != nil {
 		return nil, err
 	}

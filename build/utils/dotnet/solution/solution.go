@@ -393,7 +393,7 @@ func (solution *solution) loadSingleProjectFromDir(log utils.Log) error {
 			}
 		}
 	}
-	log.Warn(fmt.Sprintf("expecting 1 'proj' file but fuond %d files in path: %s", len(projFiles), solution.path))
+	log.Warn(fmt.Sprintf("expecting 1 'proj' file but found %d files in path: %s", len(projFiles), solution.path))
 	return nil
 }
 
