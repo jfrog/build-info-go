@@ -202,8 +202,8 @@ func populateRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap 
 	if !ok {
 		// Legacy fallback: packagesExtractor keys childrenMap by name only (no version).
 		// Remove once packagesExtractor is migrated to name:version keys.
-		if idx := strings.Index(key, ":"); idx != -1 {
-			childrenList = childrenMap[key[:idx]]
+		if name, _, found := strings.Cut(key, ":"); found {
+			childrenList = childrenMap[name]
 		}
 	}
 	for _, childName := range childrenList {
