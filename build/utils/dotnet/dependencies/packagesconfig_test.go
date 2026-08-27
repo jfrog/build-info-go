@@ -202,9 +202,9 @@ func TestPackageNotFoundIsRetainedWithoutChecksum(t *testing.T) {
 	require.Contains(t, allDependencies, "id1")
 	dep := allDependencies["id1"]
 	assert.Equal(t, "id1:1.0.0", dep.Id)
-	assert.Empty(t, dep.Checksum.Sha1)
-	assert.Empty(t, dep.Checksum.Sha256)
-	assert.Empty(t, dep.Checksum.Md5)
+	assert.Empty(t, dep.Sha1)
+	assert.Empty(t, dep.Sha256)
+	assert.Empty(t, dep.Md5)
 }
 
 // TestPackagesConfigChecksumsAndDevelopmentDependencyScope verifies that a cached package gets
@@ -229,9 +229,9 @@ func TestPackagesConfigChecksumsAndDevelopmentDependencyScope(t *testing.T) {
 	dep := extractor.allDependencies["dev.package"]
 	require.NotNil(t, dep)
 	assert.Equal(t, []string{privateScope}, dep.Scopes)
-	assert.NotEmpty(t, dep.Checksum.Sha1)
-	assert.NotEmpty(t, dep.Checksum.Sha256)
-	assert.NotEmpty(t, dep.Checksum.Md5)
+	assert.NotEmpty(t, dep.Sha1)
+	assert.NotEmpty(t, dep.Sha256)
+	assert.NotEmpty(t, dep.Md5)
 }
 
 func extractDependencies(globalPackagePath string, log utils.Log) (Extractor, error) {

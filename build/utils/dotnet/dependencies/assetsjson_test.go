@@ -71,9 +71,9 @@ func TestAssetsDependenciesChecksumsAndPrivateScope(t *testing.T) {
 	require.NotNil(t, privateDependency)
 	assert.Equal(t, nupkgType, privateDependency.Type)
 	assert.Equal(t, []string{privateScope}, privateDependency.Scopes)
-	assert.NotEmpty(t, privateDependency.Checksum.Sha1)
-	assert.NotEmpty(t, privateDependency.Checksum.Sha256)
-	assert.NotEmpty(t, privateDependency.Checksum.Md5)
+	assert.NotEmpty(t, privateDependency.Sha1)
+	assert.NotEmpty(t, privateDependency.Sha256)
+	assert.NotEmpty(t, privateDependency.Md5)
 
 	publicDependency := allDependencies["public.package:7.8.9"]
 	require.NotNil(t, publicDependency)

@@ -12,7 +12,6 @@ import (
 	"github.com/jfrog/build-info-go/utils/compareutils"
 	"github.com/jfrog/gofrog/log"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/gofrog/stringutils"
@@ -638,8 +637,10 @@ func (d *Dependency) UpdateRequestedBy(parentId string, parentRequestedBy [][]st
 
 func (d *Dependency) NodeHasLoop() bool {
 	for _, requestedBy := range d.RequestedBy {
-		if slices.Contains(requestedBy, d.Id) {
-			return true
+		for _, id := range requestedBy {
+			if id == d.Id {
+				return true
+			}
 		}
 	}
 	return false

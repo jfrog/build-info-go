@@ -62,7 +62,7 @@ func TestFindNupkgArtifactsIncludesSymbols(t *testing.T) {
 		if artifact.OriginalDeploymentRepo != "my-nuget-repo" {
 			t.Errorf("repository for %q: got %q", artifact.Name, artifact.OriginalDeploymentRepo)
 		}
-		if artifact.Checksum.Sha1 == "" || artifact.Checksum.Sha256 == "" || artifact.Checksum.Md5 == "" {
+		if artifact.Sha1 == "" || artifact.Sha256 == "" || artifact.Md5 == "" {
 			t.Errorf("expected all checksums for %q", artifact.Name)
 		}
 	}
