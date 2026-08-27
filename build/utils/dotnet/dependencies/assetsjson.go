@@ -197,6 +197,14 @@ func (assets *assets) dependencyChecksum(packagesPath string, library library, l
 		return nil, nil
 	}
 	nupkgFilePath := filepath.Join(packagesPath, library.Path, nupkgFileName)
+	rel, err := filepath.Rel(packagesPath, nupkgFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("computing relative path for package %s: %w", library.Path, err)
+	}
+	if strings.HasPrefix(rel, "..") {
+		log.Warn("Skipping library with path outside packages directory:", nupkgFilePath)
+		return nil, nil
+	}
 	exists, err := utils.IsFileExists(nupkgFilePath, false)
 	if err != nil {
 		return nil, err
@@ -237,7 +245,8 @@ func getDependencyIdForBuildInfo(dependencyAssetId string) string {
 }
 
 func getDependencyName(dependencyId string) string {
-	return strings.ToLower(dependencyId)[0:strings.Index(dependencyId, "/")]
+	name, _, _ := strings.Cut(dependencyId, "/")
+	return strings.ToLower(name)
 }
 
 // Assets json objects for unmarshalling

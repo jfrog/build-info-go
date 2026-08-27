@@ -41,7 +41,7 @@ type DependencyInfo struct {
 	MD5          string           `json:"md5"`
 	ID           string           `json:"id"`
 	Scopes       []string         `json:"scopes,omitempty"`
-	RequestedBy  []string         `json:"requestedBy,omitempty"`
+	RequestedBy  [][]string       `json:"requestedBy,omitempty"`
 	Version      string           `json:"version"`
 	Name         string           `json:"name"`
 	Path         string           `json:"path,omitempty"`

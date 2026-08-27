@@ -623,6 +623,9 @@ func (d *Dependency) UpdateRequestedBy(parentId string, parentRequestedBy [][]st
 	// Filter all existing paths from parent
 	var filteredChildRequestedBy [][]string
 	for _, childRequestedBy := range d.RequestedBy {
+		if len(childRequestedBy) == 0 {
+			continue
+		}
 		if childRequestedBy[0] != parentId {
 			filteredChildRequestedBy = append(filteredChildRequestedBy, childRequestedBy)
 		}

@@ -36,9 +36,14 @@ func TestAssetsDependenciesRetainedWithoutCachedPackage(t *testing.T) {
 
 func TestAssetsDependenciesChecksumsAndPrivateScope(t *testing.T) {
 	packagesPath := t.TempDir()
-	packagePath := filepath.Join(packagesPath, "private.package", "4.5.6", "private.package.4.5.6.nupkg")
-	require.NoError(t, os.MkdirAll(filepath.Dir(packagePath), 0o755))
-	require.NoError(t, os.WriteFile(packagePath, []byte("package contents"), 0o600))
+	for _, rel := range []string{
+		filepath.Join("private.package", "4.5.6", "private.package.4.5.6.nupkg"),
+		filepath.Join("public.package", "7.8.9", "public.package.7.8.9.nupkg"),
+	} {
+		p := filepath.Join(packagesPath, rel)
+		require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o755))
+		require.NoError(t, os.WriteFile(p, []byte(rel), 0o600))
+	}
 
 	assetsObj := assets{
 		Libraries: map[string]library{
@@ -79,6 +84,25 @@ func TestAssetsDependenciesChecksumsAndPrivateScope(t *testing.T) {
 	require.NotNil(t, publicDependency)
 	assert.Equal(t, nupkgType, publicDependency.Type)
 	assert.Equal(t, []string{compileScope}, publicDependency.Scopes)
+	assert.NotEmpty(t, publicDependency.Sha1)
+	assert.NotEmpty(t, publicDependency.Sha256)
+	assert.NotEmpty(t, publicDependency.Md5)
+}
+
+func TestAssetsExtractorNewErrors(t *testing.T) {
+	log := &utils.NullLog{}
+
+	t.Run("file not found", func(t *testing.T) {
+		_, err := (&assetsExtractor{}).new("nonexistent/project.assets.json", log)
+		assert.Error(t, err)
+	})
+
+	t.Run("malformed JSON", func(t *testing.T) {
+		f := filepath.Join(t.TempDir(), "project.assets.json")
+		require.NoError(t, os.WriteFile(f, []byte("{bad json"), 0o600))
+		_, err := (&assetsExtractor{}).new(f, log)
+		assert.Error(t, err)
+	})
 }
 
 func TestAssetsExtractorProjectVersion(t *testing.T) {

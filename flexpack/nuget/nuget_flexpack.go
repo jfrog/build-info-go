@@ -3,6 +3,7 @@ package nuget
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	buildinfosolution "github.com/jfrog/build-info-go/build/utils/dotnet/solution"
@@ -35,7 +36,11 @@ func (n *NuGetFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entiti
 	workingDirectory := n.config.WorkingDirectory
 	targetPath := n.config.TargetPath
 	if targetPath != "" && !filepath.IsAbs(targetPath) {
-		targetPath = filepath.Join(workingDirectory, targetPath)
+		resolved := filepath.Join(workingDirectory, targetPath)
+		if !strings.HasPrefix(filepath.Clean(resolved)+string(filepath.Separator), filepath.Clean(workingDirectory)+string(filepath.Separator)) {
+			return nil, fmt.Errorf("TargetPath %q resolves outside WorkingDirectory", n.config.TargetPath)
+		}
+		targetPath = resolved
 	}
 
 	var (
@@ -90,7 +95,7 @@ func (n *NuGetFlexPack) GetProjectDependencies() ([]buildinfoflex.DependencyInfo
 				SHA256:      d.Sha256,
 				MD5:         d.Md5,
 				Scopes:      d.Scopes,
-				RequestedBy: flattenRequestedBy(d.RequestedBy),
+				RequestedBy: d.RequestedBy,
 			})
 		}
 	}
@@ -125,6 +130,7 @@ func (n *NuGetFlexPack) GetDependencyGraph() (map[string][]string, error) {
 		for child := range children {
 			childSlice = append(childSlice, child)
 		}
+		sort.Strings(childSlice)
 		graph[parent] = childSlice
 	}
 	return graph, nil
@@ -140,15 +146,3 @@ func isProjectFile(path string) bool {
 	return false
 }
 
-// flattenRequestedBy converts [][]string requestedBy chains into []string (first element of each chain).
-func flattenRequestedBy(chains [][]string) []string {
-	result := make([]string, 0, len(chains))
-	seen := make(map[string]bool, len(chains))
-	for _, chain := range chains {
-		if len(chain) > 0 && !seen[chain[0]] {
-			result = append(result, chain[0])
-			seen[chain[0]] = true
-		}
-	}
-	return result
-}

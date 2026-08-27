@@ -28,9 +28,10 @@ type Solution interface {
 	Marshal() ([]byte, error)
 	GetProjects() []project.Project
 	GetDependenciesSources() []string
+	DependenciesSourcesAndProjectsPathExist() bool
 }
 
-var projectRegExp *regexp.Regexp
+var projectRegExp = regexp.MustCompile(`Project\("(.*\..*proj)`)
 
 func Load(path, slnFile, excludePattern string, log utils.Log) (Solution, error) {
 	solution := &solution{path: path, slnFile: slnFile}
@@ -500,14 +501,6 @@ func parseProjectLine(projectLine, path string) (projectName, projFilePath strin
 
 // Parse the sln file according to project regular expression and returns all the founded lines by the regex
 func parseSlnFile(slnFile string) ([]string, error) {
-	var err error
-	if projectRegExp == nil {
-		projectRegExp, err = utils.GetRegExp(`Project\("(.*\..*proj)`)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	content, err := os.ReadFile(slnFile)
 	if err != nil {
 		return nil, err
@@ -603,12 +596,20 @@ func removeQuotes(value string) string {
 //   - 'project.assets.json' files are located in 'obj' directory in project's root.
 //   - 'packages.config' files are located in the project root/ in solutions root in a directory named after project's name.
 func (solution *solution) getDependenciesSourcesInProjectsDir(slnProjects []project.Project) error {
-	// Walk and search for dependencies sources files in project's directories.
+	// Projects may legitimately live in sibling directories (one level above the .sln file),
+	// e.g. a 'solutions/MyApp.sln' referencing '../src/MyApp/MyApp.csproj'.
+	// Allow walking project directories that are within the solution path's parent; skip any
+	// path that resolves further outside the tree (e.g. '../../../../etc') to prevent traversal.
+	allowedRoot := filepath.Clean(filepath.Dir(filepath.Clean(solution.path))) + string(filepath.Separator)
 	for _, slnProject := range slnProjects {
 		// Before running this function we already looked for dependencies sources in solutions directory.
 		// If a project isn't located under solutions' dir - we should look for the dependencies sources in this specific project's directory.
 		if !strings.HasPrefix(slnProject.RootPath(), solution.path) {
-			err := gofrog.Walk(slnProject.RootPath(), func(path string, f os.FileInfo, err error) error {
+			absRoot, err := filepath.Abs(slnProject.RootPath())
+			if err != nil || !strings.HasPrefix(absRoot+string(filepath.Separator), allowedRoot) {
+				continue
+			}
+			err = gofrog.Walk(slnProject.RootPath(), func(path string, f os.FileInfo, err error) error {
 				return solution.addPathToDependenciesSourcesIfNeeded(path)
 			}, true)
 			if err != nil {

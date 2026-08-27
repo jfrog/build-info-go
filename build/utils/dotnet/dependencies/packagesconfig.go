@@ -212,6 +212,9 @@ func searchRootDependencies(dfsHelper map[string]*dfsHelper, currentId string, a
 
 func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPackage, log utils.Log) (*nugetPackage, error) {
 	nupkgPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, nPackage.version, "nupkg"}, "."))
+	if rel, err := filepath.Rel(packagesPath, nupkgPath); err != nil || strings.HasPrefix(rel, "..") {
+		return nil, fmt.Errorf("package id/version contains path traversal: %s %s", nPackage.id, nPackage.version)
+	}
 
 	exists, err := utils.IsFileExists(nupkgPath, false)
 
@@ -245,7 +248,12 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	if err != nil {
 		pack := nPackage.id + ":" + nPackage.version
 		log.Warn("Package:", pack, "couldn't be parsed due to:", err.Error(), ". Skipping the package dependency.")
-		log.Debug("nuspec content:\n" + string(nuspecContent))
+		const maxLogBytes = 512
+		preview := nuspecContent
+		if len(preview) > maxLogBytes {
+			preview = preview[:maxLogBytes]
+		}
+		log.Debug(fmt.Sprintf("nuspec content (first %d bytes):\n%s", len(preview), string(preview)))
 		return nPackage, nil
 	}
 
@@ -354,7 +362,7 @@ func xmlUnmarshal(content []byte, obj interface{}, log utils.Log) (err error) {
 			"xml.Unmarshal doesn't support utf-16 encoding, so we need to decode the utf16 by ourselves.")
 
 		buf := make([]uint16, len(content)/2)
-		for i := 0; i < len(content); i += 2 {
+		for i := 0; i+1 < len(content); i += 2 {
 			buf[i/2] = binary.LittleEndian.Uint16(content[i:])
 		}
 		// Remove utf-16 Byte Order Mark (BOM) if exists

@@ -2,6 +2,7 @@ package solution
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -269,6 +270,27 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 	assert.Equal(t, expected, firstResult)
 }
 
+func TestPopulateRequestedByMaxLengthCap(t *testing.T) {
+	// Create a leaf dependency reachable via more paths than RequestedByMaxLength.
+	// populateRequestedBy must stop adding paths once the cap is reached.
+	leaf := "leaf:1"
+	deps := map[string]*buildinfo.Dependency{leaf: {Id: "leaf:1"}}
+	childrenMap := map[string][]string{}
+
+	// Create RequestedByMaxLength+1 parents, each pointing to leaf.
+	capPlusOne := buildinfo.RequestedByMaxLength + 1
+	for i := 0; i < capPlusOne; i++ {
+		id := fmt.Sprintf("parent%d:1", i)
+		deps[id] = &buildinfo.Dependency{Id: id, RequestedBy: [][]string{{"module"}}}
+		childrenMap[id] = []string{leaf}
+		populateRequestedBy(*deps[id], deps, childrenMap)
+	}
+
+	if got := len(deps[leaf].RequestedBy); got > buildinfo.RequestedByMaxLength {
+		t.Errorf("RequestedBy length %d exceeds cap %d", got, buildinfo.RequestedByMaxLength)
+	}
+}
+
 func TestPopulateRequestedByLegacyNameOnlyFallback(t *testing.T) {
 	// packagesExtractor (packages.config) keys childrenMap by name only, not name:version.
 	// populateRequestedBy must fall back to a name-only lookup when the name:version key
@@ -514,6 +536,25 @@ EndProject`, filepath.Join("jfrog", "path", "test", "packagesconfig", "packagesc
 			}
 			if projectName != test.expectedProjectName {
 				t.Errorf("Expected %s, got %s", test.expectedProjectName, projectName)
+			}
+		})
+	}
+}
+
+func TestParseProjectLineErrors(t *testing.T) {
+	path := filepath.Join("jfrog", "path", "test")
+	tests := []struct {
+		name string
+		line string
+	}{
+		{"no equals sign", `Project("{FAE04EC0}") EndProject`},
+		{"too few comma-separated fields", `Project("{FAE04EC0}") = "onlyname"`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, _, err := parseProjectLine(test.line, path)
+			if err == nil {
+				t.Errorf("expected error for %q, got nil", test.name)
 			}
 		})
 	}

@@ -234,6 +234,33 @@ func TestPackagesConfigChecksumsAndDevelopmentDependencyScope(t *testing.T) {
 	assert.NotEmpty(t, dep.Md5)
 }
 
+func TestXmlUnmarshalUTF16(t *testing.T) {
+	// Build a valid UTF-16-LE encoded packages.config with BOM.
+	src := `<?xml version="1.0" encoding="utf-16"?><packages><package id="MyPkg" version="1.0.0" /></packages>`
+	raw := []byte(src)
+	buf := make([]byte, 2+len(raw)*2)
+	buf[0], buf[1] = 0xFF, 0xFE // little-endian BOM
+	for i, b := range raw {
+		buf[2+i*2] = b
+		buf[2+i*2+1] = 0
+	}
+	var result packagesConfig
+	log := &utils.NullLog{}
+	require.NoError(t, xmlUnmarshal(buf, &result, log))
+	require.Len(t, result.XmlPackages, 1)
+	assert.Equal(t, "MyPkg", result.XmlPackages[0].Id)
+	assert.Equal(t, "1.0.0", result.XmlPackages[0].Version)
+}
+
+func TestXmlUnmarshalUTF16OddLength(t *testing.T) {
+	// Odd-length content must not panic — the trailing byte is dropped.
+	oddContent := []byte{0xFF, 0xFE, '<', 0, 'p', 0, 'a', 0} // 8 bytes: BOM + "<pa"
+	var result packagesConfig
+	log := &utils.NullLog{}
+	// Should not panic; an unmarshal error is acceptable for truncated XML.
+	_ = xmlUnmarshal(oddContent, &result, log)
+}
+
 func extractDependencies(globalPackagePath string, log utils.Log) (Extractor, error) {
 	extractor := &packagesExtractor{allDependencies: map[string]*buildinfo.Dependency{}, childrenMap: map[string][]string{}}
 	packagesConfig, err := extractor.loadPackagesConfig(filepath.Join("testdata", "packagesproject", "packages.config"), log)

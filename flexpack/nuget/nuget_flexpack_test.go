@@ -7,7 +7,61 @@ import (
 	"testing"
 
 	"github.com/jfrog/build-info-go/entities"
+	buildinfoflex "github.com/jfrog/build-info-go/flexpack"
 )
+
+func TestNewNuGetFlexPackValidation(t *testing.T) {
+	t.Run("empty WorkingDirectory returns error", func(t *testing.T) {
+		_, err := NewNuGetFlexPack(buildinfoflex.NuGetConfig{WorkingDirectory: ""}, nil)
+		if err == nil {
+			t.Fatal("expected error for empty WorkingDirectory, got nil")
+		}
+	})
+
+	t.Run("valid WorkingDirectory succeeds", func(t *testing.T) {
+		np, err := NewNuGetFlexPack(buildinfoflex.NuGetConfig{WorkingDirectory: t.TempDir()}, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if np == nil {
+			t.Fatal("expected non-nil NuGetFlexPack")
+		}
+	})
+}
+
+func TestIsProjectFile(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"Library.csproj", true}, {"Library.CSPROJ", true},
+		{"Library.fsproj", true}, {"Library.FSPROJ", true},
+		{"Library.vbproj", true}, {"Library.VBPROJ", true},
+		{"Library.proj", true}, {"Library.PROJ", true},
+		{"Library.xproj", false}, {"Library.sln", false}, {"", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.path, func(t *testing.T) {
+			if got := isProjectFile(tc.path); got != tc.want {
+				t.Errorf("isProjectFile(%q) = %v, want %v", tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseNupkgFilenameDigitStartingID(t *testing.T) {
+	id, ver := parseNupkgFilename("3DTools.1.0.0.nupkg")
+	if id != "3DTools" || ver != "1.0.0" {
+		t.Errorf("parseNupkgFilename(3DTools.1.0.0.nupkg) = %q, %q; want %q, %q", id, ver, "3DTools", "1.0.0")
+	}
+}
+
+func TestFindNupkgArtifactsMissingDir(t *testing.T) {
+	_, err := FindNupkgArtifacts(filepath.Join(t.TempDir(), "nonexistent"), "repo")
+	if err == nil {
+		t.Fatal("expected error for non-existent directory, got nil")
+	}
+}
 
 func TestParseNupkgFilename(t *testing.T) {
 	tests := []struct {
@@ -72,6 +126,14 @@ func TestFindNupkgArtifactsIncludesSymbols(t *testing.T) {
 	assertArtifact(t, artifactsByName["My.Package.1.0.0.snupkg"], "snupkg", "symbolpackage/My.Package.1.0.0.nupkg")
 	// .symbols.nupkg (legacy) → flat at root as <id>.<version>.nupkg (regular endpoint).
 	assertArtifact(t, artifactsByName["Legacy.2.1.0.symbols.nupkg"], "snupkg", "Legacy.2.1.0.nupkg")
+}
+
+func TestCollectPushArtifactsNoPackagesError(t *testing.T) {
+	dir := t.TempDir()
+	_, err := CollectPushArtifacts(dir, []string{"--source", "https://example.com"}, "repo")
+	if err == nil {
+		t.Fatal("expected error when no package files are provided, got nil")
+	}
 }
 
 func TestCollectPushArtifactsUsesOnlyExplicitArguments(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -214,9 +215,18 @@ func CollectPushArtifacts(workingDir string, pushArgs []string, repoName string)
 func resolvePushPackagePaths(workingDir string, pushArgs []string) ([]string, error) {
 	seen := make(map[string]bool)
 	var paths []string
+	skipNext := false
 	for _, arg := range pushArgs {
-		// Skip option flags (e.g. --source, -ApiKey) and their inline values.
+		// Skip option flags (e.g. --source, -ApiKey) and their space-separated values.
+		if skipNext {
+			skipNext = false
+			continue
+		}
 		if strings.HasPrefix(arg, "-") {
+			// A flag without an inline value (no "=") consumes the next token as its value.
+			if !strings.Contains(arg, "=") {
+				skipNext = true
+			}
 			continue
 		}
 		// Only positional arguments that look like package files are push targets.
@@ -237,10 +247,15 @@ func resolvePushPackagePaths(workingDir string, pushArgs []string) ([]string, er
 				matches = []string{candidate}
 			}
 		}
+		absWorkingDir, _ := filepath.Abs(workingDir)
 		for _, m := range matches {
 			abs, err := filepath.Abs(m)
 			if err != nil {
 				return nil, fmt.Errorf("resolve push artifact %q: %w", m, err)
+			}
+			rel, relErr := filepath.Rel(absWorkingDir, abs)
+			if relErr != nil || strings.HasPrefix(rel, "..") {
+				continue
 			}
 			if isPackageFile(abs) && !seen[abs] {
 				seen[abs] = true
@@ -263,6 +278,9 @@ type PackageSnapshot map[string]snapshotEntry
 // which may contain large numbers of source and cache files. Missing directories yield an
 // empty snapshot rather than an error.
 func SnapshotPackageFiles(root string, extraDirs ...string) (PackageSnapshot, error) {
+	if root == "" {
+		return nil, fmt.Errorf("SnapshotPackageFiles: root must be non-empty")
+	}
 	snapshot := make(PackageSnapshot)
 	dirs := []string{
 		filepath.Join(root, "bin"),
@@ -295,11 +313,10 @@ func snapshotDir(snapshot PackageSnapshot, dir string) error {
 			return absErr
 		}
 		details, detailsErr := crypto.GetFileDetails(abs, true)
-		sha1 := ""
-		if detailsErr == nil {
-			sha1 = details.Checksum.Sha1
+		if detailsErr != nil {
+			return fmt.Errorf("compute snapshot checksum for %s: %w", abs, detailsErr)
 		}
-		snapshot[abs] = snapshotEntry{ModTime: info.ModTime(), Sha1: sha1}
+		snapshot[abs] = snapshotEntry{ModTime: info.ModTime(), Sha1: details.Checksum.Sha1}
 		return nil
 	})
 }
@@ -327,6 +344,7 @@ func CollectPackedArtifacts(root string, before PackageSnapshot, repoName string
 		}
 		artifacts = append(artifacts, artifact)
 	}
+	sort.Slice(artifacts, func(i, j int) bool { return artifacts[i].Name < artifacts[j].Name })
 	return artifacts, nil
 }
 
@@ -343,7 +361,7 @@ func parseNupkgFilename(filename string) (pkgID, version string) {
 	}
 	parts := strings.Split(base, ".")
 	for i, p := range parts {
-		if len(p) > 0 && p[0] >= '0' && p[0] <= '9' {
+		if i > 0 && len(p) > 0 && p[0] >= '0' && p[0] <= '9' {
 			return strings.Join(parts[:i], "."), strings.Join(parts[i:], ".")
 		}
 	}

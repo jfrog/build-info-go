@@ -764,9 +764,8 @@ func (pf *PoetryFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 			},
 		}
 
-		// Add RequestedBy information (wrap []string into [][]string per build-info spec)
 		if len(dep.RequestedBy) > 0 {
-			entityDep.RequestedBy = [][]string{dep.RequestedBy}
+			entityDep.RequestedBy = dep.RequestedBy
 		}
 
 		module.Dependencies = append(module.Dependencies, entityDep)
@@ -796,7 +795,7 @@ func (pf *PoetryFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
 	// Add RequestedBy information to dependencies
 	for i, dep := range pf.dependencies {
 		if parents, exists := requestedBy[dep.ID]; exists {
-			pf.dependencies[i].RequestedBy = parents
+			pf.dependencies[i].RequestedBy = [][]string{parents}
 		}
 	}
 
