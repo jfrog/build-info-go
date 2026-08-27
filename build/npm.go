@@ -13,12 +13,13 @@ import (
 const minSupportedNpmVersion = "5.4.0"
 
 type NpmModule struct {
-	containingBuild  *Build
-	name             string
-	srcPath          string
-	executablePath   string
-	npmArgs          []string
-	collectBuildInfo bool
+	containingBuild   *Build
+	name              string
+	srcPath           string
+	executablePath    string
+	npmArgs           []string
+	collectBuildInfo  bool
+	failOnMissingDeps bool
 }
 
 // Pass an empty string for srcPath to find the npm project in the working directory.
@@ -75,7 +76,7 @@ func (nm *NpmModule) CalcDependencies() error {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}
 	buildInfoDependencies, err := buildutils.CalculateNpmDependenciesList(nm.executablePath, nm.srcPath, nm.name,
-		buildutils.NpmTreeDepListParam{Args: nm.npmArgs}, true, nm.containingBuild.logger)
+		buildutils.NpmTreeDepListParam{Args: nm.npmArgs, FailOnMissingDeps: nm.failOnMissingDeps}, true, nm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
@@ -94,6 +95,10 @@ func (nm *NpmModule) SetNpmArgs(npmArgs []string) {
 
 func (nm *NpmModule) SetCollectBuildInfo(collectBuildInfo bool) {
 	nm.collectBuildInfo = collectBuildInfo
+}
+
+func (nm *NpmModule) SetFailOnMissingDeps(failOnMissingDeps bool) {
+	nm.failOnMissingDeps = failOnMissingDeps
 }
 
 func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {

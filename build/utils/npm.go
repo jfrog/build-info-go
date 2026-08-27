@@ -84,10 +84,24 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 	if len(missingOptionalDeps) > 0 {
 		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
 	}
-	if len(otherMissingDeps) > 0 {
-		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.")
+	if err = handleOtherMissingDeps(otherMissingDeps, npmParams.FailOnMissingDeps, log); err != nil {
+		return nil, err
 	}
 	return dependenciesList, nil
+}
+
+// handleOtherMissingDeps reports dependencies whose tarball could not be resolved from the npm cache.
+// In strict mode (FailOnMissingDeps), this returns an error instead of only warning, causing the
+// caller to fail the build rather than publish an incomplete build-info.
+func handleOtherMissingDeps(otherMissingDeps []string, failOnMissingDeps bool, log utils.Log) error {
+	if len(otherMissingDeps) == 0 {
+		return nil
+	}
+	if failOnMissingDeps {
+		return errors.New("the following dependencies could not be resolved from the npm cache and could not be mapped into the build-info: '" + strings.Join(otherMissingDeps, ",") + "' (strict mode: --fail-on-missing-deps).\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.")
+	}
+	log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.")
+	return nil
 }
 
 type dependencyInfo struct {
@@ -266,6 +280,8 @@ type NpmTreeDepListParam struct {
 	IgnoreNodeModules bool
 	// Rewrite package-lock.json, if exists.
 	OverwritePackageLock bool
+	// If true, fail the build instead of only warning when a dependency's tarball can't be found in the npm cache.
+	FailOnMissingDeps bool
 }
 
 // npm >=7 ls results for a single dependency
