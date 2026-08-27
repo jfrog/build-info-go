@@ -73,6 +73,8 @@ func (n *NuGetFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entiti
 }
 
 // GetProjectDependencies returns the flat list of dependencies for the project.
+// TODO: callers that also invoke GetDependencyGraph and CollectBuildInfo trigger three separate
+// solution parses. Cache the parsed BuildInfo on the receiver to reduce this to one.
 func (n *NuGetFlexPack) GetProjectDependencies() ([]buildinfoflex.DependencyInfo, error) {
 	bi, err := n.CollectBuildInfo("", "")
 	if err != nil {

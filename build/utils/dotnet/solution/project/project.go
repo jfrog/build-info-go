@@ -66,6 +66,10 @@ type msbuildProject struct {
 // resolvePackageID reads projectFilePath and returns its effective PackageId, following
 // MSBuild's own default resolution order (PackageId, then AssemblyName), falling back to
 // fallbackName when the file can't be read/parsed or neither property is set.
+//
+// Limitation: only the project file itself is parsed; Directory.Build.props files in parent
+// directories are not walked. If PackageId is declared exclusively in Directory.Build.props,
+// the fallback name (derived from the filename) is used instead.
 func resolvePackageID(projectFilePath, fallbackName string) string {
 	content, err := os.ReadFile(projectFilePath)
 	if err != nil {

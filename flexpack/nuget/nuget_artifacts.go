@@ -11,6 +11,14 @@ import (
 	"github.com/jfrog/gofrog/crypto"
 )
 
+// snapshotEntry records the mtime and SHA1 of a package file at snapshot time.
+// Both fields are used for change detection: mtime is the fast path; SHA1 is the
+// fallback for filesystems with coarse-grained mtime resolution (FAT32 = 1 s, some SMB mounts).
+type snapshotEntry struct {
+	ModTime time.Time
+	Sha1    string
+}
+
 const (
 	nupkgExtension      = ".nupkg"
 	snupkgExtension     = ".snupkg"
@@ -244,9 +252,10 @@ func resolvePushPackagePaths(workingDir string, pushArgs []string) ([]string, er
 }
 
 // PackageSnapshot records the package files present under a directory tree, keyed by
-// absolute path, with their last-modified time. It is used to detect the packages that a
-// pack command produces or refreshes.
-type PackageSnapshot map[string]time.Time
+// absolute path. It is used to detect the packages that a pack command produces or refreshes.
+// Both ModTime and Sha1 are recorded so that a re-pack that lands within the filesystem's
+// mtime resolution (FAT32 = 1 s, some SMB mounts) is still detected via content change.
+type PackageSnapshot map[string]snapshotEntry
 
 // SnapshotPackageFiles records every existing NuGet package file in the standard output
 // directories (bin/, obj/, artifacts/) under root, plus any additional directories supplied
@@ -285,7 +294,12 @@ func snapshotDir(snapshot PackageSnapshot, dir string) error {
 		if absErr != nil {
 			return absErr
 		}
-		snapshot[abs] = info.ModTime()
+		details, detailsErr := crypto.GetFileDetails(abs, true)
+		sha1 := ""
+		if detailsErr == nil {
+			sha1 = details.Checksum.Sha1
+		}
+		snapshot[abs] = snapshotEntry{ModTime: info.ModTime(), Sha1: sha1}
 		return nil
 	})
 }
@@ -300,9 +314,11 @@ func CollectPackedArtifacts(root string, before PackageSnapshot, repoName string
 		return nil, err
 	}
 	var artifacts []entities.Artifact
-	for path, modTime := range after {
+	for path, entry := range after {
 		prev, existed := before[path]
-		if existed && !modTime.After(prev) {
+		if existed && !entry.ModTime.After(prev.ModTime) && entry.Sha1 == prev.Sha1 {
+			// Skip: same or older mtime AND same content — not a new or re-packed file.
+			// Checking Sha1 catches re-packs on filesystems with coarse mtime resolution.
 			continue
 		}
 		artifact, err := newArtifactFromFile(path, repoName)
