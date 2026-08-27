@@ -748,3 +748,20 @@ func TestLoadSlnx(t *testing.T) {
 		}
 	}
 }
+
+func TestDependenciesSourcesAndProjectsPathExist(t *testing.T) {
+	t.Run("true after loading project with assets.json", func(t *testing.T) {
+		csprojPath := filepath.Join("testdata", "multi", "core", "core.csproj")
+		sol, err := LoadProject(csprojPath, &utils.NullLog{})
+		require.NoError(t, err)
+		assert.True(t, sol.DependenciesSourcesAndProjectsPathExist())
+	})
+
+	t.Run("false for empty directory", func(t *testing.T) {
+		emptyDir := t.TempDir()
+		sol, err := Load(emptyDir, "", "", &utils.NullLog{})
+		if err == nil {
+			assert.False(t, sol.DependenciesSourcesAndProjectsPathExist())
+		}
+	})
+}

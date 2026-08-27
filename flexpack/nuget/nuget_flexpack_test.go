@@ -256,3 +256,101 @@ func equalStrings(actual, expected []string) bool {
 	}
 	return true
 }
+
+// testdataMultiCore returns the absolute path to the multi/core project in the solution testdata.
+func testdataMultiCore(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.Abs("../../build/utils/dotnet/solution/testdata/multi/core")
+	if err != nil {
+		t.Fatalf("resolving testdata path: %v", err)
+	}
+	return dir
+}
+
+func TestCollectBuildInfoWithProjectFile(t *testing.T) {
+	coreDir := testdataMultiCore(t)
+	fp, err := NewNuGetFlexPack(buildinfoflex.NuGetConfig{
+		WorkingDirectory: coreDir,
+		TargetPath:       filepath.Join(coreDir, "core.csproj"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewNuGetFlexPack: %v", err)
+	}
+	bi, err := fp.CollectBuildInfo("myBuild", "42")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo: %v", err)
+	}
+	if bi.Name != "myBuild" || bi.Number != "42" {
+		t.Errorf("build name/number: got %q/%q, want myBuild/42", bi.Name, bi.Number)
+	}
+	if len(bi.Modules) == 0 {
+		t.Error("expected at least one module")
+	}
+}
+
+func TestCollectBuildInfoWithDirectory(t *testing.T) {
+	coreDir := testdataMultiCore(t)
+	fp, err := NewNuGetFlexPack(buildinfoflex.NuGetConfig{
+		WorkingDirectory: coreDir,
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewNuGetFlexPack: %v", err)
+	}
+	bi, err := fp.CollectBuildInfo("", "")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo: %v", err)
+	}
+	if len(bi.Modules) == 0 {
+		t.Error("expected at least one module from project directory")
+	}
+}
+
+func TestCollectBuildInfoTargetPathTraversal(t *testing.T) {
+	fp, err := NewNuGetFlexPack(buildinfoflex.NuGetConfig{
+		WorkingDirectory: t.TempDir(),
+		TargetPath:       "../escape",
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewNuGetFlexPack: %v", err)
+	}
+	_, err = fp.CollectBuildInfo("", "")
+	if err == nil {
+		t.Fatal("expected error for TargetPath escaping WorkingDirectory")
+	}
+}
+
+func TestGetProjectDependencies(t *testing.T) {
+	coreDir := testdataMultiCore(t)
+	fp, err := NewNuGetFlexPack(buildinfoflex.NuGetConfig{
+		WorkingDirectory: coreDir,
+		TargetPath:       filepath.Join(coreDir, "core.csproj"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewNuGetFlexPack: %v", err)
+	}
+	deps, err := fp.GetProjectDependencies()
+	if err != nil {
+		t.Fatalf("GetProjectDependencies: %v", err)
+	}
+	if len(deps) == 0 {
+		t.Error("expected non-empty dependency list from core project")
+	}
+}
+
+func TestGetDependencyGraph(t *testing.T) {
+	coreDir := testdataMultiCore(t)
+	fp, err := NewNuGetFlexPack(buildinfoflex.NuGetConfig{
+		WorkingDirectory: coreDir,
+		TargetPath:       filepath.Join(coreDir, "core.csproj"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewNuGetFlexPack: %v", err)
+	}
+	graph, err := fp.GetDependencyGraph()
+	if err != nil {
+		t.Fatalf("GetDependencyGraph: %v", err)
+	}
+	if graph == nil {
+		t.Error("expected non-nil graph")
+	}
+}
