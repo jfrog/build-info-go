@@ -335,9 +335,11 @@ func reachableFrom(meta *CargoMetadata, rootIds map[string]bool, includeDev bool
 // depsForRoots builds the build-info dependency list for the subgraph reachable from rootIds:
 // registry-sourced crates only, workspace members skipped, dev-deps filtered per config, scopes
 // taken verbatim from cargo's dep_kinds ("normal"/"build"/"dev"), and RequestedBy as a list of
-// single-element paths — one per direct parent — matching the pnpm/conan/poetry/maven convention
-// (no full chains, no root at the end). Cycle-guarded via NodeHasLoop, capped at
-// entities.RequestedByMaxLength.
+// FULL CHAINS from the direct parent up to the workspace/root module id — the canonical
+// build-info format shared by pip/pipenv/uv/maven ("every requestedBy path terminates at the
+// module id"; see applyModuleOverride in commands/cargo/publish.go). Cycle-guarded by skipping
+// any child whose label already appears in the growing chain; capped at
+// entities.RequestedByMaxLength paths per dep.
 //
 // Called once with every member/root for the whole-project list (cf.dependencies) and once per
 // workspace member to build that member's own module — so each module carries the dependencies
@@ -399,48 +401,19 @@ func (cf *CargoFlexPack) depsForRoots(rootIds map[string]bool) []entities.Depend
 		order = append(order, key)
 	}
 
-	// Second pass: for every edge parent -> child within the reachable subgraph where the child
-	// is an included registry dep, record the parent as a direct requester of that child. Each
-	// direct parent contributes one single-element path. Parents that are workspace members or
-	// the resolve root are labelled by their module id via nodeLabel; registry parents by the
-	// same "<name>-<version>.crate" build-info id used elsewhere.
-	for _, node := range cf.meta.Resolve.Nodes {
-		if !reachable[node.Id] {
-			continue
-		}
-		parentLabel := cf.nodeLabel(node.Id, workspace)
-		for _, childId := range childEdges(node, includeDev) {
-			childKey, ok := nodeKey[childId]
-			if !ok {
-				continue
-			}
-			child := byKey[childKey]
-			if parentLabel == child.Id {
-				// Self-parent guard: cargo's resolve graph occasionally lists a node in its own edge
-				// list when a build/dev-dependency cycles back to the same crate (e.g. a proc-macro
-				// crate that dev-depends on itself for its integration tests). Without this skip we
-				// would record "foo-1.0.0.crate" as a requestedBy of itself, which is meaningless in
-				// build-info and clutters the UI. Reachability already prevents infinite recursion;
-				// this guard is purely about not emitting the self-edge in the output.
-				continue
-			}
-			if len(child.RequestedBy) >= entities.RequestedByMaxLength {
-				continue
-			}
-			// Deduplicate: skip if this parent already recorded.
-			already := false
-			for _, path := range child.RequestedBy {
-				if len(path) == 1 && path[0] == parentLabel {
-					already = true
-					break
-				}
-			}
-			if already {
-				continue
-			}
-			child.RequestedBy = append(child.RequestedBy, []string{parentLabel})
-			byKey[childKey] = child
-		}
+	// Second pass: walk the graph from each root in DFS and accumulate the full ancestor chain
+	// (direct parent → ... → root module id). For every included registry dep encountered, record
+	// the ancestor chain as one of its RequestedBy paths. This matches pip/pipenv/uv/maven's
+	// canonical format ("every requestedBy path terminates at the module id"), which the UI's
+	// impact analysis relies on to trace a transitive dep back to a direct dep declared in
+	// Cargo.toml.
+	nodesById := make(map[string]CargoNode, len(cf.meta.Resolve.Nodes))
+	for _, n := range cf.meta.Resolve.Nodes {
+		nodesById[n.Id] = n
+	}
+	for rootId := range rootIds {
+		rootLabel := cf.nodeLabel(rootId, workspace)
+		cf.walkRequestedByChains(rootId, []string{rootLabel}, nodesById, byKey, nodeKey, workspace, includeDev)
 	}
 
 	deps := make([]entities.Dependency, 0, len(order))
@@ -448,6 +421,87 @@ func (cf *CargoFlexPack) depsForRoots(rootIds map[string]bool) []entities.Depend
 		deps = append(deps, byKey[key])
 	}
 	return deps
+}
+
+// walkRequestedByChains DFS-visits nodeId's children and, for each included registry child,
+// appends `chain` (a copy) to the child's RequestedBy — then recurses into the child with the
+// child's own label prepended. `chain` on entry represents the requestedBy path that any DIRECT
+// child of nodeId should carry: chain[0] is the direct parent (== nodeId's label) and the last
+// element is the root module id.
+//
+// Guards:
+//   - Cycle: a child whose label already appears in `chain` is skipped. This subsumes the old
+//     self-edge case (a proc-macro that dev-depends on itself would have parentLabel==childLabel,
+//     so childLabel would already be at chain[0] and the child would be skipped).
+//   - Cap: once a child's RequestedBy reaches entities.RequestedByMaxLength, no more chains are
+//     appended for it (still recurse so downstream deps see this chain via their own count).
+//   - Dedup by DIRECT PARENT: only ONE chain per unique direct parent (chain[0]) is recorded.
+//     Cargo graphs are dense DAGs — a shared transitive like proc-macro2 has three direct
+//     parents (serde_derive, quote, syn), and each of those is reachable via multiple middle
+//     paths (e.g. serde_derive can be reached via serde_json→serde→serde_core or the shorter
+//     serde_json→serde_core). Enumerating every path produced 8+ chains per dep, all just
+//     different middle-paths under the same direct parent — noise the UI cannot present
+//     meaningfully. Keeping the first-discovered chain per direct parent preserves the
+//     "which of my direct deps introduced this transitive?" answer (the load-bearing UI use)
+//     while collapsing the redundant middle-path variants.
+func (cf *CargoFlexPack) walkRequestedByChains(
+	nodeId string,
+	chain []string,
+	nodes map[string]CargoNode,
+	byKey map[string]entities.Dependency,
+	nodeKey map[string]string,
+	workspace map[string]bool,
+	includeDev bool,
+) {
+	node, ok := nodes[nodeId]
+	if !ok {
+		return
+	}
+	for _, childId := range childEdges(node, includeDev) {
+		childLabel := cf.nodeLabel(childId, workspace)
+		if containsString(chain, childLabel) {
+			continue // cycle (subsumes proc-macro self-edge)
+		}
+		if childKey, ok := nodeKey[childId]; ok {
+			child := byKey[childKey]
+			if len(child.RequestedBy) < entities.RequestedByMaxLength && !hasChainWithSameDirectParent(child.RequestedBy, chain) {
+				pathCopy := append([]string(nil), chain...)
+				child.RequestedBy = append(child.RequestedBy, pathCopy)
+				byKey[childKey] = child
+			}
+		}
+		// Recurse with childLabel prepended so downstream deps carry [descendantParent, ..., childLabel, chain...].
+		next := make([]string, 0, len(chain)+1)
+		next = append(next, childLabel)
+		next = append(next, chain...)
+		cf.walkRequestedByChains(childId, next, nodes, byKey, nodeKey, workspace, includeDev)
+	}
+}
+
+// containsString reports whether s occurs in list.
+func containsString(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+// hasChainWithSameDirectParent reports whether paths already contains a chain whose direct
+// parent (element [0]) equals path[0]. Different direct parents contribute separate chains;
+// multiple middle-paths under the same direct parent collapse to the first-recorded chain.
+// An empty candidate path never matches anything.
+func hasChainWithSameDirectParent(paths [][]string, path []string) bool {
+	if len(path) == 0 {
+		return false
+	}
+	for _, p := range paths {
+		if len(p) > 0 && p[0] == path[0] {
+			return true
+		}
+	}
+	return false
 }
 
 // collectDependenciesFromMeta populates cf.dependencies with the whole-project dependency list
@@ -460,19 +514,31 @@ func (cf *CargoFlexPack) collectDependenciesFromMeta() error {
 
 // collectDependencies runs cargo metadata, loads the lockfile, and populates deps.
 func (cf *CargoFlexPack) collectDependencies() error {
+	// Cargo metadata is REQUIRED — it is the only source of the resolved dep graph, dep_kinds and
+	// workspace membership; without it we cannot build the module or dependencies. Both the exec
+	// failure and the parse failure are surfaced up (Uday's PR #399 review comments) instead of
+	// silently leaving cf.meta==nil and returning the generic wrapper below.
 	out, err := cf.runCargoMetadata()
-	if err == nil {
-		if meta, perr := parseMetadata(out); perr == nil {
-			cf.meta = meta
-		}
+	if err != nil {
+		return fmt.Errorf("cargo metadata in %s: %w", cf.config.WorkingDirectory, err)
 	}
-	// Load lockfile checksums (best-effort).
+	meta, perr := parseMetadata(out)
+	if perr != nil {
+		return fmt.Errorf("cargo metadata in %s: %w", cf.config.WorkingDirectory, perr)
+	}
+	cf.meta = meta
+
+	// Cargo.lock is OPTIONAL — cargo generates it on the first build, so a fresh checkout may not
+	// have one yet, and we can still produce a build-info from cargo metadata alone (checksums come
+	// from $CARGO_HOME/registry/cache/... or from Artifactory as a fallback). Two distinct cases:
+	//   - File missing (os.IsNotExist): expected pre-first-build; skip silently.
+	//   - File present but malformed: unexpected; log.Warn so the user sees it, but still continue
+	//     — checksums degrade gracefully to the cache/Artifactory fallback path.
 	lockPath := filepath.Join(cf.config.WorkingDirectory, "Cargo.lock")
 	if lock, lerr := parseLockfile(lockPath); lerr == nil {
 		cf.lockChecksums = lock
-	}
-	if cf.meta == nil {
-		return fmt.Errorf("could not obtain cargo metadata in %s", cf.config.WorkingDirectory)
+	} else if !os.IsNotExist(lerr) {
+		log.Warn(fmt.Sprintf("cargo: Cargo.lock present but could not be parsed (%s); continuing without lockfile-sourced checksums", lerr.Error()))
 	}
 	if err := cf.collectDependenciesFromMeta(); err != nil {
 		return err

@@ -358,15 +358,15 @@ func TestNormalDepScope(t *testing.T) {
 		t.Errorf("b scopes = %v, want [normal]", b.Scopes)
 	}
 
-	// RequestedBy records only the direct parent, one single-element path per parent — same
-	// convention as pnpm. No chains to root; the module id does not appear at the end.
-	//   a  <- [[root:0.1.0]]        (root is a's direct parent, so it appears once)
-	//   b  <- [[a-1.0.0.crate]]     (a is b's direct parent; root does NOT appear)
+	// RequestedBy records a FULL CHAIN from direct parent up to the root module id — the
+	// canonical build-info format (pip/pipenv/uv/maven).
+	//   a  <- [[root:0.1.0]]                       (root is a's direct parent)
+	//   b  <- [[a-1.0.0.crate, root:0.1.0]]        (a is b's direct parent; chain ends at root)
 	wantA := [][]string{{"root:0.1.0"}}
 	if !reflect.DeepEqual(a.RequestedBy, wantA) {
 		t.Errorf("a.RequestedBy = %v, want %v", a.RequestedBy, wantA)
 	}
-	wantB := [][]string{{"a-1.0.0.crate"}}
+	wantB := [][]string{{"a-1.0.0.crate", "root:0.1.0"}}
 	if !reflect.DeepEqual(b.RequestedBy, wantB) {
 		t.Errorf("b.RequestedBy = %v, want %v", b.RequestedBy, wantB)
 	}
@@ -405,9 +405,130 @@ func TestRequestedByDiamondPaths(t *testing.T) {
 	if d == nil {
 		t.Fatal("missing d-1.0.0.crate")
 	}
-	// Two direct-parent paths, one per direct requester (a and b). No root at the end.
-	want := [][]string{{"a-1.0.0.crate"}, {"b-1.0.0.crate"}}
+	// Two full chains, one per direct requester (a and b), each terminating at the root module id.
+	// Chain order follows DFS visit order (root -> a first, then root -> b), so a's chain comes first.
+	want := [][]string{
+		{"a-1.0.0.crate", "root:0.1.0"},
+		{"b-1.0.0.crate", "root:0.1.0"},
+	}
 	if !reflect.DeepEqual(d.RequestedBy, want) {
 		t.Errorf("d.RequestedBy = %v, want %v", d.RequestedBy, want)
+	}
+}
+
+// TestRequestedByCollapsesMiddlePathVariants verifies that when a dep has a single direct
+// parent reachable from the root via MULTIPLE distinct middle paths (dense DAG — the real-world
+// cargo scenario where a shared transitive like proc-macro2 shows up through many overlapping
+// diamond routes), the output records ONE chain per unique direct parent — not one per
+// full-DAG path.
+//
+// Graph: root -> X -> A -> leaf, root -> Y -> A -> leaf.
+//   - A is leaf's ONLY direct parent
+//   - A is reachable from root via TWO distinct middle nodes (X and Y)
+//   - naive enumeration would produce 2 chains for leaf: [A, X, root] and [A, Y, root] — both
+//     have the same direct parent A and differ only in the middle
+//   - expected: 1 chain (whichever middle path DFS discovered first)
+func TestRequestedByCollapsesMiddlePathVariants(t *testing.T) {
+	dep := func(name, pkg string) CargoNodeDep {
+		return CargoNodeDep{Name: name, Pkg: pkg, DepKinds: []CargoDepKind{{Kind: ""}}}
+	}
+	meta := &CargoMetadata{
+		WorkspaceMembers: []string{"root 0.1.0 (path+file:///r)"},
+		Resolve: CargoResolve{
+			Root: "root 0.1.0 (path+file:///r)",
+			Nodes: []CargoNode{
+				{Id: "root 0.1.0 (path+file:///r)",
+					Dependencies: []string{"x 1.0.0 (registry+x)", "y 1.0.0 (registry+x)"},
+					Deps: []CargoNodeDep{
+						dep("x", "x 1.0.0 (registry+x)"),
+						dep("y", "y 1.0.0 (registry+x)"),
+					}},
+				{Id: "x 1.0.0 (registry+x)",
+					Dependencies: []string{"a 1.0.0 (registry+x)"},
+					Deps: []CargoNodeDep{dep("a", "a 1.0.0 (registry+x)")}},
+				{Id: "y 1.0.0 (registry+x)",
+					Dependencies: []string{"a 1.0.0 (registry+x)"},
+					Deps: []CargoNodeDep{dep("a", "a 1.0.0 (registry+x)")}},
+				{Id: "a 1.0.0 (registry+x)",
+					Dependencies: []string{"leaf 1.0.0 (registry+x)"},
+					Deps: []CargoNodeDep{dep("leaf", "leaf 1.0.0 (registry+x)")}},
+				{Id: "leaf 1.0.0 (registry+x)", Dependencies: []string{}},
+			},
+		},
+	}
+	cf := &CargoFlexPack{config: CargoConfig{}, meta: meta, lockChecksums: map[string]string{}}
+	t.Setenv("CARGO_HOME", t.TempDir())
+	if err := cf.collectDependenciesFromMeta(); err != nil {
+		t.Fatal(err)
+	}
+	var leaf *entities.Dependency
+	for i := range cf.dependencies {
+		if cf.dependencies[i].Id == "leaf-1.0.0.crate" {
+			leaf = &cf.dependencies[i]
+		}
+	}
+	if leaf == nil {
+		t.Fatal("missing leaf-1.0.0.crate")
+	}
+	// Exactly ONE chain because there's one unique direct parent (a).
+	if len(leaf.RequestedBy) != 1 {
+		t.Errorf("leaf should have 1 chain (single direct parent), got %d: %v", len(leaf.RequestedBy), leaf.RequestedBy)
+	}
+	if len(leaf.RequestedBy) > 0 {
+		p := leaf.RequestedBy[0]
+		if len(p) == 0 || p[0] != "a-1.0.0.crate" {
+			t.Errorf("chain direct parent should be a-1.0.0.crate, got %v", p)
+		}
+		if len(p) == 0 || p[len(p)-1] != "root:0.1.0" {
+			t.Errorf("chain should terminate at root:0.1.0, got %v", p)
+		}
+	}
+}
+
+// TestRequestedByDeduplication verifies that when cargo's resolve graph would produce the exact
+// same requestedBy chain twice for the same dep (e.g. the same parent listed twice on a node
+// after cargo's own merge, which can happen with rename/crate + rename/optional edges), the
+// deduplicated result carries ONE entry — not two identical ones. Uday's review comment on
+// PR #399 asked for this coverage.
+func TestRequestedByDeduplication(t *testing.T) {
+	dep := func(name, pkg string) CargoNodeDep {
+		return CargoNodeDep{Name: name, Pkg: pkg, DepKinds: []CargoDepKind{{Kind: ""}}}
+	}
+	// root -> a (listed twice via dep_kinds merging or duplicate resolve edges); a -> b
+	meta := &CargoMetadata{
+		WorkspaceMembers: []string{"root 0.1.0 (path+file:///r)"},
+		Resolve: CargoResolve{
+			Root: "root 0.1.0 (path+file:///r)",
+			Nodes: []CargoNode{
+				{Id: "root 0.1.0 (path+file:///r)",
+					Dependencies: []string{"a 1.0.0 (registry+x)", "a 1.0.0 (registry+x)"},
+					Deps: []CargoNodeDep{
+						dep("a", "a 1.0.0 (registry+x)"),
+						dep("a", "a 1.0.0 (registry+x)"),
+					}},
+				{Id: "a 1.0.0 (registry+x)", Dependencies: []string{"b 1.0.0 (registry+x)"},
+					Deps: []CargoNodeDep{dep("b", "b 1.0.0 (registry+x)")}},
+				{Id: "b 1.0.0 (registry+x)", Dependencies: []string{}},
+			},
+		},
+	}
+	cf := &CargoFlexPack{config: CargoConfig{}, meta: meta, lockChecksums: map[string]string{}}
+	t.Setenv("CARGO_HOME", t.TempDir())
+	if err := cf.collectDependenciesFromMeta(); err != nil {
+		t.Fatal(err)
+	}
+	var a *entities.Dependency
+	for i := range cf.dependencies {
+		if cf.dependencies[i].Id == "a-1.0.0.crate" {
+			a = &cf.dependencies[i]
+		}
+	}
+	if a == nil {
+		t.Fatal("missing a-1.0.0.crate")
+	}
+	// Even though root's edge list contains a TWICE, dedup collapses to a single chain entry.
+	want := [][]string{{"root:0.1.0"}}
+	if !reflect.DeepEqual(a.RequestedBy, want) {
+		t.Errorf("a.RequestedBy = %v, want %v (dedup should collapse duplicate chains)", a.RequestedBy, want)
 	}
 }

@@ -24,12 +24,15 @@ type CargoFlexPack struct {
 func NewCargoFlexPack(config CargoConfig) (*CargoFlexPack, error) {
 	cf := &CargoFlexPack{config: config, lockChecksums: map[string]string{}}
 	if cf.config.CargoExecutable == "" {
-		if p, err := exec.LookPath("cargo"); err == nil {
-			cf.config.CargoExecutable = p
-		} else {
-			log.Warn("cargo executable not found in PATH, using 'cargo'")
-			cf.config.CargoExecutable = "cargo"
+		p, err := exec.LookPath("cargo")
+		if err != nil {
+			// Fallback to the bare "cargo" string would defer this into exec.Command later with a
+			// less clear error. Surface the not-in-PATH failure at construction time (Uday's
+			// PR #399 review comment) so the caller sees "cargo not found" instead of a
+			// downstream "no such file or directory" from Command.Start().
+			return nil, fmt.Errorf("cargo executable not found in PATH: %w", err)
 		}
+		cf.config.CargoExecutable = p
 	}
 	return cf, nil
 }
