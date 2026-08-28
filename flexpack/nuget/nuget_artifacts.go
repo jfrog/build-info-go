@@ -247,15 +247,10 @@ func resolvePushPackagePaths(workingDir string, pushArgs []string) ([]string, er
 				matches = []string{candidate}
 			}
 		}
-		absWorkingDir, _ := filepath.Abs(workingDir)
 		for _, m := range matches {
 			abs, err := filepath.Abs(m)
 			if err != nil {
 				return nil, fmt.Errorf("resolve push artifact %q: %w", m, err)
-			}
-			rel, relErr := filepath.Rel(absWorkingDir, abs)
-			if relErr != nil || strings.HasPrefix(rel, "..") {
-				continue
 			}
 			if isPackageFile(abs) && !seen[abs] {
 				seen[abs] = true
