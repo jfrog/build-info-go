@@ -84,8 +84,8 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 	if len(missingOptionalDeps) > 0 {
 		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
 	}
-	if len(otherMissingDeps) > 0 {
-		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.")
+	if err := handleOtherMissingDeps(otherMissingDeps, npmParams.FailOnMissingDeps, log); err != nil {
+		return nil, err
 	}
 	return dependenciesList, nil
 }
@@ -257,6 +257,20 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 	return version.NewVersion(string(versionData)), nil
 }
 
+// handleOtherMissingDeps handles missing dependencies based on the strict mode flag.
+// If failOnMissingDeps is true, returns an error. Otherwise, logs a warning.
+func handleOtherMissingDeps(otherMissingDeps []string, failOnMissingDeps bool, log utils.Log) error {
+	if len(otherMissingDeps) == 0 {
+		return nil
+	}
+	message := "The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'."
+	if failOnMissingDeps {
+		return errors.New(message)
+	}
+	log.Warn(message)
+	return nil
+}
+
 type NpmTreeDepListParam struct {
 	// Required for the 'install' and 'ls' commands that could be triggered during the construction of the NPM dependency tree
 	Args []string
@@ -266,6 +280,8 @@ type NpmTreeDepListParam struct {
 	IgnoreNodeModules bool
 	// Rewrite package-lock.json, if exists.
 	OverwritePackageLock bool
+	// Fail the build if a dependency's tarball can't be resolved from the npm cache
+	FailOnMissingDeps bool
 }
 
 // npm >=7 ls results for a single dependency

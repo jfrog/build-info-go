@@ -17,3 +17,4 @@ bi.exe
 
 # Gradle
 .gradle
+.worktrees
