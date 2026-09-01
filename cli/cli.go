@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
@@ -752,12 +753,12 @@ func extractFromFileArg(args []string) (fromFile string, remaining []string) {
 	for i, a := range args {
 		if a == "--from-file" && i+1 < len(args) {
 			fromFile = args[i+1]
-			remaining = append(args[:i:i], args[i+2:]...)
+			remaining = slices.Concat(args[:i], args[i+2:])
 			return
 		}
 		if strings.HasPrefix(a, "--from-file=") {
 			fromFile = strings.TrimPrefix(a, "--from-file=")
-			remaining = append(args[:i:i], args[i+1:]...)
+			remaining = slices.Concat(args[:i], args[i+1:])
 			return
 		}
 	}
