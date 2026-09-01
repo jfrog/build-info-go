@@ -49,6 +49,7 @@ const (
 	Uv        ModuleType = "uv"
 	Gem       ModuleType = "gem"
 	Apk       ModuleType = "apk"
+	Cargo     ModuleType = "cargo"
 )
 
 type BuildInfo struct {

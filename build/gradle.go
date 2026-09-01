@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/jfrog/build-info-go/utils"
@@ -260,26 +261,58 @@ func (config *gradleRunConfig) GetCmd() *exec.Cmd {
 	}
 	// Add BUILDINFO_PROPFILE system property if extractor properties file exists
 	if config.extractorPropsFile != "" {
-		jvmProp := fmt.Sprintf("-D%s=%s", extractorPropsDir, config.extractorPropsFile)
-		if strings.Contains(config.extractorPropsFile, " ") {
-			jvmProp = fmt.Sprintf("-D%s='%s'", extractorPropsDir, config.extractorPropsFile)
-		}
-		cmd = append(cmd, jvmProp)
+		cmd = append(cmd, fmt.Sprintf("-D%s=%s", extractorPropsDir, config.extractorPropsFile))
 	}
-	cmd = append(cmd, formatCommandProperties(config.tasks)...)
-	config.logger.Info("Running gradle command:", strings.Join(cmd, " "))
+	cmd = append(cmd, stripPropertyQuotes(config.tasks)...)
+	config.logger.Info("Running gradle command:", strings.Join(quoteArgsForLog(cmd), " "))
 	return exec.Command(cmd[0], cmd[1:]...)
 }
 
-func formatCommandProperties(tasks []string) []string {
-	var cmdArgs []string
-	for _, task := range tasks {
-		if isSystemOrProjectProperty(task) {
-			task = quotePropertyIfNeeded(task)
-		}
-		cmdArgs = append(cmdArgs, task)
+// stripPropertyQuotes removes a matching pair of leading/trailing quote characters (' or ") from system/project
+// property values, e.g., -Dkey='val ue' => -Dkey=val ue.
+// This is only needed on Windows: cmd.exe and PowerShell don't strip single quotes from arguments the way
+// bash/zsh do, so a value quoted on the command line can still reach this process with the quotes literally
+// part of the string. Left as-is, they'd be passed straight through to Gradle, and end up uploaded to
+// Artifactory as part of the value. On other platforms the shell has already stripped shell-level quoting by
+// the time this process sees the argument, so any quotes still present were typed deliberately as part of the
+// value and must be left alone.
+func stripPropertyQuotes(tasks []string) []string {
+	if runtime.GOOS != "windows" {
+		return tasks
 	}
-	return cmdArgs
+	strippedTasks := make([]string, len(tasks))
+	for i, task := range tasks {
+		if isSystemOrProjectProperty(task) {
+			task = unquoteProperty(task)
+		}
+		strippedTasks[i] = task
+	}
+	return strippedTasks
+}
+
+// Strips a matching pair of leading/trailing single or double quotes from a system or project property's value.
+func unquoteProperty(task string) string {
+	parts := strings.SplitN(task, "=", 2)
+	if len(parts) < 2 {
+		return task
+	}
+	return parts[0] + "=" + utils.StripSurroundingQuotes(parts[1])
+}
+
+// quoteArgsForLog returns a copy of args with system/project property values wrapped in quotes, e.g.,
+// -Dkey=val ue => -Dkey='val ue', purely to make the printed command's property boundaries unambiguous.
+// This must never be used to build the actual arguments passed to exec.Command: those are executed directly,
+// without going through a shell, so added quote characters would be passed through literally instead of being
+// stripped, corrupting the property value.
+func quoteArgsForLog(args []string) []string {
+	logArgs := make([]string, len(args))
+	for i, arg := range args {
+		if isSystemOrProjectProperty(arg) {
+			arg = quoteProperty(arg)
+		}
+		logArgs[i] = arg
+	}
+	return logArgs
 }
 
 func isSystemOrProjectProperty(task string) bool {
@@ -287,14 +320,13 @@ func isSystemOrProjectProperty(task string) bool {
 	return hasPropertiesFlag && strings.Contains(task, "=")
 }
 
-// Wraps system or project property value in quotes if its value contain spaces, e.g., -Dkey=val ue => -Dkey='val ue'
-func quotePropertyIfNeeded(task string) string {
+// Wraps a system or project property's value in quotes, e.g., -Dkey=val ue => -Dkey='val ue'
+func quoteProperty(task string) string {
 	parts := strings.SplitN(task, "=", 2)
-	if strings.Contains(parts[1], " ") {
-		return fmt.Sprintf(`%s='%s'`, parts[0], parts[1])
+	if len(parts) < 2 {
+		return task
 	}
-
-	return task
+	return fmt.Sprintf(`%s='%s'`, parts[0], parts[1])
 }
 
 func (config *gradleRunConfig) runCmd(stdout, stderr io.Writer) error {
