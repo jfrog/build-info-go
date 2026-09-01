@@ -165,9 +165,16 @@ type NuGetConfig struct {
 	WorkingDirectory string
 	// TargetPath is the optional solution, project, or directory passed to the native restore command.
 	// Relative paths are resolved from WorkingDirectory.
-	TargetPath               string
-	ToolchainType            int
-	UseNugetV2               bool
+	TargetPath string
+	// ToolchainType selects the .NET toolchain: 0 = nuget.exe (default), 1 = dotnet CLI.
+	// These correspond to dotnet.Nuget and dotnet.DotnetCore in build/utils/dotnet/toolchaincmd.go.
+	// Reserved for future use; the FlexPack path currently auto-detects the toolchain.
+	ToolchainType int
+	// UseNugetV2 instructs the resolver to prefer the NuGet V2 protocol over V3.
+	// Reserved for future use; callers should pass false (zero value).
+	UseNugetV2 bool
+	// AllowInsecureConnections permits HTTP (non-TLS) NuGet feeds for legacy environments.
+	// Reserved for future use; callers should pass false (zero value).
 	AllowInsecureConnections bool
 	RepoName                 string
 	// Module is the optional user-supplied build-info module ID override (--module).
