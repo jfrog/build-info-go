@@ -10,6 +10,54 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// ── CollectBuildInfo scope assignment ──────────────────────────────────────
+
+// Every reported dependency must carry at least one scope. Essential/base-system
+// packages (base-files, dpkg, libc6, …) can enter the closure via --recurse with
+// no scope-carrying incoming edge — their only relations are Breaks/Conflicts/
+// Replaces, which are not dependencies. They must still default to "required"
+// since they are part of the installed closure. Regression for Debian trixie/
+// bookworm where such packages appeared with empty Scopes.
+func TestCollectBuildInfo_EssentialPkgDefaultsToRequiredScope(t *testing.T) {
+	c := NewAptFlexPack(AptConfig{})
+	c.rootPkgs = []string{"jq"}
+	// jq → libjq1 is a real Depends edge; base-files is a header-only node with
+	// no scope-carrying incoming edge.
+	c.edgeGraph = map[string][]aptEdge{
+		"jq":         {{child: "libjq1", scope: scopeRequired}},
+		"libjq1":     nil,
+		"base-files": nil,
+	}
+	c.allMembers = map[string]*dpkgInfo{
+		"jq":         {version: "1.7.1", arch: "amd64"},
+		"libjq1":     {version: "1.7.1", arch: "amd64"},
+		"base-files": {version: "13.8", arch: "amd64"},
+	}
+	// All three carry a checksum so none is dropped by the checksum filter.
+	for name, info := range c.allMembers {
+		c.checksums[pkgID(name, info.version, info.arch)] = entities.Checksum{Sha256: "deadbeef-" + name}
+	}
+
+	bi, err := c.CollectBuildInfo("build", "1", "mod")
+	require.NoError(t, err)
+	require.Len(t, bi.Modules, 1)
+
+	for _, dep := range bi.Modules[0].Dependencies {
+		assert.NotEmpty(t, dep.Scopes, "dep %s must have at least one scope", dep.Id)
+	}
+
+	// base-files specifically must have defaulted to "required".
+	var found bool
+	for _, dep := range bi.Modules[0].Dependencies {
+		if strings.HasPrefix(dep.Id, "base-files:") {
+			found = true
+			assert.Contains(t, dep.Scopes, scopeRequired,
+				"base-files must default to required scope")
+		}
+	}
+	assert.True(t, found, "base-files must be reported in build info")
+}
+
 // ── pkgID / packageNameOnly ────────────────────────────────────────────────
 
 // Scenario #42: dependency ID must be name:version:arch.

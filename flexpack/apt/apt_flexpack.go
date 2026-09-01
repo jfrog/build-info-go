@@ -304,6 +304,16 @@ func (c *AptFlexPack) CollectBuildInfo(buildName, buildNumber, moduleID string) 
 		}
 	}
 
+	// Any package that survived the checksum filter but has no scope-carrying
+	// incoming edge (e.g. an Essential package reachable only via Breaks/Conflicts
+	// or a header-only node in apt-cache output) gets "required" as a default.
+	// They are in the installed closure so apt considers them necessary.
+	for id := range depsMap {
+		if reportIDs[id] && scopeMap[id] == nil {
+			scopeMap[id] = map[string]bool{scopeRequired: true}
+		}
+	}
+
 	// Populate RequestedBy from the module level (same pattern as Go collector).
 	populateAptRequestedBy(moduleID, [][]string{{}}, depsMap, stringGraph, map[string]bool{moduleID: true})
 
