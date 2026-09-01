@@ -195,9 +195,7 @@ func (c *AptFlexPack) CollectDependencies(rootPkgs []string) error {
 	// Source 3: parse /var/lib/apt/lists Packages → SHA256/SHA1/MD5.
 	// After apt-get update + install, the Packages index always covers every
 	// installed package, so this resolves all checksums in the normal flow.
-	if err := c.collectChecksumsFromLists(); err != nil {
-		log.Warn("apt: Packages index parse failed: " + err.Error())
-	}
+	c.collectChecksumsFromLists()
 
 	// Fallback: compute from cached .deb files in /var/cache/apt/archives for
 	// any packages the Packages index missed (e.g., pre-installed from a removed repo).
@@ -330,7 +328,7 @@ func (c *AptFlexPack) CollectBuildInfo(buildName, buildNumber, moduleID string) 
 			skipped++
 			continue
 		}
-		if dep.Checksum.IsEmpty() {
+		if dep.IsEmpty() {
 			noChecksum = append(noChecksum, id)
 			continue
 		}
@@ -408,11 +406,7 @@ func (c *AptFlexPack) collectGraph(rootPkgs []string) error {
 	if err != nil {
 		return err
 	}
-	graph, err := parseAptCacheDependsOutput(string(out))
-	if err != nil {
-		return err
-	}
-	c.edgeGraph = graph
+	c.edgeGraph = parseAptCacheDependsOutput(string(out))
 	return nil
 }
 
@@ -443,7 +437,7 @@ func aptRelationToScope(relation string) (string, bool) {
 //	libcurl4t64
 //	  Depends: libc6
 //	  ...
-func parseAptCacheDependsOutput(output string) (map[string][]aptEdge, error) {
+func parseAptCacheDependsOutput(output string) map[string][]aptEdge {
 	graph := make(map[string][]aptEdge)
 	var currentPkg string
 	var currentRelation string
@@ -495,7 +489,7 @@ func parseAptCacheDependsOutput(output string) (map[string][]aptEdge, error) {
 			}
 		}
 	}
-	return graph, nil
+	return graph
 }
 
 func initGraphEntry(g map[string][]aptEdge, pkg string) {
@@ -559,7 +553,7 @@ func (c *AptFlexPack) collectVersions() error {
 	return nil
 }
 
-func (c *AptFlexPack) collectChecksumsFromLists() error {
+func (c *AptFlexPack) collectChecksumsFromLists() {
 	paths := c.packagesIndexFiles()
 	total := 0
 	for _, path := range paths {
@@ -570,7 +564,6 @@ func (c *AptFlexPack) collectChecksumsFromLists() error {
 		total += n
 	}
 	log.Debug(fmt.Sprintf("apt: resolved %d checksums from %d Packages index files", total, len(paths)))
-	return nil
 }
 
 // packagesIndexFiles returns every Packages index file on disk.

@@ -136,8 +136,7 @@ libcurl4t64
   Depends: libc6
 ca-certificates
 `
-	graph, err := parseAptCacheDependsOutput(output)
-	require.NoError(t, err)
+	graph := parseAptCacheDependsOutput(output)
 
 	// All four packages must appear as graph keys.
 	for _, pkg := range []string{"curl", "libc6", "libcurl4t64", "ca-certificates"} {
@@ -174,8 +173,7 @@ func TestParseAptCacheDependsOutput_AlternativeDependency(t *testing.T) {
   Depends: libcurl4t64
   |libcurl3-gnutls
 `
-	graph, err := parseAptCacheDependsOutput(output)
-	require.NoError(t, err)
+	graph := parseAptCacheDependsOutput(output)
 
 	// Both the primary and the alternative must be recorded as edges.
 	var children []string
@@ -191,8 +189,7 @@ func TestParseAptCacheDependsOutput_AngleBracketVirtual(t *testing.T) {
 	output := `curl
   Depends: <libssl-dev>
 `
-	graph, err := parseAptCacheDependsOutput(output)
-	require.NoError(t, err)
+	graph := parseAptCacheDependsOutput(output)
 
 	for _, e := range graph["curl"] {
 		assert.NotContains(t, e.child, "<", "angle brackets must be stripped from child names")
