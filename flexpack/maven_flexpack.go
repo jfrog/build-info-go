@@ -1159,11 +1159,12 @@ func (mf *MavenFlexPack) deployURLFromEffectiveSettings(isSnapshot bool) (string
 	}
 	result := ""
 	for _, profile := range settings.Profiles {
-		if isSnapshot && profile.AltSnapshotDeploymentRepository != "" {
+		switch {
+		case isSnapshot && profile.AltSnapshotDeploymentRepository != "":
 			result = repoURLFromAltValue(profile.AltSnapshotDeploymentRepository)
-		} else if !isSnapshot && profile.AltReleaseDeploymentRepository != "" {
+		case !isSnapshot && profile.AltReleaseDeploymentRepository != "":
 			result = repoURLFromAltValue(profile.AltReleaseDeploymentRepository)
-		} else if profile.AltDeploymentRepository != "" {
+		case profile.AltDeploymentRepository != "":
 			result = repoURLFromAltValue(profile.AltDeploymentRepository)
 		}
 	}
