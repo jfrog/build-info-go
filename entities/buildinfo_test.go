@@ -255,6 +255,29 @@ func TestAppendProperties(t *testing.T) {
 		target.Append(&source)
 		assert.Equal(t, MavenBuildModeNative, target.Properties[MavenBuildModeProperty])
 	})
+
+	t.Run("empty string in target is treated as existing", func(t *testing.T) {
+		target := BuildInfo{Properties: Env{"x": ""}}
+		source := BuildInfo{Properties: Env{"x": "v"}}
+		target.Append(&source)
+		assert.Equal(t, "", target.Properties["x"])
+	})
+
+	t.Run("chained appends first writer wins", func(t *testing.T) {
+		target := BuildInfo{}
+		b := BuildInfo{Properties: Env{"key": "b"}}
+		c := BuildInfo{Properties: Env{"key": "c"}}
+		target.Append(&b)
+		target.Append(&c)
+		assert.Equal(t, "b", target.Properties["key"])
+	})
+
+	t.Run("non-nil empty source properties is no-op", func(t *testing.T) {
+		target := BuildInfo{Properties: Env{"keep": "v"}}
+		source := BuildInfo{Properties: Env{}}
+		target.Append(&source)
+		assert.Equal(t, Env{"keep": "v"}, target.Properties)
+	})
 }
 
 func TestToCycloneDxBOM(t *testing.T) {

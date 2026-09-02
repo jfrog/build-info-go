@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -44,6 +45,17 @@ type MavenFlexPack struct {
 // artifactChecksum holds the checksums of a single file, cached across modules by artifact path.
 type artifactChecksum struct {
 	sha1, sha256, md5 string
+}
+
+// checksumCacheKey returns a normalized path suitable for use as a checksumCache map key.
+// On case-insensitive filesystems (macOS default, Windows) the same file can be reached
+// via different-cased paths, so the key is lowercased on those platforms.
+func checksumCacheKey(path string) string {
+	key := filepath.Clean(path)
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		return strings.ToLower(key)
+	}
+	return key
 }
 
 // ModuleLocation records where a reactor module was built and its packaging, derived from the
@@ -419,11 +431,12 @@ func (mf *MavenFlexPack) calculateChecksumWithFallback(dep DependencyInfo) map[s
 	// Strategy 1: Try to find artifact in Maven local repository. Checksums are cached by path so a
 	// dependency shared across reactor modules is hashed only once.
 	if artifactPath := mf.findMavenArtifact(dep); artifactPath != "" {
-		cached, ok := mf.checksumCache[artifactPath]
+		cacheKey := checksumCacheKey(artifactPath)
+		cached, ok := mf.checksumCache[cacheKey]
 		if !ok {
 			if sha1, sha256, md5, err := mf.calculateFileChecksum(artifactPath); err == nil {
 				cached = artifactChecksum{sha1: sha1, sha256: sha256, md5: md5}
-				mf.checksumCache[artifactPath] = cached
+				mf.checksumCache[cacheKey] = cached
 				ok = true
 			} else {
 				log.Warn(fmt.Sprintf("Failed to calculate checksum for artifact: %s", artifactPath))
@@ -862,9 +875,13 @@ func invertDependencyGraph(graph map[string][]string) map[string][]string {
 // than one parent) yields one path per distinct route. A cycle, which a resolved Maven tree should
 // never contain, is broken defensively by terminating the offending path at the repeated node.
 func buildRequestedByPaths(depID string, parents map[string][]string) [][]string {
+	const maxPaths = 15
 	var paths [][]string
 	var walk func(node string, acc []string, onPath map[string]bool)
 	walk = func(node string, acc []string, onPath map[string]bool) {
+		if len(paths) >= maxPaths {
+			return
+		}
 		directParents := parents[node]
 		if len(directParents) == 0 {
 			// Reached a root: the accumulated ancestors form one complete path.
@@ -874,6 +891,9 @@ func buildRequestedByPaths(depID string, parents map[string][]string) [][]string
 			return
 		}
 		for _, parent := range directParents {
+			if len(paths) >= maxPaths {
+				return
+			}
 			if onPath[parent] {
 				// Cycle guard: close the path at the repeated node instead of recursing forever.
 				paths = append(paths, append(append([]string(nil), acc...), parent))
@@ -885,6 +905,9 @@ func buildRequestedByPaths(depID string, parents map[string][]string) [][]string
 		}
 	}
 	walk(depID, nil, map[string]bool{depID: true})
+	if len(paths) == maxPaths {
+		log.Debug(fmt.Sprintf("dependency %s RequestedBy paths capped at %d", depID, maxPaths))
+	}
 	return paths
 }
 
@@ -1120,7 +1143,7 @@ func distributionURL(project effectivePomProject, fallbackSnapshot bool) string 
 	if dm.Repository.URL != "" {
 		return dm.Repository.URL
 	}
-	return dm.SnapshotRepository.URL
+	return ""
 }
 
 func (mf *MavenFlexPack) deployURLFromEffectiveSettings(isSnapshot bool) (string, error) {
@@ -1134,18 +1157,17 @@ func (mf *MavenFlexPack) deployURLFromEffectiveSettings(isSnapshot bool) (string
 	if err := xml.Unmarshal([]byte(content), &settings); err != nil {
 		return "", fmt.Errorf("failed to parse effective-settings: %w", err)
 	}
+	result := ""
 	for _, profile := range settings.Profiles {
 		if isSnapshot && profile.AltSnapshotDeploymentRepository != "" {
-			return repoURLFromAltValue(profile.AltSnapshotDeploymentRepository), nil
-		}
-		if !isSnapshot && profile.AltReleaseDeploymentRepository != "" {
-			return repoURLFromAltValue(profile.AltReleaseDeploymentRepository), nil
-		}
-		if profile.AltDeploymentRepository != "" {
-			return repoURLFromAltValue(profile.AltDeploymentRepository), nil
+			result = repoURLFromAltValue(profile.AltSnapshotDeploymentRepository)
+		} else if !isSnapshot && profile.AltReleaseDeploymentRepository != "" {
+			result = repoURLFromAltValue(profile.AltReleaseDeploymentRepository)
+		} else if profile.AltDeploymentRepository != "" {
+			result = repoURLFromAltValue(profile.AltDeploymentRepository)
 		}
 	}
-	return "", nil
+	return result, nil
 }
 
 // runMavenHelpGoal runs a maven-help-plugin goal that writes its output to a file (-Doutput), forwarding
