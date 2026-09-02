@@ -5,6 +5,8 @@ import (
 	buildinfo "github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -184,6 +186,79 @@ func TestPackageNotFoundWithoutFailure(t *testing.T) {
 	log := utils.NewDefaultLogger(utils.INFO)
 	_, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcachenotexists"), log)
 	assert.NoError(t, err)
+}
+
+// TestPackageNotFoundIsRetainedWithoutChecksum verifies that a package.config dependency whose
+// nupkg is absent from the local cache is still recorded in the build info (without a checksum),
+// matching project.assets.json's cache-miss tolerance in getAllDependencies, instead of being
+// silently dropped.
+func TestPackageNotFoundIsRetainedWithoutChecksum(t *testing.T) {
+	log := utils.NewDefaultLogger(utils.INFO)
+	extractor, err := extractDependencies(filepath.Join("testdata", "packagesproject", "localcachenotexists"), log)
+	require.NoError(t, err)
+
+	allDependencies, err := extractor.AllDependencies(log)
+	require.NoError(t, err)
+	require.Contains(t, allDependencies, "id1")
+	dep := allDependencies["id1"]
+	assert.Equal(t, "id1:1.0.0", dep.Id)
+	assert.Empty(t, dep.Sha1)
+	assert.Empty(t, dep.Sha256)
+	assert.Empty(t, dep.Md5)
+}
+
+// TestPackagesConfigChecksumsAndDevelopmentDependencyScope verifies that a cached package gets
+// all three checksums (sha1/sha256/md5), and that developmentDependency="true" in packages.config
+// (the classic-era equivalent of PackageReference's PrivateAssets="all") maps to the "private"
+// build-info dependency scope.
+func TestPackagesConfigChecksumsAndDevelopmentDependencyScope(t *testing.T) {
+	log := utils.NewDefaultLogger(utils.INFO)
+	globalPackagesCache := t.TempDir()
+	nupkgDir := filepath.Join(globalPackagesCache, "dev.package", "1.2.3")
+	require.NoError(t, os.MkdirAll(nupkgDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(nupkgDir, "dev.package.1.2.3.nupkg"), []byte("package contents"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(nupkgDir, "dev.package.nuspec"), []byte(`<?xml version="1.0" encoding="utf-8"?><package><metadata><id>dev.package</id></metadata></package>`), 0o600))
+
+	packagesConfig := &packagesConfig{XmlPackages: []xmlPackage{
+		{Id: "dev.package", Version: "1.2.3", DevelopmentDependency: "true"},
+	}}
+
+	extractor := &packagesExtractor{allDependencies: map[string]*buildinfo.Dependency{}, childrenMap: map[string][]string{}}
+	require.NoError(t, extractor.extract(packagesConfig, globalPackagesCache, log))
+
+	dep := extractor.allDependencies["dev.package"]
+	require.NotNil(t, dep)
+	assert.Equal(t, []string{privateScope}, dep.Scopes)
+	assert.NotEmpty(t, dep.Sha1)
+	assert.NotEmpty(t, dep.Sha256)
+	assert.NotEmpty(t, dep.Md5)
+}
+
+func TestXmlUnmarshalUTF16(t *testing.T) {
+	// Build a valid UTF-16-LE encoded packages.config with BOM.
+	src := `<?xml version="1.0" encoding="utf-16"?><packages><package id="MyPkg" version="1.0.0" /></packages>`
+	raw := []byte(src)
+	buf := make([]byte, 2+len(raw)*2)
+	buf[0], buf[1] = 0xFF, 0xFE // little-endian BOM
+	for i, b := range raw {
+		buf[2+i*2] = b
+		buf[2+i*2+1] = 0
+	}
+	var result packagesConfig
+	log := &utils.NullLog{}
+	require.NoError(t, xmlUnmarshal(buf, &result, log))
+	require.Len(t, result.XmlPackages, 1)
+	assert.Equal(t, "MyPkg", result.XmlPackages[0].Id)
+	assert.Equal(t, "1.0.0", result.XmlPackages[0].Version)
+}
+
+func TestXmlUnmarshalUTF16OddLength(t *testing.T) {
+	// Odd-length content must not panic — the trailing byte is dropped.
+	oddContent := []byte{0xFF, 0xFE, '<', 0, 'p', 0, 'a', 0} // 8 bytes: BOM + "<pa"
+	var result packagesConfig
+	log := &utils.NullLog{}
+	// Should not panic; an unmarshal error is acceptable for truncated XML.
+	_ = xmlUnmarshal(oddContent, &result, log)
 }
 
 func extractDependencies(globalPackagePath string, log utils.Log) (Extractor, error) {

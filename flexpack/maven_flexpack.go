@@ -620,7 +620,7 @@ func (mf *MavenFlexPack) GetProjectDependencies() ([]DependencyInfo, error) {
 	// Add RequestedBy information to dependencies
 	for i, dep := range mf.dependencies {
 		if parents, exists := requestedBy[dep.ID]; exists {
-			mf.dependencies[i].RequestedBy = parents
+			mf.dependencies[i].RequestedBy = [][]string{parents}
 		}
 	}
 

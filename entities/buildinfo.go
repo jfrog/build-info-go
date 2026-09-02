@@ -12,7 +12,6 @@ import (
 	"github.com/jfrog/build-info-go/utils/compareutils"
 	"github.com/jfrog/gofrog/log"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/gofrog/stringutils"
@@ -276,11 +275,14 @@ func mergeArtifacts(mergeArtifacts *[]Artifact, intoArtifacts *[]Artifact) {
 	for _, newArtifact := range *mergeArtifacts {
 		exists := false
 
-		// PRIORITY 1: Check SHA1 - if checksums match, prefer the artifact with a real path.
+		// PRIORITY 1: Check name and SHA1 - if both match, prefer the artifact with a real path.
 		// path="." means the artifact was recorded locally before upload; a non-"." path
 		// means it was confirmed in Artifactory. Always keep the richer entry.
+		// Name must match too - otherwise two distinct artifacts that happen to share
+		// content (e.g. a .nupkg and its .snupkg symbol package) would collide and one
+		// would be silently dropped instead of both being kept.
 		for i, existingArtifact := range *intoArtifacts {
-			if newArtifact.Sha1 == existingArtifact.Sha1 {
+			if newArtifact.Name == existingArtifact.Name && newArtifact.Sha1 == existingArtifact.Sha1 {
 				if existingArtifact.Path == "." && newArtifact.Path != "." {
 					(*intoArtifacts)[i] = newArtifact
 				}
@@ -622,6 +624,9 @@ func (d *Dependency) UpdateRequestedBy(parentId string, parentRequestedBy [][]st
 	// Filter all existing paths from parent
 	var filteredChildRequestedBy [][]string
 	for _, childRequestedBy := range d.RequestedBy {
+		if len(childRequestedBy) == 0 {
+			continue
+		}
 		if childRequestedBy[0] != parentId {
 			filteredChildRequestedBy = append(filteredChildRequestedBy, childRequestedBy)
 		}
@@ -636,8 +641,10 @@ func (d *Dependency) UpdateRequestedBy(parentId string, parentRequestedBy [][]st
 
 func (d *Dependency) NodeHasLoop() bool {
 	for _, requestedBy := range d.RequestedBy {
-		if slices.Contains(requestedBy, d.Id) {
-			return true
+		for _, id := range requestedBy {
+			if id == d.Id {
+				return true
+			}
 		}
 	}
 	return false
