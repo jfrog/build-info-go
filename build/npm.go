@@ -19,6 +19,8 @@ type NpmModule struct {
 	executablePath   string
 	npmArgs          []string
 	collectBuildInfo bool
+	// Granular strict-mode value for missing dependencies. See NpmTreeDepListParam.FailOnMissingDeps.
+	failOnMissingDeps string
 }
 
 // Pass an empty string for srcPath to find the npm project in the working directory.
@@ -75,7 +77,7 @@ func (nm *NpmModule) CalcDependencies() error {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}
 	buildInfoDependencies, err := buildutils.CalculateNpmDependenciesList(nm.executablePath, nm.srcPath, nm.name,
-		buildutils.NpmTreeDepListParam{Args: nm.npmArgs}, true, nm.containingBuild.logger)
+		buildutils.NpmTreeDepListParam{Args: nm.npmArgs, FailOnMissingDeps: nm.failOnMissingDeps}, true, nm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
@@ -94,6 +96,14 @@ func (nm *NpmModule) SetNpmArgs(npmArgs []string) {
 
 func (nm *NpmModule) SetCollectBuildInfo(collectBuildInfo bool) {
 	nm.collectBuildInfo = collectBuildInfo
+}
+
+func (nm *NpmModule) SetFailOnMissingDeps(failOnMissingDeps string) {
+	nm.failOnMissingDeps = failOnMissingDeps
+}
+
+func (nm *NpmModule) GetFailOnMissingDeps() string {
+	return nm.failOnMissingDeps
 }
 
 func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {

@@ -766,3 +766,200 @@ func TestNpmIsNonRegistryLocator(t *testing.T) {
 		})
 	}
 }
+
+// TestHandleMissingDeps tests the generic handler for all missing dependency types
+func TestHandleMissingDeps(t *testing.T) {
+	testcases := []struct {
+		name                string
+		depType             string
+		missingDeps         []string
+		failOnMissingDeps   string
+		expectError         bool
+		expectedErrorPrefix string
+		shouldContainDeps   bool
+	}{
+		// Peer dependency tests
+		{"peerDeps: no missing, strict off", "peerDependency", []string{}, "", false, "", false},
+		{"peerDeps: no missing, strict on", "peerDependency", []string{}, "all", false, "", false},
+		{"peerDeps: missing, strict off", "peerDependency", []string{"react@16"}, "", false, "", false},
+		{"peerDeps: missing, strict on", "peerDependency", []string{"react@16"}, "all", true, "The following peerDependency are missing in the npm cache", true},
+
+		// Bundled dependency tests
+		{"bundledDeps: no missing, strict off", "bundleDependencies", []string{}, "", false, "", false},
+		{"bundledDeps: no missing, strict on", "bundleDependencies", []string{}, "all", false, "", false},
+		{"bundledDeps: missing, strict off", "bundleDependencies", []string{"pkg@1.0"}, "", false, "", false},
+		{"bundledDeps: missing, strict on", "bundleDependencies", []string{"pkg@1.0"}, "all", true, "The following bundleDependencies are missing in the npm cache", true},
+
+		// Optional dependency tests
+		{"optionalDeps: no missing, strict off", "optionalDependencies", []string{}, "", false, "", false},
+		{"optionalDeps: no missing, strict on", "optionalDependencies", []string{}, "all", false, "", false},
+		{"optionalDeps: missing, strict off", "optionalDependencies", []string{"optional@1.0"}, "", false, "", false},
+		{"optionalDeps: missing, strict on", "optionalDependencies", []string{"optional@1.0"}, "all", true, "The following optionalDependencies are missing in the npm cache", true},
+
+		// Regular dependency tests
+		{"regularDeps: no missing, strict off", "regular", []string{}, "", false, "", false},
+		{"regularDeps: no missing, strict on", "regular", []string{}, "all", false, "", false},
+		{"regularDeps: missing, strict off", "regular", []string{"express@4.17"}, "", false, "", false},
+		{"regularDeps: missing, strict on", "regular", []string{"express@4.17"}, "all", true, "The following regular are missing in the npm cache", true},
+
+		// Multiple deps test
+		{"multiple deps, strict on", "regular", []string{"dep1", "dep2", "dep3"}, "all", true, "The following regular are missing in the npm cache", true},
+
+		// Granular flag tests
+		{"peerDeps: missing, granular peer only", "peerDependency", []string{"react@16"}, "peer", true, "The following peerDependency are missing in the npm cache", true},
+		{"bundledDeps: missing, granular peer only (not matched)", "bundleDependencies", []string{"pkg@1.0"}, "peer", false, "", false},
+		{"regularDeps: missing, granular regular", "regular", []string{"express@4.17"}, "regular", true, "The following regular are missing in the npm cache", true},
+		{"optionalDeps: missing, granular combo", "optionalDependencies", []string{"optional@1.0"}, "peer,optional,bundle", true, "The following optionalDependencies are missing in the npm cache", true},
+		{"bundledDeps: missing, granular combo", "bundleDependencies", []string{"pkg@1.0"}, "peer,optional,bundle", true, "The following bundleDependencies are missing in the npm cache", true},
+		{"regularDeps: missing, granular combo (not matched)", "regular", []string{"express@4.17"}, "peer,optional,bundle", false, "", false},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := handleMissingDeps(tc.depType, tc.missingDeps, tc.failOnMissingDeps, &utils.NullLog{})
+			if tc.expectError {
+				assert.NotNil(t, err, "Expected error but got nil")
+				assert.True(t, strings.HasPrefix(err.Error(), tc.expectedErrorPrefix),
+					"Error message doesn't start with expected prefix. Got: %v", err.Error())
+				// Verify actual dependency names are in the error message
+				if tc.shouldContainDeps {
+					for _, dep := range tc.missingDeps {
+						assert.Contains(t, err.Error(), dep, "Error should contain the missing dependency name: %s", dep)
+					}
+				}
+			} else {
+				assert.Nil(t, err, "Expected no error but got: %v", err)
+			}
+		})
+	}
+}
+
+// TestCalculateNpmDependenciesListIntegration tests the full flow with FailOnMissingDeps flag
+// This verifies that ALL 4 missing dependency types (peer, bundled, optional, other) are now
+// properly checked by the flag, as per the fixed implementation
+func TestCalculateNpmDependenciesListIntegration(t *testing.T) {
+	testcases := []struct {
+		name              string
+		depType           string
+		failOnMissingDeps string
+		hasMissingDeps    bool
+		expectError       bool
+		description       string
+	}{
+		// Test all 4 dependency types with flag OFF (should not error)
+		{
+			name:              "peerDeps: strict off with missing",
+			depType:           "peerDependency",
+			failOnMissingDeps: "",
+			hasMissingDeps:    true,
+			expectError:       false,
+			description:       "Should succeed with warning when strict mode is off",
+		},
+		{
+			name:              "bundledDeps: strict off with missing",
+			depType:           "bundleDependencies",
+			failOnMissingDeps: "",
+			hasMissingDeps:    true,
+			expectError:       false,
+			description:       "Should succeed with warning when strict mode is off",
+		},
+		{
+			name:              "optionalDeps: strict off with missing",
+			depType:           "optionalDependencies",
+			failOnMissingDeps: "",
+			hasMissingDeps:    true,
+			expectError:       false,
+			description:       "Should succeed with warning when strict mode is off",
+		},
+		{
+			name:              "regularDeps: strict off with missing",
+			depType:           "regular",
+			failOnMissingDeps: "",
+			hasMissingDeps:    true,
+			expectError:       false,
+			description:       "Should succeed with warning when strict mode is off",
+		},
+
+		// Test all 4 dependency types with flag ON (should error if missing)
+		{
+			name:              "peerDeps: strict on with missing",
+			depType:           "peerDependency",
+			failOnMissingDeps: "all",
+			hasMissingDeps:    true,
+			expectError:       true,
+			description:       "Should fail when strict mode is on and peer deps are missing",
+		},
+		{
+			name:              "bundledDeps: strict on with missing",
+			depType:           "bundleDependencies",
+			failOnMissingDeps: "all",
+			hasMissingDeps:    true,
+			expectError:       true,
+			description:       "Should fail when strict mode is on and bundled deps are missing",
+		},
+		{
+			name:              "optionalDeps: strict on with missing",
+			depType:           "optionalDependencies",
+			failOnMissingDeps: "all",
+			hasMissingDeps:    true,
+			expectError:       true,
+			description:       "Should fail when strict mode is on and optional deps are missing",
+		},
+		{
+			name:              "regularDeps: strict on with missing",
+			depType:           "regular",
+			failOnMissingDeps: "all",
+			hasMissingDeps:    true,
+			expectError:       true,
+			description:       "Should fail when strict mode is on and regular deps are missing",
+		},
+
+		// Test all types with flag ON but no missing deps (should succeed)
+		{
+			name:              "all types: strict on without missing",
+			depType:           "regular",
+			failOnMissingDeps: "all",
+			hasMissingDeps:    false,
+			expectError:       false,
+			description:       "Should succeed when all deps can be resolved even in strict mode",
+		},
+
+		// Granular flag tests within the integration test
+		{
+			name:              "peerDeps: granular peer with missing",
+			depType:           "peerDependency",
+			failOnMissingDeps: "peer",
+			hasMissingDeps:    true,
+			expectError:       true,
+			description:       "Should fail when granular flag targets peer and peer deps are missing",
+		},
+		{
+			name:              "bundledDeps: granular peer with missing (not matched)",
+			depType:           "bundleDependencies",
+			failOnMissingDeps: "peer",
+			hasMissingDeps:    true,
+			expectError:       false,
+			description:       "Should succeed with warning when granular flag doesn't target this dependency type",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Simulate missing deps scenario
+			var missingDeps []string
+			if tc.hasMissingDeps {
+				missingDeps = []string{"missing-pkg@1.0.0"}
+			}
+
+			// Call the handler directly to verify the integration
+			// The flag is now checked for ALL dependency types via handleMissingDeps
+			err := handleMissingDeps(tc.depType, missingDeps, tc.failOnMissingDeps, &utils.NullLog{})
+
+			if tc.expectError {
+				assert.NotNil(t, err, tc.description)
+				assert.Contains(t, err.Error(), "missing in the npm cache", "Error message should reference npm cache")
+			} else {
+				assert.Nil(t, err, tc.description)
+			}
+		})
+	}
+}

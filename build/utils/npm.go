@@ -23,6 +23,24 @@ import (
 
 const npmInstallCommand = "install"
 
+// Granular values accepted by the --fail-on-missing-deps flag (NpmTreeDepListParam.FailOnMissingDeps).
+// The flag also accepts a comma-separated combination of the granular values, e.g. "peer,optional,bundle".
+const (
+	failOnMissingDepsAll      = "all"
+	failOnMissingDepsRegular  = "regular"
+	failOnMissingDepsPeer     = "peer"
+	failOnMissingDepsOptional = "optional"
+	failOnMissingDepsBundle   = "bundle"
+)
+
+// Dependency type identifiers used internally in handleMissingDeps
+const (
+	depTypePeer     = "peerDependency"
+	depTypeBundle   = "bundleDependencies"
+	depTypeOptional = "optionalDependencies"
+	depTypeRegular  = "regular"
+)
+
 // CalculateNpmDependenciesList gets an npm project's dependencies.
 func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
 	if log == nil {
@@ -75,17 +93,25 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 
 		dependenciesList = append(dependenciesList, dep.Dependency)
 	}
-	if len(missingPeerDeps) > 0 {
-		printMissingDependenciesWarning("peerDependency", missingPeerDeps, log)
+	// Apply --fail-on-missing-deps flag to ALL missing dependency types
+	// Collect all errors so users see the complete picture of what's missing
+	var allErrors []string
+
+	if err := handleMissingDeps(depTypePeer, missingPeerDeps, npmParams.FailOnMissingDeps, log); err != nil {
+		allErrors = append(allErrors, err.Error())
 	}
-	if len(missingBundledDeps) > 0 {
-		printMissingDependenciesWarning("bundleDependencies", missingBundledDeps, log)
+	if err := handleMissingDeps(depTypeBundle, missingBundledDeps, npmParams.FailOnMissingDeps, log); err != nil {
+		allErrors = append(allErrors, err.Error())
 	}
-	if len(missingOptionalDeps) > 0 {
-		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
+	if err := handleMissingDeps(depTypeOptional, missingOptionalDeps, npmParams.FailOnMissingDeps, log); err != nil {
+		allErrors = append(allErrors, err.Error())
 	}
-	if len(otherMissingDeps) > 0 {
-		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.")
+	if err := handleMissingDeps(depTypeRegular, otherMissingDeps, npmParams.FailOnMissingDeps, log); err != nil {
+		allErrors = append(allErrors, err.Error())
+	}
+	if len(allErrors) > 0 {
+		errorMsg := "Build-info collection stopped.\n" + strings.Join(allErrors, "\n")
+		return nil, errors.New(errorMsg)
 	}
 	return dependenciesList, nil
 }
@@ -257,6 +283,67 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 	return version.NewVersion(string(versionData)), nil
 }
 
+// depTypeToFlagValue maps the internal dependency-type identifiers (as passed to handleMissingDeps)
+// to the granular flag value that governs them.
+var depTypeToFlagValue = map[string]string{
+	depTypePeer:     failOnMissingDepsPeer,
+	depTypeBundle:   failOnMissingDepsBundle,
+	depTypeOptional: failOnMissingDepsOptional,
+	depTypeRegular:  failOnMissingDepsRegular,
+}
+
+// shouldFailOnMissingDeps returns true if the given dependency type should fail the build,
+// according to the granular flagValue supplied to --fail-on-missing-deps.
+// flagValue can be:
+//   - "" (empty): never fail (backward compatible default)
+//   - "all": fail for every dependency type
+//   - a comma-separated combination of "regular", "peer", "optional", "bundle"
+func shouldFailOnMissingDeps(depType, flagValue string) bool {
+	if flagValue == "" {
+		return false
+	}
+	if flagValue == failOnMissingDepsAll {
+		return true
+	}
+	wantedValue, ok := depTypeToFlagValue[depType]
+	if !ok {
+		return false
+	}
+	for _, value := range strings.Split(flagValue, ",") {
+		if strings.TrimSpace(value) == wantedValue {
+			return true
+		}
+	}
+	return false
+}
+
+// handleMissingDeps handles missing dependencies based on the granular --fail-on-missing-deps flag value.
+// If shouldFailOnMissingDeps(depType, failOnMissingDeps) is true, returns an error for that dependency type.
+// Otherwise, logs a warning.
+func handleMissingDeps(depType string, missingDeps []string, failOnMissingDeps string, log utils.Log) error {
+	if len(missingDeps) == 0 {
+		return nil
+	}
+
+	if shouldFailOnMissingDeps(depType, failOnMissingDeps) {
+		// When the flag applies to this dependency type, fail with an error.
+		message := fmt.Sprintf("The following %s are missing in the npm cache and will not be included in the build-info: '%s'", depType, strings.Join(missingDeps, ","))
+		return errors.New(message)
+	}
+
+	// When the flag doesn't apply to this dependency type, use original logging behavior (backward compatible):
+	// - peer/bundled/optional: DEBUG level logging (via printMissingDependenciesWarning)
+	// - regular: WARN level logging
+	if depType == depTypePeer || depType == depTypeBundle || depType == depTypeOptional {
+		printMissingDependenciesWarning(depType, missingDeps, log)
+	} else {
+		// For depTypeRegular: use WARN level (original behavior when flag not set)
+		message := fmt.Sprintf("The following dependencies are missing in npm cache and will not be included in the build-info: '%s'", strings.Join(missingDeps, ","))
+		log.Warn(message)
+	}
+	return nil
+}
+
 type NpmTreeDepListParam struct {
 	// Required for the 'install' and 'ls' commands that could be triggered during the construction of the NPM dependency tree
 	Args []string
@@ -266,6 +353,11 @@ type NpmTreeDepListParam struct {
 	IgnoreNodeModules bool
 	// Rewrite package-lock.json, if exists.
 	OverwritePackageLock bool
+	// Fail the build if a dependency's tarball can't be resolved from the npm cache.
+	// Granular string value: "" (never fail, default), "all" (fail for every missing dependency type),
+	// or a comma-separated combination of "regular", "peer", "optional", "bundle"
+	// (e.g. "peer,optional,bundle") to fail only for the specified types.
+	FailOnMissingDeps string
 }
 
 // npm >=7 ls results for a single dependency
