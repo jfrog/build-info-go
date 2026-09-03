@@ -2,6 +2,7 @@ package solution
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +18,73 @@ import (
 )
 
 var logger = utils.NewDefaultLogger(utils.INFO)
+
+// TestParseSlnxFile verifies '.slnx' (the modern XML solution format) project references are
+// extracted correctly, including a project nested inside a <Folder> element.
+func TestParseSlnxFile(t *testing.T) {
+	dir := t.TempDir()
+	slnxPath := filepath.Join(dir, "Multi.slnx")
+	require.NoError(t, os.WriteFile(slnxPath, []byte(`<Solution>
+  <Project Path="ProjectA/ProjectA.csproj" />
+  <Folder Name="/Nested/">
+    <Project Path="ProjectB/ProjectB.csproj" />
+  </Folder>
+</Solution>`), 0o600))
+
+	lines, err := parseSlnxFile(slnxPath)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{
+		`Project("{00000000-0000-0000-0000-000000000000}") = "ProjectA", "ProjectA/ProjectA.csproj"`,
+		`Project("{00000000-0000-0000-0000-000000000000}") = "ProjectB", "ProjectB/ProjectB.csproj"`,
+	}, lines)
+}
+
+// TestGetProjectsFromSlnxOnly verifies that getProjectsListFromSlns resolves every project
+// referenced by a '.slnx' file into a distinct project.Project, instead of returning nil (which
+// would silently fall back to single-directory discovery and yield an empty build info — the
+// bug this covers) or flattening the solution's projects into one.
+func TestGetProjectsFromSlnxOnly(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "ProjectA"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "ProjectB"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ProjectA", "ProjectA.csproj"), []byte("<Project/>"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ProjectB", "ProjectB.csproj"), []byte("<Project/>"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Multi.slnx"), []byte(`<Solution>
+  <Project Path="ProjectA/ProjectA.csproj" />
+  <Project Path="ProjectB/ProjectB.csproj" />
+</Solution>`), 0o600))
+
+	sol := &solution{path: dir, slnFile: "Multi.slnx"}
+	projects, err := sol.getProjectsListFromSlns("", logger)
+	require.NoError(t, err)
+	require.Len(t, projects, 2)
+
+	var names []string
+	for _, p := range projects {
+		names = append(names, p.Name())
+	}
+	assert.ElementsMatch(t, []string{"ProjectA", "ProjectB"}, names)
+}
+
+// TestGetProjectsFromSlnxExcludePattern verifies the exclude pattern is honored for '.slnx'
+// projects, matching the classic '.sln' path's behavior.
+func TestGetProjectsFromSlnxExcludePattern(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "ProjectA"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "ProjectB"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ProjectA", "ProjectA.csproj"), []byte("<Project/>"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ProjectB", "ProjectB.csproj"), []byte("<Project/>"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Multi.slnx"), []byte(`<Solution>
+  <Project Path="ProjectA/ProjectA.csproj" />
+  <Project Path="ProjectB/ProjectB.csproj" />
+</Solution>`), 0o600))
+
+	sol := &solution{path: dir, slnFile: "Multi.slnx"}
+	projects, err := sol.getProjectsListFromSlns("ProjectB", logger)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	assert.Equal(t, "ProjectA", projects[0].Name())
+}
 
 func TestSortRequestedByPaths(t *testing.T) {
 	tests := []struct {
@@ -200,6 +268,27 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 		{"depC:1", "depB:1", "TestModule"},
 	}
 	assert.Equal(t, expected, firstResult)
+}
+
+func TestPopulateRequestedByMaxLengthCap(t *testing.T) {
+	// Create a leaf dependency reachable via more paths than RequestedByMaxLength.
+	// populateRequestedBy must stop adding paths once the cap is reached.
+	leaf := "leaf:1"
+	deps := map[string]*buildinfo.Dependency{leaf: {Id: "leaf:1"}}
+	childrenMap := map[string][]string{}
+
+	// Create RequestedByMaxLength+1 parents, each pointing to leaf.
+	capPlusOne := buildinfo.RequestedByMaxLength + 1
+	for i := 0; i < capPlusOne; i++ {
+		id := fmt.Sprintf("parent%d:1", i)
+		deps[id] = &buildinfo.Dependency{Id: id, RequestedBy: [][]string{{"module"}}}
+		childrenMap[id] = []string{leaf}
+		populateRequestedBy(*deps[id], deps, childrenMap)
+	}
+
+	if got := len(deps[leaf].RequestedBy); got > buildinfo.RequestedByMaxLength {
+		t.Errorf("RequestedBy length %d exceeds cap %d", got, buildinfo.RequestedByMaxLength)
+	}
 }
 
 func TestPopulateRequestedByLegacyNameOnlyFallback(t *testing.T) {
@@ -452,6 +541,25 @@ EndProject`, filepath.Join("jfrog", "path", "test", "packagesconfig", "packagesc
 	}
 }
 
+func TestParseProjectLineErrors(t *testing.T) {
+	path := filepath.Join("jfrog", "path", "test")
+	tests := []struct {
+		name string
+		line string
+	}{
+		{"no equals sign", `Project("{FAE04EC0}") EndProject`},
+		{"too few comma-separated fields", `Project("{FAE04EC0}") = "onlyname"`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, _, err := parseProjectLine(test.line, path)
+			if err == nil {
+				t.Errorf("expected error for %q, got nil", test.name)
+			}
+		})
+	}
+}
+
 func TestGetProjectsFromSlns(t *testing.T) {
 	pwd, err := os.Getwd()
 	if err != nil {
@@ -575,6 +683,27 @@ func TestLoadMixed(t *testing.T) {
 	}
 }
 
+func TestGetNameVersionModuleId(t *testing.T) {
+	tests := []struct {
+		name             string
+		moduleOverride   string
+		projectName      string
+		projectVersion   string
+		expectedModuleID string
+	}{
+		{name: "name and version default", projectName: "My.Package", projectVersion: "1.2.3", expectedModuleID: "My.Package:1.2.3"},
+		{name: "module override wins", moduleOverride: "custom-module", projectName: "My.Package", projectVersion: "1.2.3", expectedModuleID: "custom-module"},
+		{name: "missing version falls back to name", projectName: "Legacy.Package", expectedModuleID: "Legacy.Package"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := getNameVersionModuleId(test.moduleOverride, test.projectName, test.projectVersion)
+			assert.Equal(t, test.expectedModuleID, actual)
+		})
+	}
+}
+
 // TestLoadSlnx is the end-to-end counterpart to TestLoadMixed for the '.slnx' format: it exercises
 // the full Load(...) path (auto-discovering dependency sources, running project extractors) with
 // an explicit '.slnx' file, not just parseSlnxFile() in isolation.
@@ -618,4 +747,21 @@ func TestLoadSlnx(t *testing.T) {
 			t.Errorf("Unexpected project name: %s", project.Name())
 		}
 	}
+}
+
+func TestDependenciesSourcesAndProjectsPathExist(t *testing.T) {
+	t.Run("true after loading project with assets.json", func(t *testing.T) {
+		csprojPath := filepath.Join("testdata", "multi", "core", "core.csproj")
+		sol, err := LoadProject(csprojPath, &utils.NullLog{})
+		require.NoError(t, err)
+		assert.True(t, sol.DependenciesSourcesAndProjectsPathExist())
+	})
+
+	t.Run("false for empty directory", func(t *testing.T) {
+		emptyDir := t.TempDir()
+		sol, err := Load(emptyDir, "", "", &utils.NullLog{})
+		if err == nil {
+			assert.False(t, sol.DependenciesSourcesAndProjectsPathExist())
+		}
+	})
 }

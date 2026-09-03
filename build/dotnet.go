@@ -148,8 +148,8 @@ func (dm *DotnetModule) updateSolutionPathAndGetFileName() (string, error) {
 		return "", err
 	}
 	if exist {
-		// The path argument is a .sln file.
-		if strings.HasSuffix(cmdFirstArg, ".sln") {
+		// The path argument is a .sln or .slnx file.
+		if strings.HasSuffix(cmdFirstArg, ".sln") || strings.HasSuffix(cmdFirstArg, ".slnx") {
 			dm.updateSolutionPath(filepath.Dir(cmdFirstArg))
 			return filepath.Base(cmdFirstArg), nil
 		}

@@ -68,25 +68,32 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 				// Seems like the compatibility upgrades may result in dependencies losing their integrity.
 				// We use the integrity to get the dependencies tarball
 				otherMissingDeps = append(otherMissingDeps, dep.Id)
-				log.Debug("couldn't calculate checksum for " + dep.Id + ". Error: '" + err.Error() + "'.")
+				log.Debug(fmt.Sprintf("couldn't calculate checksum for %s: %v", dep.Id, err))
 				continue
 			}
 		}
 
 		dependenciesList = append(dependenciesList, dep.Dependency)
 	}
-	// Apply --fail-on-missing-deps flag to ALL missing dependency types (peer, bundled, optional, other)
+	// Apply --fail-on-missing-deps flag to ALL missing dependency types
+	// Collect all errors so users see the complete picture of what's missing
+	var allErrors []string
+
 	if err := handleMissingDeps("peerDependency", missingPeerDeps, npmParams.FailOnMissingDeps, log); err != nil {
-		return nil, err
+		allErrors = append(allErrors, err.Error())
 	}
 	if err := handleMissingDeps("bundleDependencies", missingBundledDeps, npmParams.FailOnMissingDeps, log); err != nil {
-		return nil, err
+		allErrors = append(allErrors, err.Error())
 	}
 	if err := handleMissingDeps("optionalDependencies", missingOptionalDeps, npmParams.FailOnMissingDeps, log); err != nil {
-		return nil, err
+		allErrors = append(allErrors, err.Error())
 	}
-	if err := handleMissingDeps("other", otherMissingDeps, npmParams.FailOnMissingDeps, log); err != nil {
-		return nil, err
+	if err := handleMissingDeps("regular", otherMissingDeps, npmParams.FailOnMissingDeps, log); err != nil {
+		allErrors = append(allErrors, err.Error())
+	}
+	if len(allErrors) > 0 {
+		errorMsg := "Build-info collection stopped.\n" + strings.Join(allErrors, "\n")
+		return nil, errors.New(errorMsg)
 	}
 	return dependenciesList, nil
 }
@@ -258,28 +265,78 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 	return version.NewVersion(string(versionData)), nil
 }
 
-// handleMissingDeps handles missing dependencies based on the strict mode flag.
-// If failOnMissingDeps is true, returns an error for ANY missing dependency type.
+// Granular values accepted by the --fail-on-missing-deps flag (NpmTreeDepListParam.FailOnMissingDeps).
+// The flag also accepts a comma-separated combination of the granular values, e.g. "peer,optional,bundle".
+const (
+	failOnMissingDepsAll      = "all"
+	failOnMissingDepsRegular  = "regular"
+	failOnMissingDepsPeer     = "peer"
+	failOnMissingDepsOptional = "optional"
+	failOnMissingDepsBundle   = "bundle"
+)
+
+// depTypeToFlagValue maps the internal dependency-type identifiers (as passed to handleMissingDeps)
+// to the granular flag value that governs them.
+var depTypeToFlagValue = map[string]string{
+	"peerDependency":       failOnMissingDepsPeer,
+	"bundleDependencies":   failOnMissingDepsBundle,
+	"optionalDependencies": failOnMissingDepsOptional,
+	"regular":              failOnMissingDepsRegular,
+}
+
+// shouldFailOnMissingDeps returns true if the given dependency type should fail the build,
+// according to the granular flagValue supplied to --fail-on-missing-deps.
+// flagValue can be:
+//   - "" (empty): never fail (backward compatible default)
+//   - "all": fail for every dependency type
+//   - a comma-separated combination of "regular", "peer", "optional", "bundle"
+func shouldFailOnMissingDeps(depType, flagValue string) bool {
+	if flagValue == "" {
+		return false
+	}
+	if flagValue == failOnMissingDepsAll {
+		return true
+	}
+	wantedValue, ok := depTypeToFlagValue[depType]
+	if !ok {
+		return false
+	}
+	for _, value := range strings.Split(flagValue, ",") {
+		if strings.TrimSpace(value) == wantedValue {
+			return true
+		}
+	}
+	return false
+}
+
+// handleMissingDeps handles missing dependencies based on the granular --fail-on-missing-deps flag value.
+// If shouldFailOnMissingDeps(depType, failOnMissingDeps) is true, returns an error for that dependency type.
 // Otherwise, logs a warning.
-func handleMissingDeps(depType string, missingDeps []string, failOnMissingDeps bool, log utils.Log) error {
+func handleMissingDeps(depType string, missingDeps []string, failOnMissingDeps string, log utils.Log) error {
 	if len(missingDeps) == 0 {
 		return nil
 	}
 
-	if failOnMissingDeps {
-		// When strict mode is enabled, always fail with an error for any missing dependency type
-		message := "The following " + depType + " dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(missingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'."
-		return errors.New(message)
+	if shouldFailOnMissingDeps(depType, failOnMissingDeps) {
+		// When the flag applies to this dependency type, fail with an error.
+		if depType == "regular" {
+			message := fmt.Sprintf("The following dependencies are missing from npm cache and will not be included in the build-info: '%s'", strings.Join(missingDeps, ","))
+			return errors.New(message)
+		} else {
+			// For peer/bundle/optional: use exact format
+			message := fmt.Sprintf("The following %s were not found by 'npm ls' and will not be included in the build-info: '%s'", depType, strings.Join(missingDeps, ","))
+			return errors.New(message)
+		}
 	}
 
-	// When strict mode is NOT enabled, use original logging behavior (backward compatible):
+	// When the flag doesn't apply to this dependency type, use original logging behavior (backward compatible):
 	// - peer/bundled/optional: DEBUG level logging (via printMissingDependenciesWarning)
-	// - other: WARN level logging
+	// - regular: WARN level logging
 	if depType == "peerDependency" || depType == "bundleDependencies" || depType == "optionalDependencies" {
 		printMissingDependenciesWarning(depType, missingDeps, log)
 	} else {
-		// For "other" type: use WARN level (original behavior)
-		message := "The following " + depType + " dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(missingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'."
+		// For "regular" type: use WARN level (original behavior when flag not set)
+		message := fmt.Sprintf("The following dependencies are missing in npm cache and will not be included in the build-info: '%s'", strings.Join(missingDeps, ","))
 		log.Warn(message)
 	}
 	return nil
@@ -294,8 +351,11 @@ type NpmTreeDepListParam struct {
 	IgnoreNodeModules bool
 	// Rewrite package-lock.json, if exists.
 	OverwritePackageLock bool
-	// Fail the build if a dependency's tarball can't be resolved from the npm cache
-	FailOnMissingDeps bool
+	// Fail the build if a dependency's tarball can't be resolved from the npm cache.
+	// Granular string value: "" (never fail, default), "all" (fail for every missing dependency type),
+	// or a comma-separated combination of "regular", "peer", "optional", "bundle"
+	// (e.g. "peer,optional,bundle") to fail only for the specified types.
+	FailOnMissingDeps string
 }
 
 // npm >=7 ls results for a single dependency
@@ -759,3 +819,4 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 func printMissingDependenciesWarning(dependencyType string, dependencies []string, log utils.Log) {
 	log.Debug("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\nIt is therefore okay to skip this dependency: " + strings.Join(dependencies, ","))
 }
+

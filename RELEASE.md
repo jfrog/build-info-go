@@ -3,6 +3,13 @@
 | Release notes moved to https://github.com/jfrog/build-info-go/releases |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------|
 
+## Next (Unreleased)
+- **Breaking**: `CreateProject` signature changed from `CreateProject(name, rootPath string)` to `CreateProject(projectFilePath string)`. Callers must pass the full path to the project file; the name is derived from it.
+- **Breaking**: `Extractor` interface gained `ProjectVersion() string`. External implementations of `Extractor` must add this method.
+- **Breaking**: `Solution` interface gained `BuildInfoWithNameVersionModuleId(module string, log utils.Log) (*buildinfo.BuildInfo, error)`. External implementations of `Solution` must add this method.
+- **Behavior change**: `mergeArtifacts` now deduplicates by both `Name` and `Sha1` (previously `Sha1` only). Artifacts sharing content but having different names (e.g. `.nupkg` vs `.snupkg`) are now kept as separate entries instead of being merged.
+- NuGet FlexPack: native nuget.exe/dotnet CLI wrapping with build-info collection via `JFROG_RUN_NATIVE=true`.
+
 ## 1.6.0 (September 18, 2022)
 - Add support for the Poetry package manager
 

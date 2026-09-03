@@ -53,6 +53,12 @@ func (extractor *packagesExtractor) ChildrenMap() (map[string][]string, error) {
 	return extractor.childrenMap, nil
 }
 
+// ProjectVersion returns an empty string: packages.config projects do not record the
+// project's own version in the dependency source.
+func (extractor *packagesExtractor) ProjectVersion() string {
+	return ""
+}
+
 // Create new packages.config extractor
 func (extractor *packagesExtractor) new(dependenciesSource string, log utils.Log) (Extractor, error) {
 	newExtractor := &packagesExtractor{allDependencies: map[string]*buildinfo.Dependency{}, childrenMap: map[string][]string{}}
@@ -98,7 +104,11 @@ func (extractor *packagesExtractor) extract(packagesConfig *packagesConfig, glob
 			extractor.allDependencies[id] = pack.dependency
 			extractor.childrenMap[id] = pack.getDependencies()
 		} else {
+			// project.assets.json-based projects are recorded even when the nupkg is absent from
+			// the local cache (see getAllDependencies); packages.config projects must not be
+			// dropped either, or the dependency silently disappears from the build info.
 			log.Warn(fmt.Sprintf("The following NuGet package %s with version %s was not found in the NuGet cache %s."+absentNupkgWarnMsg, nuget.Id, nuget.Version, globalPackagesCache))
+			extractor.allDependencies[id] = &buildinfo.Dependency{Id: nuget.Id + ":" + nuget.Version, Type: nupkgType, Scopes: developmentDependencyScope(nuget)}
 		}
 	}
 	return nil
@@ -202,6 +212,9 @@ func searchRootDependencies(dfsHelper map[string]*dfsHelper, currentId string, a
 
 func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPackage, log utils.Log) (*nugetPackage, error) {
 	nupkgPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, nPackage.version, "nupkg"}, "."))
+	if rel, err := filepath.Rel(packagesPath, nupkgPath); err != nil || strings.HasPrefix(rel, "..") {
+		return nil, fmt.Errorf("package id/version contains path traversal: %s %s", nPackage.id, nPackage.version)
+	}
 
 	exists, err := utils.IsFileExists(nupkgPath, false)
 
@@ -217,7 +230,12 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	if err != nil {
 		return nil, err
 	}
-	nPackage.dependency = &buildinfo.Dependency{Id: nuget.Id + ":" + nuget.Version, Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}}
+	nPackage.dependency = &buildinfo.Dependency{
+		Id:       nuget.Id + ":" + nuget.Version,
+		Type:     nupkgType,
+		Scopes:   developmentDependencyScope(nuget),
+		Checksum: buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Sha256: fileDetails.Checksum.Sha256, Md5: fileDetails.Checksum.Md5},
+	}
 
 	// Nuspec file that holds the metadata for the package.
 	nuspecPath := filepath.Join(packagesPath, nPackage.id, nPackage.version, strings.Join([]string{nPackage.id, "nuspec"}, "."))
@@ -230,7 +248,12 @@ func createNugetPackage(packagesPath string, nuget xmlPackage, nPackage *nugetPa
 	if err != nil {
 		pack := nPackage.id + ":" + nPackage.version
 		log.Warn("Package:", pack, "couldn't be parsed due to:", err.Error(), ". Skipping the package dependency.")
-		log.Debug("nuspec content:\n" + string(nuspecContent))
+		const maxLogBytes = 512
+		preview := nuspecContent
+		if len(preview) > maxLogBytes {
+			preview = preview[:maxLogBytes]
+		}
+		log.Debug(fmt.Sprintf("nuspec content (first %d bytes):\n%s", len(preview), string(preview)))
 		return nPackage, nil
 	}
 
@@ -297,6 +320,19 @@ type packagesConfig struct {
 type xmlPackage struct {
 	Id      string `xml:"id,attr"`
 	Version string `xml:"version,attr"`
+	// DevelopmentDependency mirrors PackageReference's PrivateAssets="all": the package is a
+	// build-time-only dependency (e.g. an analyzer) that should not flow to consumers.
+	DevelopmentDependency string `xml:"developmentDependency,attr"`
+}
+
+// developmentDependencyScope maps packages.config's developmentDependency="true" attribute to
+// the "private" build-info scope, mirroring project.assets.json's PrivateAssets=all handling.
+// All other packages are compile-time dependencies.
+func developmentDependencyScope(nuget xmlPackage) []string {
+	if strings.EqualFold(nuget.DevelopmentDependency, "true") {
+		return []string{privateScope}
+	}
+	return []string{compileScope}
 }
 
 type nuspec struct {
@@ -326,7 +362,7 @@ func xmlUnmarshal(content []byte, obj interface{}, log utils.Log) (err error) {
 			"xml.Unmarshal doesn't support utf-16 encoding, so we need to decode the utf16 by ourselves.")
 
 		buf := make([]uint16, len(content)/2)
-		for i := 0; i < len(content); i += 2 {
+		for i := 0; i+1 < len(content); i += 2 {
 			buf[i/2] = binary.LittleEndian.Uint16(content[i:])
 		}
 		// Remove utf-16 Byte Order Mark (BOM) if exists

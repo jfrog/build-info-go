@@ -773,37 +773,45 @@ func TestHandleMissingDeps(t *testing.T) {
 		name                string
 		depType             string
 		missingDeps         []string
-		failOnMissingDeps   bool
+		failOnMissingDeps   string
 		expectError         bool
 		expectedErrorPrefix string
 		shouldContainDeps   bool
 	}{
 		// Peer dependency tests
-		{"peerDeps: no missing, strict off", "peerDependency", []string{}, false, false, "", false},
-		{"peerDeps: no missing, strict on", "peerDependency", []string{}, true, false, "", false},
-		{"peerDeps: missing, strict off", "peerDependency", []string{"react@16"}, false, false, "", false},
-		{"peerDeps: missing, strict on", "peerDependency", []string{"react@16"}, true, true, "The following peerDependency", true},
+		{"peerDeps: no missing, strict off", "peerDependency", []string{}, "", false, "", false},
+		{"peerDeps: no missing, strict on", "peerDependency", []string{}, "all", false, "", false},
+		{"peerDeps: missing, strict off", "peerDependency", []string{"react@16"}, "", false, "", false},
+		{"peerDeps: missing, strict on", "peerDependency", []string{"react@16"}, "all", true, "Missing peerDependency", true},
 
 		// Bundled dependency tests
-		{"bundledDeps: no missing, strict off", "bundleDependencies", []string{}, false, false, "", false},
-		{"bundledDeps: no missing, strict on", "bundleDependencies", []string{}, true, false, "", false},
-		{"bundledDeps: missing, strict off", "bundleDependencies", []string{"pkg@1.0"}, false, false, "", false},
-		{"bundledDeps: missing, strict on", "bundleDependencies", []string{"pkg@1.0"}, true, true, "The following bundleDependencies", true},
+		{"bundledDeps: no missing, strict off", "bundleDependencies", []string{}, "", false, "", false},
+		{"bundledDeps: no missing, strict on", "bundleDependencies", []string{}, "all", false, "", false},
+		{"bundledDeps: missing, strict off", "bundleDependencies", []string{"pkg@1.0"}, "", false, "", false},
+		{"bundledDeps: missing, strict on", "bundleDependencies", []string{"pkg@1.0"}, "all", true, "Missing bundleDependencies", true},
 
 		// Optional dependency tests
-		{"optionalDeps: no missing, strict off", "optionalDependencies", []string{}, false, false, "", false},
-		{"optionalDeps: no missing, strict on", "optionalDependencies", []string{}, true, false, "", false},
-		{"optionalDeps: missing, strict off", "optionalDependencies", []string{"optional@1.0"}, false, false, "", false},
-		{"optionalDeps: missing, strict on", "optionalDependencies", []string{"optional@1.0"}, true, true, "The following optionalDependencies", true},
+		{"optionalDeps: no missing, strict off", "optionalDependencies", []string{}, "", false, "", false},
+		{"optionalDeps: no missing, strict on", "optionalDependencies", []string{}, "all", false, "", false},
+		{"optionalDeps: missing, strict off", "optionalDependencies", []string{"optional@1.0"}, "", false, "", false},
+		{"optionalDeps: missing, strict on", "optionalDependencies", []string{"optional@1.0"}, "all", true, "Missing optionalDependencies", true},
 
-		// Other dependency tests
-		{"otherDeps: no missing, strict off", "other", []string{}, false, false, "", false},
-		{"otherDeps: no missing, strict on", "other", []string{}, true, false, "", false},
-		{"otherDeps: missing, strict off", "other", []string{"express@4.17"}, false, false, "", false},
-		{"otherDeps: missing, strict on", "other", []string{"express@4.17"}, true, true, "The following other", true},
+		// Regular dependency tests
+		{"regularDeps: no missing, strict off", "regular", []string{}, "", false, "", false},
+		{"regularDeps: no missing, strict on", "regular", []string{}, "all", false, "", false},
+		{"regularDeps: missing, strict off", "regular", []string{"express@4.17"}, "", false, "", false},
+		{"regularDeps: missing, strict on", "regular", []string{"express@4.17"}, "all", true, "Missing regular", true},
 
 		// Multiple deps test
-		{"multiple deps, strict on", "other", []string{"dep1", "dep2", "dep3"}, true, true, "The following other", true},
+		{"multiple deps, strict on", "regular", []string{"dep1", "dep2", "dep3"}, "all", true, "Missing regular", true},
+
+		// Granular flag tests
+		{"peerDeps: missing, granular peer only", "peerDependency", []string{"react@16"}, "peer", true, "Missing peerDependency", true},
+		{"bundledDeps: missing, granular peer only (not matched)", "bundleDependencies", []string{"pkg@1.0"}, "peer", false, "", false},
+		{"regularDeps: missing, granular regular", "regular", []string{"express@4.17"}, "regular", true, "Missing regular", true},
+		{"optionalDeps: missing, granular combo", "optionalDependencies", []string{"optional@1.0"}, "peer,optional,bundle", true, "Missing optionalDependencies", true},
+		{"bundledDeps: missing, granular combo", "bundleDependencies", []string{"pkg@1.0"}, "peer,optional,bundle", true, "Missing bundleDependencies", true},
+		{"regularDeps: missing, granular combo (not matched)", "regular", []string{"express@4.17"}, "peer,optional,bundle", false, "", false},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -824,6 +832,7 @@ func TestHandleMissingDeps(t *testing.T) {
 		})
 	}
 }
+
 // TestCalculateNpmDependenciesListIntegration tests the full flow with FailOnMissingDeps flag
 // This verifies that ALL 4 missing dependency types (peer, bundled, optional, other) are now
 // properly checked by the flag, as per the fixed implementation
@@ -831,7 +840,7 @@ func TestCalculateNpmDependenciesListIntegration(t *testing.T) {
 	testcases := []struct {
 		name              string
 		depType           string
-		failOnMissingDeps bool
+		failOnMissingDeps string
 		hasMissingDeps    bool
 		expectError       bool
 		description       string
@@ -840,7 +849,7 @@ func TestCalculateNpmDependenciesListIntegration(t *testing.T) {
 		{
 			name:              "peerDeps: strict off with missing",
 			depType:           "peerDependency",
-			failOnMissingDeps: false,
+			failOnMissingDeps: "",
 			hasMissingDeps:    true,
 			expectError:       false,
 			description:       "Should succeed with warning when strict mode is off",
@@ -848,7 +857,7 @@ func TestCalculateNpmDependenciesListIntegration(t *testing.T) {
 		{
 			name:              "bundledDeps: strict off with missing",
 			depType:           "bundleDependencies",
-			failOnMissingDeps: false,
+			failOnMissingDeps: "",
 			hasMissingDeps:    true,
 			expectError:       false,
 			description:       "Should succeed with warning when strict mode is off",
@@ -856,15 +865,15 @@ func TestCalculateNpmDependenciesListIntegration(t *testing.T) {
 		{
 			name:              "optionalDeps: strict off with missing",
 			depType:           "optionalDependencies",
-			failOnMissingDeps: false,
+			failOnMissingDeps: "",
 			hasMissingDeps:    true,
 			expectError:       false,
 			description:       "Should succeed with warning when strict mode is off",
 		},
 		{
-			name:              "otherDeps: strict off with missing",
-			depType:           "other",
-			failOnMissingDeps: false,
+			name:              "regularDeps: strict off with missing",
+			depType:           "regular",
+			failOnMissingDeps: "",
 			hasMissingDeps:    true,
 			expectError:       false,
 			description:       "Should succeed with warning when strict mode is off",
@@ -874,7 +883,7 @@ func TestCalculateNpmDependenciesListIntegration(t *testing.T) {
 		{
 			name:              "peerDeps: strict on with missing",
 			depType:           "peerDependency",
-			failOnMissingDeps: true,
+			failOnMissingDeps: "all",
 			hasMissingDeps:    true,
 			expectError:       true,
 			description:       "Should fail when strict mode is on and peer deps are missing",
@@ -882,7 +891,7 @@ func TestCalculateNpmDependenciesListIntegration(t *testing.T) {
 		{
 			name:              "bundledDeps: strict on with missing",
 			depType:           "bundleDependencies",
-			failOnMissingDeps: true,
+			failOnMissingDeps: "all",
 			hasMissingDeps:    true,
 			expectError:       true,
 			description:       "Should fail when strict mode is on and bundled deps are missing",
@@ -890,28 +899,46 @@ func TestCalculateNpmDependenciesListIntegration(t *testing.T) {
 		{
 			name:              "optionalDeps: strict on with missing",
 			depType:           "optionalDependencies",
-			failOnMissingDeps: true,
+			failOnMissingDeps: "all",
 			hasMissingDeps:    true,
 			expectError:       true,
 			description:       "Should fail when strict mode is on and optional deps are missing",
 		},
 		{
-			name:              "otherDeps: strict on with missing",
-			depType:           "other",
-			failOnMissingDeps: true,
+			name:              "regularDeps: strict on with missing",
+			depType:           "regular",
+			failOnMissingDeps: "all",
 			hasMissingDeps:    true,
 			expectError:       true,
-			description:       "Should fail when strict mode is on and other deps are missing",
+			description:       "Should fail when strict mode is on and regular deps are missing",
 		},
 
 		// Test all types with flag ON but no missing deps (should succeed)
 		{
 			name:              "all types: strict on without missing",
-			depType:           "other",
-			failOnMissingDeps: true,
+			depType:           "regular",
+			failOnMissingDeps: "all",
 			hasMissingDeps:    false,
 			expectError:       false,
 			description:       "Should succeed when all deps can be resolved even in strict mode",
+		},
+
+		// Granular flag tests within the integration test
+		{
+			name:              "peerDeps: granular peer with missing",
+			depType:           "peerDependency",
+			failOnMissingDeps: "peer",
+			hasMissingDeps:    true,
+			expectError:       true,
+			description:       "Should fail when granular flag targets peer and peer deps are missing",
+		},
+		{
+			name:              "bundledDeps: granular peer with missing (not matched)",
+			depType:           "bundleDependencies",
+			failOnMissingDeps: "peer",
+			hasMissingDeps:    true,
+			expectError:       false,
+			description:       "Should succeed with warning when granular flag doesn't target this dependency type",
 		},
 	}
 

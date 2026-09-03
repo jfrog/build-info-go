@@ -41,7 +41,7 @@ type DependencyInfo struct {
 	MD5          string           `json:"md5"`
 	ID           string           `json:"id"`
 	Scopes       []string         `json:"scopes,omitempty"`
-	RequestedBy  []string         `json:"requestedBy,omitempty"`
+	RequestedBy  [][]string       `json:"requestedBy,omitempty"`
 	Version      string           `json:"version"`
 	Name         string           `json:"name"`
 	Path         string           `json:"path,omitempty"`
@@ -158,6 +158,28 @@ type GradleConfig struct {
 
 	// CommandTimeout is the maximum duration for Gradle commands (optional, defaults to 10 minutes)
 	CommandTimeout time.Duration
+}
+
+// NuGetConfig holds configuration for the NuGet FlexPack implementation.
+type NuGetConfig struct {
+	WorkingDirectory string
+	// TargetPath is the optional solution, project, or directory passed to the native restore command.
+	// Relative paths are resolved from WorkingDirectory.
+	TargetPath string
+	// ToolchainType selects the .NET toolchain: 0 = nuget.exe (default), 1 = dotnet CLI.
+	// These correspond to dotnet.Nuget and dotnet.DotnetCore in build/utils/dotnet/toolchaincmd.go.
+	// Reserved for future use; the FlexPack path currently auto-detects the toolchain.
+	ToolchainType int
+	// UseNugetV2 instructs the resolver to prefer the NuGet V2 protocol over V3.
+	// Reserved for future use; callers should pass false (zero value).
+	UseNugetV2 bool
+	// AllowInsecureConnections permits HTTP (non-TLS) NuGet feeds for legacy environments.
+	// Reserved for future use; callers should pass false (zero value).
+	AllowInsecureConnections bool
+	RepoName                 string
+	// Module is the optional user-supplied build-info module ID override (--module).
+	// When set, it is used as the module ID instead of the per-project default.
+	Module string
 }
 
 // IsFlexPackEnabled checks if the FlexPack (native) implementation should be used
