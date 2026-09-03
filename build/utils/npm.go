@@ -86,7 +86,7 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 				// Seems like the compatibility upgrades may result in dependencies losing their integrity.
 				// We use the integrity to get the dependencies tarball
 				otherMissingDeps = append(otherMissingDeps, dep.Id)
-				log.Debug(fmt.Sprintf("couldn't calculate checksum for %s: %v", dep.Id, err))
+				log.Debug("couldn't calculate checksum for " + dep.Id + ". Error: '" + err.Error() + "'.")
 				continue
 			}
 		}
@@ -97,16 +97,16 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 	// Collect all errors so users see the complete picture of what's missing
 	var allErrors []string
 
-	if err := handleMissingDeps("peerDependency", missingPeerDeps, npmParams.FailOnMissingDeps, log); err != nil {
+	if err := handleMissingDeps(depTypePeer, missingPeerDeps, npmParams.FailOnMissingDeps, log); err != nil {
 		allErrors = append(allErrors, err.Error())
 	}
-	if err := handleMissingDeps("bundleDependencies", missingBundledDeps, npmParams.FailOnMissingDeps, log); err != nil {
+	if err := handleMissingDeps(depTypeBundle, missingBundledDeps, npmParams.FailOnMissingDeps, log); err != nil {
 		allErrors = append(allErrors, err.Error())
 	}
-	if err := handleMissingDeps("optionalDependencies", missingOptionalDeps, npmParams.FailOnMissingDeps, log); err != nil {
+	if err := handleMissingDeps(depTypeOptional, missingOptionalDeps, npmParams.FailOnMissingDeps, log); err != nil {
 		allErrors = append(allErrors, err.Error())
 	}
-	if err := handleMissingDeps("regular", otherMissingDeps, npmParams.FailOnMissingDeps, log); err != nil {
+	if err := handleMissingDeps(depTypeRegular, otherMissingDeps, npmParams.FailOnMissingDeps, log); err != nil {
 		allErrors = append(allErrors, err.Error())
 	}
 	if len(allErrors) > 0 {
@@ -327,14 +327,8 @@ func handleMissingDeps(depType string, missingDeps []string, failOnMissingDeps s
 
 	if shouldFailOnMissingDeps(depType, failOnMissingDeps) {
 		// When the flag applies to this dependency type, fail with an error.
-		if depType == depTypeRegular {
-			message := fmt.Sprintf("The following dependencies are missing from npm cache and will not be included in the build-info: '%s'", strings.Join(missingDeps, ","))
-			return errors.New(message)
-		} else {
-			// For peer/bundle/optional: use exact format
-			message := fmt.Sprintf("The following %s were not found by 'npm ls' and will not be included in the build-info: '%s'", depType, strings.Join(missingDeps, ","))
-			return errors.New(message)
-		}
+		message := fmt.Sprintf("The following %s are missing in the npm cache and will not be included in the build-info: '%s'", depType, strings.Join(missingDeps, ","))
+		return errors.New(message)
 	}
 
 	// When the flag doesn't apply to this dependency type, use original logging behavior (backward compatible):
@@ -827,4 +821,3 @@ func GetNpmConfigCache(srcPath, executablePath string, npmArgs []string, log uti
 func printMissingDependenciesWarning(dependencyType string, dependencies []string, log utils.Log) {
 	log.Debug("The following dependencies will not be included in the build-info, because the 'npm ls' command did not return their integrity.\nThe reason why the version wasn't returned may be because the package is a '" + dependencyType + "', which was not manually installed.\nIt is therefore okay to skip this dependency: " + strings.Join(dependencies, ","))
 }
-
