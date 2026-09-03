@@ -327,7 +327,7 @@ func handleMissingDeps(depType string, missingDeps []string, failOnMissingDeps s
 
 	if shouldFailOnMissingDeps(depType, failOnMissingDeps) {
 		// When the flag applies to this dependency type, fail with an error.
-		if depType == "regular" {
+		if depType == depTypeRegular {
 			message := fmt.Sprintf("The following dependencies are missing from npm cache and will not be included in the build-info: '%s'", strings.Join(missingDeps, ","))
 			return errors.New(message)
 		} else {
@@ -340,10 +340,10 @@ func handleMissingDeps(depType string, missingDeps []string, failOnMissingDeps s
 	// When the flag doesn't apply to this dependency type, use original logging behavior (backward compatible):
 	// - peer/bundled/optional: DEBUG level logging (via printMissingDependenciesWarning)
 	// - regular: WARN level logging
-	if depType == "peerDependency" || depType == "bundleDependencies" || depType == "optionalDependencies" {
+	if depType == depTypePeer || depType == depTypeBundle || depType == depTypeOptional {
 		printMissingDependenciesWarning(depType, missingDeps, log)
 	} else {
-		// For "regular" type: use WARN level (original behavior when flag not set)
+		// For depTypeRegular: use WARN level (original behavior when flag not set)
 		message := fmt.Sprintf("The following dependencies are missing in npm cache and will not be included in the build-info: '%s'", strings.Join(missingDeps, ","))
 		log.Warn(message)
 	}
