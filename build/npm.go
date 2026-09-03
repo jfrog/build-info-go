@@ -19,7 +19,8 @@ type NpmModule struct {
 	executablePath   string
 	npmArgs          []string
 	collectBuildInfo bool
-	failOnMissingDeps bool
+	// Granular strict-mode value for missing dependencies. See NpmTreeDepListParam.FailOnMissingDeps.
+	failOnMissingDeps string
 }
 
 // Pass an empty string for srcPath to find the npm project in the working directory.
@@ -97,11 +98,11 @@ func (nm *NpmModule) SetCollectBuildInfo(collectBuildInfo bool) {
 	nm.collectBuildInfo = collectBuildInfo
 }
 
-func (nm *NpmModule) SetFailOnMissingDeps(failOnMissingDeps bool) {
+func (nm *NpmModule) SetFailOnMissingDeps(failOnMissingDeps string) {
 	nm.failOnMissingDeps = failOnMissingDeps
 }
 
-func (nm *NpmModule) GetFailOnMissingDeps() bool {
+func (nm *NpmModule) GetFailOnMissingDeps() string {
 	return nm.failOnMissingDeps
 }
 

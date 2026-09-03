@@ -23,6 +23,24 @@ import (
 
 const npmInstallCommand = "install"
 
+// Granular values accepted by the --fail-on-missing-deps flag (NpmTreeDepListParam.FailOnMissingDeps).
+// The flag also accepts a comma-separated combination of the granular values, e.g. "peer,optional,bundle".
+const (
+	failOnMissingDepsAll      = "all"
+	failOnMissingDepsRegular  = "regular"
+	failOnMissingDepsPeer     = "peer"
+	failOnMissingDepsOptional = "optional"
+	failOnMissingDepsBundle   = "bundle"
+)
+
+// Dependency type identifiers used internally in handleMissingDeps
+const (
+	depTypePeer     = "peerDependency"
+	depTypeBundle   = "bundleDependencies"
+	depTypeOptional = "optionalDependencies"
+	depTypeRegular  = "regular"
+)
+
 // CalculateNpmDependenciesList gets an npm project's dependencies.
 func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
 	if log == nil {
@@ -265,23 +283,13 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 	return version.NewVersion(string(versionData)), nil
 }
 
-// Granular values accepted by the --fail-on-missing-deps flag (NpmTreeDepListParam.FailOnMissingDeps).
-// The flag also accepts a comma-separated combination of the granular values, e.g. "peer,optional,bundle".
-const (
-	failOnMissingDepsAll      = "all"
-	failOnMissingDepsRegular  = "regular"
-	failOnMissingDepsPeer     = "peer"
-	failOnMissingDepsOptional = "optional"
-	failOnMissingDepsBundle   = "bundle"
-)
-
 // depTypeToFlagValue maps the internal dependency-type identifiers (as passed to handleMissingDeps)
 // to the granular flag value that governs them.
 var depTypeToFlagValue = map[string]string{
-	"peerDependency":       failOnMissingDepsPeer,
-	"bundleDependencies":   failOnMissingDepsBundle,
-	"optionalDependencies": failOnMissingDepsOptional,
-	"regular":              failOnMissingDepsRegular,
+	depTypePeer:     failOnMissingDepsPeer,
+	depTypeBundle:   failOnMissingDepsBundle,
+	depTypeOptional: failOnMissingDepsOptional,
+	depTypeRegular:  failOnMissingDepsRegular,
 }
 
 // shouldFailOnMissingDeps returns true if the given dependency type should fail the build,
