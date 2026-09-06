@@ -455,3 +455,64 @@ func TestGetChildrenMapBracketRangeVersion(t *testing.T) {
 	// Both children must resolve to the library entry's version, NOT the declared constraint string.
 	assert.ElementsMatch(t, []string{"jquery:3.0.0", "popper.js:1.12.9"}, result["bootstrap:4.0.0"])
 }
+
+// TestLocalResolutionSource covers the detection behind the "resolved outside Artifactory"
+// warning: a package restored from a local folder (the .NET SDK's FSharp/library-packs, a
+// NuGetFallbackFolder) never reaches Artifactory, so it is neither curated nor scanned and
+// gets no repo path in build-info.
+func TestLocalResolutionSource(t *testing.T) {
+	writeMetadata := func(t *testing.T, root, pkgPath, body string) {
+		t.Helper()
+		dir := filepath.Join(root, pkgPath)
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, nupkgMetadataFileName), []byte(body), 0o600))
+	}
+
+	t.Run("local folder source is reported", func(t *testing.T) {
+		root := t.TempDir()
+		writeMetadata(t, root, "fsharp.core/10.1.302",
+			`{"version":2,"contentHash":"abc","source":"/usr/local/share/dotnet/sdk/10.0.302/FSharp/library-packs"}`)
+		assert.Equal(t, "/usr/local/share/dotnet/sdk/10.0.302/FSharp/library-packs",
+			localResolutionSource(root, library{Path: "fsharp.core/10.1.302"}))
+	})
+
+	t.Run("https feed source is not reported", func(t *testing.T) {
+		root := t.TempDir()
+		writeMetadata(t, root, "newtonsoft.json/13.0.3",
+			`{"version":2,"source":"https://acme.jfrog.io/artifactory/api/nuget/v3/nuget-virtual/index.json"}`)
+		assert.Empty(t, localResolutionSource(root, library{Path: "newtonsoft.json/13.0.3"}))
+	})
+
+	t.Run("http feed source is not reported", func(t *testing.T) {
+		root := t.TempDir()
+		writeMetadata(t, root, "pkg/1.0.0", `{"version":2,"source":"http://internal/nuget/index.json"}`)
+		assert.Empty(t, localResolutionSource(root, library{Path: "pkg/1.0.0"}))
+	})
+
+	// Absence of evidence must not be reported as a bypass.
+	t.Run("missing metadata file is not reported", func(t *testing.T) {
+		assert.Empty(t, localResolutionSource(t.TempDir(), library{Path: "pkg/1.0.0"}))
+	})
+
+	t.Run("malformed metadata is not reported", func(t *testing.T) {
+		root := t.TempDir()
+		writeMetadata(t, root, "pkg/1.0.0", `not json`)
+		assert.Empty(t, localResolutionSource(root, library{Path: "pkg/1.0.0"}))
+	})
+
+	t.Run("empty source is not reported", func(t *testing.T) {
+		root := t.TempDir()
+		writeMetadata(t, root, "pkg/1.0.0", `{"version":2,"source":""}`)
+		assert.Empty(t, localResolutionSource(root, library{Path: "pkg/1.0.0"}))
+	})
+
+	t.Run("empty inputs are handled", func(t *testing.T) {
+		assert.Empty(t, localResolutionSource("", library{Path: "pkg/1.0.0"}))
+		assert.Empty(t, localResolutionSource(t.TempDir(), library{}))
+	})
+
+	// A library path escaping the packages directory must not be followed.
+	t.Run("path traversal is rejected", func(t *testing.T) {
+		assert.Empty(t, localResolutionSource(t.TempDir(), library{Path: "../../etc"}))
+	})
+}

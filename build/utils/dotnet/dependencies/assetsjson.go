@@ -151,12 +151,18 @@ func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.D
 	// NUGET_PACKAGES path or the SDK fallback folder); checksums are added when the file is
 	// available. This prevents dependencies from being silently dropped (jfrog-cli#600, #1796).
 	privateDeps := assets.getPrivateDependencyNames()
+	var externallyResolved []string
 	for dependencyId, library := range assets.Libraries {
 		if library.Type == "project" {
 			continue
 		}
 		dependencyKey := strings.ToLower(getDependencyIdForBuildInfo(dependencyId))
 		dependency := &buildinfo.Dependency{Id: getDependencyIdForBuildInfo(dependencyId), Type: nupkgType}
+
+		if source := localResolutionSource(packagesPath, library); source != "" {
+			externallyResolved = append(externallyResolved,
+				fmt.Sprintf("%s (source: %s)", getDependencyIdForBuildInfo(dependencyId), source))
+		}
 
 		checksum, err := assets.dependencyChecksum(packagesPath, library, log)
 		if err != nil {
@@ -177,7 +183,68 @@ func (assets *assets) getAllDependencies(log utils.Log) (map[string]*buildinfo.D
 		dependencies[dependencyKey] = dependency
 	}
 
+	warnExternallyResolved(externallyResolved, log)
+
 	return dependencies, nil
+}
+
+// warnExternallyResolved emits a single aggregated warning naming every dependency that NuGet
+// satisfied from a local folder rather than through the configured (Artifactory) feed. One
+// warning is used rather than one per package so a large graph does not bury the log.
+func warnExternallyResolved(externallyResolved []string, log utils.Log) {
+	if len(externallyResolved) == 0 || log == nil {
+		return
+	}
+	sort.Strings(externallyResolved)
+	subject, verb := "dependency was", "dependencies were"
+	if len(externallyResolved) > 1 {
+		subject = verb
+	}
+	log.Warn(fmt.Sprintf(
+		"%d %s resolved outside Artifactory and therefore not curated or scanned:\n  %s\n"+
+			"Such packages are satisfied from a local folder (for example the .NET SDK's FSharp/library-packs "+
+			"or a NuGetFallbackFolder), so no request reached Artifactory and no repository path will be "+
+			"recorded for them in build-info. To route them through Artifactory, build with "+
+			"-p:DisableImplicitLibraryPacksFolder=true (F# projects) or clear the fallback folder.",
+		len(externallyResolved),
+		subject,
+		strings.Join(externallyResolved, "\n  ")))
+}
+
+// nupkgMetadataFileName is written by NuGet next to every extracted package and records the
+// source the package was actually restored from.
+const nupkgMetadataFileName = ".nupkg.metadata"
+
+// localResolutionSource returns the source recorded in a package's .nupkg.metadata when that
+// source is a local directory rather than a remote feed, and "" otherwise (including when the
+// metadata file is missing or unreadable — absence of evidence is not reported as a bypass).
+//
+// Only non-HTTP sources are reported. A remote source cannot be attributed here because this
+// layer does not know which feed URL was injected, so flagging remote URLs would risk false
+// positives; a local folder, by contrast, is unambiguously a path that never reached Artifactory.
+func localResolutionSource(packagesPath string, library library) string {
+	if packagesPath == "" || library.Path == "" {
+		return ""
+	}
+	metadataPath := filepath.Join(packagesPath, library.Path, nupkgMetadataFileName)
+	rel, err := filepath.Rel(packagesPath, metadataPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return ""
+	}
+	content, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return ""
+	}
+	var metadata struct {
+		Source string `json:"source"`
+	}
+	if err := json.Unmarshal(content, &metadata); err != nil || metadata.Source == "" {
+		return ""
+	}
+	if strings.HasPrefix(metadata.Source, "http://") || strings.HasPrefix(metadata.Source, "https://") {
+		return ""
+	}
+	return metadata.Source
 }
 
 const (

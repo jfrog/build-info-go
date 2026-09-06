@@ -262,10 +262,14 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 		assert.Equal(t, firstResult, result, "Run %d produced different results", i)
 	}
 
-	// Verify expected paths
+	// Verify expected paths.
+	// depD is reached only through depC, so both of the chains that used to be emitted here
+	// ({depC,depA,TestModule} and {depC,depB,TestModule}) share the same immediate parent and
+	// yield the identical SBOM edge depC->depD. Only one is kept now; the depA/depB split is
+	// not lost, it lives on depC's own entry where it actually carries an edge - see
+	// TestDedupeRequestedByPreservesDistinctParents. See also dedupeRequestedByParent.
 	expected := [][]string{
 		{"depC:1", "depA:1", "TestModule"},
-		{"depC:1", "depB:1", "TestModule"},
 	}
 	assert.Equal(t, expected, firstResult)
 }
@@ -763,5 +767,66 @@ func TestDependenciesSourcesAndProjectsPathExist(t *testing.T) {
 		if err == nil {
 			assert.False(t, sol.DependenciesSourcesAndProjectsPathExist())
 		}
+	})
+}
+
+// TestDedupeRequestedByPreservesDistinctParents pins the property the dedupe relies on:
+// collapsing paths that share an immediate parent must never drop a distinct parent, because
+// each distinct path[0] is exactly one edge in Xray's SBOM dependency graph.
+func TestDedupeRequestedByPreservesDistinctParents(t *testing.T) {
+	t.Run("same parent collapses to the shortest chain", func(t *testing.T) {
+		in := [][]string{
+			{"depC:1", "depA:1", "TestModule"},
+			{"depC:1", "depB:1", "TestModule"},
+		}
+		assert.Equal(t, [][]string{{"depC:1", "depA:1", "TestModule"}}, dedupeRequestedByParent(in))
+	})
+
+	t.Run("distinct parents are all kept", func(t *testing.T) {
+		in := [][]string{
+			{"depA:1", "TestModule"},
+			{"depB:1", "TestModule"},
+		}
+		assert.Equal(t, in, dedupeRequestedByParent(in))
+	})
+
+	t.Run("shortest chain wins regardless of order", func(t *testing.T) {
+		in := [][]string{
+			{"depC:1", "depA:1", "TestModule"},
+			{"depC:1", "TestModule"},
+		}
+		assert.Equal(t, [][]string{{"depC:1", "TestModule"}}, dedupeRequestedByParent(in))
+	})
+
+	t.Run("empty paths are dropped", func(t *testing.T) {
+		in := [][]string{{}, {"depA:1"}}
+		assert.Equal(t, [][]string{{"depA:1"}}, dedupeRequestedByParent(in))
+	})
+
+	// A direct dependency's single-element {moduleId} path is what attaches it to the SBOM
+	// graph's root: Xray builds its id->entry map from the module id plus every dependency id,
+	// then turns each path[0] into an edge. Drop that path and the dependency becomes an
+	// orphan node with no edge to the module. The dedupe must never remove it - being the
+	// shortest possible path, it always wins its parent slot.
+	t.Run("direct dependency keeps its module path", func(t *testing.T) {
+		in := [][]string{{"TestModule"}}
+		assert.Equal(t, in, dedupeRequestedByParent(in))
+	})
+
+	t.Run("module path survives alongside transitive paths", func(t *testing.T) {
+		in := [][]string{
+			{"TestModule"},
+			{"depB:1", "TestModule"},
+			{"depC:1", "depB:1", "TestModule"},
+		}
+		assert.Equal(t, in, dedupeRequestedByParent(in))
+	})
+
+	t.Run("module path is never displaced by a longer same-parent path", func(t *testing.T) {
+		in := [][]string{
+			{"TestModule", "somethingElse"},
+			{"TestModule"},
+		}
+		assert.Equal(t, [][]string{{"TestModule"}}, dedupeRequestedByParent(in))
 	})
 }

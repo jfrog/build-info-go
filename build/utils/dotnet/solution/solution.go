@@ -193,6 +193,34 @@ func projectVersion(currProject project.Project) string {
 	return ""
 }
 
+// dedupeRequestedByParent keeps a single representative path per distinct immediate parent
+// (path[0]), preferring the shortest path for each. Order of first appearance is preserved so
+// output stays deterministic. Empty paths are dropped.
+func dedupeRequestedByParent(paths [][]string) [][]string {
+	if len(paths) < 2 {
+		return paths
+	}
+	indexByParent := make(map[string]int, len(paths))
+	var deduped [][]string
+	for _, path := range paths {
+		if len(path) == 0 {
+			continue
+		}
+		existing, seen := indexByParent[path[0]]
+		if !seen {
+			indexByParent[path[0]] = len(deduped)
+			deduped = append(deduped, path)
+			continue
+		}
+		// Same immediate parent already recorded - keep whichever chain is shorter, so the
+		// retained path stays the most direct explanation of how this package was pulled in.
+		if len(path) < len(deduped[existing]) {
+			deduped[existing] = path
+		}
+	}
+	return deduped
+}
+
 // Populate requested by field for the input dependencies.
 // parentDependency - The parent dependency
 // dependenciesMap  - The input dependencies map
@@ -214,6 +242,13 @@ func populateRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap 
 			}
 			// Update RequestedBy field from parent's RequestedBy.
 			childDep.UpdateRequestedBy(parentDependency.Id, parentDependency.RequestedBy)
+			// Consumers of requestedBy (Xray's SBOM builder) only read path[0] of each path -
+			// the immediate parent - and reassemble the full tree from every package's own
+			// entry. Keeping several paths that share a path[0] therefore adds no information,
+			// but it does consume the RequestedByMaxLength budget, which can push out a path
+			// carrying a parent not recorded anywhere else and silently drop an SBOM edge.
+			// Collapse to one path per distinct immediate parent, shortest first.
+			childDep.RequestedBy = dedupeRequestedByParent(childDep.RequestedBy)
 
 			// Run recursive call on child dependencies
 			populateRequestedBy(*childDep, dependenciesMap, childrenMap)
