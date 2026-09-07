@@ -57,8 +57,13 @@ func isPackageFile(name string) bool {
 //
 // Primary packages (.nupkg) are stored flat at the repository root: "<id>.<version>.nupkg".
 //
-// Modern symbol packages (.snupkg) are pushed via the /api/nuget/v2/<repo>/symbolpackage
-// endpoint and stored as: "symbolpackage/<id>.<version>.nupkg".
+// Modern symbol packages (.snupkg) are stored flat at the repository root under their own
+// name: "<id>.<version>.snupkg". Both toolchains reach the source FlexPack declares through
+// its V3 service index, whose SymbolPackagePublish resource is /api/nuget/v3/<repo>/symbols,
+// and Artifactory stores what that endpoint receives flat and unrenamed. The older
+// /api/nuget/v2/<repo>/symbolpackage endpoint - which does store as
+// "symbolpackage/<id>.<version>.nupkg" - is not the one in use here; assuming it left every
+// pushed .snupkg unfindable, so property stamping failed and took the whole push with it.
 //
 // Legacy symbol packages (.symbols.nupkg) are pushed via the regular package endpoint and
 // stored flat at the repository root as "<id>.<version>.nupkg" (extension renamed by Artifactory
@@ -76,9 +81,6 @@ func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 	lower := strings.ToLower(name)
 	var path string
 	switch {
-	case strings.HasSuffix(lower, snupkgExtension):
-		// .snupkg → symbolpackage/<id>.<version>.nupkg
-		path = "symbolpackage/" + snupkgStorageName(name)
 	case strings.HasSuffix(lower, legacySymbolsSuffix):
 		// .symbols.nupkg → flat at root as <id>.<version>.nupkg
 		path = snupkgStorageName(name)

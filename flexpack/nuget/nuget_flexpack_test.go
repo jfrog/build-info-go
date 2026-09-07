@@ -122,8 +122,10 @@ func TestFindNupkgArtifactsIncludesSymbols(t *testing.T) {
 	}
 
 	assertArtifact(t, artifactsByName["My.Package.1.0.0.nupkg"], "nupkg", "My.Package.1.0.0.nupkg")
-	// .snupkg → symbolpackage/<id>.<version>.nupkg (symbolpackage endpoint).
-	assertArtifact(t, artifactsByName["My.Package.1.0.0.snupkg"], "snupkg", "symbolpackage/My.Package.1.0.0.nupkg")
+	// .snupkg → flat at root under its own name, as stored by the V3 /symbols endpoint that
+	// FlexPack's declared source advertises. NOT symbolpackage/<id>.<version>.nupkg, which is
+	// the older V2 /symbolpackage endpoint's layout.
+	assertArtifact(t, artifactsByName["My.Package.1.0.0.snupkg"], "snupkg", "My.Package.1.0.0.snupkg")
 	// .symbols.nupkg (legacy) → flat at root as <id>.<version>.nupkg (regular endpoint).
 	assertArtifact(t, artifactsByName["Legacy.2.1.0.symbols.nupkg"], "snupkg", "Legacy.2.1.0.nupkg")
 }
