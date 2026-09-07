@@ -1,0 +1,102 @@
+name: Release
+
+# Ported from the (now EOL) JFrog Pipelines pipeline "release_build_info_go"
+# defined in release/pipelines.yml. Triggered manually with the version to
+# release.
+on:
+  workflow_dispatch:
+    inputs:
+      next_version:
+        description: 'Version to release (e.g. 1.2.3)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+  JFROG_CLI_BUILD_NAME: ecosystem-build-info-go-release
+  JFROG_CLI_BUILD_NUMBER: ${{ github.run_number }}
+  JFROG_CLI_BUILD_PROJECT: ecosys
+  NEXT_VERSION: ${{ github.event.inputs.next_version }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Make sure version provided
+        run: |
+          test -n "$NEXT_VERSION" -a "$NEXT_VERSION" != "0.0.0"
+
+      - name: Configure Git and merge from dev
+        run: |
+          git checkout main
+          git config user.name "jfrog-ecosystem-integration-env"
+          git config user.email "eco-system@jfrog.com"
+          git remote set-url origin https://${{ secrets.IL_AUTOMATION_TOKEN }}@github.com/jfrog/build-info-go.git
+          git fetch origin dev
+          git merge origin/dev
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Behavior change from the original JFrog Pipelines version, which
+      # bootstrapped the CLI via `curl -fL https://install-cli.jfrog.io | sh`
+      # inside a custom runtime image. Here we use the official setup action,
+      # which also configures a JFrog CLI server (env vars below) so no
+      # separate `jf c add` step is needed.
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ secrets.ARTIFACTORY_URL }}
+          JF_USER: ${{ secrets.ARTIFACTORY_USER }}
+          JF_PASSWORD: ${{ secrets.ARTIFACTORY_APIKEY }}
+
+      - name: Configure Go resolution repo
+        run: jf goc --repo-resolve ecosys-go-remote
+
+      - name: Audit
+        run: jf audit
+
+      - name: Build and upload
+        run: release/build.sh "$NEXT_VERSION"
+
+      - name: Collect and publish build info
+        run: |
+          jf rt bag
+          jf rt bce
+          jf rt bp "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER"
+
+      - name: Update build-info.json
+        run: |
+          ./buildscripts/build.sh
+          chmod u+x bi
+          ./bi go > build-info.json
+          git add build-info.json
+          git commit -m "Update build-info.json file"
+
+      - name: Create Git tag
+        run: git tag "v${NEXT_VERSION}"
+
+      - name: Distribute release bundle
+        run: |
+          jf ds rbc ecosystem-build-info-go "$NEXT_VERSION" --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
+          jf ds rbd ecosystem-build-info-go "$NEXT_VERSION" --site="releases.jfrog.io" --sync
+
+      - name: Push to main
+        run: |
+          git clean -fd
+          git push
+          git push --tags
+
+      - name: Remove JFrog CLI config
+        if: always()
+        run: jf c rm --quiet
