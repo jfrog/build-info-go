@@ -220,7 +220,9 @@ func appendSiblingSymbolPackages(packages []string) []string {
 		if seen[snupkgPath] {
 			continue
 		}
-		if _, statErr := os.Stat(snupkgPath); statErr != nil {
+		// Must be a regular file: a directory named like a package would otherwise reach
+		// crypto.GetFileDetails and fail the whole command after the push already succeeded.
+		if info, statErr := os.Stat(snupkgPath); statErr != nil || info.IsDir() {
 			continue
 		}
 		seen[snupkgPath] = true
@@ -268,9 +270,12 @@ func resolvePushPackagePaths(workingDir string, pushArgs []string) ([]string, er
 		if !filepath.IsAbs(candidate) {
 			candidate = filepath.Join(workingDir, candidate)
 		}
-		matches, err := filepath.Glob(candidate)
-		if err != nil {
-			return nil, fmt.Errorf("resolve push argument %q: %w", arg, err)
+		// filepath.Glob's only error is ErrBadPattern. A real filename may legitimately contain
+		// "[", so fall through to the literal path rather than failing the command: the push has
+		// already succeeded by the time this runs.
+		matches, globErr := filepath.Glob(candidate)
+		if globErr != nil {
+			matches = nil
 		}
 		if len(matches) == 0 {
 			// Not a glob (or no match); keep the literal path if it exists.
@@ -283,10 +288,16 @@ func resolvePushPackagePaths(workingDir string, pushArgs []string) ([]string, er
 			if err != nil {
 				return nil, fmt.Errorf("resolve push artifact %q: %w", m, err)
 			}
-			if isPackageFile(abs) && !seen[abs] {
-				seen[abs] = true
-				paths = append(paths, abs)
+			if !isPackageFile(abs) || seen[abs] {
+				continue
 			}
+			// A glob can match a directory whose name ends in .nupkg/.snupkg; checksumming it
+			// would fail the command after a successful push.
+			if info, statErr := os.Stat(abs); statErr != nil || info.IsDir() {
+				continue
+			}
+			seen[abs] = true
+			paths = append(paths, abs)
 		}
 	}
 	return paths, nil
