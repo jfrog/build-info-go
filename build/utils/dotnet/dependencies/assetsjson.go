@@ -196,9 +196,9 @@ func warnExternallyResolved(externallyResolved []string, log utils.Log) {
 		return
 	}
 	sort.Strings(externallyResolved)
-	subject, verb := "dependency was", "dependencies were"
+	subject := "dependency was"
 	if len(externallyResolved) > 1 {
-		subject = verb
+		subject = "dependencies were"
 	}
 	log.Warn(fmt.Sprintf(
 		"%d %s resolved outside Artifactory and therefore not curated or scanned:\n  %s\n"+

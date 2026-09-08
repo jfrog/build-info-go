@@ -78,14 +78,11 @@ func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 	if err != nil {
 		return entities.Artifact{}, fmt.Errorf("compute checksum for %s: %w", name, err)
 	}
-	lower := strings.ToLower(name)
-	var path string
-	switch {
-	case strings.HasSuffix(lower, legacySymbolsSuffix):
-		// .symbols.nupkg → flat at root as <id>.<version>.nupkg
-		path = snupkgStorageName(name)
-	default:
-		path = name
+	// A .nupkg and a .snupkg are both stored under the name they were pushed with; only the
+	// legacy .symbols.nupkg is renamed, Artifactory dropping the ".symbols" segment.
+	path := name
+	if strings.HasSuffix(strings.ToLower(name), legacySymbolsSuffix) {
+		path = name[:len(name)-len(legacySymbolsSuffix)] + nupkgExtension
 	}
 	return entities.Artifact{
 		Name:                   name,
@@ -98,21 +95,6 @@ func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 			Md5:    details.Checksum.Md5,
 		},
 	}, nil
-}
-
-// snupkgStorageName converts a symbol package filename to the name Artifactory uses when
-// storing it: the .snupkg or .symbols.nupkg extension is replaced with .nupkg.
-// E.g. "Foo.1.0.0.snupkg" → "Foo.1.0.0.nupkg", "Foo.1.0.0.symbols.nupkg" → "Foo.1.0.0.nupkg".
-func snupkgStorageName(name string) string {
-	lower := strings.ToLower(name)
-	switch {
-	case strings.HasSuffix(lower, snupkgExtension):
-		return name[:len(name)-len(snupkgExtension)] + nupkgExtension
-	case strings.HasSuffix(lower, legacySymbolsSuffix):
-		return name[:len(name)-len(legacySymbolsSuffix)] + nupkgExtension
-	default:
-		return name
-	}
 }
 
 // BuildArtifactModules groups uploaded/packed artifacts into build-info modules.
