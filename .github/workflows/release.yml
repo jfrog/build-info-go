@@ -30,19 +30,6 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Make sure version provided
-        run: |
-          test -n "$NEXT_VERSION" -a "$NEXT_VERSION" != "0.0.0"
-
-      - name: Configure Git and merge from dev
-        run: |
-          git checkout main
-          git config user.name "jfrog-ecosystem-integration-env"
-          git config user.email "eco-system@jfrog.com"
-          git remote set-url origin https://${{ secrets.IL_AUTOMATION_TOKEN }}@github.com/jfrog/build-info-go.git
-          git fetch origin dev
-          git merge origin/dev
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -60,43 +47,12 @@ jobs:
           JF_USER: ${{ secrets.ARTIFACTORY_USER }}
           JF_PASSWORD: ${{ secrets.ARTIFACTORY_APIKEY }}
 
-      - name: Configure Go resolution repo
-        run: jf goc --repo-resolve ecosys-go-remote
-
-      - name: Audit
-        run: jf audit
-
-      - name: Build and upload
-        run: release/build.sh "$NEXT_VERSION"
-
-      - name: Collect and publish build info
-        run: |
-          jf rt bag
-          jf rt bce
-          jf rt bp "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER"
-
-      - name: Update build-info.json
-        run: |
-          ./buildscripts/build.sh
-          chmod u+x bi
-          ./bi go > build-info.json
-          git add build-info.json
-          git commit -m "Update build-info.json file"
-
-      - name: Create Git tag
-        run: git tag "v${NEXT_VERSION}"
-
-      - name: Distribute release bundle
-        run: |
-          jf ds rbc ecosystem-build-info-go "$NEXT_VERSION" --spec="release/specs/bi-rbc-spec.json" --spec-vars="VERSION=$NEXT_VERSION" --sign
-          jf ds rbd ecosystem-build-info-go "$NEXT_VERSION" --site="releases.jfrog.io" --sync
-
-      - name: Push to main
-        run: |
-          git clean -fd
-          git push
-          git push --tags
-
-      - name: Remove JFrog CLI config
-        if: always()
-        run: jf c rm --quiet
+      # Runs the full release: version check, merge dev into main, Go
+      # audit/build/upload, build-info collection and publish, git tag,
+      # release bundle distribution, and push to main. See
+      # .github/scripts/release.sh, which can also be run directly on a
+      # developer machine (export the same env vars used here).
+      - name: Release
+        run: .github/scripts/release.sh
+        env:
+          IL_AUTOMATION_TOKEN: ${{ secrets.IL_AUTOMATION_TOKEN }}
