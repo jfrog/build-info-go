@@ -249,8 +249,12 @@ func TestPopulateRequestedByDeterministic(t *testing.T) {
 			populateRequestedBy(*dependencies[direct], dependencies, childrenMap)
 		}
 
-		// Sort the results for comparison
-		result := dependencies["depd:1"].RequestedBy
+		// Sort the results for comparison. dedupeRequestedByParent is applied here because it
+		// runs at emit time in BuildInfo, not inside populateRequestedBy - the traversal relies
+		// on RequestedBy growing to hit the RequestedByMaxLength brake, so collapsing paths
+		// during the walk removes its only terminator (see
+		// TestPopulateRequestedByTerminatesOnDenseGraph).
+		result := dedupeRequestedByParent(dependencies["depd:1"].RequestedBy)
 		sortRequestedByPaths(result)
 		return result
 	}
