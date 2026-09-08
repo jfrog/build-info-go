@@ -191,8 +191,12 @@ func FindNupkgArtifacts(outputDir, repoName string) ([]entities.Artifact, error)
 // CollectPushArtifacts resolves the package files that a push command uploads. It considers
 // only the explicit positional package arguments (paths or globs) supplied to the native
 // command, so it never captures stale, unrelated packages that happen to sit in the working
-// directory. Relative arguments are resolved against workingDir. Symbol packages pushed
-// alongside the primary package are included when matched by the arguments.
+// directory. Relative arguments are resolved against workingDir.
+//
+// A .snupkg sitting next to a pushed .nupkg is included even though it never appears on the
+// command line: both native clients upload it automatically, so omitting it would leave a file
+// in the repository that no build-info records and that never receives build properties. The
+// sibling is skipped when the command opts out of symbols (-NoSymbols / --no-symbols).
 func CollectPushArtifacts(workingDir string, pushArgs []string, repoName string) ([]entities.Artifact, error) {
 	paths, err := resolvePushPackagePaths(workingDir, pushArgs)
 	if err != nil {
@@ -200,6 +204,9 @@ func CollectPushArtifacts(workingDir string, pushArgs []string, repoName string)
 	}
 	if len(paths) == 0 {
 		return nil, fmt.Errorf("no NuGet package (.nupkg/.snupkg) found in the push arguments")
+	}
+	if !hasNoSymbols(pushArgs) {
+		paths = appendSiblingSymbolPackages(paths)
 	}
 	var artifacts []entities.Artifact
 	for _, p := range paths {
@@ -210,6 +217,46 @@ func CollectPushArtifacts(workingDir string, pushArgs []string, repoName string)
 		artifacts = append(artifacts, artifact)
 	}
 	return artifacts, nil
+}
+
+// appendSiblingSymbolPackages returns packages plus the sibling .snupkg of every .nupkg that has
+// one on disk, preserving order and skipping any path already present. Both nuget.exe and the
+// dotnet CLI discover that sibling themselves and push it alongside the primary package, so it
+// belongs in build-info even though the caller never named it.
+func appendSiblingSymbolPackages(packages []string) []string {
+	seen := make(map[string]bool, len(packages))
+	for _, pkgPath := range packages {
+		seen[pkgPath] = true
+	}
+	withSymbols := packages
+	for _, pkgPath := range packages {
+		if !strings.HasSuffix(strings.ToLower(pkgPath), nupkgExtension) ||
+			strings.HasSuffix(strings.ToLower(pkgPath), legacySymbolsSuffix) {
+			continue
+		}
+		snupkgPath := pkgPath[:len(pkgPath)-len(nupkgExtension)] + snupkgExtension
+		if seen[snupkgPath] {
+			continue
+		}
+		if _, statErr := os.Stat(snupkgPath); statErr != nil {
+			continue
+		}
+		seen[snupkgPath] = true
+		withSymbols = append(withSymbols, snupkgPath)
+	}
+	return withSymbols
+}
+
+// hasNoSymbols reports whether the push command opts out of uploading symbol packages.
+// nuget.exe spells it -NoSymbols, the dotnet CLI --no-symbols (-n).
+func hasNoSymbols(args []string) bool {
+	for _, arg := range args {
+		switch strings.ToLower(arg) {
+		case "-nosymbols", "--no-symbols", "-n":
+			return true
+		}
+	}
+	return false
 }
 
 // resolvePushPackagePaths extracts package file paths from the positional push arguments,
