@@ -155,6 +155,35 @@ func (gf *GradleFlexPack) parseSettingsGradleModules(content string) []string {
 	return modules
 }
 
+// parseIncludeBuildDirectives parses settings.gradle content to extract includeBuild() directives
+// Returns a list of paths found in includeBuild() calls
+// Handles both single-quoted and double-quoted paths
+func (gf *GradleFlexPack) parseIncludeBuildDirectives(content string) []string {
+	strippedContent := gf.stripComments(content)
+
+	var buildPaths []string
+	lines := strings.Split(strippedContent, "\n")
+
+	// Regex to match includeBuild('path') or includeBuild("path") or includeBuild( 'path' ) variations
+	includeBuildRegex := regexp.MustCompile(`includeBuild\s*\(\s*['"]([^'"]+)['"]\s*\)`)
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "includeBuild") {
+			matches := includeBuildRegex.FindAllStringSubmatch(trimmed, -1)
+			for _, match := range matches {
+				if len(match) > 1 {
+					path := match[1]
+					if path != "" {
+						buildPaths = append(buildPaths, path)
+					}
+				}
+			}
+		}
+	}
+	return buildPaths
+}
+
 // parseFromBuildGradle parses dependencies directly from build.gradle file using regex.
 // This is a fallback method when CLI-based parsing fails.
 func (gf *GradleFlexPack) parseFromBuildGradle(moduleName string) []flexpack.DependencyInfo {

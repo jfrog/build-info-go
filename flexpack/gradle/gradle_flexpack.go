@@ -34,6 +34,7 @@ type GradleFlexPack struct {
 	artifactId        string
 	buildGradlePath   string
 	wasPublishCommand bool
+	includeSharedBuild bool
 	modulesMap        map[string]moduleMetadata
 	modulesList       []string
 	deployedArtifacts map[string][]entities.Artifact
@@ -56,8 +57,9 @@ func NewGradleFlexPackWithContext(ctx context.Context, config flexpack.GradleCon
 	}
 
 	gf := &GradleFlexPack{
-		config: config,
-		ctx:    ctx,
+		config:             config,
+		ctx:                ctx,
+		includeSharedBuild: config.IncludeSharedBuild,
 	}
 
 	if gf.config.GradleExecutable == "" {
@@ -79,6 +81,10 @@ func NewGradleFlexPackWithContext(ctx context.Context, config flexpack.GradleCon
 
 func (gf *GradleFlexPack) SetWasPublishCommand(wasPublish bool) {
 	gf.wasPublishCommand = wasPublish
+}
+
+func (gf *GradleFlexPack) SetIncludeSharedBuild(include bool) {
+	gf.includeSharedBuild = include
 }
 
 func (gf *GradleFlexPack) loadBuildGradle() error {
@@ -116,6 +122,66 @@ func (gf *GradleFlexPack) loadBuildGradle() error {
 
 	gf.projectName = fmt.Sprintf("%s:%s", gf.groupId, gf.artifactId)
 	return nil
+}
+
+// detectBuildSrcBuild checks if a buildSrc directory exists in the working directory
+func (gf *GradleFlexPack) detectBuildSrcBuild() bool {
+	buildSrcPath := filepath.Join(gf.config.WorkingDirectory, "buildSrc")
+	info, err := os.Stat(buildSrcPath)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
+// detectCompositeBuildIncludes parses settings.gradle to find includeBuild() directives
+// Returns a list of paths found in includeBuild() calls
+func (gf *GradleFlexPack) detectCompositeBuildIncludes() []string {
+	content, err := gf.readSettingsFile()
+	if err != nil {
+		log.Debug(fmt.Sprintf("Failed to read settings file for composite build detection: %s", err.Error()))
+		return []string{}
+	}
+	if content == "" {
+		return []string{}
+	}
+	return gf.parseIncludeBuildDirectives(content)
+}
+
+// collectSharedBuildDependencies runs gradle dependencies for a shared build and parses the output
+// Returns a list of dependencies found in the shared build
+// Note: IncludeSharedBuild is set to false for nested builds to avoid recursive collection
+func (gf *GradleFlexPack) collectSharedBuildDependencies(buildPath string) []flexpack.DependencyInfo {
+	if !isSubPath(gf.config.WorkingDirectory, buildPath) {
+		log.Debug(fmt.Sprintf("Skipping shared build: path traversal detected for %s", buildPath))
+		return []flexpack.DependencyInfo{}
+	}
+
+	// Create a temporary GradleFlexPack instance for the shared build with its own working directory
+	// Important: Set IncludeSharedBuild to false to avoid recursive collection of nested shared builds
+	sharedBuildConfig := flexpack.GradleConfig{
+		WorkingDirectory:        buildPath,
+		IncludeTestDependencies: gf.config.IncludeTestDependencies,
+		IncludeSharedBuild:      false, // Disable for nested builds to prevent recursion
+		GradleExecutable:        gf.config.GradleExecutable,
+		CommandTimeout:          gf.config.CommandTimeout,
+	}
+
+	sharedBuild, err := NewGradleFlexPackWithContext(gf.ctx, sharedBuildConfig)
+	if err != nil {
+		log.Debug(fmt.Sprintf("Failed to initialize shared build FlexPack for %s: %s", buildPath, err.Error()))
+		return []flexpack.DependencyInfo{}
+	}
+
+	// Parse dependencies for the root module of the shared build (moduleName = "")
+	deps, _ := sharedBuild.parseModuleDependencies("")
+	if len(deps) == 0 {
+		log.Debug(fmt.Sprintf("No dependencies found in shared build: %s", buildPath))
+		return []flexpack.DependencyInfo{}
+	}
+
+	log.Debug(fmt.Sprintf("Collected %d dependencies from shared build: %s", len(deps), buildPath))
+	return deps
 }
 
 func (gf *GradleFlexPack) scanAllModules() {
@@ -288,7 +354,74 @@ func (gf *GradleFlexPack) parseModuleDependencies(moduleName string) ([]flexpack
 		deps = gf.parseFromBuildGradle(moduleName)
 	}
 
+	// Collect shared build dependencies if flag is enabled and this is the root module
+	if gf.includeSharedBuild && moduleName == "" {
+		sharedDeps := gf.collectAllSharedBuildDependencies()
+		if len(sharedDeps) > 0 {
+			log.Debug(fmt.Sprintf("Adding %d shared build dependencies to root module", len(sharedDeps)))
+			deps = mergeSharedBuildDependencies(deps, sharedDeps)
+		}
+	}
+
 	return deps, depGraph
+}
+
+// collectAllSharedBuildDependencies collects dependencies from buildSrc and composite builds
+func (gf *GradleFlexPack) collectAllSharedBuildDependencies() []flexpack.DependencyInfo {
+	allSharedDeps := make(map[string]flexpack.DependencyInfo)
+
+	// 1. Collect from buildSrc if it exists
+	if gf.detectBuildSrcBuild() {
+		buildSrcPath := filepath.Join(gf.config.WorkingDirectory, "buildSrc")
+		log.Debug(fmt.Sprintf("Collecting dependencies from buildSrc: %s", buildSrcPath))
+		buildSrcDeps := gf.collectSharedBuildDependencies(buildSrcPath)
+		for _, dep := range buildSrcDeps {
+			allSharedDeps[dep.ID] = dep
+		}
+	}
+
+	// 2. Collect from composite builds (includeBuild directives)
+	compositePaths := gf.detectCompositeBuildIncludes()
+	for _, relativePath := range compositePaths {
+		compositePath := filepath.Join(gf.config.WorkingDirectory, relativePath)
+		compositePath = filepath.Clean(compositePath)
+		log.Debug(fmt.Sprintf("Collecting dependencies from composite build: %s", compositePath))
+		compositeDeps := gf.collectSharedBuildDependencies(compositePath)
+		for _, dep := range compositeDeps {
+			allSharedDeps[dep.ID] = dep
+		}
+	}
+
+	// Convert map to slice
+	var result []flexpack.DependencyInfo
+	for _, dep := range allSharedDeps {
+		result = append(result, dep)
+	}
+	return result
+}
+
+// mergeSharedBuildDependencies merges shared build dependencies into root module dependencies,
+// deduplicating by ID and preferring existing root dependencies
+func mergeSharedBuildDependencies(rootDeps, sharedDeps []flexpack.DependencyInfo) []flexpack.DependencyInfo {
+	// Create a map of root dependencies by ID for quick lookup
+	rootDepMap := make(map[string]flexpack.DependencyInfo)
+	for _, dep := range rootDeps {
+		rootDepMap[dep.ID] = dep
+	}
+
+	// Add shared dependencies that don't already exist in root
+	for _, sharedDep := range sharedDeps {
+		if _, exists := rootDepMap[sharedDep.ID]; !exists {
+			rootDepMap[sharedDep.ID] = sharedDep
+		}
+	}
+
+	// Convert back to slice
+	var merged []flexpack.DependencyInfo
+	for _, dep := range rootDepMap {
+		merged = append(merged, dep)
+	}
+	return merged
 }
 
 func (gf *GradleFlexPack) createDependencyEntities(deps []flexpack.DependencyInfo, requestedByMap map[string][]string) []entities.Dependency {
