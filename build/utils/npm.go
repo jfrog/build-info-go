@@ -23,14 +23,14 @@ import (
 
 const npmInstallCommand = "install"
 
-// Granular values accepted by the --fail-on-missing-deps flag (NpmTreeDepListParam.FailOnMissingDeps).
+// Granular values accepted by the --fail-on-uncollected-deps flag (passed to CalculateNpmDependenciesList).
 // The flag also accepts a comma-separated combination of the granular values, e.g. "peer,optional,bundle".
 const (
-	failOnMissingDepsAll      = "all"
-	failOnMissingDepsRegular  = "regular"
-	failOnMissingDepsPeer     = "peer"
-	failOnMissingDepsOptional = "optional"
-	failOnMissingDepsBundle   = "bundle"
+	failOnUncollectedDepsAll      = "all"
+	failOnUncollectedDepsRegular  = "regular"
+	failOnUncollectedDepsPeer     = "peer"
+	failOnUncollectedDepsOptional = "optional"
+	failOnUncollectedDepsBundle   = "bundle"
 )
 
 // Dependency type identifiers used internally in handleMissingDeps
@@ -42,7 +42,9 @@ const (
 )
 
 // CalculateNpmDependenciesList gets an npm project's dependencies.
-func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
+// failOnUncollectedDeps controls whether the build fails when a dependency's integrity/checksum can't be
+// collected for build-info. See the failOnUncollectedDeps* constants above.
+func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, failOnUncollectedDeps string, log utils.Log) ([]entities.Dependency, error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
@@ -93,20 +95,20 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 
 		dependenciesList = append(dependenciesList, dep.Dependency)
 	}
-	// Apply --fail-on-missing-deps flag to ALL missing dependency types
+	// Apply --fail-on-uncollected-deps flag to ALL missing dependency types
 	// Collect all errors so users see the complete picture of what's missing
 	var allErrors []string
 
-	if err := handleMissingDeps(depTypePeer, missingPeerDeps, npmParams.FailOnMissingDeps, log); err != nil {
+	if err := handleMissingDeps(depTypePeer, missingPeerDeps, failOnUncollectedDeps, log); err != nil {
 		allErrors = append(allErrors, err.Error())
 	}
-	if err := handleMissingDeps(depTypeBundle, missingBundledDeps, npmParams.FailOnMissingDeps, log); err != nil {
+	if err := handleMissingDeps(depTypeBundle, missingBundledDeps, failOnUncollectedDeps, log); err != nil {
 		allErrors = append(allErrors, err.Error())
 	}
-	if err := handleMissingDeps(depTypeOptional, missingOptionalDeps, npmParams.FailOnMissingDeps, log); err != nil {
+	if err := handleMissingDeps(depTypeOptional, missingOptionalDeps, failOnUncollectedDeps, log); err != nil {
 		allErrors = append(allErrors, err.Error())
 	}
-	if err := handleMissingDeps(depTypeRegular, otherMissingDeps, npmParams.FailOnMissingDeps, log); err != nil {
+	if err := handleMissingDeps(depTypeRegular, otherMissingDeps, failOnUncollectedDeps, log); err != nil {
 		allErrors = append(allErrors, err.Error())
 	}
 	if len(allErrors) > 0 {
@@ -286,23 +288,23 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 // depTypeToFlagValue maps the internal dependency-type identifiers (as passed to handleMissingDeps)
 // to the granular flag value that governs them.
 var depTypeToFlagValue = map[string]string{
-	depTypePeer:     failOnMissingDepsPeer,
-	depTypeBundle:   failOnMissingDepsBundle,
-	depTypeOptional: failOnMissingDepsOptional,
-	depTypeRegular:  failOnMissingDepsRegular,
+	depTypePeer:     failOnUncollectedDepsPeer,
+	depTypeBundle:   failOnUncollectedDepsBundle,
+	depTypeOptional: failOnUncollectedDepsOptional,
+	depTypeRegular:  failOnUncollectedDepsRegular,
 }
 
-// shouldFailOnMissingDeps returns true if the given dependency type should fail the build,
-// according to the granular flagValue supplied to --fail-on-missing-deps.
+// shouldFailOnUncollectedDeps returns true if the given dependency type should fail the build,
+// according to the granular flagValue supplied to --fail-on-uncollected-deps.
 // flagValue can be:
 //   - "" (empty): never fail (backward compatible default)
 //   - "all": fail for every dependency type
 //   - a comma-separated combination of "regular", "peer", "optional", "bundle"
-func shouldFailOnMissingDeps(depType, flagValue string) bool {
+func shouldFailOnUncollectedDeps(depType, flagValue string) bool {
 	if flagValue == "" {
 		return false
 	}
-	if flagValue == failOnMissingDepsAll {
+	if flagValue == failOnUncollectedDepsAll {
 		return true
 	}
 	wantedValue, ok := depTypeToFlagValue[depType]
@@ -317,29 +319,36 @@ func shouldFailOnMissingDeps(depType, flagValue string) bool {
 	return false
 }
 
-// handleMissingDeps handles missing dependencies based on the granular --fail-on-missing-deps flag value.
-// If shouldFailOnMissingDeps(depType, failOnMissingDeps) is true, returns an error for that dependency type.
+// handleMissingDeps handles missing dependencies based on the granular --fail-on-uncollected-deps flag value.
+// If shouldFailOnUncollectedDeps(depType, failOnUncollectedDeps) is true, returns an error for that dependency type.
 // Otherwise, logs a warning.
-func handleMissingDeps(depType string, missingDeps []string, failOnMissingDeps string, log utils.Log) error {
+func handleMissingDeps(depType string, missingDeps []string, failOnUncollectedDeps string, log utils.Log) error {
 	if len(missingDeps) == 0 {
 		return nil
 	}
 
-	if shouldFailOnMissingDeps(depType, failOnMissingDeps) {
-		// When the flag applies to this dependency type, fail with an error.
-		message := fmt.Sprintf("The following %s are missing in the npm cache and will not be included in the build-info: '%s'", depType, strings.Join(missingDeps, ","))
+	if shouldFailOnUncollectedDeps(depType, failOnUncollectedDeps) {
+		var message string
+		switch depType {
+		case depTypePeer, depTypeBundle:
+			message = fmt.Sprintf("The following %s could not be included in the build-info, because 'npm ls' did not return their integrity: '%s'", depType, strings.Join(missingDeps, ","))
+		case depTypeOptional:
+			message = fmt.Sprintf("The following %s could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'", depType, strings.Join(missingDeps, ","))
+		default:
+			// depTypeRegular is an internal bucket name, not a real npm-facing term like the others -
+			// say "dependencies" instead of surfacing it verbatim.
+			message = fmt.Sprintf("The following dependencies could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'", strings.Join(missingDeps, ","))
+		}
 		return errors.New(message)
 	}
 
-	// When the flag doesn't apply to this dependency type, use original logging behavior (backward compatible):
-	// - peer/bundled/optional: DEBUG level logging (via printMissingDependenciesWarning)
-	// - regular: WARN level logging
-	if depType == depTypePeer || depType == depTypeBundle || depType == depTypeOptional {
+	switch depType {
+	case depTypePeer, depTypeBundle:
 		printMissingDependenciesWarning(depType, missingDeps, log)
-	} else {
-		// For depTypeRegular: use WARN level (original behavior when flag not set)
-		message := fmt.Sprintf("The following dependencies are missing in npm cache and will not be included in the build-info: '%s'", strings.Join(missingDeps, ","))
-		log.Warn(message)
+	case depTypeOptional:
+		log.Debug(fmt.Sprintf("The following %s could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'", depType, strings.Join(missingDeps, ",")))
+	default:
+		log.Warn(fmt.Sprintf("The following dependencies could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'", strings.Join(missingDeps, ",")))
 	}
 	return nil
 }
@@ -353,11 +362,6 @@ type NpmTreeDepListParam struct {
 	IgnoreNodeModules bool
 	// Rewrite package-lock.json, if exists.
 	OverwritePackageLock bool
-	// Fail the build if a dependency's tarball can't be resolved from the npm cache.
-	// Granular string value: "" (never fail, default), "all" (fail for every missing dependency type),
-	// or a comma-separated combination of "regular", "peer", "optional", "bundle"
-	// (e.g. "peer,optional,bundle") to fail only for the specified types.
-	FailOnMissingDeps string
 }
 
 // npm >=7 ls results for a single dependency

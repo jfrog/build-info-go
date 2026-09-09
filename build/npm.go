@@ -19,8 +19,8 @@ type NpmModule struct {
 	executablePath   string
 	npmArgs          []string
 	collectBuildInfo bool
-	// Granular strict-mode value for missing dependencies. See NpmTreeDepListParam.FailOnMissingDeps.
-	failOnMissingDeps string
+	// Granular strict-mode value for uncollected dependencies. See buildutils.CalculateNpmDependenciesList.
+	failOnUncollectedDeps string
 }
 
 // Pass an empty string for srcPath to find the npm project in the working directory.
@@ -77,7 +77,7 @@ func (nm *NpmModule) CalcDependencies() error {
 		return errors.New("a build name must be provided in order to collect the project's dependencies")
 	}
 	buildInfoDependencies, err := buildutils.CalculateNpmDependenciesList(nm.executablePath, nm.srcPath, nm.name,
-		buildutils.NpmTreeDepListParam{Args: nm.npmArgs, FailOnMissingDeps: nm.failOnMissingDeps}, true, nm.containingBuild.logger)
+		buildutils.NpmTreeDepListParam{Args: nm.npmArgs}, true, nm.failOnUncollectedDeps, nm.containingBuild.logger)
 	if err != nil {
 		return err
 	}
@@ -98,12 +98,12 @@ func (nm *NpmModule) SetCollectBuildInfo(collectBuildInfo bool) {
 	nm.collectBuildInfo = collectBuildInfo
 }
 
-func (nm *NpmModule) SetFailOnMissingDeps(failOnMissingDeps string) {
-	nm.failOnMissingDeps = failOnMissingDeps
+func (nm *NpmModule) SetFailOnUncollectedDeps(failOnUncollectedDeps string) {
+	nm.failOnUncollectedDeps = failOnUncollectedDeps
 }
 
-func (nm *NpmModule) GetFailOnMissingDeps() string {
-	return nm.failOnMissingDeps
+func (nm *NpmModule) GetFailOnUncollectedDeps() string {
+	return nm.failOnUncollectedDeps
 }
 
 func (nm *NpmModule) AddArtifacts(artifacts ...entities.Artifact) error {
