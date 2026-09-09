@@ -85,10 +85,9 @@ type MavenConfig struct {
 const mavenDepsFileName = "maven-deps.json"
 
 // mavenDependencyPluginTreeGoal is the fully-qualified plugin coordinate used to invoke the
-// dependency:tree goal. The version is pinned because `-DoutputType=json` was only added in
-// maven-dependency-plugin 3.7.0; older versions silently write plain-text output which the JSON
-// parser then rejects. 3.8.1 (current latest) is used to also pick up bug fixes.
-const mavenDependencyPluginTreeGoal = "org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree"
+// dependency:tree goal. The version is pinned to the minimum that supports -DoutputType=json
+// (added in 3.7.0); older versions silently write plain-text output which the JSON parser rejects.
+const mavenDependencyPluginTreeGoal = "org.apache.maven.plugins:maven-dependency-plugin:3.7.0:tree"
 
 // MavenPOM represents the structure of pom.xml file
 type MavenPOM struct {
@@ -488,11 +487,11 @@ func (mf *MavenFlexPack) localRepositoryPath() string {
 }
 
 func (mf *MavenFlexPack) resolveLocalRepositoryPath() string {
-	const flag = "-Dmaven.repo.local="
+	const mavenLocalRepoFlag = "-Dmaven.repo.local="
 	// Later occurrences win, matching Maven's last-value-wins behavior for repeated properties.
 	custom := ""
 	for _, arg := range mf.config.ExtraArgs {
-		if v, ok := strings.CutPrefix(arg, flag); ok && v != "" {
+		if v, ok := strings.CutPrefix(arg, mavenLocalRepoFlag); ok && v != "" {
 			custom = v
 		}
 	}
