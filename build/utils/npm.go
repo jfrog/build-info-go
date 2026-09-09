@@ -41,6 +41,15 @@ const (
 	depTypeRegular  = "regular"
 )
 
+// depTypeToFlagValue maps the internal dependency-type identifiers (as passed to handleMissingDeps)
+// to the granular flag value that governs them.
+var depTypeToFlagValue = map[string]string{
+	depTypePeer:     failOnUncollectedDepsPeer,
+	depTypeBundle:   failOnUncollectedDepsBundle,
+	depTypeOptional: failOnUncollectedDepsOptional,
+	depTypeRegular:  failOnUncollectedDepsRegular,
+}
+
 // CalculateNpmDependenciesList gets an npm project's dependencies.
 // failOnUncollectedDeps controls whether the build fails when a dependency's integrity/checksum can't be
 // collected for build-info. See the failOnUncollectedDeps* constants above.
@@ -283,15 +292,6 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 		return nil, err
 	}
 	return version.NewVersion(string(versionData)), nil
-}
-
-// depTypeToFlagValue maps the internal dependency-type identifiers (as passed to handleMissingDeps)
-// to the granular flag value that governs them.
-var depTypeToFlagValue = map[string]string{
-	depTypePeer:     failOnUncollectedDepsPeer,
-	depTypeBundle:   failOnUncollectedDepsBundle,
-	depTypeOptional: failOnUncollectedDepsOptional,
-	depTypeRegular:  failOnUncollectedDepsRegular,
 }
 
 // shouldFailOnUncollectedDeps returns true if the given dependency type should fail the build,
