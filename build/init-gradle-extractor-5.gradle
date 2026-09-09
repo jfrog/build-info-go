@@ -1,13 +1,18 @@
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPlugin
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPluginSettings
 import org.jfrog.gradle.plugin.artifactory.Constant
+import org.jfrog.gradle.plugin.artifactory.extractor.ExternalProjectModuleInfoFileProducer
 import org.jfrog.gradle.plugin.artifactory.task.ArtifactoryTask
+import org.jfrog.gradle.plugin.artifactory.task.DeployTask
+import org.jfrog.gradle.plugin.artifactory.utils.PluginUtils;
 
 initscript {
     dependencies {
         classpath fileTree('${pluginLibDir}')
     }
 }
+
+PluginUtils.assertGradleVersionSupported(getGradle())
 
 beforeSettings { Settings settings ->
     settings.apply plugin: ArtifactoryPluginSettings
@@ -19,10 +24,116 @@ projectsLoaded { Gradle gradle ->
     gradle.startParameter.setProjectProperties(projectProperties)
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
-    if (!"buildSrc".equals(root.name)) {
+
+    // Extract includeSharedBuild from project properties (passed from jfrog.init.gradle or gradle command)
+    String includeSharedBuildProp = projectProperties.getOrDefault("includeSharedBuild", "false")
+    boolean includeSharedBuild = includeSharedBuildProp.equalsIgnoreCase("true")
+
+    if (gradle.parent == null) {
+        // The containing (top-level) build.
         root.allprojects {
             apply {
                 apply plugin: ArtifactoryPlugin
+            }
+        }
+    } else if (includeSharedBuild && gradle.parent != null) {
+        // RTECO-1725: buildSrc, or a composite/included build (settings.gradle includeBuild(...)).
+        // Both are separate Gradle build instances. Note that this init script is re-evaluated from
+        // scratch for each one - top-level script variables here do NOT persist across these separate
+        // firings of projectsLoaded, so we can't accumulate state in a plain script variable across them.
+        // gradle.parent, though, is a live reference to the actual containing Gradle build object, shared
+        // across all these separate evaluations within the same session.
+        //
+        // Apply the plugin here too (even though its own artifactoryPublish/extractModuleInfo tasks will
+        // never run): ExternalProjectModuleInfoFileProducer's dependency extraction needs
+        // project.getRootProject().getPlugins().getPlugin(ArtifactoryPlugin) to succeed, and it wouldn't
+        // without this - it would fail with UnknownPluginException and silently produce no dependencies.
+        // root.allprojects covers every subproject of this nested build too, not just its root - a
+        // multi-project included build needs the plugin applied to each of them individually.
+        root.allprojects {
+            apply {
+                apply plugin: ArtifactoryPlugin
+            }
+        }
+
+        // Register this build's (and each of its subprojects') dependencies directly on the containing
+        // build's DeployTask right now, instead of adding the usual ArtifactoryTask/ExtractModuleTask pair
+        // to each of these projects the normal way: those would never run anyway, because buildSrc's own
+        // task graph is already finished by the time the containing build is even configured, and an
+        // included build's tasks are only ever scheduled if something in the containing build substitutes
+        // a dependency for them, which our bookkeeping tasks never are.
+        //
+        // Deliberately NOT relying on Gradle firing the containing build's projectsLoaded before any
+        // nested build's (that ordering has only been empirically observed here, it is not a documented
+        // Gradle contract). `tasks.withType(DeployTask).configureEach { ... }` is a lazy, order-independent
+        // registration: it fires for the DeployTask whenever it gets added to containingRoot's task
+        // container, whether that already happened or happens later.
+        //
+        // RTECO-136 SUBPROCESS APPROACH (COMPLETE):
+        // For buildSrc and composite/included builds, run './gradlew -p <build-path> dependencies'
+        // to capture the dependency list via subprocess instead of walking up to top-level DeployTask.
+        // This keeps builds isolated and doesn't rely on parent chain assumptions.
+
+        root.logger.debug("RTECO-136 subprocess approach: Running gradle dependencies for ${root.name}")
+
+        // Walk up to find top-level gradle
+        Gradle topLevelGradle = gradle
+        while (topLevelGradle.parent != null) {
+            topLevelGradle = topLevelGradle.parent
+        }
+        Project containingRoot = topLevelGradle.getRootProject()
+
+        // Run ./gradlew -p buildSrc dependencies to capture dependency list
+        String buildPath = root.projectDir.absolutePath
+        String gradleCmd = "${buildPath}${File.separator}gradlew"
+
+        // Check if gradlew exists, otherwise use gradle command
+        if (!new File(gradleCmd).exists()) {
+            // Try to find gradle in PATH
+            String pathGradle = System.getenv("GRADLE_HOME")
+            if (pathGradle) {
+                gradleCmd = "${pathGradle}${File.separator}bin${File.separator}gradle"
+            } else {
+                gradleCmd = "gradle"
+            }
+        }
+
+        String dependenciesOutput = ""
+
+        root.logger.debug("Running subprocess: ${gradleCmd} -p ${buildPath} dependencies --quiet")
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder(gradleCmd, "-p", buildPath, "dependencies", "--quiet")
+            pb.redirectErrorStream(true)
+            Process process = pb.start()
+
+            // Capture output
+            StringBuilder output = new StringBuilder()
+            process.inputStream.eachLine { line ->
+                output.append(line).append("\n")
+            }
+
+            int exitCode = process.waitFor()
+            dependenciesOutput = output.toString()
+
+            root.logger.debug("Subprocess exited with code: ${exitCode}")
+
+            if (exitCode == 0) {
+                root.logger.info("Successfully ran dependencies for ${root.name}: ${dependenciesOutput.lines().size()} lines captured")
+            } else {
+                root.logger.warn("Subprocess exited with code ${exitCode} for ${root.name}")
+            }
+        } catch (Exception e) {
+            root.logger.error("Failed to run subprocess for ${root.name}: ${e.message}")
+        }
+
+        // Register ExternalProjectModuleInfoFileProducer with subprocess output
+        containingRoot.tasks.withType(DeployTask).configureEach { deployTask ->
+            root.allprojects.each { Project externalProject ->
+                // Pass subprocess output to the producer
+                deployTask.registerModuleInfoProducer(
+                    new ExternalProjectModuleInfoFileProducer(externalProject, containingRoot.getName(), dependenciesOutput)
+                )
             }
         }
     }
