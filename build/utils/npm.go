@@ -327,28 +327,33 @@ func handleMissingDeps(depType string, missingDeps []string, failOnUncollectedDe
 		return nil
 	}
 
+	// The flag targets this dependency type: throw an error instead of just logging.
 	if shouldFailOnUncollectedDeps(depType, failOnUncollectedDeps) {
 		var message string
 		switch depType {
 		case depTypePeer, depTypeBundle:
 			message = fmt.Sprintf("The following %s could not be included in the build-info, because 'npm ls' did not return their integrity: '%s'", depType, strings.Join(missingDeps, ","))
 		case depTypeOptional:
-			message = fmt.Sprintf("The following %s could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'", depType, strings.Join(missingDeps, ","))
+			message = fmt.Sprintf("The following %s could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", depType, strings.Join(missingDeps, ","))
 		default:
 			// depTypeRegular is an internal bucket name, not a real npm-facing term like the others -
 			// say "dependencies" instead of surfacing it verbatim.
-			message = fmt.Sprintf("The following dependencies could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'", strings.Join(missingDeps, ","))
+			message = fmt.Sprintf("The following dependencies could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", strings.Join(missingDeps, ","))
 		}
 		return errors.New(message)
 	}
 
+	// The flag doesn't target this dependency type: log instead of failing.
 	switch depType {
 	case depTypePeer, depTypeBundle:
+		// Legacy DEBUG-level logging, unchanged from before this flag existed.
 		printMissingDependenciesWarning(depType, missingDeps, log)
 	case depTypeOptional:
-		log.Debug(fmt.Sprintf("The following %s could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'", depType, strings.Join(missingDeps, ",")))
+		// DEBUG: an unresolvable optional dependency is expected/benign, not necessarily a problem.
+		log.Debug(fmt.Sprintf("The following %s could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", depType, strings.Join(missingDeps, ",")))
 	default:
-		log.Warn(fmt.Sprintf("The following dependencies could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'", strings.Join(missingDeps, ",")))
+		// WARN: legacy behavior for an unexpected cache/tarball resolution failure.
+		log.Warn(fmt.Sprintf("The following dependencies could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", strings.Join(missingDeps, ",")))
 	}
 	return nil
 }
