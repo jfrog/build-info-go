@@ -25,8 +25,12 @@ projectsLoaded { Gradle gradle ->
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
 
-    // Extract includeSharedBuild from project properties (passed from jfrog.init.gradle or gradle command)
-    String includeSharedBuildProp = projectProperties.getOrDefault("includeSharedBuild", "false")
+    // Extract includeSharedBuild from the project's properties. Deliberately NOT read via
+    // gradle.startParameter.getProjectProperties() (that map only reflects explicit -P flags /
+    // gradle.properties entries) - the CLI passes this flag as an ORG_GRADLE_PROJECT_includeSharedBuild
+    // environment variable (see jfrog-cli-artifactory's createGradleRunConfig), which Gradle exposes
+    // through root.findProperty()/hasProperty() instead, not through startParameter's property map.
+    String includeSharedBuildProp = root.findProperty("includeSharedBuild")?.toString() ?: "false"
     boolean includeSharedBuild = includeSharedBuildProp.equalsIgnoreCase("true")
 
     if (gradle.parent == null) {
@@ -119,7 +123,7 @@ projectsLoaded { Gradle gradle ->
             root.logger.debug("Subprocess exited with code: ${exitCode}")
 
             if (exitCode == 0) {
-                root.logger.info("Successfully ran dependencies for ${root.name}: ${dependenciesOutput.lines().size()} lines captured")
+                root.logger.info("Successfully ran dependencies for ${root.name}: ${dependenciesOutput.readLines().size()} lines captured")
             } else {
                 root.logger.warn("Subprocess exited with code ${exitCode} for ${root.name}")
             }
