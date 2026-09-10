@@ -25,6 +25,12 @@ projectsLoaded { Gradle gradle ->
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
 
+    // RTECO-136: mark this project as init-script-managed BEFORE applying the plugin below, so
+    // ArtifactoryPlugin.apply() knows to skip its own buildSrc/composite detection (this init script
+    // already runs its own, more complete one). Must match SharedBuildLogicUtils.
+    // INIT_SCRIPT_MANAGES_SHARED_BUILD_PROPERTY in the plugin jar this init script is paired with.
+    root.ext.set('jfrogInitScriptManagesSharedBuild', true)
+
     if (gradle.parent == null) {
         // The containing (top-level) build.
         root.allprojects {
@@ -32,13 +38,22 @@ projectsLoaded { Gradle gradle ->
                 apply plugin: ArtifactoryPlugin
             }
         }
+    } else if ("buildSrc".equals(root.name)) {
+        // buildSrc: preserve pre-RTECO-136 behavior unless the shared-build-logic feature is explicitly
+        // opted into (-PincludeSharedBuild=true / ORG_GRADLE_PROJECT_includeSharedBuild=true) - the plugin
+        // was never applied to buildSrc before this feature existed, and users who don't use the flag must
+        // see exactly that same behavior.
+        if (isIncludeSharedBuildEnabled(root)) {
+            applyPluginAndCollectSharedBuildDependencies(gradle, root)
+        }
     } else {
-        // RTECO-1725: buildSrc, or a composite/included build (settings.gradle includeBuild(...)).
-        // Both are separate Gradle build instances. Note that this init script is re-evaluated from
-        // scratch for each one - top-level script variables here do NOT persist across these separate
-        // firings of projectsLoaded, so we can't accumulate state in a plain script variable across them.
-        // gradle.parent, though, is a live reference to the actual containing Gradle build object, shared
-        // across all these separate evaluations within the same session.
+        // RTECO-1725: a composite/included build (settings.gradle includeBuild(...)) - a separate Gradle
+        // build instance. Applying the plugin here matches pre-RTECO-136 behavior (the old guard only ever
+        // excluded buildSrc by name), so this part always runs regardless of the flag. Note that this init
+        // script is re-evaluated from scratch for each one - top-level script variables here do NOT persist
+        // across these separate firings of projectsLoaded, so we can't accumulate state in a plain script
+        // variable across them. gradle.parent, though, is a live reference to the actual containing Gradle
+        // build object, shared across all these separate evaluations within the same session.
         //
         // Apply the plugin here too (even though its own artifactoryPublish/extractModuleInfo tasks will
         // never run): ExternalProjectModuleInfoFileProducer's dependency extraction needs
@@ -52,70 +67,10 @@ projectsLoaded { Gradle gradle ->
             }
         }
 
-        // RTECO-136 SUBPROCESS APPROACH: Run 'gradle -p <buildPath> dependencies --quiet' and capture
-        // the output, then pass it to ExternalProjectModuleInfoFileProducer for parsing. This keeps
-        // builds completely isolated and avoids assumptions about gradle.parent chain or Gradle's
-        // callback ordering - only the output text is needed.
-        //
-        // Deliberately NOT relying on Gradle firing the containing build's projectsLoaded before any
-        // nested build's (that ordering has only been empirically observed here, it is not a documented
-        // Gradle contract). `tasks.withType(DeployTask).configureEach { ... }` is a lazy, order-independent
-        // registration: it fires for the DeployTask whenever it gets added to containingRoot's task
-        // container, whether that already happened or happens later.
-        //
-        // gradle.parent is only the IMMEDIATE containing build, not necessarily the top-level one: a
-        // composite build can itself include another composite build (A includeBuild(B), B
-        // includeBuild(C)), in which case C's gradle.parent is B, not A. Walk all the way up to find
-        // the true top-level build whose DeployTask actually runs.
-        Gradle topLevelGradle = gradle
-        while (topLevelGradle.parent != null) {
-            topLevelGradle = topLevelGradle.parent
-        }
-        Project containingRoot = topLevelGradle.getRootProject()
-
-        // Run subprocess to capture dependencies for this external build
-        String buildPath = root.projectDir.absolutePath
-        String gradleCmd = buildPath + File.separator + "gradlew"
-        if (!new File(gradleCmd).exists()) {
-            String pathGradle = System.getenv("GRADLE_HOME")
-            if (pathGradle) {
-                gradleCmd = pathGradle + File.separator + "bin" + File.separator + "gradle"
-            } else {
-                gradleCmd = "gradle"
-            }
-        }
-
-        String dependenciesOutput = ""
-        root.logger.debug("RTECO-136: Running subprocess: ${gradleCmd} -p ${buildPath} dependencies --quiet")
-
-        try {
-            ProcessBuilder pb = new ProcessBuilder(gradleCmd, "-p", buildPath, "dependencies", "--quiet")
-            pb.redirectErrorStream(true)
-            Process process = pb.start()
-
-            StringBuilder output = new StringBuilder()
-            process.inputStream.eachLine { line ->
-                output.append(line).append("\n")
-            }
-
-            int exitCode = process.waitFor()
-            dependenciesOutput = output.toString()
-
-            root.logger.debug("Subprocess exited with code: ${exitCode}")
-            if (exitCode == 0) {
-                root.logger.info("Successfully ran dependencies for ${root.name}: ${dependenciesOutput.readLines().size()} lines captured")
-            } else {
-                root.logger.warn("Subprocess exited with code ${exitCode} for ${root.name}")
-            }
-        } catch (Exception e) {
-            root.logger.error("Failed to run subprocess for ${root.name}: ${e.message}")
-        }
-
-        // Register ExternalProjectModuleInfoFileProducer with subprocess output on containing build's DeployTask
-        containingRoot.tasks.withType(DeployTask).configureEach { deployTask ->
-            root.allprojects.each { Project externalProject ->
-                deployTask.registerModuleInfoProducer(new ExternalProjectModuleInfoFileProducer(externalProject, containingRoot.getName(), dependenciesOutput))
-            }
+        // RTECO-136: dependency collection for composite builds is new behavior, so it stays opt-in even
+        // though applying the plugin above is not.
+        if (isIncludeSharedBuildEnabled(root)) {
+            collectSharedBuildDependencies(gradle, root)
         }
     }
 
@@ -128,6 +83,97 @@ projectsLoaded { Gradle gradle ->
             }
         } catch (UnknownTaskException ignored) {
             root.logger.debug("Can't find sub project configured for {}", p.getPath());
+        }
+    }
+}
+
+/**
+ * RTECO-136: Whether shared build (buildSrc/composite) dependency collection is enabled. Read via
+ * Project#findProperty (not gradle.getStartParameter().getProjectProperties()) so both
+ * -PincludeSharedBuild=true and an ORG_GRADLE_PROJECT_includeSharedBuild env var are honored.
+ */
+boolean isIncludeSharedBuildEnabled(Project root) {
+    Object value = root.findProperty("includeSharedBuild")
+    return value != null && "true".equalsIgnoreCase(value.toString())
+}
+
+/**
+ * RTECO-136: buildSrc needs the plugin applied (for the same UnknownPluginException reason described
+ * above for composite builds) before its dependencies can be collected.
+ */
+void applyPluginAndCollectSharedBuildDependencies(Gradle gradle, Project root) {
+    root.allprojects {
+        apply {
+            apply plugin: ArtifactoryPlugin
+        }
+    }
+    collectSharedBuildDependencies(gradle, root)
+}
+
+void collectSharedBuildDependencies(Gradle gradle, Project root) {
+    // RTECO-136 SUBPROCESS APPROACH: Run 'gradle -p <buildPath> dependencies --quiet' and capture
+    // the output, then pass it to ExternalProjectModuleInfoFileProducer for parsing. This keeps
+    // builds completely isolated and avoids assumptions about gradle.parent chain or Gradle's
+    // callback ordering - only the output text is needed.
+    //
+    // Deliberately NOT relying on Gradle firing the containing build's projectsLoaded before any
+    // nested build's (that ordering has only been empirically observed here, it is not a documented
+    // Gradle contract). `tasks.withType(DeployTask).configureEach { ... }` is a lazy, order-independent
+    // registration: it fires for the DeployTask whenever it gets added to containingRoot's task
+    // container, whether that already happened or happens later.
+    //
+    // gradle.parent is only the IMMEDIATE containing build, not necessarily the top-level one: a
+    // composite build can itself include another composite build (A includeBuild(B), B
+    // includeBuild(C)), in which case C's gradle.parent is B, not A. Walk all the way up to find
+    // the true top-level build whose DeployTask actually runs.
+    Gradle topLevelGradle = gradle
+    while (topLevelGradle.parent != null) {
+        topLevelGradle = topLevelGradle.parent
+    }
+    Project containingRoot = topLevelGradle.getRootProject()
+
+    // Run subprocess to capture dependencies for this external build
+    String buildPath = root.projectDir.absolutePath
+    String gradleCmd = buildPath + File.separator + "gradlew"
+    if (!new File(gradleCmd).exists()) {
+        String pathGradle = System.getenv("GRADLE_HOME")
+        if (pathGradle) {
+            gradleCmd = pathGradle + File.separator + "bin" + File.separator + "gradle"
+        } else {
+            gradleCmd = "gradle"
+        }
+    }
+
+    String dependenciesOutput = ""
+    root.logger.debug("RTECO-136: Running subprocess: ${gradleCmd} -p ${buildPath} dependencies --quiet")
+
+    try {
+        ProcessBuilder pb = new ProcessBuilder(gradleCmd, "-p", buildPath, "dependencies", "--quiet")
+        pb.redirectErrorStream(true)
+        Process process = pb.start()
+
+        StringBuilder output = new StringBuilder()
+        process.inputStream.eachLine { line ->
+            output.append(line).append("\n")
+        }
+
+        int exitCode = process.waitFor()
+        dependenciesOutput = output.toString()
+
+        root.logger.debug("Subprocess exited with code: ${exitCode}")
+        if (exitCode == 0) {
+            root.logger.info("Successfully ran dependencies for ${root.name}: ${dependenciesOutput.readLines().size()} lines captured")
+        } else {
+            root.logger.warn("Subprocess exited with code ${exitCode} for ${root.name}")
+        }
+    } catch (Exception e) {
+        root.logger.error("Failed to run subprocess for ${root.name}: ${e.message}")
+    }
+
+    // Register ExternalProjectModuleInfoFileProducer with subprocess output on containing build's DeployTask
+    containingRoot.tasks.withType(DeployTask).configureEach { deployTask ->
+        root.allprojects.each { Project externalProject ->
+            deployTask.registerModuleInfoProducer(new ExternalProjectModuleInfoFileProducer(externalProject, containingRoot.getName(), dependenciesOutput))
         }
     }
 }
