@@ -151,6 +151,12 @@ func (solution *solution) buildInfo(moduleName string, useNameVersionModuleId bo
 			// module-ID convention only ("<PackageID>:<Version>", matching Maven/Gradle FlexPack's
 			// requestedBy shape) - BuildInfo's legacy project-name default keeps its existing
 			// requestedBy shape so 'jf rt nuget'/'jf rt dotnet' output doesn't change.
+			// Collapse to one path per distinct immediate parent. Consumers of requestedBy
+			// (Xray's SBOM builder) read only path[0] of each path and reassemble the tree from
+			// every package's own entry, so several paths sharing a path[0] add no information.
+			// Applied here rather than during populateRequestedBy, whose recursion depends on
+			// RequestedBy growing to terminate - see the comment there.
+			dep.RequestedBy = dedupeRequestedByParent(dep.RequestedBy)
 			if useNameVersionModuleId {
 				dep.RequestedBy = stripModuleFromRequestedBy(dep.RequestedBy, module.Id)
 			}
@@ -193,6 +199,34 @@ func projectVersion(currProject project.Project) string {
 	return ""
 }
 
+// dedupeRequestedByParent keeps a single representative path per distinct immediate parent
+// (path[0]), preferring the shortest path for each. Order of first appearance is preserved so
+// output stays deterministic. Empty paths are dropped.
+func dedupeRequestedByParent(paths [][]string) [][]string {
+	if len(paths) < 2 {
+		return paths
+	}
+	indexByParent := make(map[string]int, len(paths))
+	var deduped [][]string
+	for _, path := range paths {
+		if len(path) == 0 {
+			continue
+		}
+		existing, seen := indexByParent[path[0]]
+		if !seen {
+			indexByParent[path[0]] = len(deduped)
+			deduped = append(deduped, path)
+			continue
+		}
+		// Same immediate parent already recorded - keep whichever chain is shorter, so the
+		// retained path stays the most direct explanation of how this package was pulled in.
+		if len(path) < len(deduped[existing]) {
+			deduped[existing] = path
+		}
+	}
+	return deduped
+}
+
 // Populate requested by field for the input dependencies.
 // parentDependency - The parent dependency
 // dependenciesMap  - The input dependencies map
@@ -214,6 +248,15 @@ func populateRequestedBy(parentDependency buildinfo.Dependency, dependenciesMap 
 			}
 			// Update RequestedBy field from parent's RequestedBy.
 			childDep.UpdateRequestedBy(parentDependency.Id, parentDependency.RequestedBy)
+
+			// Do NOT collapse childDep.RequestedBy here. This traversal has no visited set, and
+			// the growth of RequestedBy is what makes the RequestedByMaxLength check above fire
+			// and terminate the recursion. Shrinking it inside the loop defeats that brake and
+			// turns the walk into a full root-to-node path enumeration: a 30-package closure
+			// with a fan-out of 3 stops completing at all (measured: 25 packages 1.7s,
+			// 30 packages no result in 10s, against ~1ms without the collapse). Deduplication
+			// is an output concern and is applied once per dependency at emit time in
+			// BuildInfo instead.
 
 			// Run recursive call on child dependencies
 			populateRequestedBy(*childDep, dependenciesMap, childrenMap)
