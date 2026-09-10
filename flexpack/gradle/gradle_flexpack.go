@@ -148,13 +148,24 @@ func (gf *GradleFlexPack) detectCompositeBuildIncludes() []string {
 	return gf.parseIncludeBuildDirectives(content)
 }
 
-// collectSharedBuildDependencies runs gradle dependencies for a shared build and parses the output
-// Returns a list of dependencies found in the shared build
-// Note: IncludeSharedBuild is set to false for nested builds to avoid recursive collection
-func (gf *GradleFlexPack) collectSharedBuildDependencies(buildPath string) []flexpack.DependencyInfo {
+// sharedBuildModule holds what's needed to publish a buildSrc/composite build as its own standalone
+// build-info module (see buildSharedBuildModule), instead of merging its dependencies into the root module.
+type sharedBuildModule struct {
+	ModuleID string
+	Deps     []flexpack.DependencyInfo
+}
+
+// collectSharedBuildDependencies runs gradle dependencies for a shared build and parses the output.
+// Returns this shared build's dependencies together with a module ID for it, qualified the same way
+// artifactory-gradle-plugin's classic path does (SharedBuildLogicUtils.buildQualifiedModuleId): the
+// containing build's own name folded into the group slot, e.g. "gradle-demo-project:buildSrc:unspecified"
+// or "gradle-demo-project.com.example.build-logic:build-logic:1.0.0". Returns ("", nil) if nothing was
+// found (missing build, no dependencies, or a path-traversal attempt).
+// Note: IncludeSharedBuild is set to false for nested builds to avoid recursive collection.
+func (gf *GradleFlexPack) collectSharedBuildDependencies(buildPath string) (string, []flexpack.DependencyInfo) {
 	if !isSubPath(gf.config.WorkingDirectory, buildPath) {
 		log.Debug(fmt.Sprintf("Skipping shared build: path traversal detected for %s", buildPath))
-		return []flexpack.DependencyInfo{}
+		return "", nil
 	}
 
 	// Create a temporary GradleFlexPack instance for the shared build with its own working directory
@@ -170,18 +181,50 @@ func (gf *GradleFlexPack) collectSharedBuildDependencies(buildPath string) []fle
 	sharedBuild, err := NewGradleFlexPackWithContext(gf.ctx, sharedBuildConfig)
 	if err != nil {
 		log.Debug(fmt.Sprintf("Failed to initialize shared build FlexPack for %s: %s", buildPath, err.Error()))
-		return []flexpack.DependencyInfo{}
+		return "", nil
 	}
 
 	// Parse dependencies for the root module of the shared build (moduleName = "")
 	deps, _ := sharedBuild.parseModuleDependencies("")
 	if len(deps) == 0 {
 		log.Debug(fmt.Sprintf("No dependencies found in shared build: %s", buildPath))
-		return []flexpack.DependencyInfo{}
+		return "", nil
 	}
 
 	log.Debug(fmt.Sprintf("Collected %d dependencies from shared build: %s", len(deps), buildPath))
-	return deps
+	moduleID := gf.buildSharedBuildModuleID(sharedBuild.groupId, sharedBuild.artifactId, sharedBuild.projectVersion)
+	return moduleID, deps
+}
+
+// buildSharedBuildModuleID qualifies a buildSrc/composite build's own group:artifact:version with this
+// build's own artifactId, to avoid collisions across builds (buildSrc's own group is usually blank and its
+// name is always literally "buildSrc", so an unqualified ID would collide with every other project's
+// buildSrc). Matches artifactory-gradle-plugin's SharedBuildLogicUtils.buildQualifiedModuleId convention:
+// the qualifier replaces the group segment (rather than being prepended as a whole extra GAV) so the result
+// stays a normal 3-segment "group:name:version" identifier.
+func (gf *GradleFlexPack) buildSharedBuildModuleID(group, artifact, version string) string {
+	qualifiedGroup := gf.artifactId
+	if group != "" && group != "unspecified" {
+		qualifiedGroup = gf.artifactId + "." + group
+	}
+	if version == "" {
+		version = "unspecified"
+	}
+	return fmt.Sprintf("%s:%s:%s", qualifiedGroup, artifact, version)
+}
+
+// buildSharedBuildModule builds a standalone module entity for a buildSrc/composite build's already-
+// collected dependencies (see collectSharedBuildDependencies). Unlike a normal module, it carries no
+// requestedBy graph: gradle-dependencies subprocess output for a shared build is parsed the same way a
+// normal module's would be, but it's never wired into the containing build's own dependency graph, so
+// there's no "who requested this" lineage to attach.
+func (gf *GradleFlexPack) buildSharedBuildModule(shared sharedBuildModule) entities.Module {
+	dependencies := gf.createDependencyEntities(shared.Deps, map[string][]string{})
+	return entities.Module{
+		Id:           shared.ModuleID,
+		Type:         entities.Gradle,
+		Dependencies: dependencies,
+	}
 }
 
 func (gf *GradleFlexPack) scanAllModules() {
@@ -297,6 +340,18 @@ func (gf *GradleFlexPack) CollectBuildInfo(buildName, buildNumber string) (*enti
 		}
 		buildInfo.Modules = append(buildInfo.Modules, module)
 	}
+
+	// RTECO-136: buildSrc and each composite build get their own module here, same shape as any other
+	// module above - not merged into the root module's dependency list (see buildSharedBuildModule).
+	if gf.includeSharedBuild {
+		for _, shared := range gf.collectAllSharedBuildDependencies() {
+			if err := gf.ctx.Err(); err != nil {
+				return buildInfo, err
+			}
+			buildInfo.Modules = append(buildInfo.Modules, gf.buildSharedBuildModule(shared))
+		}
+	}
+
 	return buildInfo, nil
 }
 
@@ -354,74 +409,37 @@ func (gf *GradleFlexPack) parseModuleDependencies(moduleName string) ([]flexpack
 		deps = gf.parseFromBuildGradle(moduleName)
 	}
 
-	// Collect shared build dependencies if flag is enabled and this is the root module
-	if gf.includeSharedBuild && moduleName == "" {
-		sharedDeps := gf.collectAllSharedBuildDependencies()
-		if len(sharedDeps) > 0 {
-			log.Debug(fmt.Sprintf("Adding %d shared build dependencies to root module", len(sharedDeps)))
-			deps = mergeSharedBuildDependencies(deps, sharedDeps)
-		}
-	}
-
 	return deps, depGraph
 }
 
-// collectAllSharedBuildDependencies collects dependencies from buildSrc and composite builds
-func (gf *GradleFlexPack) collectAllSharedBuildDependencies() []flexpack.DependencyInfo {
-	allSharedDeps := make(map[string]flexpack.DependencyInfo)
+// collectAllSharedBuildDependencies collects dependencies from buildSrc and each composite build, each as
+// its own standalone module (see sharedBuildModule) rather than merged into the root module - matching the
+// classic artifactory-gradle-plugin path's shape. Sorted by module ID for deterministic output (a plain map
+// would iterate in random order).
+func (gf *GradleFlexPack) collectAllSharedBuildDependencies() []sharedBuildModule {
+	var result []sharedBuildModule
 
 	// 1. Collect from buildSrc if it exists
 	if gf.detectBuildSrcBuild() {
 		buildSrcPath := filepath.Join(gf.config.WorkingDirectory, "buildSrc")
 		log.Debug(fmt.Sprintf("Collecting dependencies from buildSrc: %s", buildSrcPath))
-		buildSrcDeps := gf.collectSharedBuildDependencies(buildSrcPath)
-		for _, dep := range buildSrcDeps {
-			allSharedDeps[dep.ID] = dep
+		if moduleID, deps := gf.collectSharedBuildDependencies(buildSrcPath); moduleID != "" {
+			result = append(result, sharedBuildModule{ModuleID: moduleID, Deps: deps})
 		}
 	}
 
 	// 2. Collect from composite builds (includeBuild directives)
 	compositePaths := gf.detectCompositeBuildIncludes()
 	for _, relativePath := range compositePaths {
-		compositePath := filepath.Join(gf.config.WorkingDirectory, relativePath)
-		compositePath = filepath.Clean(compositePath)
+		compositePath := filepath.Clean(filepath.Join(gf.config.WorkingDirectory, relativePath))
 		log.Debug(fmt.Sprintf("Collecting dependencies from composite build: %s", compositePath))
-		compositeDeps := gf.collectSharedBuildDependencies(compositePath)
-		for _, dep := range compositeDeps {
-			allSharedDeps[dep.ID] = dep
+		if moduleID, deps := gf.collectSharedBuildDependencies(compositePath); moduleID != "" {
+			result = append(result, sharedBuildModule{ModuleID: moduleID, Deps: deps})
 		}
 	}
 
-	// Convert map to slice
-	var result []flexpack.DependencyInfo
-	for _, dep := range allSharedDeps {
-		result = append(result, dep)
-	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ModuleID < result[j].ModuleID })
 	return result
-}
-
-// mergeSharedBuildDependencies merges shared build dependencies into root module dependencies,
-// deduplicating by ID and preferring existing root dependencies
-func mergeSharedBuildDependencies(rootDeps, sharedDeps []flexpack.DependencyInfo) []flexpack.DependencyInfo {
-	// Create a map of root dependencies by ID for quick lookup
-	rootDepMap := make(map[string]flexpack.DependencyInfo)
-	for _, dep := range rootDeps {
-		rootDepMap[dep.ID] = dep
-	}
-
-	// Add shared dependencies that don't already exist in root
-	for _, sharedDep := range sharedDeps {
-		if _, exists := rootDepMap[sharedDep.ID]; !exists {
-			rootDepMap[sharedDep.ID] = sharedDep
-		}
-	}
-
-	// Convert back to slice
-	var merged []flexpack.DependencyInfo
-	for _, dep := range rootDepMap {
-		merged = append(merged, dep)
-	}
-	return merged
 }
 
 func (gf *GradleFlexPack) createDependencyEntities(deps []flexpack.DependencyInfo, requestedByMap map[string][]string) []entities.Dependency {

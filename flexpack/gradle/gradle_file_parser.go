@@ -21,9 +21,14 @@ import (
 //   - Version catalogs (libs.some.dependency) are not supported
 //   - For full accuracy, prefer CLI-based parsing; these regexes are fallback only
 var (
-	groupRegex   = regexp.MustCompile(`(?:group|groupId)\s*=\s*['"]([^'"]+)['"]`)
-	nameRegex    = regexp.MustCompile(`(?:(?:rootProject\.)?name|artifactId)\s*=\s*['"]([^'"]+)['"]`)
-	versionRegex = regexp.MustCompile(`(?:version\s*=|versionName)\s*['"]([^'"]+)['"]`)
+	// \b word boundaries matter here: without them, e.g. "username = \"admin\"" would false-match
+	// nameRegex (it ends in "...ername" - a match for "name" with nothing anchoring it to a word start),
+	// and "subgroup = ..." would false-match groupRegex the same way. Found live via RTECO-136 shared-
+	// build-module testing: a buildSrc/build.gradle with a `credentials { username = "admin" }` block
+	// (a common pattern for repository auth) was silently resolving this project's artifactId to "admin".
+	groupRegex   = regexp.MustCompile(`\b(?:group|groupId)\s*=\s*['"]([^'"]+)['"]`)
+	nameRegex    = regexp.MustCompile(`\b(?:(?:rootProject\.)?name|artifactId)\s*=\s*['"]([^'"]+)['"]`)
+	versionRegex = regexp.MustCompile(`(?:\bversion\s*=|\bversionName)\s*['"]([^'"]+)['"]`)
 	includeRegex = regexp.MustCompile(`['"]([^'"]+)['"]`)
 	// depRegex handles string notation: implementation("group:artifact:version") or implementation 'group:artifact:version'
 	depRegex = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*[\(\s]['"]([^'"]+)['"]`)
