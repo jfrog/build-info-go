@@ -598,6 +598,9 @@ func (mf *MavenFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entit
 		Name:    buildName,
 		Number:  buildNumber,
 		Started: time.Now().Format(entities.TimeFormat),
+		// Agent.Name and Agent.Version are overridden at publish time by jfrog-cli via
+		// SetAgentName("jfrog-cli-go") and SetAgentVersion(<cli version>); these values
+		// are placeholders used when the library is called directly outside of jfrog-cli.
 		Agent: &entities.Agent{
 			Name:    "build-info-go",
 			Version: "1.0.0",
