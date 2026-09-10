@@ -1,0 +1,57 @@
+name: Release
+
+# Ported from the (now EOL) JFrog Pipelines pipeline "release_build_info_go"
+# defined in release/pipelines.yml. Triggered manually with the version to
+# release.
+on:
+  workflow_dispatch:
+    inputs:
+      next_version:
+        description: 'Version to release (e.g. 1.2.3)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+  JFROG_CLI_BUILD_NAME: ecosystem-build-info-go-release
+  JFROG_CLI_BUILD_NUMBER: ${{ github.run_number }}
+  JFROG_CLI_BUILD_PROJECT: ecosys
+  NEXT_VERSION: ${{ github.event.inputs.next_version }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Behavior change from the original JFrog Pipelines version, which
+      # bootstrapped the CLI via `curl -fL https://install-cli.jfrog.io | sh`
+      # inside a custom runtime image. Here we use the official setup action,
+      # which also configures a JFrog CLI server (env vars below) so no
+      # separate `jf c add` step is needed.
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ secrets.ARTIFACTORY_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_APIKEY }}
+
+      # Runs the full release: version check, merge dev into main, Go
+      # audit/build/upload, build-info collection and publish, git tag,
+      # release bundle distribution, and push to main. See
+      # .github/scripts/release.sh, which can also be run directly on a
+      # developer machine (export the same env vars used here).
+      - name: Release
+        run: .github/scripts/release.sh
+        env:
+          IL_AUTOMATION_TOKEN: ${{ secrets.IL_AUTOMATION_TOKEN }}
