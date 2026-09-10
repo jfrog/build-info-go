@@ -8,12 +8,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/jfrog/build-info-go/build"
 	"github.com/jfrog/build-info-go/entities"
 	"github.com/jfrog/build-info-go/flexpack"
+	aptflex "github.com/jfrog/build-info-go/flexpack/apt"
 	"github.com/jfrog/build-info-go/flexpack/conan"
 	gradleflex "github.com/jfrog/build-info-go/flexpack/gradle"
 	nixflex "github.com/jfrog/build-info-go/flexpack/nix"
@@ -290,6 +292,61 @@ func GetCommands(logger utils.Log) []*clitool.Command {
 					return err
 				}
 				return printBuildInfo(buildInfo, formatValue)
+			},
+		},
+		{
+			Name:            "apt",
+			Usage:           "Run apt-get install and generate build-info for the installed Debian packages",
+			UsageText:       "bi apt install [--from-file pkgs.txt] <packages...>",
+			Flags:           flags,
+			SkipFlagParsing: true,
+			Action: func(context *clitool.Context) error {
+				formatValue, positional, err := extractStringFlag(context.Args().Slice(), formatFlag)
+				if err != nil {
+					return err
+				}
+				if len(positional) == 0 {
+					return fmt.Errorf("bi apt requires arguments, e.g.: bi apt install curl")
+				}
+
+				// Run apt-get install first (bi apt always runs the real install)
+				if positional[0] == "install" {
+					// Extract --from-file before forwarding to apt-get.
+					fromFile, installArgs := extractFromFileArg(positional[1:])
+					if fromFile != "" {
+						pkgs, err := aptflex.ReadPackagesFile(fromFile)
+						if err != nil {
+							return fmt.Errorf("--from-file %s: %w", fromFile, err)
+						}
+						installArgs = append(installArgs, pkgs...)
+					}
+					if len(installArgs) == 0 {
+						return fmt.Errorf("bi apt install: no packages specified")
+					}
+
+					collector := aptflex.NewAptFlexPack(aptflex.AptConfig{})
+
+					installCmd := exec.Command("apt-get", append([]string{"install"}, installArgs...)...)
+					installCmd.Stdout = os.Stdout
+					installCmd.Stderr = os.Stderr
+					installCmd.Stdin = os.Stdin
+					if err := installCmd.Run(); err != nil {
+						return fmt.Errorf("apt-get install failed: %w", err)
+					}
+
+					// Collect build-info after the install completes.
+					if err := collector.CollectDependencies(installArgs); err != nil {
+						return fmt.Errorf("apt build-info collection failed: %w", err)
+					}
+					buildInfo, err := collector.CollectBuildInfo("apt-build", "1", "")
+					if err != nil {
+						return fmt.Errorf("apt build-info assembly failed: %w", err)
+					}
+					return printBuildInfo(buildInfo, formatValue)
+				}
+
+				// For non-install subcommands, pass through to apt-get.
+				return exec.Command("apt-get", positional...).Run()
 			},
 		},
 		{
@@ -688,6 +745,25 @@ func printBuildInfo(buildInfo *entities.BuildInfo, format string) error {
 	}
 
 	return nil
+}
+
+// extractFromFileArg pulls --from-file <path> out of args, returning the path
+// and the remaining args (without the flag pair).
+func extractFromFileArg(args []string) (fromFile string, remaining []string) {
+	for i, a := range args {
+		if a == "--from-file" && i+1 < len(args) {
+			fromFile = args[i+1]
+			remaining = slices.Concat(args[:i], args[i+2:])
+			return
+		}
+		if strings.HasPrefix(a, "--from-file=") {
+			fromFile = strings.TrimPrefix(a, "--from-file=")
+			remaining = slices.Concat(args[:i], args[i+1:])
+			return
+		}
+	}
+	remaining = args
+	return
 }
 
 func filterCliFlags(allArgs []string, cliFlags []clitool.Flag) []string {

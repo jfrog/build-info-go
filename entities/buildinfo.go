@@ -50,6 +50,7 @@ const (
 	Gem       ModuleType = "gem"
 	Apk       ModuleType = "apk"
 	Cargo     ModuleType = "cargo"
+	Debian    ModuleType = "debian"
 )
 
 type BuildInfo struct {
