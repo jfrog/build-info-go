@@ -254,6 +254,11 @@ func readNuspecDependencies(packageDirectory, packageName string, log utils.Log)
 	if err := xml.Unmarshal(content, &document); err != nil {
 		log.Warn("Could not parse the Chocolatey manifest " + nuspecPath + ", so the dependencies of " +
 			packageName + " are not recorded in the build-info: " + err.Error())
+		// Swallowing the error is deliberate: an unparseable manifest in an already-installed
+		// dependency means its own dependencies are unknown, not that the build failed. Returning
+		// the error here would fail build-info collection for the whole command over one bad
+		// package, so the package is treated as a leaf and the warning above is the record.
+		//nolint:nilerr // see above: a malformed manifest degrades to a leaf, it does not fail
 		return nil, nil
 	}
 	declared := document.Metadata.Dependencies.Dependencies
