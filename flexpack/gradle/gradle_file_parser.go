@@ -169,8 +169,12 @@ func (gf *GradleFlexPack) parseIncludeBuildDirectives(content string) []string {
 	var buildPaths []string
 	lines := strings.Split(strippedContent, "\n")
 
-	// Regex to match includeBuild('path') or includeBuild("path") or includeBuild( 'path' ) variations
-	includeBuildRegex := regexp.MustCompile(`includeBuild\s*\(\s*['"]([^'"]+)['"]\s*\)`)
+	// Regex to match includeBuild('path'), includeBuild("path"), includeBuild( 'path' ), and Groovy's
+	// paren-less shorthand includeBuild 'path' (a single-string-argument method call without parens is
+	// valid Groovy and is what most real settings.gradle files actually use - Kotlin DSL always requires
+	// parens, but making them optional here doesn't risk a false match either way since a quoted path
+	// must still immediately follow).
+	includeBuildRegex := regexp.MustCompile(`includeBuild\s*\(?\s*['"]([^'"]+)['"]\s*\)?`)
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)

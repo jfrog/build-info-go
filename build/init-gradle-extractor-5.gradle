@@ -5,6 +5,7 @@ import org.jfrog.gradle.plugin.artifactory.extractor.ExternalProjectModuleInfoFi
 import org.jfrog.gradle.plugin.artifactory.task.ArtifactoryTask
 import org.jfrog.gradle.plugin.artifactory.task.DeployTask
 import org.jfrog.gradle.plugin.artifactory.utils.PluginUtils;
+import org.jfrog.gradle.plugin.artifactory.utils.SharedBuildLogicUtils
 
 initscript {
     dependencies {
@@ -111,10 +112,14 @@ void applyPluginAndCollectSharedBuildDependencies(Gradle gradle, Project root) {
 }
 
 void collectSharedBuildDependencies(Gradle gradle, Project root) {
-    // RTECO-136 SUBPROCESS APPROACH: Run 'gradle -p <buildPath> dependencies --quiet' and capture
-    // the output, then pass it to ExternalProjectModuleInfoFileProducer for parsing. This keeps
-    // builds completely isolated and avoids assumptions about gradle.parent chain or Gradle's
-    // callback ordering - only the output text is needed.
+    // RTECO-136 SUBPROCESS APPROACH: delegate to SharedBuildLogicUtils.runDependenciesSubprocess(), the
+    // single-sourced helper the direct-application (ArtifactoryPlugin) path also uses, instead of a
+    // hand-copied Groovy subprocess call. That gets this path the same JSON-first (exportDependenciesAsJson,
+    // falling back to plain 'dependencies') behavior, GRADLE_USER_HOME propagation to the subprocess (so
+    // checksum lookups hit the same Gradle module cache the main process uses), and executable resolution
+    // as the direct-application path - see its javadoc for why drift here is exactly what it exists to avoid.
+    // The producer keeps builds completely isolated and avoids assumptions about gradle.parent chain or
+    // Gradle's callback ordering - only the output text is needed.
     //
     // Deliberately NOT relying on Gradle firing the containing build's projectsLoaded before any
     // nested build's (that ordering has only been empirically observed here, it is not a documented
@@ -132,42 +137,13 @@ void collectSharedBuildDependencies(Gradle gradle, Project root) {
     }
     Project containingRoot = topLevelGradle.getRootProject()
 
-    // Run subprocess to capture dependencies for this external build
     String buildPath = root.projectDir.absolutePath
-    String gradleCmd = buildPath + File.separator + "gradlew"
-    if (!new File(gradleCmd).exists()) {
-        String pathGradle = System.getenv("GRADLE_HOME")
-        if (pathGradle) {
-            gradleCmd = pathGradle + File.separator + "bin" + File.separator + "gradle"
-        } else {
-            gradleCmd = "gradle"
-        }
-    }
+    String gradleCmd = SharedBuildLogicUtils.resolveGradleExecutable(root.projectDir)
+    root.logger.debug("RTECO-136: Collecting shared build dependencies for ${root.name} via ${gradleCmd}")
 
-    String dependenciesOutput = ""
-    root.logger.debug("RTECO-136: Running subprocess: ${gradleCmd} -p ${buildPath} dependencies --quiet")
-
-    try {
-        ProcessBuilder pb = new ProcessBuilder(gradleCmd, "-p", buildPath, "dependencies", "--quiet")
-        pb.redirectErrorStream(true)
-        Process process = pb.start()
-
-        StringBuilder output = new StringBuilder()
-        process.inputStream.eachLine { line ->
-            output.append(line).append("\n")
-        }
-
-        int exitCode = process.waitFor()
-        dependenciesOutput = output.toString()
-
-        root.logger.debug("Subprocess exited with code: ${exitCode}")
-        if (exitCode == 0) {
-            root.logger.info("Successfully ran dependencies for ${root.name}: ${dependenciesOutput.readLines().size()} lines captured")
-        } else {
-            root.logger.warn("Subprocess exited with code ${exitCode} for ${root.name}")
-        }
-    } catch (Exception e) {
-        root.logger.error("Failed to run subprocess for ${root.name}: ${e.message}")
+    String dependenciesOutput = SharedBuildLogicUtils.runDependenciesSubprocess(gradleCmd, buildPath)
+    if (dependenciesOutput.isEmpty()) {
+        root.logger.warn("Failed to collect dependencies for shared build '${root.name}' at ${buildPath}")
     }
 
     // Register ExternalProjectModuleInfoFileProducer with subprocess output on containing build's DeployTask
