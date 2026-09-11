@@ -212,3 +212,26 @@ func TestCommandWithRootProjectDir(t *testing.T) {
 	assert.Contains(t, cmd.Args, "myMavenOpt2")
 	assert.Contains(t, cmd.Args, "-Dmaven.multiModuleProjectDirectory=myRootProjectDir")
 }
+
+// The Maven extractor decides unique-vs-non-unique snapshots from the -DuniqueVersion system property.
+// jf mvn does not translate that flag; it forwards the user's raw goals to the extractor's Maven command
+// line, where Maven turns -DuniqueVersion into a session user property. This test guards that passthrough.
+func TestUniqueVersionGoalPassedThrough(t *testing.T) {
+	for _, uniqueVersionArg := range []string{"-DuniqueVersion=false", "-DuniqueVersion=true"} {
+		t.Run(uniqueVersionArg, func(t *testing.T) {
+			mvnc := &mvnRunConfig{
+				java:                "myJava",
+				plexusClassworlds:   "myPlexus",
+				cleassworldsConfig:  "myCleassworldsConfig",
+				mavenHome:           "myMavenHome",
+				pluginDependencies:  "myPluginDependencies",
+				workspace:           "myWorkspace",
+				goals:               []string{"deploy", uniqueVersionArg},
+				buildInfoProperties: "myBuildInfoProperties",
+			}
+			cmd := mvnc.GetCmd()
+			assert.Contains(t, cmd.Args, "deploy")
+			assert.Contains(t, cmd.Args, uniqueVersionArg)
+		})
+	}
+}
