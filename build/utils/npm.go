@@ -23,8 +23,37 @@ import (
 
 const npmInstallCommand = "install"
 
+// Granular values accepted by the --fail-on-uncollected-deps flag (passed to CalculateNpmDependenciesList).
+// The flag also accepts a comma-separated combination of the granular values, e.g. "peer,optional,bundle".
+const (
+	failOnUncollectedDepsAll      = "all"
+	failOnUncollectedDepsRegular  = "regular"
+	failOnUncollectedDepsPeer     = "peer"
+	failOnUncollectedDepsOptional = "optional"
+	failOnUncollectedDepsBundle   = "bundle"
+)
+
+// Dependency type identifiers used internally in handleMissingDeps
+const (
+	depTypePeer     = "peerDependency"
+	depTypeBundle   = "bundleDependencies"
+	depTypeOptional = "optionalDependencies"
+	depTypeRegular  = "regular"
+)
+
+// depTypeToFlagValue maps the internal dependency-type identifiers (as passed to handleMissingDeps)
+// to the granular flag value that governs them.
+var depTypeToFlagValue = map[string]string{
+	depTypePeer:     failOnUncollectedDepsPeer,
+	depTypeBundle:   failOnUncollectedDepsBundle,
+	depTypeOptional: failOnUncollectedDepsOptional,
+	depTypeRegular:  failOnUncollectedDepsRegular,
+}
+
 // CalculateNpmDependenciesList gets an npm project's dependencies.
-func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, log utils.Log) ([]entities.Dependency, error) {
+// failOnUncollectedDeps controls whether the build fails when a dependency's integrity/checksum can't be
+// collected for build-info. See the failOnUncollectedDeps* constants above.
+func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmParams NpmTreeDepListParam, calculateChecksums bool, failOnUncollectedDeps string, log utils.Log) ([]entities.Dependency, error) {
 	if log == nil {
 		log = &utils.NullLog{}
 	}
@@ -75,17 +104,25 @@ func CalculateNpmDependenciesList(executablePath, srcPath, moduleId string, npmP
 
 		dependenciesList = append(dependenciesList, dep.Dependency)
 	}
-	if len(missingPeerDeps) > 0 {
-		printMissingDependenciesWarning("peerDependency", missingPeerDeps, log)
+	// Apply --fail-on-uncollected-deps flag to ALL missing dependency types
+	// Collect all errors so users see the complete picture of what's missing
+	var allErrors []string
+
+	if err := handleMissingDeps(depTypePeer, missingPeerDeps, failOnUncollectedDeps, log); err != nil {
+		allErrors = append(allErrors, err.Error())
 	}
-	if len(missingBundledDeps) > 0 {
-		printMissingDependenciesWarning("bundleDependencies", missingBundledDeps, log)
+	if err := handleMissingDeps(depTypeBundle, missingBundledDeps, failOnUncollectedDeps, log); err != nil {
+		allErrors = append(allErrors, err.Error())
 	}
-	if len(missingOptionalDeps) > 0 {
-		printMissingDependenciesWarning("optionalDependencies", missingOptionalDeps, log)
+	if err := handleMissingDeps(depTypeOptional, missingOptionalDeps, failOnUncollectedDeps, log); err != nil {
+		allErrors = append(allErrors, err.Error())
 	}
-	if len(otherMissingDeps) > 0 {
-		log.Warn("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '" + strings.Join(otherMissingDeps, ",") + "'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.")
+	if err := handleMissingDeps(depTypeRegular, otherMissingDeps, failOnUncollectedDeps, log); err != nil {
+		allErrors = append(allErrors, err.Error())
+	}
+	if len(allErrors) > 0 {
+		errorMsg := "Build-info collection stopped.\n" + strings.Join(allErrors, "\n")
+		return nil, errors.New(errorMsg)
 	}
 	return dependenciesList, nil
 }
@@ -255,6 +292,70 @@ func GetNpmVersion(executablePath string, log utils.Log) (*version.Version, erro
 		return nil, err
 	}
 	return version.NewVersion(string(versionData)), nil
+}
+
+// shouldFailOnUncollectedDeps returns true if the given dependency type should fail the build,
+// according to the granular flagValue supplied to --fail-on-uncollected-deps.
+// flagValue can be:
+//   - "" (empty): never fail (backward compatible default)
+//   - "all": fail for every dependency type
+//   - a comma-separated combination of "regular", "peer", "optional", "bundle"
+func shouldFailOnUncollectedDeps(depType, flagValue string) bool {
+	if flagValue == "" {
+		return false
+	}
+	if flagValue == failOnUncollectedDepsAll {
+		return true
+	}
+	wantedValue, ok := depTypeToFlagValue[depType]
+	if !ok {
+		return false
+	}
+	for _, value := range strings.Split(flagValue, ",") {
+		if strings.TrimSpace(value) == wantedValue {
+			return true
+		}
+	}
+	return false
+}
+
+// handleMissingDeps handles missing dependencies based on the granular --fail-on-uncollected-deps flag value.
+// If shouldFailOnUncollectedDeps(depType, failOnUncollectedDeps) is true, returns an error for that dependency type.
+// Otherwise, logs a warning.
+func handleMissingDeps(depType string, missingDeps []string, failOnUncollectedDeps string, log utils.Log) error {
+	if len(missingDeps) == 0 {
+		return nil
+	}
+
+	// The flag targets this dependency type: throw an error instead of just logging.
+	if shouldFailOnUncollectedDeps(depType, failOnUncollectedDeps) {
+		var message string
+		switch depType {
+		case depTypePeer, depTypeBundle:
+			message = fmt.Sprintf("The following %s could not be included in the build-info, because 'npm ls' did not return their integrity: '%s'", depType, strings.Join(missingDeps, ","))
+		case depTypeOptional:
+			message = fmt.Sprintf("The following %s could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", depType, strings.Join(missingDeps, ","))
+		default:
+			// depTypeRegular is an internal bucket name, not a real npm-facing term like the others -
+			// say "dependencies" instead of surfacing it verbatim.
+			message = fmt.Sprintf("The following dependencies could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", strings.Join(missingDeps, ","))
+		}
+		return errors.New(message)
+	}
+
+	// The flag doesn't target this dependency type: log instead of failing.
+	switch depType {
+	case depTypePeer, depTypeBundle:
+		// Legacy DEBUG-level logging, unchanged from before this flag existed.
+		printMissingDependenciesWarning(depType, missingDeps, log)
+	case depTypeOptional:
+		// DEBUG: an unresolvable optional dependency is expected/benign, not necessarily a problem.
+		log.Debug(fmt.Sprintf("The following %s could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", depType, strings.Join(missingDeps, ",")))
+	default:
+		// WARN: legacy behavior for an unexpected cache/tarball resolution failure.
+		log.Warn(fmt.Sprintf("The following dependencies could not be included in the build-info, because their tarball could not be resolved from the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", strings.Join(missingDeps, ",")))
+	}
+	return nil
 }
 
 type NpmTreeDepListParam struct {
