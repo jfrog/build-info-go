@@ -210,14 +210,15 @@ func getInitScript(initScriptPattern, gradleDependenciesDir, gradlePluginFilenam
 	}
 	initScriptPath := filepath.Join(gradleDependenciesDir, gradleInitScriptTemplate)
 
-	exists, err := utils.IsFileExists(initScriptPath, true)
-	if exists || err != nil {
-		return initScriptPath, err
-	}
-
 	gradlePluginPath := filepath.Join(gradleDependenciesDir, gradlePluginFilename)
 	gradlePluginPath = strings.ReplaceAll(gradlePluginPath, "\\", "\\\\")
 	initScriptContent := strings.ReplaceAll(initScriptPattern, "${pluginLibDir}", gradlePluginPath)
+
+	// Rewrite when missing or stale so an updated embedded init script takes effect.
+	existing, readErr := os.ReadFile(initScriptPath)
+	if readErr == nil && string(existing) == initScriptContent {
+		return initScriptPath, nil
+	}
 	if !utils.IsPathExists(gradleDependenciesDir) {
 		err = os.MkdirAll(gradleDependenciesDir, 0777)
 		if err != nil {

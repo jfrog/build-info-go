@@ -26,18 +26,18 @@ type moduleMetadata struct {
 }
 
 type GradleFlexPack struct {
-	config            flexpack.GradleConfig
-	ctx               context.Context
-	projectName       string
-	projectVersion    string
-	groupId           string
-	artifactId        string
-	buildGradlePath   string
-	wasPublishCommand bool
+	config             flexpack.GradleConfig
+	ctx                context.Context
+	projectName        string
+	projectVersion     string
+	groupId            string
+	artifactId         string
+	buildGradlePath    string
+	wasPublishCommand  bool
 	includeSharedBuild bool
-	modulesMap        map[string]moduleMetadata
-	modulesList       []string
-	deployedArtifacts map[string][]entities.Artifact
+	modulesMap         map[string]moduleMetadata
+	modulesList        []string
+	deployedArtifacts  map[string][]entities.Artifact
 }
 
 func NewGradleFlexPack(config flexpack.GradleConfig) (*GradleFlexPack, error) {

@@ -1,3 +1,6 @@
+// jf gradle writes this file as --init-script. --include-shared-build becomes
+// ORG_GRADLE_PROJECT_includeSharedBuild=true and -PincludeSharedBuild=true, which
+// SharedBuildLogicUtils.isIncludeSharedBuildEnabled reads via Project.findProperty.
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPlugin
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPluginSettings
 import org.jfrog.gradle.plugin.artifactory.Constant
@@ -25,57 +28,33 @@ projectsLoaded { Gradle gradle ->
     gradle.startParameter.setProjectProperties(projectProperties)
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
-
-    // RTECO-136: mark this project as init-script-managed BEFORE applying the plugin below, so
-    // ArtifactoryPlugin.apply() knows to skip its own buildSrc/composite detection (this init script
-    // already runs its own, more complete one). Must match SharedBuildLogicUtils.
-    // INIT_SCRIPT_MANAGES_SHARED_BUILD_PROPERTY in the plugin jar this init script is paired with.
+    // Tell ArtifactoryPlugin.apply() not to register the same shared builds a second time.
     root.ext.set('jfrogInitScriptManagesSharedBuild', true)
 
     if (gradle.parent == null) {
-        // The containing (top-level) build.
-        root.allprojects {
-            apply {
-                apply plugin: ArtifactoryPlugin
-            }
+        root.allprojects { Project p ->
+            applyArtifactoryIfMissing(p)
+        }
+        // Collect shared builds (buildSrc, includedBuilds) when flag is enabled
+        if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
+            collectSharedBuildDependencies(gradle, root)
         }
     } else if ("buildSrc".equals(root.name)) {
-        // buildSrc: preserve pre-RTECO-136 behavior unless the shared-build-logic feature is explicitly
-        // opted into (-PincludeSharedBuild=true / ORG_GRADLE_PROJECT_includeSharedBuild=true) - the plugin
-        // was never applied to buildSrc before this feature existed, and users who don't use the flag must
-        // see exactly that same behavior.
-        if (isIncludeSharedBuildEnabled(root)) {
+        // buildSrc stays unapplied unless includeSharedBuild is explicitly on.
+        if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
             applyPluginAndCollectSharedBuildDependencies(gradle, root)
         }
     } else {
-        // RTECO-1725: a composite/included build (settings.gradle includeBuild(...)) - a separate Gradle
-        // build instance. Applying the plugin here matches pre-RTECO-136 behavior (the old guard only ever
-        // excluded buildSrc by name), so this part always runs regardless of the flag. Note that this init
-        // script is re-evaluated from scratch for each one - top-level script variables here do NOT persist
-        // across these separate firings of projectsLoaded, so we can't accumulate state in a plain script
-        // variable across them. gradle.parent, though, is a live reference to the actual containing Gradle
-        // build object, shared across all these separate evaluations within the same session.
-        //
-        // Apply the plugin here too (even though its own artifactoryPublish/extractModuleInfo tasks will
-        // never run): ExternalProjectModuleInfoFileProducer's dependency extraction needs
-        // project.getRootProject().getPlugins().getPlugin(ArtifactoryPlugin) to succeed, and it wouldn't
-        // without this - it would fail with UnknownPluginException and silently produce no dependencies.
-        // root.allprojects covers every subproject of this nested build too, not just its root - a
-        // multi-project included build needs the plugin applied to each of them individually.
-        root.allprojects {
-            apply {
-                apply plugin: ArtifactoryPlugin
-            }
+        // Included builds always get the plugin (needed for ExternalProjectModuleInfoFileProducer).
+        // Collecting their dependencies is still opt-in.
+        root.allprojects { Project p ->
+            applyArtifactoryIfMissing(p)
         }
-
-        // RTECO-136: dependency collection for composite builds is new behavior, so it stays opt-in even
-        // though applying the plugin above is not.
-        if (isIncludeSharedBuildEnabled(root)) {
+        if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
             collectSharedBuildDependencies(gradle, root)
         }
     }
 
-    // Set the CI Server mode to all Artifactory tasks.
     for (Project p : root.getAllprojects()) {
         try {
             TaskProvider<? extends Task> subCollectInfoTask = p.getTasks().named(Constant.ARTIFACTORY_PUBLISH_TASK_NAME, ArtifactoryTask.class);
@@ -88,68 +67,43 @@ projectsLoaded { Gradle gradle ->
     }
 }
 
-/**
- * RTECO-136: Whether shared build (buildSrc/composite) dependency collection is enabled. Read via
- * Project#findProperty (not gradle.getStartParameter().getProjectProperties()) so both
- * -PincludeSharedBuild=true and an ORG_GRADLE_PROJECT_includeSharedBuild env var are honored.
- */
-boolean isIncludeSharedBuildEnabled(Project root) {
-    Object value = root.findProperty("includeSharedBuild")
-    return value != null && "true".equalsIgnoreCase(value.toString())
+void applyArtifactoryIfMissing(Project project) {
+    if (project.extensions.findByName(Constant.ARTIFACTORY) != null) {
+        return
+    }
+    project.pluginManager.apply(ArtifactoryPlugin)
 }
 
-/**
- * RTECO-136: buildSrc needs the plugin applied (for the same UnknownPluginException reason described
- * above for composite builds) before its dependencies can be collected.
- */
 void applyPluginAndCollectSharedBuildDependencies(Gradle gradle, Project root) {
-    root.allprojects {
-        apply {
-            apply plugin: ArtifactoryPlugin
-        }
+    root.allprojects { Project p ->
+        applyArtifactoryIfMissing(p)
     }
     collectSharedBuildDependencies(gradle, root)
 }
 
+/**
+ * Walk to the top-level DeployTask and register an eager producer for this shared build.
+ */
 void collectSharedBuildDependencies(Gradle gradle, Project root) {
-    // RTECO-136 SUBPROCESS APPROACH: delegate to SharedBuildLogicUtils.runDependenciesSubprocess(), the
-    // single-sourced helper the direct-application (ArtifactoryPlugin) path also uses, instead of a
-    // hand-copied Groovy subprocess call. That gets this path the same JSON-first (exportDependenciesAsJson,
-    // falling back to plain 'dependencies') behavior, GRADLE_USER_HOME propagation to the subprocess (so
-    // checksum lookups hit the same Gradle module cache the main process uses), and executable resolution
-    // as the direct-application path - see its javadoc for why drift here is exactly what it exists to avoid.
-    // The producer keeps builds completely isolated and avoids assumptions about gradle.parent chain or
-    // Gradle's callback ordering - only the output text is needed.
-    //
-    // Deliberately NOT relying on Gradle firing the containing build's projectsLoaded before any
-    // nested build's (that ordering has only been empirically observed here, it is not a documented
-    // Gradle contract). `tasks.withType(DeployTask).configureEach { ... }` is a lazy, order-independent
-    // registration: it fires for the DeployTask whenever it gets added to containingRoot's task
-    // container, whether that already happened or happens later.
-    //
-    // gradle.parent is only the IMMEDIATE containing build, not necessarily the top-level one: a
-    // composite build can itself include another composite build (A includeBuild(B), B
-    // includeBuild(C)), in which case C's gradle.parent is B, not A. Walk all the way up to find
-    // the true top-level build whose DeployTask actually runs.
+    // gradle.parent is only the immediate parent; nested includes must walk to the true top-level build.
     Gradle topLevelGradle = gradle
     while (topLevelGradle.parent != null) {
         topLevelGradle = topLevelGradle.parent
     }
     Project containingRoot = topLevelGradle.getRootProject()
-
     String buildPath = root.projectDir.absolutePath
     String gradleCmd = SharedBuildLogicUtils.resolveGradleExecutable(root.projectDir)
-    root.logger.debug("RTECO-136: Collecting shared build dependencies for ${root.name} via ${gradleCmd}")
-
-    String dependenciesOutput = SharedBuildLogicUtils.runDependenciesSubprocess(gradleCmd, buildPath)
-    if (dependenciesOutput.isEmpty()) {
+    def export = SharedBuildLogicUtils.exportSharedBuild(gradleCmd, buildPath)
+    // Use the API dump when it has dependencies; otherwise run the dependencies subprocess.
+    String dependenciesOutput = export != null && export.dependencyCount > 0
+            ? export.rawJson
+            : SharedBuildLogicUtils.runDependenciesSubprocess(gradleCmd, buildPath)
+    if (dependenciesOutput == null || dependenciesOutput.isEmpty()) {
         root.logger.warn("Failed to collect dependencies for shared build '${root.name}' at ${buildPath}")
     }
-
-    // Register ExternalProjectModuleInfoFileProducer with subprocess output on containing build's DeployTask
     containingRoot.tasks.withType(DeployTask).configureEach { deployTask ->
         root.allprojects.each { Project externalProject ->
-            deployTask.registerModuleInfoProducer(new ExternalProjectModuleInfoFileProducer(externalProject, containingRoot.getName(), dependenciesOutput))
+            deployTask.registerModuleInfoProducer(new ExternalProjectModuleInfoFileProducer(externalProject, null, dependenciesOutput))
         }
     }
 }
