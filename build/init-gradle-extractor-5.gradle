@@ -4,10 +4,8 @@
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPlugin
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPluginSettings
 import org.jfrog.gradle.plugin.artifactory.Constant
-import org.jfrog.gradle.plugin.artifactory.extractor.ExternalProjectModuleInfoFileProducer
 import org.jfrog.gradle.plugin.artifactory.task.ArtifactoryTask
-import org.jfrog.gradle.plugin.artifactory.task.DeployTask
-import org.jfrog.gradle.plugin.artifactory.utils.PluginUtils;
+import org.jfrog.gradle.plugin.artifactory.utils.PluginUtils
 import org.jfrog.gradle.plugin.artifactory.utils.SharedBuildLogicUtils
 
 initscript {
@@ -28,30 +26,21 @@ projectsLoaded { Gradle gradle ->
     gradle.startParameter.setProjectProperties(projectProperties)
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
-    // Tell ArtifactoryPlugin.apply() not to register the same shared builds a second time.
-    root.ext.set('jfrogInitScriptManagesSharedBuild', true)
 
     if (gradle.parent == null) {
         root.allprojects { Project p ->
             applyArtifactoryIfMissing(p)
         }
-        // Collect shared builds (buildSrc, includedBuilds) when flag is enabled
-        if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
-            collectSharedBuildDependencies(gradle, root)
-        }
     } else if ("buildSrc".equals(root.name)) {
         // buildSrc stays unapplied unless includeSharedBuild is explicitly on.
         if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
-            applyPluginAndCollectSharedBuildDependencies(gradle, root)
+            root.allprojects { Project p ->
+                applyArtifactoryIfMissing(p)
+            }
         }
     } else {
-        // Included builds always get the plugin (needed for ExternalProjectModuleInfoFileProducer).
-        // Collecting their dependencies is still opt-in.
         root.allprojects { Project p ->
             applyArtifactoryIfMissing(p)
-        }
-        if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
-            collectSharedBuildDependencies(gradle, root)
         }
     }
 
@@ -72,38 +61,4 @@ void applyArtifactoryIfMissing(Project project) {
         return
     }
     project.pluginManager.apply(ArtifactoryPlugin)
-}
-
-void applyPluginAndCollectSharedBuildDependencies(Gradle gradle, Project root) {
-    root.allprojects { Project p ->
-        applyArtifactoryIfMissing(p)
-    }
-    collectSharedBuildDependencies(gradle, root)
-}
-
-/**
- * Walk to the top-level DeployTask and register an eager producer for this shared build.
- */
-void collectSharedBuildDependencies(Gradle gradle, Project root) {
-    // gradle.parent is only the immediate parent; nested includes must walk to the true top-level build.
-    Gradle topLevelGradle = gradle
-    while (topLevelGradle.parent != null) {
-        topLevelGradle = topLevelGradle.parent
-    }
-    Project containingRoot = topLevelGradle.getRootProject()
-    String buildPath = root.projectDir.absolutePath
-    String gradleCmd = SharedBuildLogicUtils.resolveGradleExecutable(root.projectDir)
-    def export = SharedBuildLogicUtils.exportSharedBuild(gradleCmd, buildPath)
-    // Use the API dump when it has dependencies; otherwise run the dependencies subprocess.
-    String dependenciesOutput = export != null && export.dependencyCount > 0
-            ? export.rawJson
-            : SharedBuildLogicUtils.runDependenciesSubprocess(gradleCmd, buildPath)
-    if (dependenciesOutput == null || dependenciesOutput.isEmpty()) {
-        root.logger.warn("Failed to collect dependencies for shared build '${root.name}' at ${buildPath}")
-    }
-    containingRoot.tasks.withType(DeployTask).configureEach { deployTask ->
-        root.allprojects.each { Project externalProject ->
-            deployTask.registerModuleInfoProducer(new ExternalProjectModuleInfoFileProducer(externalProject, null, dependenciesOutput))
-        }
-    }
 }
