@@ -21,14 +21,9 @@ import (
 //   - Version catalogs (libs.some.dependency) are not supported
 //   - For full accuracy, prefer CLI-based parsing; these regexes are fallback only
 var (
-	// \b word boundaries matter here: without them, e.g. "username = \"admin\"" would false-match
-	// nameRegex (it ends in "...ername" - a match for "name" with nothing anchoring it to a word start),
-	// and "subgroup = ..." would false-match groupRegex the same way. Found live via RTECO-136 shared-
-	// build-module testing: a buildSrc/build.gradle with a `credentials { username = "admin" }` block
-	// (a common pattern for repository auth) was silently resolving this project's artifactId to "admin".
-	groupRegex   = regexp.MustCompile(`\b(?:group|groupId)\s*=\s*['"]([^'"]+)['"]`)
-	nameRegex    = regexp.MustCompile(`\b(?:(?:rootProject\.)?name|artifactId)\s*=\s*['"]([^'"]+)['"]`)
-	versionRegex = regexp.MustCompile(`(?:\bversion\s*=|\bversionName)\s*['"]([^'"]+)['"]`)
+	groupRegex   = regexp.MustCompile(`(?:group|groupId)\s*=\s*['"]([^'"]+)['"]`)
+	nameRegex    = regexp.MustCompile(`(?:(?:rootProject\.)?name|artifactId)\s*=\s*['"]([^'"]+)['"]`)
+	versionRegex = regexp.MustCompile(`(?:version\s*=|versionName)\s*['"]([^'"]+)['"]`)
 	includeRegex = regexp.MustCompile(`['"]([^'"]+)['"]`)
 	// depRegex handles string notation: implementation("group:artifact:version") or implementation 'group:artifact:version'
 	depRegex = regexp.MustCompile(`(implementation|compileOnly|runtimeOnly|testImplementation|testCompileOnly|testRuntimeOnly|api|compile|runtime|annotationProcessor|kapt|ksp)\s*[\(\s]['"]([^'"]+)['"]`)
@@ -158,39 +153,6 @@ func (gf *GradleFlexPack) parseSettingsGradleModules(content string) []string {
 		}
 	}
 	return modules
-}
-
-// parseIncludeBuildDirectives parses settings.gradle content to extract includeBuild() directives
-// Returns a list of paths found in includeBuild() calls
-// Handles both single-quoted and double-quoted paths
-func (gf *GradleFlexPack) parseIncludeBuildDirectives(content string) []string {
-	strippedContent := gf.stripComments(content)
-
-	var buildPaths []string
-	lines := strings.Split(strippedContent, "\n")
-
-	// Regex to match includeBuild('path'), includeBuild("path"), includeBuild( 'path' ), and Groovy's
-	// paren-less shorthand includeBuild 'path' (a single-string-argument method call without parens is
-	// valid Groovy and is what most real settings.gradle files actually use - Kotlin DSL always requires
-	// parens, but making them optional here doesn't risk a false match either way since a quoted path
-	// must still immediately follow).
-	includeBuildRegex := regexp.MustCompile(`includeBuild\s*\(?\s*['"]([^'"]+)['"]\s*\)?`)
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "includeBuild") {
-			matches := includeBuildRegex.FindAllStringSubmatch(trimmed, -1)
-			for _, match := range matches {
-				if len(match) > 1 {
-					path := match[1]
-					if path != "" {
-						buildPaths = append(buildPaths, path)
-					}
-				}
-			}
-		}
-	}
-	return buildPaths
 }
 
 // parseFromBuildGradle parses dependencies directly from build.gradle file using regex.

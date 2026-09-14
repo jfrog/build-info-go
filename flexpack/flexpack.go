@@ -153,10 +153,6 @@ type GradleConfig struct {
 	// IncludeTestDependencies indicates whether to include test dependencies
 	IncludeTestDependencies bool
 
-	// IncludeSharedBuild indicates whether to include shared builds (buildSrc and composite builds)
-	// Default: false (backward compatible)
-	IncludeSharedBuild bool
-
 	// GradleExecutable is the path to the Gradle executable (optional, will be auto-detected)
 	GradleExecutable string
 

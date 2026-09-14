@@ -27,20 +27,14 @@ projectsLoaded { Gradle gradle ->
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
 
-    if (gradle.parent == null) {
-        root.allprojects { Project p ->
-            applyArtifactoryIfMissing(p)
-        }
-    } else if ("buildSrc".equals(root.name)) {
-        // buildSrc stays unapplied unless includeSharedBuild is explicitly on.
-        if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
-            root.allprojects { Project p ->
-                applyArtifactoryIfMissing(p)
+    if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
+        applySharedBuildPlugin(root)
+    } else if (!"buildSrc".equals(root.name)) {
+        // Flag off: same apply as main (including a second apply if build.gradle also applies the plugin).
+        root.allprojects {
+            apply {
+                apply plugin: ArtifactoryPlugin
             }
-        }
-    } else {
-        root.allprojects { Project p ->
-            applyArtifactoryIfMissing(p)
         }
     }
 
@@ -53,6 +47,12 @@ projectsLoaded { Gradle gradle ->
         } catch (UnknownTaskException ignored) {
             root.logger.debug("Can't find sub project configured for {}", p.getPath());
         }
+    }
+}
+
+void applySharedBuildPlugin(Project root) {
+    root.allprojects { Project p ->
+        applyArtifactoryIfMissing(p)
     }
 }
 
