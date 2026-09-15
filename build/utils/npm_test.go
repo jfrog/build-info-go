@@ -794,22 +794,22 @@ func TestHandleMissingDeps(t *testing.T) {
 		{"optionalDeps: no missing, strict off", "optionalDependencies", []string{}, "", false, "", false},
 		{"optionalDeps: no missing, strict on", "optionalDependencies", []string{}, "all", false, "", false},
 		{"optionalDeps: missing, strict off", "optionalDependencies", []string{"optional@1.0"}, "", false, "", false},
-		{"optionalDeps: missing, strict on", "optionalDependencies", []string{"optional@1.0"}, "all", true, "The following optionalDependencies will not be included in the build-info, because they are missing in the npm cache", true},
+		{"optionalDeps: missing, strict on", "optionalDependencies", []string{"optional@1.0"}, "all", true, "The following optionalDependencies could not be included in the build-info, because they are missing in the npm cache", true},
 
 		// Regular dependency tests
 		{"regularDeps: no missing, strict off", "regular", []string{}, "", false, "", false},
 		{"regularDeps: no missing, strict on", "regular", []string{}, "all", false, "", false},
 		{"regularDeps: missing, strict off", "regular", []string{"express@4.17"}, "", false, "", false},
-		{"regularDeps: missing, strict on", "regular", []string{"express@4.17"}, "all", true, "The following dependencies will not be included in the build-info, because they are missing in the npm cache", true},
+		{"regularDeps: missing, strict on", "regular", []string{"express@4.17"}, "all", true, "The following dependencies could not be included in the build-info, because they are missing in the npm cache", true},
 
 		// Multiple deps test
-		{"multiple deps, strict on", "regular", []string{"dep1", "dep2", "dep3"}, "all", true, "The following dependencies will not be included in the build-info, because they are missing in the npm cache", true},
+		{"multiple deps, strict on", "regular", []string{"dep1", "dep2", "dep3"}, "all", true, "The following dependencies could not be included in the build-info, because they are missing in the npm cache", true},
 
 		// Granular flag tests
 		{"peerDeps: missing, granular peer only", "peerDependency", []string{"react@16"}, "peer", true, "The following peerDependency could not be included in the build-info, because 'npm ls' did not return their integrity", true},
 		{"bundledDeps: missing, granular peer only (not matched)", "bundleDependencies", []string{"pkg@1.0"}, "peer", false, "", false},
-		{"regularDeps: missing, granular regular", "regular", []string{"express@4.17"}, "regular", true, "The following dependencies will not be included in the build-info, because they are missing in the npm cache", true},
-		{"optionalDeps: missing, granular combo", "optionalDependencies", []string{"optional@1.0"}, "peer,optional,bundle", true, "The following optionalDependencies will not be included in the build-info, because they are missing in the npm cache", true},
+		{"regularDeps: missing, granular regular", "regular", []string{"express@4.17"}, "regular", true, "The following dependencies could not be included in the build-info, because they are missing in the npm cache", true},
+		{"optionalDeps: missing, granular combo", "optionalDependencies", []string{"optional@1.0"}, "peer,optional,bundle", true, "The following optionalDependencies could not be included in the build-info, because they are missing in the npm cache", true},
 		{"bundledDeps: missing, granular combo", "bundleDependencies", []string{"pkg@1.0"}, "peer,optional,bundle", true, "The following bundleDependencies could not be included in the build-info, because 'npm ls' did not return their integrity", true},
 		{"regularDeps: missing, granular combo (not matched)", "regular", []string{"express@4.17"}, "peer,optional,bundle", false, "", false},
 	}

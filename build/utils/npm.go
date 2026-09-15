@@ -334,11 +334,11 @@ func handleMissingDeps(depType string, missingDeps []string, failOnUncollectedDe
 		case depTypePeer, depTypeBundle:
 			message = fmt.Sprintf("The following %s could not be included in the build-info, because 'npm ls' did not return their integrity: '%s'", depType, strings.Join(missingDeps, ","))
 		case depTypeOptional:
-			message = fmt.Sprintf("The following %s will not be included in the build-info, because they are missing in the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", depType, strings.Join(missingDeps, ","))
+			message = fmt.Sprintf("The following %s could not be included in the build-info, because they are missing in the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", depType, strings.Join(missingDeps, ","))
 		default:
 			// depTypeRegular is an internal bucket name, not a real npm-facing term like the others -
 			// say "dependencies" instead of surfacing it verbatim.
-			message = fmt.Sprintf("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", strings.Join(missingDeps, ","))
+			message = fmt.Sprintf("The following dependencies could not be included in the build-info, because they are missing in the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", strings.Join(missingDeps, ","))
 		}
 		return errors.New(message)
 	}
@@ -349,10 +349,10 @@ func handleMissingDeps(depType string, missingDeps []string, failOnUncollectedDe
 		// Legacy DEBUG-level logging, unchanged from before this flag existed.
 		printMissingDependenciesWarning(depType, missingDeps, log)
 	case depTypeOptional:
-		// DEBUG: same wording as regular, at debug because a missing optional dep is expected.
+		// DEBUG: same cache reason as regular, at debug because a missing optional dep is expected.
 		log.Debug(fmt.Sprintf("The following %s will not be included in the build-info, because they are missing in the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", depType, strings.Join(missingDeps, ",")))
 	default:
-		// WARN: legacy wording for an unexpected cache miss.
+		// WARN: legacy cache wording for an unexpected regular miss.
 		log.Warn(fmt.Sprintf("The following dependencies will not be included in the build-info, because they are missing in the npm cache: '%s'.\nHint: Try deleting 'node_modules' and/or 'package-lock.json'.", strings.Join(missingDeps, ",")))
 	}
 	return nil
