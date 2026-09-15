@@ -27,13 +27,15 @@ projectsLoaded { Gradle gradle ->
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
 
-    if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
-        applySharedBuildPlugin(root)
-    } else if (!"buildSrc".equals(root.name)) {
-        // Flag off: same apply as main (including a second apply if build.gradle also applies the plugin).
-        root.allprojects {
-            apply {
-                apply plugin: ArtifactoryPlugin
+    if (!"buildSrc".equals(root.name)) {
+        if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
+            applySharedBuildPlugin(root)
+        } else {
+            // Flag off: same apply as main (including a second apply if build.gradle also applies the plugin).
+            root.allprojects {
+                apply {
+                    apply plugin: ArtifactoryPlugin
+                }
             }
         }
     }
