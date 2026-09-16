@@ -10,7 +10,7 @@ import (
 // Stanzas are separated by blank lines. Fields are "Key: value" pairs.
 // Continuation lines (starting with a space) are skipped — we only need
 // single-line fields (Package, Version, Architecture, Filename, SHA256, SHA1, MD5sum).
-func parseDeb822(r io.Reader) []map[string]string {
+func parseDeb822(r io.Reader) ([]map[string]string, error) {
 	var stanzas []map[string]string
 	current := make(map[string]string)
 
@@ -40,10 +40,14 @@ func parseDeb822(r io.Reader) []map[string]string {
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return stanzas, err
+	}
+
 	// Flush final stanza (file may not end with a blank line)
 	if len(current) > 0 {
 		stanzas = append(stanzas, current)
 	}
 
-	return stanzas
+	return stanzas, nil
 }

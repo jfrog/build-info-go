@@ -684,8 +684,9 @@ func (c *cmdReadCloser) Close() error {
 }
 
 func (c *AptFlexPack) fillChecksumsFromReader(r io.Reader) (int, error) {
+	stanzas, err := parseDeb822(r)
 	count := 0
-	for _, stanza := range parseDeb822(r) {
+	for _, stanza := range stanzas {
 		name := stanza["Package"]
 		version := stanza["Version"]
 		arch := stanza["Architecture"]
@@ -706,7 +707,7 @@ func (c *AptFlexPack) fillChecksumsFromReader(r io.Reader) (int, error) {
 			count++
 		}
 	}
-	return count, nil
+	return count, err
 }
 
 // collectMissingChecksums is a fallback that computes checksums from .deb files

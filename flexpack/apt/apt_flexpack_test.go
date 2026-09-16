@@ -318,7 +318,8 @@ func TestPopulateAptRequestedBy_LinearChain(t *testing.T) {
 
 func TestParseDeb822_BasicStanza(t *testing.T) {
 	input := "Package: curl\nVersion: 8.5.0\nArchitecture: amd64\nSHA256: abc123\n"
-	stanzas := parseDeb822(strings.NewReader(input))
+	stanzas, err := parseDeb822(strings.NewReader(input))
+	require.NoError(t, err)
 	require.Len(t, stanzas, 1)
 	assert.Equal(t, "curl", stanzas[0]["Package"])
 	assert.Equal(t, "8.5.0", stanzas[0]["Version"])
@@ -327,7 +328,8 @@ func TestParseDeb822_BasicStanza(t *testing.T) {
 
 func TestParseDeb822_MultipleStanzas(t *testing.T) {
 	input := "Package: curl\nVersion: 8.5.0\n\nPackage: wget\nVersion: 1.21.2\n"
-	stanzas := parseDeb822(strings.NewReader(input))
+	stanzas, err := parseDeb822(strings.NewReader(input))
+	require.NoError(t, err)
 	assert.Len(t, stanzas, 2)
 }
 
@@ -335,7 +337,8 @@ func TestParseDeb822_ContinuationLinesSkipped(t *testing.T) {
 	// Description fields span multiple lines (continuation lines start with space).
 	// Continuation lines must be skipped; only single-line fields are needed.
 	input := "Package: curl\nDescription: A tool\n long multiline\n description here\nVersion: 8.5.0\n"
-	stanzas := parseDeb822(strings.NewReader(input))
+	stanzas, err := parseDeb822(strings.NewReader(input))
+	require.NoError(t, err)
 	require.Len(t, stanzas, 1)
 	assert.Equal(t, "curl", stanzas[0]["Package"])
 	assert.Equal(t, "8.5.0", stanzas[0]["Version"])
@@ -346,7 +349,8 @@ func TestParseDeb822_ContinuationLinesSkipped(t *testing.T) {
 func TestParseDeb822_TrailingStanzaWithoutBlankLine(t *testing.T) {
 	// File may not end with a blank line; last stanza must still be parsed.
 	input := "Package: jq\nVersion: 1.6"
-	stanzas := parseDeb822(strings.NewReader(input))
+	stanzas, err := parseDeb822(strings.NewReader(input))
+	require.NoError(t, err)
 	require.Len(t, stanzas, 1)
 	assert.Equal(t, "jq", stanzas[0]["Package"])
 }
