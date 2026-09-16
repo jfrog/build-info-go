@@ -56,13 +56,9 @@ projectsLoaded { Gradle gradle ->
 }
 
 void applySharedBuildPlugin(Project root) {
-    // No "already applied" guard here: at projectsLoaded, no project's build.gradle has evaluated
-    // yet, so a check like "does the Artifactory extension already exist on this project" can
-    // never see an apply that build.gradle performs afterwards - it would always be a no-op check
-    // that only ever ran before any real double-apply could occur. The actual double-apply
-    // protection (for when build.gradle also applies this plugin later) lives where the apply
-    // really happens: ArtifactoryPlugin.apply() itself detects and safely reuses an existing
-    // extension (see ArtifactoryPlugin#extensionForSharedBuildApply).
+    // No apply-if-missing guard: build.gradle hasn't evaluated yet at projectsLoaded, so such a
+    // check would be a no-op. A later double-apply is already handled by ArtifactoryPlugin.apply()
+    // itself (see ArtifactoryPlugin#extensionForSharedBuildApply).
     root.allprojects { Project p ->
         p.pluginManager.apply(ArtifactoryPlugin)
     }
