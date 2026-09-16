@@ -27,21 +27,17 @@ projectsLoaded { Gradle gradle ->
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
 
-    // Flag on: apply to buildSrc too - since Gradle 8.0, --init-script is applied to buildSrc the
-    // same as the main build and every includeBuild (each gets its own projectsLoaded firing with
-    // its own live root Project), so buildSrc may itself be a used shared build. Flag off: keep
-    // buildSrc excluded, unchanged from before. IMPORTANT: the buildSrc exclusion must only guard
-    // the flag-off branch - putting it around the whole if/else (as an earlier version of this
-    // script did) means buildSrc's own projectsLoaded firing (where root.name == "buildSrc")
-    // never applies the plugin at all, even with the flag on, since neither branch's condition is
-    // then satisfied for it.
-    if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
-        applySharedBuildPlugin(root)
-    } else if (!"buildSrc".equals(root.name)) {
-        // Same apply as main (including a second apply if build.gradle also applies the plugin).
-        root.allprojects {
-            apply {
-                apply plugin: ArtifactoryPlugin
+    // ArtifactoryPlugin still refuses apply() on buildSrc, so skip that invocation here too.
+    // Collection of the consumer's buildSrc happens from the consumer DeployTask.
+    if (!"buildSrc".equals(root.name)) {
+        if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
+            applySharedBuildPlugin(root)
+        } else {
+            // Flag off: same apply as main (including a second apply if build.gradle also applies the plugin).
+            root.allprojects {
+                apply {
+                    apply plugin: ArtifactoryPlugin
+                }
             }
         }
     }
@@ -60,14 +56,14 @@ projectsLoaded { Gradle gradle ->
 }
 
 void applySharedBuildPlugin(Project root) {
+    // No "already applied" guard here: at projectsLoaded, no project's build.gradle has evaluated
+    // yet, so a check like "does the Artifactory extension already exist on this project" can
+    // never see an apply that build.gradle performs afterwards - it would always be a no-op check
+    // that only ever ran before any real double-apply could occur. The actual double-apply
+    // protection (for when build.gradle also applies this plugin later) lives where the apply
+    // really happens: ArtifactoryPlugin.apply() itself detects and safely reuses an existing
+    // extension (see ArtifactoryPlugin#extensionForSharedBuildApply).
     root.allprojects { Project p ->
-        applyArtifactoryIfMissing(p)
+        p.pluginManager.apply(ArtifactoryPlugin)
     }
-}
-
-void applyArtifactoryIfMissing(Project project) {
-    if (project.extensions.findByName(Constant.ARTIFACTORY) != null) {
-        return
-    }
-    project.pluginManager.apply(ArtifactoryPlugin)
 }
