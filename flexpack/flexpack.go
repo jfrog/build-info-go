@@ -182,6 +182,22 @@ type NuGetConfig struct {
 	Module string
 }
 
+// PSResourceConfig holds configuration for the PSResource FlexPack implementation.
+//
+// build-info-go is a pure, offline collection library: it never talks to Artifactory. PSResource
+// packages have no local .nupkg to hash (unlike, say, Chocolatey), so the caller - jfrog-cli-artifactory,
+// which holds the server/auth context - is responsible for resolving package identity (via
+// Get-InstalledPSResource) and checksums (via a HEAD request to Artifactory) and handing the results
+// in as already-resolved data. See ResolvedPackage in flexpack/psresource.
+type PSResourceConfig struct {
+	// WorkingDirectory is the directory where PowerShell commands should operate
+	WorkingDirectory string
+
+	// Module is the optional user-supplied build-info module ID override (--module).
+	// When set, it is used as the module ID instead of the default.
+	Module string
+}
+
 // IsFlexPackEnabled checks if the FlexPack (native) implementation should be used
 // Returns true if JFROG_RUN_NATIVE environment variable is set to "true"
 func IsFlexPackEnabled() bool {

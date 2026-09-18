@@ -8,15 +8,16 @@ import (
 type PackageManager string
 
 const (
-	Npm    PackageManager = "npm"
-	Maven  PackageManager = "maven"
-	Pip    PackageManager = "pip"
-	Go     PackageManager = "go"
-	Poetry PackageManager = "poetry"
-	Yarn   PackageManager = "yarn"
-	Pnpm   PackageManager = "pnpm"
-	Uv     PackageManager = "uv"
-	Pipenv PackageManager = "pipenv"
+	Npm        PackageManager = "npm"
+	Maven      PackageManager = "maven"
+	Pip        PackageManager = "pip"
+	Go         PackageManager = "go"
+	Poetry     PackageManager = "poetry"
+	Yarn       PackageManager = "yarn"
+	Pnpm       PackageManager = "pnpm"
+	Uv         PackageManager = "uv"
+	Pipenv     PackageManager = "pipenv"
+	PSResource PackageManager = "psresource"
 )
 
 // ForbiddenError represents a 403 Forbidden error.
@@ -71,6 +72,10 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")
 	case "pipenv":
 		return strings.Contains(strings.ToLower(cmdOutput), "http error 403")
+	case "psresource":
+		// PowerShell error output may contain sensitive data; skip logging raw errors
+		return strings.Contains(strings.ToLower(cmdOutput), "403") ||
+			strings.Contains(strings.ToLower(cmdOutput), "forbidden")
 	}
 	return false
 }
