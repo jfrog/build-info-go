@@ -156,9 +156,15 @@ func collectDependencyTree(config buildinfoflex.ChocoConfig, rootModule string, 
 
 		if existing, seen := visited[strings.ToLower(packageName)]; seen {
 			// Reached again through a different parent: a shared dependency has several requesters,
-			// so record the extra path but do not walk its own dependencies twice. This is also
-			// what terminates a dependency cycle.
-			existing.requestedBy = append(existing.requestedBy, pending.requestedBy)
+			// so record the extra path but do not walk its own dependencies twice.
+			//
+			// This is also how a dependency cycle (A -> B -> A) terminates: the walk reaches A a
+			// second time via B. That second path's own leading entries are A's dependents, so
+			// appending it as-is would put A inside its own RequestedBy chain. Drop that edge instead
+			// of recording it.
+			if !chainContainsPackage(pending.requestedBy, packageName) {
+				existing.requestedBy = append(existing.requestedBy, pending.requestedBy)
+			}
 			continue
 		}
 		node := &packageNode{
@@ -210,6 +216,20 @@ func appendUniqueEdge(edges []string, dependencyID string) []string {
 		}
 	}
 	return append(edges, dependencyID)
+}
+
+// chainContainsPackage reports whether a RequestedBy chain already carries packageName as one of
+// its dependency entries (formatted "<id>:<version>"), name-matched case-insensitively. Chocolatey
+// installs a single version per name, so any occurrence of packageName in the chain refers back to
+// the same node - i.e. the chain closes a cycle through it.
+func chainContainsPackage(chain []string, packageName string) bool {
+	prefix := strings.ToLower(packageName) + ":"
+	for _, entry := range chain {
+		if strings.HasPrefix(strings.ToLower(entry), prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // nuspecDocument is the subset of the NuGet .nuspec schema needed to read declared dependencies.

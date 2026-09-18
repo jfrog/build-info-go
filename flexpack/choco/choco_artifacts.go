@@ -275,7 +275,10 @@ func chocoOptionTakesValue(option string) bool {
 		// `choco pack` output-directory spellings: their value is a directory, never a package.
 		"--out", "--outdir", "--outputdirectory", "--output-directory",
 		// `choco push` credential spellings, so a key is never treated as a package path.
-		"-k", "--key", "--apikey", "--api-key":
+		"-k", "--key", "--apikey", "--api-key",
+		// `choco install`/`upgrade` source-authentication spellings, so a credential value is never
+		// treated as a package ID.
+		"-u", "--user", "-p", "--password":
 		return true
 	default:
 		return false

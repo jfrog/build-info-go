@@ -142,6 +142,7 @@ func TestCollectTransitiveDependencies(t *testing.T) {
 		assert.NotEmpty(t, dependency.Sha256, dependency.Id)
 		assert.NotEmpty(t, dependency.Md5, dependency.Id)
 	}
+	require.Contains(t, byID, "tool:1.0.0")
 	require.Contains(t, byID, "libA:1.1.0")
 	require.Contains(t, byID, "libShared:2.0.0")
 
@@ -152,6 +153,11 @@ func TestCollectTransitiveDependencies(t *testing.T) {
 		{"tool:1.0.0", "image-build"},
 		{"libA:1.1.0", "tool:1.0.0", "image-build"},
 	}, byID["libShared:2.0.0"].RequestedBy)
+
+	// The cycle edge (libA -> tool) must be dropped, not recorded: tool is reached a second time via
+	// libA, and that second path's own leading entries are tool's own dependents. Appending it would
+	// put tool inside its own RequestedBy chain - the corruption this test guards against.
+	assert.Equal(t, [][]string{{"image-build"}}, byID["tool:1.0.0"].RequestedBy)
 
 	graph, err := collector.GetDependencyGraph()
 	require.NoError(t, err)
