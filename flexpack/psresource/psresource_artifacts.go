@@ -41,15 +41,19 @@ func BuildPublishedArtifact(published PublishedArtifact) (entities.Artifact, err
 	return entities.Artifact{
 		Name:                   fileName,
 		Type:                   nupkgType,
-		Path:                   derivePublishedPath(published.Name, published.Version),
+		Path:                   DerivePublishedPath(published.Name, published.Version),
 		OriginalDeploymentRepo: published.Repo,
 		Checksum:               published.Checksum,
 	}, nil
 }
 
-// derivePublishedPath constructs the Artifactory path for a published PSResource package.
+// DerivePublishedPath constructs the Artifactory path for a published PSResource package.
 // NuGet convention: <name>/<version>/<Name>.<version>.nupkg
 // Note: Path uses lowercase name, filename uses original case (typically PascalCase).
-func derivePublishedPath(name, version string) string {
+//
+// Exported so the caller (jfrog-cli-artifactory) can compute the identical path to issue a HEAD
+// request for checksums *before* constructing a PublishedArtifact - both sides must agree on
+// exactly the same formula, or the HEAD request and the recorded build-info path would drift apart.
+func DerivePublishedPath(name, version string) string {
 	return fmt.Sprintf("%s/%s/%s.%s.nupkg", strings.ToLower(name), version, name, version)
 }

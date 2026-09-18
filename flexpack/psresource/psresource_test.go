@@ -51,7 +51,7 @@ func TestDerivePublishedPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expectedPath, derivePublishedPath(tc.packageName, tc.version))
+			assert.Equal(t, tc.expectedPath, DerivePublishedPath(tc.packageName, tc.version))
 		})
 	}
 }
