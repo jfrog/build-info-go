@@ -145,4 +145,3 @@ func isProjectFile(path string) bool {
 	}
 	return false
 }
-
