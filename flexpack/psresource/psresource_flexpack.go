@@ -100,4 +100,3 @@ func (p *PSResourceFlexPack) GetProjectDependencies() ([]buildinfoflex.Dependenc
 func (p *PSResourceFlexPack) GetDependencyGraph() (map[string][]string, error) {
 	return make(map[string][]string), nil
 }
-

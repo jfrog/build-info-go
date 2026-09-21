@@ -64,4 +64,3 @@ func validateNameVersion(kind, name, version string) error {
 	}
 	return nil
 }
-
