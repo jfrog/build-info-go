@@ -23,6 +23,10 @@ const (
 	gradleInitScriptTemplate          = "gradle.init"
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
 	gradleExtractor4DependencyVersion = "4.35.9"
+	// Last published Classic extractor. Flag-off init script compiles against this jar.
+	// --include-shared-build collection is in artifactory-gradle-plugin 6.x; bump this
+	// when that extractor is released, or Classic flag-on will apply the plugin but
+	// never register shared-build modules.
 	gradleExtractor5DependencyVersion = "5.2.5"
 	projectPropertiesFlag             = "-P"
 	systemPropertiesFlag              = "-D"

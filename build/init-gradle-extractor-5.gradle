@@ -1,12 +1,12 @@
 // jf gradle writes this file as --init-script. --include-shared-build becomes
-// ORG_GRADLE_PROJECT_includeSharedBuild=true and -PincludeSharedBuild=true, which
-// SharedBuildLogicUtils.isIncludeSharedBuildEnabled reads via Project.findProperty.
+// ORG_GRADLE_PROJECT_includeSharedBuild=true, which Gradle exposes as the
+// includeSharedBuild project property. The flag check is inlined so this script
+// still compiles against extractor 5.2.5 (SharedBuildLogicUtils is not in that jar).
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPlugin
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPluginSettings
 import org.jfrog.gradle.plugin.artifactory.Constant
 import org.jfrog.gradle.plugin.artifactory.task.ArtifactoryTask
 import org.jfrog.gradle.plugin.artifactory.utils.PluginUtils
-import org.jfrog.gradle.plugin.artifactory.utils.SharedBuildLogicUtils
 
 initscript {
     dependencies {
@@ -26,14 +26,10 @@ projectsLoaded { Gradle gradle ->
     gradle.startParameter.setProjectProperties(projectProperties)
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
-
-    // ArtifactoryPlugin still refuses apply() on buildSrc, so skip that invocation here too.
-    // Collection of the consumer's buildSrc happens from the consumer DeployTask.
     if (!"buildSrc".equals(root.name)) {
-        if (SharedBuildLogicUtils.isIncludeSharedBuildEnabled(root)) {
+        if (isIncludeSharedBuildEnabled(root)) {
             applySharedBuildPlugin(root)
         } else {
-            // Flag off: same apply as main (including a second apply if build.gradle also applies the plugin).
             root.allprojects {
                 apply {
                     apply plugin: ArtifactoryPlugin
@@ -53,6 +49,11 @@ projectsLoaded { Gradle gradle ->
             root.logger.debug("Can't find sub project configured for {}", p.getPath());
         }
     }
+}
+
+boolean isIncludeSharedBuildEnabled(Project project) {
+    Object value = project.findProperty("includeSharedBuild")
+    return value != null && "true".equalsIgnoreCase(value.toString())
 }
 
 void applySharedBuildPlugin(Project root) {
