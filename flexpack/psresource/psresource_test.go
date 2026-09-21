@@ -11,12 +11,12 @@ import (
 
 func TestNewPSResourceFlexPackValidation(t *testing.T) {
 	t.Run("empty WorkingDirectory returns error", func(t *testing.T) {
-		_, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{WorkingDirectory: ""}, nil)
+		_, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{WorkingDirectory: ""})
 		require.Error(t, err)
 	})
 
 	t.Run("valid WorkingDirectory succeeds", func(t *testing.T) {
-		fp, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{WorkingDirectory: t.TempDir()}, nil)
+		fp, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{WorkingDirectory: t.TempDir()})
 		require.NoError(t, err)
 		require.NotNil(t, fp)
 	})
@@ -146,14 +146,16 @@ func TestBuildPublishedArtifact(t *testing.T) {
 		{
 			name: "standard package",
 			published: PublishedArtifact{
-				Name:    "PackageName",
-				Version: "1.0.0",
-				Repo:    "psresource-local",
-				Checksum: entities.Checksum{
-					Sha1:   "sha1hash",
-					Sha256: "sha256hash",
-					Md5:    "md5hash",
+				ResolvedPackage: ResolvedPackage{
+					Name:    "PackageName",
+					Version: "1.0.0",
+					Checksum: entities.Checksum{
+						Sha1:   "sha1hash",
+						Sha256: "sha256hash",
+						Md5:    "md5hash",
+					},
 				},
+				Repo: "psresource-local",
 			},
 			want: entities.Artifact{
 				Name:                   "PackageName.1.0.0.nupkg",
@@ -169,12 +171,12 @@ func TestBuildPublishedArtifact(t *testing.T) {
 		},
 		{
 			name:      "missing name is an error",
-			published: PublishedArtifact{Version: "1.0.0"},
+			published: PublishedArtifact{ResolvedPackage: ResolvedPackage{Version: "1.0.0"}},
 			wantErr:   true,
 		},
 		{
 			name:      "missing version is an error",
-			published: PublishedArtifact{Name: "PackageName"},
+			published: PublishedArtifact{ResolvedPackage: ResolvedPackage{Name: "PackageName"}},
 			wantErr:   true,
 		},
 	}
@@ -195,7 +197,7 @@ func TestBuildPublishedArtifact(t *testing.T) {
 func TestGetDependencyGraph(t *testing.T) {
 	fp, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{
 		WorkingDirectory: t.TempDir(),
-	}, nil)
+	})
 	require.NoError(t, err)
 
 	graph, err := fp.GetDependencyGraph()
@@ -207,7 +209,7 @@ func TestGetDependencyGraph(t *testing.T) {
 func TestGetProjectDependencies(t *testing.T) {
 	fp, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{
 		WorkingDirectory: t.TempDir(),
-	}, nil)
+	})
 	require.NoError(t, err)
 
 	deps, err := fp.GetProjectDependencies()
@@ -216,12 +218,6 @@ func TestGetProjectDependencies(t *testing.T) {
 }
 
 func TestCollectBuildInfo(t *testing.T) {
-	fp, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{
-		WorkingDirectory: t.TempDir(),
-		Module:           "custom-module",
-	}, nil)
-	require.NoError(t, err)
-
 	resolved := []ResolvedPackage{
 		{
 			Name:    "Pester",
@@ -233,8 +229,14 @@ func TestCollectBuildInfo(t *testing.T) {
 			},
 		},
 	}
+	fp, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{
+		WorkingDirectory: t.TempDir(),
+		Module:           "custom-module",
+		ResolvedPackages: resolved,
+	})
+	require.NoError(t, err)
 
-	bi, err := fp.CollectBuildInfo("test-build", "123", resolved)
+	bi, err := fp.CollectBuildInfo("test-build", "123")
 	require.NoError(t, err)
 	assert.Equal(t, "test-build", bi.Name)
 	assert.Equal(t, "123", bi.Number)
@@ -255,10 +257,10 @@ func TestCollectBuildInfo(t *testing.T) {
 func TestCollectBuildInfoDefaultModule(t *testing.T) {
 	fp, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{
 		WorkingDirectory: t.TempDir(),
-	}, nil)
+	})
 	require.NoError(t, err)
 
-	bi, err := fp.CollectBuildInfo("test-build", "123", nil)
+	bi, err := fp.CollectBuildInfo("test-build", "123")
 	require.NoError(t, err)
 	require.Len(t, bi.Modules, 1)
 	assert.Equal(t, "psresource-project", bi.Modules[0].Id)

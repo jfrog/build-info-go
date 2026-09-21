@@ -73,7 +73,7 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 	case "pipenv":
 		return strings.Contains(strings.ToLower(cmdOutput), "http error 403")
 	case "psresource":
-		// PowerShell error output may contain sensitive data; skip logging raw errors
+		// PowerShell Artifactory-access errors don't follow one fixed phrase, so match broadly.
 		return strings.Contains(strings.ToLower(cmdOutput), "403") ||
 			strings.Contains(strings.ToLower(cmdOutput), "forbidden")
 	}
