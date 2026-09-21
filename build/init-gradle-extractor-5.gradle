@@ -1,6 +1,6 @@
-// jf gradle writes this file as --init-script. --include-shared-build becomes
-// ORG_GRADLE_PROJECT_includeSharedBuild=true, which Gradle exposes as the
-// includeSharedBuild project property. The flag check is inlined so this script
+// jf gradle writes this file as --init-script. --include-shared-build-logic becomes
+// ORG_GRADLE_PROJECT_includeSharedBuildLogic=true, which Gradle exposes as the
+// includeSharedBuildLogic project property. The flag check is inlined so this script
 // still compiles against extractor 5.2.5 (SharedBuildLogicUtils is not in that jar).
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPlugin
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPluginSettings
@@ -27,7 +27,7 @@ projectsLoaded { Gradle gradle ->
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
     if (!"buildSrc".equals(root.name)) {
-        if (isIncludeSharedBuildEnabled(root)) {
+        if (isIncludeSharedBuildLogicEnabled(root)) {
             applySharedBuildPlugin(root)
         } else {
             root.allprojects {
@@ -51,8 +51,8 @@ projectsLoaded { Gradle gradle ->
     }
 }
 
-boolean isIncludeSharedBuildEnabled(Project project) {
-    Object value = project.findProperty("includeSharedBuild")
+boolean isIncludeSharedBuildLogicEnabled(Project project) {
+    Object value = project.findProperty("includeSharedBuildLogic")
     return value != null && "true".equalsIgnoreCase(value.toString())
 }
 
