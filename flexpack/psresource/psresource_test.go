@@ -266,3 +266,24 @@ func TestCollectBuildInfoDefaultModule(t *testing.T) {
 	assert.Equal(t, "psresource-project", bi.Modules[0].Id)
 	assert.Empty(t, bi.Modules[0].Dependencies)
 }
+
+// TestCollectBuildInfoPropagatesInvalidPackageError closes a real test-coverage gap: only
+// BuildDependencies itself was tested against an invalid (missing name/version) package - the
+// wrapping/propagation of that same error through CollectBuildInfo (the actual public entry point
+// callers use) had no test, so a regression that silently dropped an invalid entry instead of
+// returning an error, or that stopped wrapping/propagating it, would go undetected.
+func TestCollectBuildInfoPropagatesInvalidPackageError(t *testing.T) {
+	fp, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{
+		WorkingDirectory: t.TempDir(),
+		ResolvedPackages: []ResolvedPackage{
+			{Name: "Pester", Version: "5.5.0"},
+			{Name: "", Version: "1.0.0"}, // invalid: missing name
+		},
+	})
+	require.NoError(t, err)
+
+	bi, err := fp.CollectBuildInfo("test-build", "123")
+	require.Error(t, err)
+	assert.Nil(t, bi, "no partial BuildInfo must be returned when a resolved package is invalid")
+	assert.Contains(t, err.Error(), "collect PSResource dependencies", "the error must still be wrapped with CollectBuildInfo's own context")
+}
