@@ -1,9 +1,13 @@
 package unit
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/jfrog/build-info-go/flexpack"
 )
@@ -40,6 +44,55 @@ func writeTempFiles(t *testing.T, dir string, files map[string]string) {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
 			t.Fatalf("Failed to write %s: %v", name, err)
 		}
+	}
+}
+
+// writeTestWheel creates a minimal but real wheel (zip) at path containing just a
+// "{name}.dist-info/METADATA" entry, mirroring what a real build backend writes.
+func writeTestWheel(t *testing.T, path, name, version string) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	zw := zip.NewWriter(f)
+	w, err := zw.Create(name + ".dist-info/METADATA")
+	if err != nil {
+		t.Fatalf("Failed to add METADATA entry: %v", err)
+	}
+	if _, err := w.Write([]byte("Metadata-Version: 2.4\nName: " + name + "\nVersion: " + version + "\n\n")); err != nil {
+		t.Fatalf("Failed to write METADATA: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("Failed to close wheel zip: %v", err)
+	}
+}
+
+// writeTestSdist creates a minimal but real sdist (tar.gz) at path containing just a
+// top-level "PKG-INFO" file, mirroring what a real build backend writes.
+func writeTestSdist(t *testing.T, path, name, version string) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+	content := []byte("Metadata-Version: 2.4\nName: " + name + "\nVersion: " + version + "\n\n")
+	hdr := &tar.Header{Name: name + "-" + version + "/PKG-INFO", Mode: 0644, Size: int64(len(content))}
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatalf("Failed to write tar header: %v", err)
+	}
+	if _, err := tw.Write(content); err != nil {
+		t.Fatalf("Failed to write PKG-INFO: %v", err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("Failed to close tar writer: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("Failed to close gzip writer: %v", err)
 	}
 }
 
@@ -786,4 +839,368 @@ func TestUvErrorHandling(t *testing.T) {
 			t.Errorf("Expected empty dependency list without uv.lock, got %d deps", len(deps))
 		}
 	})
+}
+
+// dynamicPyproject returns a pyproject.toml for project "my-app" declaring
+// `dynamic = ["version"]`, e.g. as produced by hatch-vcs, with no static [project.version].
+func dynamicPyproject() string {
+	return "[project]\nname = \"my-app\"\ndynamic = [\"version\"]\n" +
+		"[tool.hatch.version]\nsource = \"vcs\"\n"
+}
+
+// TestUvDynamicVersionResolvedFromLockFallback covers the (currently unobserved in real uv
+// output, but cheap and harmless to support) case where uv.lock's root package entry does
+// carry an explicit version. The realistic sources — dist/ artifacts and installed packages —
+// are covered by TestUvDynamicVersionResolvedFromDist and
+// TestUvDynamicVersionResolvedFromInstalledPackages below; real `uv lock` output was verified
+// to never populate a version on the root/editable [[package]] entry, static or dynamic.
+func TestUvDynamicVersionResolvedFromLockFallback(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject(),
+		"uv.lock":        minimalUvLock("my-app"),
+	})
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for dynamic version: %v", err)
+	}
+
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	if len(buildInfo.Modules) == 0 {
+		t.Fatal("Expected at least one module")
+	}
+	if buildInfo.Modules[0].Id != "my-app:1.0.0" {
+		t.Errorf("Expected module ID 'my-app:1.0.0', got '%s'", buildInfo.Modules[0].Id)
+	}
+}
+
+// TestUvDynamicVersionResolvedFromDist covers `jf uv build`/`jf uv publish`: by the time
+// build-info collection runs for those commands, `uv build`/`uv publish` has already
+// succeeded, so dist/ is guaranteed to contain a wheel/sdist whose embedded package metadata
+// (METADATA/PKG-INFO) records the real backend-resolved version. This is the exact scenario
+// from the reported bug (jfrog/jfrog-cli#3624): a hatch-vcs project with no uv.lock root
+// version at all.
+func TestUvDynamicVersionResolvedFromDist(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject(),
+	})
+	distDir := filepath.Join(tempDir, "dist")
+	if err := os.MkdirAll(distDir, 0755); err != nil {
+		t.Fatalf("Failed to create dist dir: %v", err)
+	}
+	// Real hatch-vcs-resolved version, e.g. a dev build a few commits past the last tag.
+	const version = "1.2.4.dev0+g6df800799.d20260730"
+	writeTestWheel(t, filepath.Join(distDir, "my_app-"+version+"-py3-none-any.whl"), "my-app", version)
+	writeTestSdist(t, filepath.Join(distDir, "my_app-"+version+".tar.gz"), "my-app", version)
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for dynamic version resolved from dist/: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:" + version
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
+	}
+}
+
+// TestUvDynamicVersionResolvedFromInstalledPackages covers `jf uv sync`/`add`/`install`/
+// `remove`: those commands install the project itself into the venv, and `uv pip list`
+// (already collected into UVConfig.InstalledPackages) reports its resolved version.
+func TestUvDynamicVersionResolvedFromInstalledPackages(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject(),
+	})
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
+		WorkingDirectory:  tempDir,
+		InstalledPackages: map[string]string{"my-app": "1.2.4.dev0+g6df800799.d20260730"},
+	})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for dynamic version resolved from installed packages: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:1.2.4.dev0+g6df800799.d20260730"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
+	}
+}
+
+// TestUvDynamicVersionFallsBackToEmptyVersion covers the case where a dynamic version can't
+// be resolved from any source at all. This must NOT fail collector construction — that would
+// throw away dependency and artifact collection too, just because one field is unknown. It
+// mirrors the existing PEP 723 inline-script tolerance (see loadPyProjectToml): an empty
+// version still produces a usable "name:" module ID.
+func TestUvDynamicVersionFallsBackToEmptyVersion(t *testing.T) {
+	t.Run("no uv.lock, dist/, or installed packages", func(t *testing.T) {
+		tempDir := t.TempDir()
+		writeTempFiles(t, tempDir, map[string]string{
+			"pyproject.toml": dynamicPyproject(),
+		})
+
+		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+		if err != nil {
+			t.Fatalf("Expected constructor to succeed with an empty fallback version, got: %v", err)
+		}
+		buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+		if err != nil {
+			t.Fatalf("CollectBuildInfo failed: %v", err)
+		}
+		if want := "my-app:"; buildInfo.Modules[0].Id != want {
+			t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
+		}
+	})
+
+	t.Run("uv.lock has no root package entry", func(t *testing.T) {
+		tempDir := t.TempDir()
+		// A lock file with only a third-party dependency and no root ("virtual"/"editable"/
+		// "directory" == ".") entry — e.g. malformed or stale relative to pyproject.toml.
+		uvLockContent := `version = 1
+
+[[package]]
+name = "requests"
+version = "2.31.0"
+source = { registry = "https://pypi.org/simple" }
+`
+		writeTempFiles(t, tempDir, map[string]string{
+			"pyproject.toml": dynamicPyproject(),
+			"uv.lock":        uvLockContent,
+		})
+
+		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+		if err != nil {
+			t.Fatalf("Expected constructor to succeed with an empty fallback version, got: %v", err)
+		}
+		buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+		if err != nil {
+			t.Fatalf("CollectBuildInfo failed: %v", err)
+		}
+		if want := "my-app:"; buildInfo.Modules[0].Id != want {
+			t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
+		}
+	})
+
+	t.Run("dist/ has only unrelated packages", func(t *testing.T) {
+		tempDir := t.TempDir()
+		writeTempFiles(t, tempDir, map[string]string{
+			"pyproject.toml": dynamicPyproject(),
+		})
+		distDir := filepath.Join(tempDir, "dist")
+		if err := os.MkdirAll(distDir, 0755); err != nil {
+			t.Fatalf("Failed to create dist dir: %v", err)
+		}
+		// A real, valid wheel — just for a different package. Its Name field in METADATA
+		// must be checked against, not just its filename, or this would false-match.
+		writeTestWheel(t, filepath.Join(distDir, "other_package-2.0.0-py3-none-any.whl"), "other-package", "2.0.0")
+
+		uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+		if err != nil {
+			t.Fatalf("Expected constructor to succeed with an empty fallback version, got: %v", err)
+		}
+		buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+		if err != nil {
+			t.Fatalf("CollectBuildInfo failed: %v", err)
+		}
+		if want := "my-app:"; buildInfo.Modules[0].Id != want {
+			t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
+		}
+	})
+}
+
+// TestUvDynamicVersionResolvedFromDistPrefersNewestOnMismatch covers dist/ accumulating
+// artifacts across multiple builds (uv does not clean dist/ between `uv build` runs): a
+// stale wheel from an older version alongside a freshly built sdist for the current version.
+// The most recently modified matching file must win, not whichever os.ReadDir happens to
+// return first.
+func TestUvDynamicVersionResolvedFromDistPrefersNewestOnMismatch(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject(),
+	})
+	distDir := filepath.Join(tempDir, "dist")
+	if err := os.MkdirAll(distDir, 0755); err != nil {
+		t.Fatalf("Failed to create dist dir: %v", err)
+	}
+	writeTestWheel(t, filepath.Join(distDir, "my_app-1.2.3-py3-none-any.whl"), "my-app", "1.2.3")         // stale, from an earlier build
+	writeTestSdist(t, filepath.Join(distDir, "my_app-1.2.4.dev0+abc.tar.gz"), "my-app", "1.2.4.dev0+abc") // fresh, from the current build
+	staleTime := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(distDir, "my_app-1.2.3-py3-none-any.whl"), staleTime, staleTime); err != nil {
+		t.Fatalf("Failed to set stale mtime: %v", err)
+	}
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:1.2.4.dev0+abc"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected module ID %q (from the freshly built artifact), got %q", want, buildInfo.Modules[0].Id)
+	}
+}
+
+// TestUvDynamicVersionSkipsUnreadableDistArchive covers a corrupt or partially-written
+// archive in dist/ (e.g. an interrupted build) sitting next to a good one — reading package
+// metadata must skip files it can't open rather than erroring the whole resolution.
+func TestUvDynamicVersionSkipsUnreadableDistArchive(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject(),
+	})
+	distDir := filepath.Join(tempDir, "dist")
+	if err := os.MkdirAll(distDir, 0755); err != nil {
+		t.Fatalf("Failed to create dist dir: %v", err)
+	}
+	writeTempFiles(t, distDir, map[string]string{
+		"my_app-1.2.3-py3-none-any.whl": "not a real zip file",
+	})
+	writeTestSdist(t, filepath.Join(distDir, "my_app-1.2.3.tar.gz"), "my-app", "1.2.3")
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:1.2.3"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected the valid sdist's version %q despite the corrupt wheel, got %q", want, buildInfo.Modules[0].Id)
+	}
+}
+
+// writeTestSdistWithEntries creates a tar.gz at path with the given entries written in
+// order, each as a plain file. Used to control tar entry ordering precisely, unlike
+// writeTestSdist which always writes a single well-formed top-level PKG-INFO.
+func writeTestSdistWithEntries(t *testing.T, path string, entries map[string]string, order []string) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+	for _, name := range order {
+		content := []byte(entries[name])
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0644, Size: int64(len(content))}); err != nil {
+			t.Fatalf("Failed to write tar header for %s: %v", name, err)
+		}
+		if _, err := tw.Write(content); err != nil {
+			t.Fatalf("Failed to write %s: %v", name, err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("Failed to close tar writer: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("Failed to close gzip writer: %v", err)
+	}
+}
+
+// TestUvDynamicVersionIgnoresNestedEggInfoPkgInfo covers an sdist that accidentally bundles
+// a nested *.egg-info/PKG-INFO (a known historical setuptools quirk) alongside the real
+// top-level PKG-INFO, with the nested (stale) one appearing FIRST in tar order. The nested
+// entry must be ignored — only the top-level "{name}-{version}/PKG-INFO" is authoritative.
+func TestUvDynamicVersionIgnoresNestedEggInfoPkgInfo(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": dynamicPyproject(),
+	})
+	distDir := filepath.Join(tempDir, "dist")
+	if err := os.MkdirAll(distDir, 0755); err != nil {
+		t.Fatalf("Failed to create dist dir: %v", err)
+	}
+	staleMetadata := "Metadata-Version: 2.4\nName: my-app\nVersion: 0.0.1-stale\n\n"
+	realMetadata := "Metadata-Version: 2.4\nName: my-app\nVersion: 1.2.3\n\n"
+	writeTestSdistWithEntries(t, filepath.Join(distDir, "my_app-1.2.3.tar.gz"),
+		map[string]string{
+			"my_app-1.2.3/my_app.egg-info/PKG-INFO": staleMetadata, // nested, listed first
+			"my_app-1.2.3/PKG-INFO":                 realMetadata,  // top-level, authoritative
+		},
+		[]string{"my_app-1.2.3/my_app.egg-info/PKG-INFO", "my_app-1.2.3/PKG-INFO"},
+	)
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my-app:1.2.3"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected the top-level PKG-INFO's version %q, got %q (picked up the nested egg-info instead?)", want, buildInfo.Modules[0].Id)
+	}
+}
+
+// TestUvDynamicVersionResolvedFromInstalledPackagesWithDottedName covers a project name
+// containing "." (common for Python namespace packages, e.g. zope.interface). Callers like
+// jfrog-cli-artifactory's uvInstalledPackages build UVConfig.InstalledPackages with only
+// ToLower + "_"->"-" (dots untouched), not full PEP 503 normalization — the lookup must still
+// match despite that mismatch, comparing both sides through the same normalization.
+func TestUvDynamicVersionResolvedFromInstalledPackagesWithDottedName(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": "[project]\nname = \"my.app\"\ndynamic = [\"version\"]\n" +
+			"[tool.hatch.version]\nsource = \"vcs\"\n",
+	})
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{
+		WorkingDirectory: tempDir,
+		// Mirrors jfrog-cli-artifactory's uvInstalledPackages key format: lowercase + "_"->"-"
+		// only — "my.app" stays "my.app", it is NOT collapsed to "my-app".
+		InstalledPackages: map[string]string{"my.app": "1.2.4.dev0+g6df800799.d20260730"},
+	})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for dotted project name: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	want := "my.app:1.2.4.dev0+g6df800799.d20260730"
+	if buildInfo.Modules[0].Id != want {
+		t.Errorf("Expected module ID %q, got %q", want, buildInfo.Modules[0].Id)
+	}
+}
+
+func TestUvStaticVersionUnaffectedByDynamicField(t *testing.T) {
+	// A project that declares dynamic = ["version"] alongside dependency collection
+	// still using a plain static pyproject.toml (no dynamic field at all) must behave
+	// exactly as before: unchanged error and success paths.
+	tempDir := t.TempDir()
+	writeTempFiles(t, tempDir, map[string]string{
+		"pyproject.toml": minimalPyproject("my-app"),
+		"uv.lock":        minimalUvLock("my-app"),
+	})
+
+	uf, err := flexpack.NewUVFlexPack(flexpack.UVConfig{WorkingDirectory: tempDir})
+	if err != nil {
+		t.Fatalf("NewUvFlexPack failed for static version: %v", err)
+	}
+	buildInfo, err := uf.CollectBuildInfo("my-build", "1")
+	if err != nil {
+		t.Fatalf("CollectBuildInfo failed: %v", err)
+	}
+	if buildInfo.Modules[0].Id != "my-app:1.0.0" {
+		t.Errorf("Expected module ID 'my-app:1.0.0', got '%s'", buildInfo.Modules[0].Id)
+	}
 }
