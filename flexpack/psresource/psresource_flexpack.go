@@ -2,6 +2,7 @@ package psresource
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/jfrog/build-info-go/entities"
 	buildinfoflex "github.com/jfrog/build-info-go/flexpack"
@@ -9,6 +10,17 @@ import (
 
 // nupkgType is the build-info dependency/artifact type used for PSResource (NuGet-based) packages.
 const nupkgType = "nupkg"
+
+// defaultModuleID is the build-info module ID used when the caller does not supply one via
+// PSResourceConfig.Module (or --module). Mirrors the same "<tool>-project" fallback convention
+// other FlexPack collectors in this repo use for their default module IDs.
+const defaultModuleID = "psresource-project"
+
+// defaultScope is the only dependency scope PSResourceGet produces. Get-InstalledPSResource
+// returns a flat list of installed modules with no dev/optional/transitive classification (unlike,
+// say, Poetry's or Maven's dependency groups), so every resolved dependency is recorded under this
+// single scope.
+const defaultScope = "main"
 
 // ResolvedPackage is a PSResource package whose identity and checksum have already been determined
 // by the caller: name/version via Get-InstalledPSResource, checksum via a HEAD request to
@@ -35,7 +47,11 @@ var _ buildinfoflex.BuildInfoCollector = (*PSResourceFlexPack)(nil)
 // NewPSResourceFlexPack creates a new PSResourceFlexPack with the given configuration.
 func NewPSResourceFlexPack(config buildinfoflex.PSResourceConfig) (*PSResourceFlexPack, error) {
 	if config.WorkingDirectory == "" {
-		return nil, fmt.Errorf("PSResourceConfig.WorkingDirectory must not be empty")
+		wd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get working directory: %w", err)
+		}
+		config.WorkingDirectory = wd
 	}
 	return &PSResourceFlexPack{config: config}, nil
 }
@@ -50,7 +66,7 @@ func (p *PSResourceFlexPack) CollectBuildInfo(buildName, buildNumber string) (*e
 
 	moduleID := p.config.Module
 	if moduleID == "" {
-		moduleID = "psresource-project"
+		moduleID = defaultModuleID
 	}
 
 	return &entities.BuildInfo{
@@ -75,18 +91,25 @@ func BuildDependencies(resolved []ResolvedPackage) ([]entities.Dependency, error
 	}
 	dependencies := make([]entities.Dependency, 0, len(resolved))
 	for _, pkg := range resolved {
-		if err := validateNameVersion("resolved", pkg.Name, pkg.Version); err != nil {
+		if err := validateNameVersion(resolvedPackageKind, pkg.Name, pkg.Version); err != nil {
 			return nil, err
 		}
 		dependencies = append(dependencies, entities.Dependency{
 			Id:       nupkgFileName(pkg.Name, pkg.Version),
 			Type:     nupkgType,
-			Scopes:   []string{"main"},
+			Scopes:   []string{defaultScope},
 			Checksum: pkg.Checksum,
 		})
 	}
 	return dependencies, nil
 }
+
+// GetProjectDependencies and GetDependencyGraph below are required by the
+// buildinfoflex.BuildInfoCollector interface (see the compile-time assertion above) that every
+// FlexPack collector in this repo implements; callers such as jfrog-cli-artifactory invoke them
+// polymorphically through that interface, not through the concrete *PSResourceFlexPack type, so
+// within this repo they are only exercised directly from psresource_test.go. Removing them would
+// break the interface conformance assertion and any caller that depends on it.
 
 // GetProjectDependencies satisfies buildinfoflex.BuildInfoCollector. PSResource has no local project
 // manifest to introspect independently of the resolved packages the caller supplies via

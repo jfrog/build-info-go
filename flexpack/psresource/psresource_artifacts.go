@@ -7,6 +7,14 @@ import (
 	"github.com/jfrog/build-info-go/entities"
 )
 
+// Package-kind labels folded into validateNameVersion's error messages so callers can tell which
+// side of a PSResource operation - the caller-resolved dependency or the already-published
+// artifact - failed validation.
+const (
+	resolvedPackageKind  = "resolved"
+	publishedPackageKind = "published"
+)
+
 // PublishedArtifact is a PSResource package published via Publish-PSResource whose identity and
 // checksum have already been resolved by the caller (jfrog-cli-artifactory), typically via a HEAD
 // request to Artifactory after the publish completed. Publish-PSResource uploads directly without
@@ -24,7 +32,7 @@ type PublishedArtifact struct {
 // already-resolved package data in published. It performs no network or filesystem I/O: checksum
 // resolution (via a HEAD request to Artifactory) is the caller's responsibility.
 func BuildPublishedArtifact(published PublishedArtifact) (entities.Artifact, error) {
-	if err := validateNameVersion("published", published.Name, published.Version); err != nil {
+	if err := validateNameVersion(publishedPackageKind, published.Name, published.Version); err != nil {
 		return entities.Artifact{}, err
 	}
 

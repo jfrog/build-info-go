@@ -1,6 +1,7 @@
 package psresource
 
 import (
+	"os"
 	"testing"
 
 	"github.com/jfrog/build-info-go/entities"
@@ -10,9 +11,13 @@ import (
 )
 
 func TestNewPSResourceFlexPackValidation(t *testing.T) {
-	t.Run("empty WorkingDirectory returns error", func(t *testing.T) {
-		_, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{WorkingDirectory: ""})
-		require.Error(t, err)
+	t.Run("empty WorkingDirectory defaults to the current working directory", func(t *testing.T) {
+		fp, err := NewPSResourceFlexPack(buildinfoflex.PSResourceConfig{WorkingDirectory: ""})
+		require.NoError(t, err)
+		require.NotNil(t, fp)
+		wd, err := os.Getwd()
+		require.NoError(t, err)
+		assert.Equal(t, wd, fp.config.WorkingDirectory)
 	})
 
 	t.Run("valid WorkingDirectory succeeds", func(t *testing.T) {
