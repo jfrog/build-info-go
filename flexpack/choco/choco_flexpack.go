@@ -162,7 +162,10 @@ func collectDependencyTree(config buildinfoflex.ChocoConfig, rootModule string, 
 			// second time via B. That second path's own leading entries are A's dependents, so
 			// appending it as-is would put A inside its own RequestedBy chain. Drop that edge instead
 			// of recording it.
-			if !chainContainsPackage(pending.requestedBy, packageName) {
+			//
+			// The apt and dotnet collectors in this repo cap RequestedBy the same way: a package
+			// with many requesters (a common runtime lib, say) must not grow that list unbounded.
+			if len(existing.requestedBy) < entities.RequestedByMaxLength && !chainContainsPackage(pending.requestedBy, packageName) {
 				existing.requestedBy = append(existing.requestedBy, pending.requestedBy)
 			}
 			continue

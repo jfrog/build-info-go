@@ -1,6 +1,7 @@
 package choco
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -166,6 +167,50 @@ func TestCollectTransitiveDependencies(t *testing.T) {
 	assert.Equal(t, []string{"libShared:2.0.0", "tool:1.0.0"}, graph["libA:1.1.0"],
 		"a dependency cycle is reported as an edge, and must not loop forever")
 	assert.Empty(t, graph["libShared:2.0.0"])
+}
+
+// A shared dependency's RequestedBy must not grow without bound: entities.RequestedByMaxLength
+// caps it the same way the apt and dotnet collectors in this repo already do.
+func TestCollectDependencyTreeCapsRequestedBy(t *testing.T) {
+	chocolateyRoot := t.TempDir()
+	library := filepath.Join(chocolateyRoot, "lib")
+
+	const requesterCount = entities.RequestedByMaxLength + 5
+	var toolDeps strings.Builder
+	for i := 0; i < requesterCount; i++ {
+		requester := fmt.Sprintf("requester%02d", i)
+		fmt.Fprintf(&toolDeps, `<dependency id="%s" version="1.0.0" />`, requester)
+		writePackage(t, filepath.Join(library, requester), requester+".1.0.0.nupkg", requester)
+		writeNuspec(t, filepath.Join(library, requester), requester+".nuspec",
+			`<dependency id="shared" version="1.0.0" />`)
+	}
+	writePackage(t, filepath.Join(library, "tool"), "tool.1.0.0.nupkg", "tool")
+	writeNuspec(t, filepath.Join(library, "tool"), "tool.nuspec", toolDeps.String())
+	writePackage(t, filepath.Join(library, "shared"), "shared.1.0.0.nupkg", "shared")
+	writeGroupedNuspec(t, filepath.Join(library, "shared"), "shared.nuspec")
+
+	collector, err := NewChocoFlexPack(buildinfoflex.ChocoConfig{
+		WorkingDirectory:  filepath.Join(t.TempDir(), "project"),
+		ChocolateyInstall: chocolateyRoot,
+		Packages:          []string{"tool"},
+		RepoResolve:       "choco-virtual",
+		Module:            "image-build",
+	}, nil)
+	require.NoError(t, err)
+
+	buildInfo, err := collector.CollectBuildInfo("my-build", "43")
+	require.NoError(t, err)
+	require.Len(t, buildInfo.Modules, 1)
+
+	var shared *entities.Dependency
+	for i, dependency := range buildInfo.Modules[0].Dependencies {
+		if dependency.Id == "shared:1.0.0" {
+			shared = &buildInfo.Modules[0].Dependencies[i]
+		}
+	}
+	require.NotNil(t, shared, "shared:1.0.0 must still be recorded once")
+	assert.Len(t, shared.RequestedBy, entities.RequestedByMaxLength,
+		"RequestedBy must stop growing at entities.RequestedByMaxLength even with more requesters")
 }
 
 // "-v" is Chocolatey's global --verbose switch, not a short form of --version, so it must not
