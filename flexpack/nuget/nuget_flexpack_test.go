@@ -122,8 +122,10 @@ func TestFindNupkgArtifactsIncludesSymbols(t *testing.T) {
 	}
 
 	assertArtifact(t, artifactsByName["My.Package.1.0.0.nupkg"], "nupkg", "My.Package.1.0.0.nupkg")
-	// .snupkg → symbolpackage/<id>.<version>.nupkg (symbolpackage endpoint).
-	assertArtifact(t, artifactsByName["My.Package.1.0.0.snupkg"], "snupkg", "symbolpackage/My.Package.1.0.0.nupkg")
+	// .snupkg → flat at root under its own name, as stored by the V3 /symbols endpoint that
+	// FlexPack's declared source advertises. NOT symbolpackage/<id>.<version>.nupkg, which is
+	// the older V2 /symbolpackage endpoint's layout.
+	assertArtifact(t, artifactsByName["My.Package.1.0.0.snupkg"], "snupkg", "My.Package.1.0.0.snupkg")
 	// .symbols.nupkg (legacy) → flat at root as <id>.<version>.nupkg (regular endpoint).
 	assertArtifact(t, artifactsByName["Legacy.2.1.0.symbols.nupkg"], "snupkg", "Legacy.2.1.0.nupkg")
 }
@@ -158,6 +160,92 @@ func TestCollectPushArtifactsUsesOnlyExplicitArguments(t *testing.T) {
 	if !equalStrings(actualNames, expectedNames) {
 		t.Fatalf("artifact names: got %v, want %v", actualNames, expectedNames)
 	}
+}
+
+// TestCollectPushArtifactsIncludesSiblingSymbolPackage pins that a .snupkg next to a pushed
+// .nupkg is recorded even though it never appears on the command line. Both native clients find
+// and upload it themselves; without this it would sit in the repository unrecorded by any
+// build-info and never stamped with build properties.
+func TestCollectPushArtifactsIncludesSiblingSymbolPackage(t *testing.T) {
+	workingDir := t.TempDir()
+	writePackageFile(t, workingDir, "Sibling.1.0.0.nupkg")
+	writePackageFile(t, workingDir, "Sibling.1.0.0.snupkg")
+
+	artifacts, err := CollectPushArtifacts(workingDir, []string{"Sibling.1.0.0.nupkg"}, "nuget-local")
+	if err != nil {
+		t.Fatalf("CollectPushArtifacts() error = %v", err)
+	}
+	expectedNames := []string{"Sibling.1.0.0.nupkg", "Sibling.1.0.0.snupkg"}
+	if actualNames := artifactNames(artifacts); !equalStrings(actualNames, expectedNames) {
+		t.Fatalf("artifact names: got %v, want %v", actualNames, expectedNames)
+	}
+}
+
+func TestCollectPushArtifactsSiblingSymbolPackageRules(t *testing.T) {
+	t.Run("no sibling on disk", func(t *testing.T) {
+		workingDir := t.TempDir()
+		writePackageFile(t, workingDir, "Lonely.1.0.0.nupkg")
+
+		artifacts, err := CollectPushArtifacts(workingDir, []string{"Lonely.1.0.0.nupkg"}, "nuget-local")
+		if err != nil {
+			t.Fatalf("CollectPushArtifacts() error = %v", err)
+		}
+		if actualNames := artifactNames(artifacts); !equalStrings(actualNames, []string{"Lonely.1.0.0.nupkg"}) {
+			t.Fatalf("artifact names: got %v, want only the primary package", actualNames)
+		}
+	})
+
+	// The native clients skip the symbol upload entirely under this flag, so recording it would
+	// describe a file that was never sent.
+	for _, flag := range []string{"--no-symbols", "-NoSymbols", "-n"} {
+		t.Run("suppressed by "+flag, func(t *testing.T) {
+			workingDir := t.TempDir()
+			writePackageFile(t, workingDir, "Suppressed.1.0.0.nupkg")
+			writePackageFile(t, workingDir, "Suppressed.1.0.0.snupkg")
+
+			artifacts, err := CollectPushArtifacts(workingDir,
+				[]string{"Suppressed.1.0.0.nupkg", flag}, "nuget-local")
+			if err != nil {
+				t.Fatalf("CollectPushArtifacts() error = %v", err)
+			}
+			if actualNames := artifactNames(artifacts); !equalStrings(actualNames, []string{"Suppressed.1.0.0.nupkg"}) {
+				t.Fatalf("artifact names: got %v, want only the primary package", actualNames)
+			}
+		})
+	}
+
+	// An explicitly named .snupkg must not be recorded twice once sibling detection also finds it.
+	t.Run("explicitly named sibling is not duplicated", func(t *testing.T) {
+		workingDir := t.TempDir()
+		writePackageFile(t, workingDir, "Both.1.0.0.nupkg")
+		writePackageFile(t, workingDir, "Both.1.0.0.snupkg")
+
+		artifacts, err := CollectPushArtifacts(workingDir,
+			[]string{"Both.1.0.0.nupkg", "Both.1.0.0.snupkg"}, "nuget-local")
+		if err != nil {
+			t.Fatalf("CollectPushArtifacts() error = %v", err)
+		}
+		expectedNames := []string{"Both.1.0.0.nupkg", "Both.1.0.0.snupkg"}
+		if actualNames := artifactNames(artifacts); !equalStrings(actualNames, expectedNames) {
+			t.Fatalf("artifact names: got %v, want %v", actualNames, expectedNames)
+		}
+	})
+
+	// A legacy .symbols.nupkg is itself the symbol package; it has no separate sibling to find,
+	// and trimming ".nupkg" off it must not manufacture a "<id>.<version>.symbols.snupkg".
+	t.Run("legacy symbols package gains no sibling", func(t *testing.T) {
+		workingDir := t.TempDir()
+		writePackageFile(t, workingDir, "Legacy.2.1.0.symbols.nupkg")
+
+		artifacts, err := CollectPushArtifacts(workingDir,
+			[]string{"Legacy.2.1.0.symbols.nupkg"}, "nuget-local")
+		if err != nil {
+			t.Fatalf("CollectPushArtifacts() error = %v", err)
+		}
+		if actualNames := artifactNames(artifacts); !equalStrings(actualNames, []string{"Legacy.2.1.0.symbols.nupkg"}) {
+			t.Fatalf("artifact names: got %v, want only the legacy package", actualNames)
+		}
+	})
 }
 
 func TestCollectPackedArtifactsFindsNestedAndCustomOutputs(t *testing.T) {

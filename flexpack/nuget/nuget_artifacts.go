@@ -57,8 +57,13 @@ func isPackageFile(name string) bool {
 //
 // Primary packages (.nupkg) are stored flat at the repository root: "<id>.<version>.nupkg".
 //
-// Modern symbol packages (.snupkg) are pushed via the /api/nuget/v2/<repo>/symbolpackage
-// endpoint and stored as: "symbolpackage/<id>.<version>.nupkg".
+// Modern symbol packages (.snupkg) are stored flat at the repository root under their own
+// name: "<id>.<version>.snupkg". Both toolchains reach the source FlexPack declares through
+// its V3 service index, whose SymbolPackagePublish resource is /api/nuget/v3/<repo>/symbols,
+// and Artifactory stores what that endpoint receives flat and unrenamed. The older
+// /api/nuget/v2/<repo>/symbolpackage endpoint - which does store as
+// "symbolpackage/<id>.<version>.nupkg" - is not the one in use here; assuming it left every
+// pushed .snupkg unfindable, so property stamping failed and took the whole push with it.
 //
 // Legacy symbol packages (.symbols.nupkg) are pushed via the regular package endpoint and
 // stored flat at the repository root as "<id>.<version>.nupkg" (extension renamed by Artifactory
@@ -73,17 +78,11 @@ func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 	if err != nil {
 		return entities.Artifact{}, fmt.Errorf("compute checksum for %s: %w", name, err)
 	}
-	lower := strings.ToLower(name)
-	var path string
-	switch {
-	case strings.HasSuffix(lower, snupkgExtension):
-		// .snupkg → symbolpackage/<id>.<version>.nupkg
-		path = "symbolpackage/" + snupkgStorageName(name)
-	case strings.HasSuffix(lower, legacySymbolsSuffix):
-		// .symbols.nupkg → flat at root as <id>.<version>.nupkg
-		path = snupkgStorageName(name)
-	default:
-		path = name
+	// A .nupkg and a .snupkg are both stored under the name they were pushed with; only the
+	// legacy .symbols.nupkg is renamed, Artifactory dropping the ".symbols" segment.
+	path := name
+	if strings.HasSuffix(strings.ToLower(name), legacySymbolsSuffix) {
+		path = name[:len(name)-len(legacySymbolsSuffix)] + nupkgExtension
 	}
 	return entities.Artifact{
 		Name:                   name,
@@ -96,21 +95,6 @@ func newArtifactFromFile(fullPath, repoName string) (entities.Artifact, error) {
 			Md5:    details.Checksum.Md5,
 		},
 	}, nil
-}
-
-// snupkgStorageName converts a symbol package filename to the name Artifactory uses when
-// storing it: the .snupkg or .symbols.nupkg extension is replaced with .nupkg.
-// E.g. "Foo.1.0.0.snupkg" → "Foo.1.0.0.nupkg", "Foo.1.0.0.symbols.nupkg" → "Foo.1.0.0.nupkg".
-func snupkgStorageName(name string) string {
-	lower := strings.ToLower(name)
-	switch {
-	case strings.HasSuffix(lower, snupkgExtension):
-		return name[:len(name)-len(snupkgExtension)] + nupkgExtension
-	case strings.HasSuffix(lower, legacySymbolsSuffix):
-		return name[:len(name)-len(legacySymbolsSuffix)] + nupkgExtension
-	default:
-		return name
-	}
 }
 
 // BuildArtifactModules groups uploaded/packed artifacts into build-info modules.
@@ -189,8 +173,12 @@ func FindNupkgArtifacts(outputDir, repoName string) ([]entities.Artifact, error)
 // CollectPushArtifacts resolves the package files that a push command uploads. It considers
 // only the explicit positional package arguments (paths or globs) supplied to the native
 // command, so it never captures stale, unrelated packages that happen to sit in the working
-// directory. Relative arguments are resolved against workingDir. Symbol packages pushed
-// alongside the primary package are included when matched by the arguments.
+// directory. Relative arguments are resolved against workingDir.
+//
+// A .snupkg sitting next to a pushed .nupkg is included even though it never appears on the
+// command line: both native clients upload it automatically, so omitting it would leave a file
+// in the repository that no build-info records and that never receives build properties. The
+// sibling is skipped when the command opts out of symbols (-NoSymbols / --no-symbols).
 func CollectPushArtifacts(workingDir string, pushArgs []string, repoName string) ([]entities.Artifact, error) {
 	paths, err := resolvePushPackagePaths(workingDir, pushArgs)
 	if err != nil {
@@ -198,6 +186,9 @@ func CollectPushArtifacts(workingDir string, pushArgs []string, repoName string)
 	}
 	if len(paths) == 0 {
 		return nil, fmt.Errorf("no NuGet package (.nupkg/.snupkg) found in the push arguments")
+	}
+	if !hasNoSymbols(pushArgs) {
+		paths = appendSiblingSymbolPackages(paths)
 	}
 	var artifacts []entities.Artifact
 	for _, p := range paths {
@@ -208,6 +199,48 @@ func CollectPushArtifacts(workingDir string, pushArgs []string, repoName string)
 		artifacts = append(artifacts, artifact)
 	}
 	return artifacts, nil
+}
+
+// appendSiblingSymbolPackages returns packages plus the sibling .snupkg of every .nupkg that has
+// one on disk, preserving order and skipping any path already present. Both nuget.exe and the
+// dotnet CLI discover that sibling themselves and push it alongside the primary package, so it
+// belongs in build-info even though the caller never named it.
+func appendSiblingSymbolPackages(packages []string) []string {
+	seen := make(map[string]bool, len(packages))
+	for _, pkgPath := range packages {
+		seen[pkgPath] = true
+	}
+	withSymbols := packages
+	for _, pkgPath := range packages {
+		if !strings.HasSuffix(strings.ToLower(pkgPath), nupkgExtension) ||
+			strings.HasSuffix(strings.ToLower(pkgPath), legacySymbolsSuffix) {
+			continue
+		}
+		snupkgPath := pkgPath[:len(pkgPath)-len(nupkgExtension)] + snupkgExtension
+		if seen[snupkgPath] {
+			continue
+		}
+		// Must be a regular file: a directory named like a package would otherwise reach
+		// crypto.GetFileDetails and fail the whole command after the push already succeeded.
+		if info, statErr := os.Stat(snupkgPath); statErr != nil || info.IsDir() {
+			continue
+		}
+		seen[snupkgPath] = true
+		withSymbols = append(withSymbols, snupkgPath)
+	}
+	return withSymbols
+}
+
+// hasNoSymbols reports whether the push command opts out of uploading symbol packages.
+// nuget.exe spells it -NoSymbols, the dotnet CLI --no-symbols (-n).
+func hasNoSymbols(args []string) bool {
+	for _, arg := range args {
+		switch strings.ToLower(arg) {
+		case "-nosymbols", "--no-symbols", "-n":
+			return true
+		}
+	}
+	return false
 }
 
 // resolvePushPackagePaths extracts package file paths from the positional push arguments,
@@ -237,9 +270,12 @@ func resolvePushPackagePaths(workingDir string, pushArgs []string) ([]string, er
 		if !filepath.IsAbs(candidate) {
 			candidate = filepath.Join(workingDir, candidate)
 		}
-		matches, err := filepath.Glob(candidate)
-		if err != nil {
-			return nil, fmt.Errorf("resolve push argument %q: %w", arg, err)
+		// filepath.Glob's only error is ErrBadPattern. A real filename may legitimately contain
+		// "[", so fall through to the literal path rather than failing the command: the push has
+		// already succeeded by the time this runs.
+		matches, globErr := filepath.Glob(candidate)
+		if globErr != nil {
+			matches = nil
 		}
 		if len(matches) == 0 {
 			// Not a glob (or no match); keep the literal path if it exists.
@@ -252,10 +288,16 @@ func resolvePushPackagePaths(workingDir string, pushArgs []string) ([]string, er
 			if err != nil {
 				return nil, fmt.Errorf("resolve push artifact %q: %w", m, err)
 			}
-			if isPackageFile(abs) && !seen[abs] {
-				seen[abs] = true
-				paths = append(paths, abs)
+			if !isPackageFile(abs) || seen[abs] {
+				continue
 			}
+			// A glob can match a directory whose name ends in .nupkg/.snupkg; checksumming it
+			// would fail the command after a successful push.
+			if info, statErr := os.Stat(abs); statErr != nil || info.IsDir() {
+				continue
+			}
+			seen[abs] = true
+			paths = append(paths, abs)
 		}
 	}
 	return paths, nil
