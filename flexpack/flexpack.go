@@ -182,6 +182,46 @@ type NuGetConfig struct {
 	Module string
 }
 
+// ResolvedPackage is a PSResource package whose identity and checksum have already been determined
+// by the caller: name/version via Get-InstalledPSResource, checksum via a HEAD request to
+// Artifactory. build-info-go performs neither of those - it only assembles the resulting data into
+// entities.Dependency records, exactly like every other FlexPack collector in this repo.
+//
+// Defined here (rather than in flexpack/psresource, which imports this package for PSResourceConfig)
+// to avoid an import cycle: PSResourceConfig needs to carry a slice of these.
+type ResolvedPackage struct {
+	// Name is the PSResource package name, as returned by Get-InstalledPSResource.
+	Name string
+
+	// Version is the resolved package version, as returned by Get-InstalledPSResource.
+	Version string
+
+	// Checksum is the package checksum, already fetched by the caller from Artifactory.
+	Checksum entities.Checksum
+}
+
+// PSResourceConfig holds configuration for the PSResource FlexPack implementation.
+//
+// build-info-go is a pure, offline collection library: it never talks to Artifactory. PSResource
+// packages have no local .nupkg to hash (unlike, say, Chocolatey), so the caller - jfrog-cli-artifactory,
+// which holds the server/auth context - is responsible for resolving package identity (via
+// Get-InstalledPSResource) and checksums (via a HEAD request to Artifactory) and handing the results
+// in as already-resolved data via ResolvedPackages.
+type PSResourceConfig struct {
+	// WorkingDirectory is the directory where PowerShell commands should operate
+	WorkingDirectory string
+
+	// Module is the optional user-supplied build-info module ID override (--module).
+	// When set, it is used as the module ID instead of the default.
+	Module string
+
+	// ResolvedPackages is the ground-truth set of packages to record as dependencies - the direct
+	// packages Install-/Save-/Update-PSResource resolved, each with its checksum already fetched by
+	// the caller. Threaded through the config (rather than a CollectBuildInfo parameter) so
+	// PSResourceFlexPack satisfies the same BuildInfoCollector interface every other collector does.
+	ResolvedPackages []ResolvedPackage
+}
+
 // ChocoConfig holds configuration for Chocolatey build-info collection.
 type ChocoConfig struct {
 	WorkingDirectory  string

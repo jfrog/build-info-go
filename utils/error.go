@@ -8,16 +8,17 @@ import (
 type PackageManager string
 
 const (
-	Npm    PackageManager = "npm"
-	Maven  PackageManager = "maven"
-	Pip    PackageManager = "pip"
-	Go     PackageManager = "go"
-	Poetry PackageManager = "poetry"
-	Yarn   PackageManager = "yarn"
-	Pnpm   PackageManager = "pnpm"
-	Uv     PackageManager = "uv"
-	Pipenv PackageManager = "pipenv"
-	Choco  PackageManager = "choco"
+	Npm        PackageManager = "npm"
+	Maven      PackageManager = "maven"
+	Pip        PackageManager = "pip"
+	Go         PackageManager = "go"
+	Poetry     PackageManager = "poetry"
+	Yarn       PackageManager = "yarn"
+	Pnpm       PackageManager = "pnpm"
+	Uv         PackageManager = "uv"
+	Pipenv     PackageManager = "pipenv"
+	Choco      PackageManager = "choco"
+	PSResource PackageManager = "psresource"
 )
 
 // ForbiddenError represents a 403 Forbidden error.
@@ -72,6 +73,10 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")
 	case "pipenv":
 		return strings.Contains(strings.ToLower(cmdOutput), "http error 403")
+	case "psresource":
+		// PowerShell Artifactory-access errors don't follow one fixed phrase, so match broadly.
+		return strings.Contains(strings.ToLower(cmdOutput), "403") ||
+			strings.Contains(strings.ToLower(cmdOutput), "forbidden")
 	case "nuget", "choco":
 		output := strings.ToLower(cmdOutput)
 		return (strings.Contains(output, "403") && strings.Contains(output, "forbidden")) ||
