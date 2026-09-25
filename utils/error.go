@@ -8,17 +8,17 @@ import (
 type PackageManager string
 
 const (
-	Npm    PackageManager = "npm"
-	Maven  PackageManager = "maven"
-	Pip    PackageManager = "pip"
-	Go     PackageManager = "go"
-	Poetry PackageManager = "poetry"
-	Yarn   PackageManager = "yarn"
-	Pnpm   PackageManager = "pnpm"
-	Uv     PackageManager = "uv"
-	Pipenv PackageManager = "pipenv"
-	Choco  PackageManager = "choco"
-  PSResource PackageManager = "psresource"
+	Npm        PackageManager = "npm"
+	Maven      PackageManager = "maven"
+	Pip        PackageManager = "pip"
+	Go         PackageManager = "go"
+	Poetry     PackageManager = "poetry"
+	Yarn       PackageManager = "yarn"
+	Pnpm       PackageManager = "pnpm"
+	Uv         PackageManager = "uv"
+	Pipenv     PackageManager = "pipenv"
+	Choco      PackageManager = "choco"
+	PSResource PackageManager = "psresource"
 )
 
 // ForbiddenError represents a 403 Forbidden error.

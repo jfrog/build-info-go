@@ -220,6 +220,8 @@ type PSResourceConfig struct {
 	// the caller. Threaded through the config (rather than a CollectBuildInfo parameter) so
 	// PSResourceFlexPack satisfies the same BuildInfoCollector interface every other collector does.
 	ResolvedPackages []ResolvedPackage
+}
+
 // ChocoConfig holds configuration for Chocolatey build-info collection.
 type ChocoConfig struct {
 	WorkingDirectory  string
