@@ -182,6 +182,15 @@ type NuGetConfig struct {
 	Module string
 }
 
+// ChocoConfig holds configuration for Chocolatey build-info collection.
+type ChocoConfig struct {
+	WorkingDirectory  string
+	ChocolateyInstall string
+	Packages          []string
+	RepoResolve       string
+	Module            string
+}
+
 // IsFlexPackEnabled checks if the FlexPack (native) implementation should be used
 // Returns true if JFROG_RUN_NATIVE environment variable is set to "true"
 func IsFlexPackEnabled() bool {

@@ -17,6 +17,7 @@ const (
 	Pnpm   PackageManager = "pnpm"
 	Uv     PackageManager = "uv"
 	Pipenv PackageManager = "pipenv"
+	Choco  PackageManager = "choco"
 )
 
 // ForbiddenError represents a 403 Forbidden error.
@@ -71,6 +72,10 @@ func IsForbiddenOutput(tech PackageManager, cmdOutput string) bool {
 		return strings.Contains(strings.ToLower(cmdOutput), "403 forbidden")
 	case "pipenv":
 		return strings.Contains(strings.ToLower(cmdOutput), "http error 403")
+	case "nuget", "choco":
+		output := strings.ToLower(cmdOutput)
+		return (strings.Contains(output, "403") && strings.Contains(output, "forbidden")) ||
+			strings.Contains(output, "response status code does not indicate success: 403")
 	}
 	return false
 }
