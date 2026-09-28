@@ -14,9 +14,10 @@ type PyProjectToml struct {
 
 // Pypi project defined for package managers other than poetry (pip, pipenv, etc...)
 type Project struct {
-	Name        string
-	Version     string
-	Description string
+	Name         string
+	Version      string
+	Description  string
+	Dependencies []string
 }
 
 // Get project name and version by parsing the pyproject.toml file.
