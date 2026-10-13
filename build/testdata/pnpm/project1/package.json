@@ -1,0 +1,17 @@
+{
+  "name": "build-info-go-pnpm-tests",
+  "version": "1.0.0",
+  "description": "test package for pnpm",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "underscore": "1.13.6"
+  },
+  "devDependencies": {
+    "minimist": "1.2.8"
+  }
+}
