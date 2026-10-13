@@ -1,13 +1,20 @@
+// jf gradle writes this file as --init-script. --include-shared-build-logic becomes
+// ORG_GRADLE_PROJECT_includeSharedBuildLogic=true, which Gradle exposes as the
+// includeSharedBuildLogic project property. The flag check is inlined so this script
+// still compiles against extractor 5.2.5 (SharedBuildLogicUtils is not in that jar).
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPlugin
 import org.jfrog.gradle.plugin.artifactory.ArtifactoryPluginSettings
 import org.jfrog.gradle.plugin.artifactory.Constant
 import org.jfrog.gradle.plugin.artifactory.task.ArtifactoryTask
+import org.jfrog.gradle.plugin.artifactory.utils.PluginUtils
 
 initscript {
     dependencies {
         classpath fileTree('${pluginLibDir}')
     }
 }
+
+PluginUtils.assertGradleVersionSupported(getGradle())
 
 beforeSettings { Settings settings ->
     settings.apply plugin: ArtifactoryPluginSettings
@@ -20,9 +27,13 @@ projectsLoaded { Gradle gradle ->
     Project root = gradle.getRootProject()
     root.logger.debug("Artifactory plugin: projectsEvaluated: ${root.name}")
     if (!"buildSrc".equals(root.name)) {
-        root.allprojects {
-            apply {
-                apply plugin: ArtifactoryPlugin
+        if (isIncludeSharedBuildLogicEnabled(root)) {
+            applySharedBuildPlugin(root)
+        } else {
+            root.allprojects {
+                apply {
+                    apply plugin: ArtifactoryPlugin
+                }
             }
         }
     }
@@ -37,5 +48,19 @@ projectsLoaded { Gradle gradle ->
         } catch (UnknownTaskException ignored) {
             root.logger.debug("Can't find sub project configured for {}", p.getPath());
         }
+    }
+}
+
+boolean isIncludeSharedBuildLogicEnabled(Project project) {
+    Object value = project.findProperty("includeSharedBuildLogic")
+    return value != null && "true".equalsIgnoreCase(value.toString())
+}
+
+void applySharedBuildPlugin(Project root) {
+    // No apply-if-missing guard: build.gradle hasn't evaluated yet at projectsLoaded, so such a
+    // check would be a no-op. A later double-apply is already handled by ArtifactoryPlugin.apply()
+    // itself (see ArtifactoryPlugin#extensionForSharedBuildApply).
+    root.allprojects { Project p ->
+        p.pluginManager.apply(ArtifactoryPlugin)
     }
 }
