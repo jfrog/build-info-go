@@ -137,6 +137,9 @@ func GetYarnDependenciesWithVersion(executablePath, srcPath string, packageInfo 
 
 	if isV2AndAbove {
 		dependenciesMap, root, err = buildYarnV2DependencyMap(packageInfo, responseStr)
+		if err == nil {
+			removeDanglingYarnDependencyPointers(dependenciesMap, log)
+		}
 	} else {
 		dependenciesMap, root, err = buildYarnV1DependencyMap(packageInfo, responseStr, allowPartialResults, log)
 	}
@@ -269,6 +272,27 @@ func buildYarnV2DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 		dependenciesMap[currDependency.Value] = &currDependency
 	}
 	return
+}
+
+// removeDanglingYarnDependencyPointers removes child dependency pointers whose locator has no entry of its
+// own in dependenciesMap, so callers that look children up by GetYarnDependencyKeyFromLocator never get nil.
+// 'yarn info' can list a child that it never prints as a top-level entry, for example when it fails partway
+// on a package it can't resolve (its partial output is still used above), or for some patch/workspace locators.
+func removeDanglingYarnDependencyPointers(dependenciesMap map[string]*YarnDependency, log utils.Log) {
+	for _, dependency := range dependenciesMap {
+		if dependency == nil {
+			continue
+		}
+		children := dependency.Details.Dependencies[:0]
+		for _, child := range dependency.Details.Dependencies {
+			if _, found := dependenciesMap[GetYarnDependencyKeyFromLocator(child.Locator)]; !found {
+				log.Warn(fmt.Sprintf("Skipping the Yarn dependency '%s' of '%s': it was not found in the 'yarn info' output, so the dependency tree may be incomplete.", child.Locator, dependency.Value))
+				continue
+			}
+			children = append(children, child)
+		}
+		dependency.Details.Dependencies = children
+	}
 }
 
 // Depending on the Yarn version currently in use for the project, this function runs the command that retrieves the project's dependencies
