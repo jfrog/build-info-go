@@ -3,7 +3,10 @@ package utils
 import (
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -305,4 +308,59 @@ func TestIsNonRegistryLocator(t *testing.T) {
 	for _, l := range nonRegistryCases {
 		assert.True(t, IsNonRegistryLocator(l), "expected non-registry: %s", l)
 	}
+}
+
+func TestRemoveDanglingYarnDependencyPointers(t *testing.T) {
+	const patchLocator = "lodash@patch:lodash@npm%3A4.17.21#./.yarn/patches/lodash.patch::version=4.17.21&hash=abc123"
+	dependenciesMap := map[string]*YarnDependency{
+		"root@workspace:.": {Value: "root@workspace:.", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{
+			// Resolves to "react@npm:18.2.0" through GetYarnDependencyKeyFromLocator: kept.
+			{Locator: "react@virtual:abc123#npm:18.2.0"},
+			// Has its own entry: kept.
+			{Locator: patchLocator},
+			// No entry of its own (e.g. a private package 'yarn info' couldn't resolve): removed.
+			{Locator: "@internal/private@npm:2.0.0"},
+		}}},
+		"react@npm:18.2.0": {Value: "react@npm:18.2.0", Details: YarnDepDetails{Version: "18.2.0", Dependencies: []YarnDependencyPointer{
+			// No entry of its own: removed, leaving no children.
+			{Locator: "loose-envify@patch:loose-envify@npm%3A1.4.0#./missing.patch::version=1.4.0&hash=def456"},
+		}}},
+		patchLocator: {Value: patchLocator, Details: YarnDepDetails{Version: "4.17.21"}},
+		"nil-entry":  nil,
+	}
+
+	removeDanglingYarnDependencyPointers(dependenciesMap, utils.NewDefaultLogger(utils.INFO))
+
+	assert.Equal(t, []YarnDependencyPointer{{Locator: "react@virtual:abc123#npm:18.2.0"}, {Locator: patchLocator}},
+		dependenciesMap["root@workspace:."].Details.Dependencies)
+	assert.Empty(t, dependenciesMap["react@npm:18.2.0"].Details.Dependencies)
+	// Every remaining child pointer resolves to an entry, so callers can look children up without a nil check.
+	for _, dependency := range dependenciesMap {
+		if dependency == nil {
+			continue
+		}
+		for _, child := range dependency.Details.Dependencies {
+			assert.NotNil(t, dependenciesMap[GetYarnDependencyKeyFromLocator(child.Locator)], child.Locator)
+		}
+	}
+}
+
+// TestGetYarnDependenciesWithVersionRemovesDanglingPointers runs the Yarn 2+ path against a fake yarn whose
+// 'yarn info' output lists a child ('@internal/private@npm:2.0.0') that has no entry of its own.
+func TestGetYarnDependenciesWithVersionRemovesDanglingPointers(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a POSIX shell script as a fake yarn binary")
+	}
+	infoOutput := `{"value":"root@workspace:.","children":{"Version":"0.0.0-use.local","Dependencies":[{"descriptor":"express@npm:^3.0.1","locator":"express@npm:3.0.1"},{"descriptor":"@internal/private@npm:^2.0.0","locator":"@internal/private@npm:2.0.0"}]}}
+{"value":"express@npm:3.0.1","children":{"Version":"3.0.1"}}`
+	yarnPath := filepath.Join(t.TempDir(), "yarn")
+	script := "#!/bin/sh\ncat <<'EOF'\n" + infoOutput + "\nEOF\n"
+	require.NoError(t, os.WriteFile(yarnPath, []byte(script), 0700)) // #nosec G306 -- test stub must be executable
+
+	packageInfo := &PackageInfo{Name: "root", Version: "1.0.0"}
+	dependenciesMap, root, err := GetYarnDependenciesWithVersion(yarnPath, t.TempDir(), packageInfo, "4.1.0", utils.NewDefaultLogger(utils.INFO), false)
+	require.NoError(t, err)
+	require.NotNil(t, root)
+	assert.Equal(t, []YarnDependencyPointer{{Descriptor: "express@npm:^3.0.1", Locator: "express@npm:3.0.1"}}, root.Details.Dependencies)
+	assert.Len(t, dependenciesMap, 2)
 }
