@@ -133,12 +133,19 @@ func GetYarnDependenciesWithVersion(executablePath, srcPath string, packageInfo 
 		if responseStr == "" {
 			return
 		}
+		// 'yarn info' (Yarn 2+) stops at the first package it can't resolve, so its output is missing every entry after it.
+		// Don't build the dependency tree from that partial output unless the caller allowed partial results.
+		if isV2AndAbove && !allowPartialResults {
+			err = fmt.Errorf("'yarn info' failed, so the dependencies of the project could not be fully collected: %w", err)
+			return
+		}
+		err = nil
 	}
 
 	if isV2AndAbove {
 		dependenciesMap, root, err = buildYarnV2DependencyMap(packageInfo, responseStr)
 		if err == nil {
-			removeDanglingYarnDependencyPointers(dependenciesMap, log)
+			addMissingYarnDependencyEntries(dependenciesMap, log)
 		}
 	} else {
 		dependenciesMap, root, err = buildYarnV1DependencyMap(packageInfo, responseStr, allowPartialResults, log)
@@ -274,25 +281,56 @@ func buildYarnV2DependencyMap(packageInfo *PackageInfo, responseStr string) (dep
 	return
 }
 
-// removeDanglingYarnDependencyPointers removes child dependency pointers whose locator has no entry of its
-// own in dependenciesMap, so callers that look children up by GetYarnDependencyKeyFromLocator never get nil.
-// 'yarn info' can list a child that it never prints as a top-level entry, for example when it fails partway
-// on a package it can't resolve (its partial output is still used above), or for some patch/workspace locators.
-func removeDanglingYarnDependencyPointers(dependenciesMap map[string]*YarnDependency, log utils.Log) {
+// addMissingYarnDependencyEntries makes sure that every child dependency pointer resolves to an entry in
+// dependenciesMap, so callers that look children up by GetYarnDependencyKeyFromLocator never get nil.
+// 'yarn info' can list a child that it never prints as a top-level entry, for example when its output is partial.
+// Such a child gets an entry built from its locator (name and version, without children of its own). A child whose
+// version can't be read from its locator is removed instead, since it can't be identified.
+func addMissingYarnDependencyEntries(dependenciesMap map[string]*YarnDependency, log utils.Log) {
+	missing := make(map[string]*YarnDependency)
 	for _, dependency := range dependenciesMap {
 		if dependency == nil {
 			continue
 		}
 		children := dependency.Details.Dependencies[:0]
 		for _, child := range dependency.Details.Dependencies {
-			if _, found := dependenciesMap[GetYarnDependencyKeyFromLocator(child.Locator)]; !found {
-				log.Warn(fmt.Sprintf("Skipping the Yarn dependency '%s' of '%s': it was not found in the 'yarn info' output, so the dependency tree may be incomplete.", child.Locator, dependency.Value))
-				continue
+			key := GetYarnDependencyKeyFromLocator(child.Locator)
+			if _, found := dependenciesMap[key]; !found {
+				if _, added := missing[key]; !added {
+					childVersion := yarnLocatorVersion(key)
+					if childVersion == "" {
+						log.Warn(fmt.Sprintf("Skipping the Yarn dependency '%s' of '%s': it was not found in the 'yarn info' output and its version can't be read from its locator, so the dependency tree may be incomplete.", child.Locator, dependency.Value))
+						continue
+					}
+					log.Warn(fmt.Sprintf("The Yarn dependency '%s' of '%s' was not found in the 'yarn info' output. It is added without its own dependencies, so the dependency tree may be incomplete.", child.Locator, dependency.Value))
+					missing[key] = &YarnDependency{Value: key, Details: YarnDepDetails{Version: childVersion}}
+				}
 			}
 			children = append(children, child)
 		}
 		dependency.Details.Dependencies = children
 	}
+	for key, dependency := range missing {
+		dependenciesMap[key] = dependency
+	}
+}
+
+// yarnLocatorVersion returns the version of a Yarn 2+ locator (as returned by GetYarnDependencyKeyFromLocator),
+// or "" when the locator doesn't carry one. For example:
+// '@scope/name@npm:1.2.3' -> '1.2.3', 'name@patch:name@npm%3A1.2.3#./fix.patch::version=1.2.3&hash=abc' -> '1.2.3'.
+func yarnLocatorVersion(locator string) string {
+	if _, params, found := strings.Cut(locator, "::"); found {
+		for _, param := range strings.Split(params, "&") {
+			if value, isVersion := strings.CutPrefix(param, "version="); isVersion {
+				return value
+			}
+		}
+	}
+	if ExtractLocatorProtocol(locator) != "npm" {
+		return ""
+	}
+	_, reference, _ := strings.Cut(locator[1:], "@npm:")
+	return reference
 }
 
 // Depending on the Yarn version currently in use for the project, this function runs the command that retrieves the project's dependencies
