@@ -482,6 +482,10 @@ type YarnDependency struct {
 }
 
 func (yd *YarnDependency) Name() (string, error) {
+	// Callers look dependencies up by locator, so a missing dependency must be reported as an error, not a nil pointer panic.
+	if yd == nil {
+		return "", errors.New("got a nil yarn dependency")
+	}
 	if yd.Value == "" {
 		return "", fmt.Errorf("got an empty name yarn dependency: %+v", yd)
 	}

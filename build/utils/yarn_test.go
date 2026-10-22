@@ -219,6 +219,11 @@ func TestYarnDependency_Name(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, testCase.packageExpectedName, depName)
 	}
+
+	// A dependency looked up by a locator that has no entry is nil: Name must return an error, not panic.
+	var missing *YarnDependency
+	_, err := missing.Name()
+	assert.Error(t, err)
 }
 
 func TestSplitNameAndVersion(t *testing.T) {
