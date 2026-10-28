@@ -330,6 +330,8 @@ func yarnLocatorVersion(locator string) string {
 		return ""
 	}
 	_, reference, _ := strings.Cut(locator[1:], "@npm:")
+	// Drop locator params without a version, e.g. '::__archiveUrl=...'.
+	reference, _, _ = strings.Cut(reference, "::")
 	return reference
 }
 

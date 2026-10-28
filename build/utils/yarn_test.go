@@ -362,7 +362,8 @@ func TestYarnLocatorVersion(t *testing.T) {
 	cases := map[string]string{
 		"express@npm:3.0.1":            "3.0.1",
 		"@scope/name@npm:1.2.3-beta.1": "1.2.3-beta.1",
-		"lodash@patch:lodash@npm%3A4.17.21#./p.patch::version=4.17.21&hash=abc": "4.17.21",
+		"lodash@patch:lodash@npm%3A4.17.21#./p.patch::version=4.17.21&hash=abc":         "4.17.21",
+		"private@npm:1.0.0::__archiveUrl=https%3A%2F%2Fexample.com%2Fprivate-1.0.0.tgz": "1.0.0",
 		"root@workspace:.":                   "",
 		"tool@git+https://example.com/t.git": "",
 		"local@file:../local":                "",
