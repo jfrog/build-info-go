@@ -1,9 +1,13 @@
 package utils
 
 import (
+	"fmt"
 	"github.com/jfrog/build-info-go/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -215,6 +219,11 @@ func TestYarnDependency_Name(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, testCase.packageExpectedName, depName)
 	}
+
+	// A dependency looked up by a locator that has no entry is nil: Name must return an error, not panic.
+	var missing *YarnDependency
+	_, err := missing.Name()
+	assert.Error(t, err)
 }
 
 func TestSplitNameAndVersion(t *testing.T) {
@@ -305,4 +314,107 @@ func TestIsNonRegistryLocator(t *testing.T) {
 	for _, l := range nonRegistryCases {
 		assert.True(t, IsNonRegistryLocator(l), "expected non-registry: %s", l)
 	}
+}
+
+func TestAddMissingYarnDependencyEntries(t *testing.T) {
+	const patchLocator = "lodash@patch:lodash@npm%3A4.17.21#./.yarn/patches/lodash.patch::version=4.17.21&hash=abc123"
+	const missingPatchLocator = "loose-envify@patch:loose-envify@npm%3A1.4.0#./missing.patch::version=1.4.0&hash=def456"
+	dependenciesMap := map[string]*YarnDependency{
+		"root@workspace:.": {Value: "root@workspace:.", Details: YarnDepDetails{Version: "1.0.0", Dependencies: []YarnDependencyPointer{
+			// Resolves to "react@npm:18.2.0" through GetYarnDependencyKeyFromLocator: kept as is.
+			{Locator: "react@virtual:abc123#npm:18.2.0"},
+			// Has its own entry: kept as is.
+			{Locator: patchLocator},
+			// No entry of its own (e.g. a private package 'yarn info' couldn't resolve): an entry is added.
+			{Locator: "@internal/private@npm:2.0.0"},
+			// No entry and no version in the locator: removed.
+			{Locator: "tool@git+https://example.com/tool.git#commit=abc"},
+		}}},
+		"react@npm:18.2.0": {Value: "react@npm:18.2.0", Details: YarnDepDetails{Version: "18.2.0", Dependencies: []YarnDependencyPointer{
+			// No entry of its own: an entry is added with the version from the patch locator.
+			{Locator: missingPatchLocator},
+			// Missing child shared with another parent: added once.
+			{Locator: "@internal/private@npm:2.0.0"},
+		}}},
+		patchLocator: {Value: patchLocator, Details: YarnDepDetails{Version: "4.17.21"}},
+		"nil-entry":  nil,
+	}
+
+	addMissingYarnDependencyEntries(dependenciesMap, utils.NewDefaultLogger(utils.INFO))
+
+	assert.Equal(t, []YarnDependencyPointer{{Locator: "react@virtual:abc123#npm:18.2.0"}, {Locator: patchLocator}, {Locator: "@internal/private@npm:2.0.0"}},
+		dependenciesMap["root@workspace:."].Details.Dependencies)
+	assert.Equal(t, &YarnDependency{Value: "@internal/private@npm:2.0.0", Details: YarnDepDetails{Version: "2.0.0"}}, dependenciesMap["@internal/private@npm:2.0.0"])
+	assert.Equal(t, &YarnDependency{Value: missingPatchLocator, Details: YarnDepDetails{Version: "1.4.0"}}, dependenciesMap[missingPatchLocator])
+	assert.Len(t, dependenciesMap, 6)
+	// Every child pointer resolves to an entry, so callers can look children up without a nil check.
+	for _, dependency := range dependenciesMap {
+		if dependency == nil {
+			continue
+		}
+		for _, child := range dependency.Details.Dependencies {
+			assert.NotNil(t, dependenciesMap[GetYarnDependencyKeyFromLocator(child.Locator)], child.Locator)
+		}
+	}
+}
+
+func TestYarnLocatorVersion(t *testing.T) {
+	cases := map[string]string{
+		"express@npm:3.0.1":            "3.0.1",
+		"@scope/name@npm:1.2.3-beta.1": "1.2.3-beta.1",
+		"lodash@patch:lodash@npm%3A4.17.21#./p.patch::version=4.17.21&hash=abc":         "4.17.21",
+		"private@npm:1.0.0::__archiveUrl=https%3A%2F%2Fexample.com%2Fprivate-1.0.0.tgz": "1.0.0",
+		"root@workspace:.":                   "",
+		"tool@git+https://example.com/t.git": "",
+		"local@file:../local":                "",
+		"":                                   "",
+	}
+	for locator, expected := range cases {
+		assert.Equal(t, expected, yarnLocatorVersion(locator), locator)
+	}
+}
+
+// TestGetYarnDependenciesWithVersionAddsMissingEntries runs the Yarn 2+ path against a fake yarn whose
+// 'yarn info' output lists a child ('@internal/private@npm:2.0.0') that has no entry of its own.
+func TestGetYarnDependenciesWithVersionAddsMissingEntries(t *testing.T) {
+	yarnPath := writeFakeYarn(t, yarnInfoWithMissingChild, 0)
+	packageInfo := &PackageInfo{Name: "root", Version: "1.0.0"}
+	dependenciesMap, root, err := GetYarnDependenciesWithVersion(yarnPath, t.TempDir(), packageInfo, "4.1.0", utils.NewDefaultLogger(utils.INFO), false)
+	require.NoError(t, err)
+	require.NotNil(t, root)
+	assert.Len(t, root.Details.Dependencies, 2)
+	assert.Len(t, dependenciesMap, 3)
+	assert.Equal(t, "2.0.0", dependenciesMap["@internal/private@npm:2.0.0"].Details.Version)
+}
+
+// TestGetYarnDependenciesWithVersionFailsWhenYarnInfoFails verifies that the partial output of a failed
+// 'yarn info' is not used, unless partial results are allowed.
+func TestGetYarnDependenciesWithVersionFailsWhenYarnInfoFails(t *testing.T) {
+	yarnPath := writeFakeYarn(t, yarnInfoWithMissingChild, 1)
+	packageInfo := &PackageInfo{Name: "root", Version: "1.0.0"}
+
+	dependenciesMap, root, err := GetYarnDependenciesWithVersion(yarnPath, t.TempDir(), packageInfo, "4.1.0", utils.NewDefaultLogger(utils.INFO), false)
+	assert.ErrorContains(t, err, "'yarn info' failed")
+	assert.Nil(t, dependenciesMap)
+	assert.Nil(t, root)
+
+	dependenciesMap, root, err = GetYarnDependenciesWithVersion(yarnPath, t.TempDir(), packageInfo, "4.1.0", utils.NewDefaultLogger(utils.INFO), true)
+	require.NoError(t, err)
+	require.NotNil(t, root)
+	assert.Len(t, dependenciesMap, 3)
+}
+
+const yarnInfoWithMissingChild = `{"value":"root@workspace:.","children":{"Version":"0.0.0-use.local","Dependencies":[{"descriptor":"express@npm:^3.0.1","locator":"express@npm:3.0.1"},{"descriptor":"@internal/private@npm:^2.0.0","locator":"@internal/private@npm:2.0.0"}]}}
+{"value":"express@npm:3.0.1","children":{"Version":"3.0.1"}}`
+
+// writeFakeYarn writes a fake yarn executable that prints output and exits with exitCode.
+func writeFakeYarn(t *testing.T, output string, exitCode int) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a POSIX shell script as a fake yarn binary")
+	}
+	yarnPath := filepath.Join(t.TempDir(), "yarn")
+	script := fmt.Sprintf("#!/bin/sh\ncat <<'EOF'\n%s\nEOF\nexit %d\n", output, exitCode)
+	require.NoError(t, os.WriteFile(yarnPath, []byte(script), 0700)) // #nosec G306 -- test stub must be executable
+	return yarnPath
 }
