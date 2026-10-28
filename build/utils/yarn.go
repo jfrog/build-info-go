@@ -139,7 +139,6 @@ func GetYarnDependenciesWithVersion(executablePath, srcPath string, packageInfo 
 			err = fmt.Errorf("'yarn info' failed, so the dependencies of the project could not be fully collected: %w", err)
 			return
 		}
-		err = nil
 	}
 
 	if isV2AndAbove {
