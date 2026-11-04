@@ -19,7 +19,8 @@ jobs:
       fail-fast: false
       matrix:
         # macos-latest = arm64, macos-14-large = amd64
-        os: [ ubuntu-latest, windows-latest, macos-latest, macos-14-large ]
+        # ubuntu-24.04 is pinned because ubuntu-latest (26.04) has no Python 3.8/3.9 builds and breaks the Mono apt repo setup
+        os: [ ubuntu-24.04, windows-latest, macos-latest, macos-14-large ]
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
@@ -37,6 +38,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup Python3
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -71,7 +73,7 @@ jobs:
 
       # Install Mono on Ubuntu to run nuget.exe (due to this issue on Ubuntu 24 that hasn't been fixed yet - https://github.com/NuGet/setup-nuget/issues/168)
       - name: Install Mono on Ubuntu
-        if: matrix.os == 'ubuntu-latest'
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y apt-transport-https dirmngr gnupg ca-certificates
@@ -99,6 +101,8 @@ jobs:
       - name: Tests
         env:
           GOTOOLCHAIN: 'go1.26.10'
+          # Make pipenv create virtualenvs with the matrix Python instead of the newest Python on the runner
+          PIPENV_PYTHON: ${{ steps.setup-python.outputs.python-path }}
         run: |
           go env
           go test -v -race -timeout 0 -cover ./...
