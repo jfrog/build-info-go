@@ -19,14 +19,13 @@ jobs:
       fail-fast: false
       matrix:
         # macos-latest = arm64, macos-14-large = amd64
-        # ubuntu-24.04 is pinned because ubuntu-latest (26.04) has no Python 3.8/3.9 builds and breaks the Mono apt repo setup
-        os: [ ubuntu-24.04, windows-latest, macos-latest, macos-14-large ]
+        os: [ ubuntu-latest, windows-latest, macos-latest, macos-14-large ]
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
-            python: "3.8"
+            python: "3.10"
           - node: "16"
-            python: "3.9"
+            python: "3.12"
           - node: "16.9"
             python: "3.x"
         exclude:
@@ -73,14 +72,11 @@ jobs:
 
       # Install Mono on Ubuntu to run nuget.exe (due to this issue on Ubuntu 24 that hasn't been fixed yet - https://github.com/NuGet/setup-nuget/issues/168)
       - name: Install Mono on Ubuntu
-        if: startsWith(matrix.os, 'ubuntu')
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y apt-transport-https dirmngr gnupg ca-certificates
-          sudo apt-key adv --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-          echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
-          sudo apt-get update
-          sudo apt-get install -y mono-complete
+          sudo apt-get install -y mono-devel
+          mono --version
 
       # Install Mono on macOS to run nuget.exe
       - name: Install Mono on macOS
