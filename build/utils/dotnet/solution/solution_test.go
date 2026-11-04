@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -605,7 +606,16 @@ func replaceCarriageSign(results []string) {
 	}
 }
 
+// skipIfNugetCannotRun skips tests that run 'nuget restore' on Linux when nuget.exe can't run there.
+// nuget.exe is a .NET Framework app, so on Linux it needs Mono, which isn't always available.
+func skipIfNugetCannotRun(t *testing.T) {
+	if runtime.GOOS == "linux" && exec.Command("nuget", "help").Run() != nil {
+		t.Skip("nuget.exe can't run on this Linux machine (requires Mono), skipping...")
+	}
+}
+
 func TestLoadNuget(t *testing.T) {
+	skipIfNugetCannotRun(t)
 	// Prepare
 	log := utils.NewDefaultLogger(utils.INFO)
 	wd, err := os.Getwd()
@@ -646,6 +656,7 @@ func TestLoadNuget(t *testing.T) {
 }
 
 func TestLoadMixed(t *testing.T) {
+	skipIfNugetCannotRun(t)
 	// Prepare
 	log := utils.NewDefaultLogger(utils.INFO)
 	wd, err := os.Getwd()
@@ -716,6 +727,7 @@ func TestGetNameVersionModuleId(t *testing.T) {
 // the full Load(...) path (auto-discovering dependency sources, running project extractors) with
 // an explicit '.slnx' file, not just parseSlnxFile() in isolation.
 func TestLoadSlnx(t *testing.T) {
+	skipIfNugetCannotRun(t)
 	// Prepare
 	log := utils.NewDefaultLogger(utils.INFO)
 	wd, err := os.Getwd()
