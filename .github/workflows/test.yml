@@ -70,14 +70,6 @@ jobs:
         with:
           maven-version: 3.9.11
 
-      # Install Mono on Ubuntu to run nuget.exe (due to this issue on Ubuntu 24 that hasn't been fixed yet - https://github.com/NuGet/setup-nuget/issues/168)
-      - name: Install Mono on Ubuntu
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mono-devel
-          mono --version
-
       # Install Mono on macOS to run nuget.exe
       - name: Install Mono on macOS
         if: startsWith(matrix.os, 'macos')
