@@ -834,3 +834,54 @@ func TestDedupeRequestedByPreservesDistinctParents(t *testing.T) {
 		assert.Equal(t, [][]string{{"TestModule"}}, dedupeRequestedByParent(in))
 	})
 }
+
+// TestBuildInfoModuleIdUsesPackageID verifies that BuildInfo's default module ID is the project's
+// resolved NuGet PackageId (<PackageId>, then <AssemblyName>) rather than the project file's base
+// name, so the build-info module matches the .nupkg that pack/push produce for the same project.
+func TestBuildInfoModuleIdUsesPackageID(t *testing.T) {
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	coreTestdata := filepath.Join(wd, "testdata", "multi", "core")
+
+	tests := []struct {
+		name             string
+		propertyGroup    string
+		moduleOverride   string
+		expectedModuleID string
+		expectedFlexPack string
+	}{
+		{"assemblyName", "<AssemblyName>JohnsonControls.jftest</AssemblyName>", "", "JohnsonControls.jftest", "JohnsonControls.jftest:1.0.0"},
+		{"packageIdWinsOverAssemblyName", "<AssemblyName>Some.Assembly</AssemblyName><PackageId>JohnsonControls.Pkg</PackageId>", "", "JohnsonControls.Pkg", "JohnsonControls.Pkg:1.0.0"},
+		{"noOverrideFallsBackToFileName", "", "", "jftest", "jftest:1.0.0"},
+		{"moduleOverrideWins", "<AssemblyName>JohnsonControls.jftest</AssemblyName>", "custom-module", "custom-module", "custom-module"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			projectDir := filepath.Join(t.TempDir(), "jftest")
+			require.NoError(t, utils.CopyDir(coreTestdata, projectDir, true, nil))
+			require.NoError(t, os.Remove(filepath.Join(projectDir, "core.csproj")))
+			projectFile := filepath.Join(projectDir, "jftest.csproj")
+			content := `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework>` + test.propertyGroup + `</PropertyGroup></Project>`
+			require.NoError(t, os.WriteFile(projectFile, []byte(content), 0644))
+
+			sol, err := LoadProject(projectFile, logger)
+			require.NoError(t, err)
+
+			bi, err := sol.BuildInfo(test.moduleOverride, logger)
+			require.NoError(t, err)
+			require.Len(t, bi.Modules, 1)
+			assert.Equal(t, test.expectedModuleID, bi.Modules[0].Id)
+			require.NotEmpty(t, bi.Modules[0].Dependencies)
+			for _, dep := range bi.Modules[0].Dependencies {
+				for _, path := range dep.RequestedBy {
+					assert.Equal(t, test.expectedModuleID, path[len(path)-1], "requestedBy paths must terminate in the module ID")
+				}
+			}
+
+			bi, err = sol.BuildInfoWithNameVersionModuleId(test.moduleOverride, logger)
+			require.NoError(t, err)
+			require.Len(t, bi.Modules, 1)
+			assert.Equal(t, test.expectedFlexPack, bi.Modules[0].Id)
+		})
+	}
+}
