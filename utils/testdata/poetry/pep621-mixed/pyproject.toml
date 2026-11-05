@@ -1,0 +1,24 @@
+# Poetry 2.0+ project mixing the PEP 621 [project] table with the [tool.poetry] tables.
+[project]
+name = "my-poetry-project"
+version = "1.2.0"
+description = ""
+requires-python = ">=3.10"
+dependencies = [
+    "aiostream (>=0.8.1,<0.9.0)",
+    "Typing_Extensions>=4.0 ; python_version < '3.13'",
+]
+
+[project.optional-dependencies]
+cli = ["click[colorama]>=8.1"]
+
+# Additional constraints for a package that is already declared in [project.dependencies].
+[tool.poetry.dependencies]
+aiostream = { version = ">=0.8.1", allow-prereleases = false }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
