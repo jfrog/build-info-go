@@ -61,6 +61,8 @@ type gradleExtractorDetails struct {
 	props map[string]string
 	// Local path to the configuration file.
 	propsDir string
+	// Optional. Lists the available extractor versions. When set, the newest allowed version of the same major line is used.
+	versionsFunc utils.ExtractorVersionsFunc
 }
 
 // Add a new Gradle module to a given build.
@@ -84,6 +86,14 @@ func (gm *GradleModule) SetExtractorDetails(localExtractorPath, extractorPropsDi
 	gm.gradleExtractorDetails.localPath = localExtractorPath
 	gm.gradleExtractorDetails.downloadExtractorFunc = downloadExtractorFunc
 	gm.gradleExtractorDetails.props = props
+	return gm
+}
+
+// SetExtractorVersionsFunc enables the run-time selection of the extractor version.
+// The extractor stays in the major line of the version that matches the Gradle version.
+// Without this call, the fixed version for the Gradle version is used.
+func (gm *GradleModule) SetExtractorVersionsFunc(versionsFunc utils.ExtractorVersionsFunc) *GradleModule {
+	gm.gradleExtractorDetails.versionsFunc = versionsFunc
 	return gm
 }
 
@@ -124,16 +134,25 @@ func (gm *GradleModule) downloadGradleExtractor(gradleExecPath string) (err erro
 	if err != nil {
 		return err
 	}
-	gm.containingBuild.logger.Debug("Using Gradle build-info extractor", gradleExtractorVersion)
 
-	dependencyLocalPath := filepath.Join(gm.gradleExtractorDetails.localPath, gradleExtractorVersion)
-	if err = downloadGradleDependencies(dependencyLocalPath, gradleExtractorVersion, gm.gradleExtractorDetails.downloadExtractorFunc, gm.containingBuild.logger); err != nil {
+	gradleExtractorVersion, err = gm.downloadExtractorVersion(gradleExtractorVersion)
+	if err != nil {
 		return err
 	}
+	dependencyLocalPath := filepath.Join(gm.gradleExtractorDetails.localPath, gradleExtractorVersion)
 	gradlePluginFilename := fmt.Sprintf(gradleExtractorFileName, gradleExtractorVersion)
 
 	gm.gradleExtractorDetails.initScript, err = getInitScript(initScriptPattern, dependencyLocalPath, gradlePluginFilename)
 	return
+}
+
+// Downloads the extractor, if needed, and returns the version used.
+// defaultVersion is the fixed version for the Gradle version. It is used as is, unless run-time version selection is enabled.
+func (gm *GradleModule) downloadExtractorVersion(defaultVersion string) (string, error) {
+	details := gm.gradleExtractorDetails
+	return utils.DownloadNewestExtractor(details.versionsFunc, details.localPath, defaultVersion, gradleExtractorFileName, func(v string) error {
+		return downloadGradleDependencies(filepath.Join(details.localPath, v), v, details.downloadExtractorFunc, gm.containingBuild.logger)
+	}, gm.containingBuild.logger)
 }
 
 // Return the Gradle extractor version and the relevant init script according to the Gradle version:
@@ -218,14 +237,7 @@ func getInitScript(initScriptPattern, gradleDependenciesDir, gradlePluginFilenam
 	gradlePluginPath := filepath.Join(gradleDependenciesDir, gradlePluginFilename)
 	gradlePluginPath = strings.ReplaceAll(gradlePluginPath, "\\", "\\\\")
 	initScriptContent := strings.ReplaceAll(initScriptPattern, "${pluginLibDir}", gradlePluginPath)
-	if !utils.IsPathExists(gradleDependenciesDir) {
-		err = os.MkdirAll(gradleDependenciesDir, 0777)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return initScriptPath, os.WriteFile(initScriptPath, []byte(initScriptContent), 0644)
+	return initScriptPath, utils.WriteFileAtomic(initScriptPath, strings.NewReader(initScriptContent), 0644)
 }
 
 func GetGradleExecPath(useWrapper bool) (string, error) {

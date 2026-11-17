@@ -24,16 +24,23 @@ const (
 // downloadPath: download path in the remote server.
 // filename: The local file name.
 // targetPath: The local download path (without the file name).
-func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger Log) error {
+func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger Log) (err error) {
 	// If the file exists locally, we're done.
 	absFileName := filepath.Join(downloadTo, filename)
 	exists, err := IsFileExists(absFileName, true)
 	if exists || err != nil {
 		return err
 	}
-	if err := os.MkdirAll(downloadTo, 0777); err != nil {
+	if err = os.MkdirAll(downloadTo, 0777); err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			// A failed download leaves an empty folder, which looks like a version that was downloaded.
+			// os.Remove fails if the folder has files in it, and then the folder stays.
+			_ = os.Remove(downloadTo)
+		}
+	}()
 	if downloadExtractorFunc != nil {
 		// Override default download.
 		return downloadExtractorFunc(absFileName, downloadPath)
