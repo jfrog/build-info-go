@@ -25,6 +25,10 @@ var ErrBlockedByCuration = errors.New("blocked by JFrog Curation")
 // The lookup is not retried with another source, the command fails.
 var ErrInvalidExtractorVersion = errors.New("invalid extractor version")
 
+// ErrLookupNotRepeated tells that the lookup of the versions was not tried again, because an earlier lookup failed a short time ago.
+// The user was told about that failure then, so it is not a new warning.
+var ErrLookupNotRepeated = errors.New("the lookup of the extractor versions is not repeated yet")
+
 var stableVersionRegex = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 
 // IsStableVersion returns true for a version of the form x.y.z. Such a version is also safe to use as a folder name.
@@ -112,7 +116,7 @@ func DownloadNewestExtractor(versionsFunc ExtractorVersionsFunc, baseDir, defaul
 		return "", err
 	}
 	if err != nil {
-		logger.Warn(fmt.Sprintf("Failed to look up the latest extractor version: %s.%s", err.Error(), pinHint(found.PinEnv)))
+		logLookupFailure(err, found.PinEnv, logger)
 	}
 	walk := &extractorWalk{defaultVersion: defaultVersion, baseDir: baseDir, jarFileFormat: jarFileFormat,
 		verify: found.Verify, download: download, logger: logger, blocked: map[string]bool{}}
@@ -120,7 +124,7 @@ func DownloadNewestExtractor(versionsFunc ExtractorVersionsFunc, baseDir, defaul
 	switch {
 	case found.Pinned:
 		// Used as is: no cached jar or other version replaces it.
-		return downloadNewestAllowed(candidates, found.PinEnv, download, logger)
+		return downloadNewestAllowed(candidates, found.PinEnv, true, download, logger)
 	case err != nil || len(candidates) == 0:
 		candidates = []string{defaultVersion}
 	default:
@@ -180,11 +184,22 @@ func (w *extractorWalk) newestCached() string {
 
 // chooseVersion downloads the first allowed version of the list, and tells the user if it is not the default one.
 func chooseVersion(versions []string, pinEnv, defaultVersion string, download func(version string) error, logger Log) (string, error) {
-	chosen, err := downloadNewestAllowed(versions, pinEnv, download, logger)
+	chosen, err := downloadNewestAllowed(versions, pinEnv, false, download, logger)
 	if err == nil && chosen != defaultVersion {
 		logger.Info("Using build-info extractor version", chosen)
 	}
 	return chosen, err
+}
+
+// logLookupFailure warns about a lookup that failed. A lookup that was not tried again is only a Debug message:
+// an offline user would see the same warning in each command for as long as the lookup is not repeated.
+func logLookupFailure(err error, pinEnv string, logger Log) {
+	message := fmt.Sprintf("Failed to look up the latest extractor version: %s.%s", err.Error(), pinHint(pinEnv))
+	if errors.Is(err, ErrLookupNotRepeated) {
+		logger.Debug(message)
+		return
+	}
+	logger.Warn(message)
 }
 
 // pinHint tells how to skip the lookup. It is empty if the name of the variable is not known.
@@ -237,7 +252,7 @@ func cachedVersions(baseDir, defaultVersion, jarFileFormat string, exclude map[s
 // downloadNewestAllowed calls download for each version, in order, and returns the first version that succeeds.
 // A version blocked by Curation is skipped. Any other error stops the walk.
 // pinEnv is the name of the environment variable that pins a version. It is shown if all the versions are blocked.
-func downloadNewestAllowed(versions []string, pinEnv string, download func(version string) error, logger Log) (string, error) {
+func downloadNewestAllowed(versions []string, pinEnv string, pinned bool, download func(version string) error, logger Log) (string, error) {
 	if len(versions) == 0 {
 		return "", errors.New("no extractor version to download")
 	}
@@ -259,13 +274,20 @@ func downloadNewestAllowed(versions []string, pinEnv string, download func(versi
 		blocked = append(blocked, v)
 		blockedErr = err
 	}
-	pinAdvice := ""
-	if pinEnv != "" {
-		pinAdvice = fmt.Sprintf(", or pin an allowed version with the %s environment variable", pinEnv)
+	return "", fmt.Errorf("all the extractor versions tried (%s) are blocked by Curation. %s.\n%w",
+		strings.Join(blocked, ", "), blockedAdvice(pinEnv, pinned), blockedErr)
+}
+
+// blockedAdvice tells what the user can do when every version that was tried is blocked.
+// A user who pinned the version has already set the variable, so the advice is to change it.
+func blockedAdvice(pinEnv string, pinned bool) string {
+	switch {
+	case pinned && pinEnv != "":
+		return fmt.Sprintf("Change or unset %s, or ask your Curation admin to allow the version", pinEnv)
+	case pinEnv != "":
+		return fmt.Sprintf("Ask your Curation admin to allow one of them, or pin an allowed version with the %s environment variable", pinEnv)
 	}
-	return "", fmt.Errorf("all the extractor versions tried (%s) are blocked by Curation. "+
-		"Ask your Curation admin to allow one of them%s.\n%w",
-		strings.Join(blocked, ", "), pinAdvice, blockedErr)
+	return "Ask your Curation admin to allow one of them"
 }
 
 // WriteFileAtomic writes the content of r to path. A reader of path sees the old file or the whole new one, never a part of it.

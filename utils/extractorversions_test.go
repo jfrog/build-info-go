@@ -152,6 +152,8 @@ func TestDownloadNewestExtractor(t *testing.T) {
 			failingDownloader(map[string]error{"2.44.1": blockedError("2.44.1")}, &tried), &NullLog{})
 		assert.ErrorIs(t, err, ErrBlockedByCuration)
 		assert.Equal(t, []string{"2.44.1"}, tried)
+		assert.Contains(t, err.Error(), "Change or unset PIN_ENV", "the user already set the variable: the advice is to change it")
+		assert.NotContains(t, err.Error(), "pin an allowed version")
 
 		tried = nil
 		_, err = DownloadNewestExtractor(listerOf(t, pinned, nil), baseDir, "2.43.9", testJarFormat,
@@ -307,7 +309,7 @@ func TestDownloadNewestExtractorWarnings(t *testing.T) {
 	t.Run("a block that is remembered shows its hint", func(t *testing.T) {
 		logger := &warnRecorder{}
 		remembered := fmt.Errorf("%w: url was blocked at 12:00. Delete blocked.json to try it now", ErrBlockedByCuration)
-		_, err := downloadNewestAllowed([]string{"2.44.2", "2.44.1"}, "PIN_ENV", failingDownloader(map[string]error{"2.44.2": remembered}, new([]string)), logger)
+		_, err := downloadNewestAllowed([]string{"2.44.2", "2.44.1"}, "PIN_ENV", false, failingDownloader(map[string]error{"2.44.2": remembered}, new([]string)), logger)
 		require.NoError(t, err)
 		assert.Contains(t, strings.Join(logger.warnings, "\n"), "Delete blocked.json to try it now")
 	})
@@ -336,7 +338,7 @@ func TestDownloadNewestAllowed(t *testing.T) {
 
 	t.Run("newest is allowed", func(t *testing.T) {
 		var tried []string
-		got, err := downloadNewestAllowed(versions, "PIN_ENV", failingDownloader(nil, &tried), &NullLog{})
+		got, err := downloadNewestAllowed(versions, "PIN_ENV", false, failingDownloader(nil, &tried), &NullLog{})
 		require.NoError(t, err)
 		assert.Equal(t, "2.44.2", got)
 		assert.Equal(t, []string{"2.44.2"}, tried)
@@ -344,21 +346,21 @@ func TestDownloadNewestAllowed(t *testing.T) {
 	t.Run("newest versions are blocked: the 4th is used", func(t *testing.T) {
 		var tried []string
 		blocked := map[string]error{"2.44.2": blockedError("2.44.2"), "2.44.1": blockedError("2.44.1"), "2.44.0": blockedError("2.44.0")}
-		got, err := downloadNewestAllowed(versions, "PIN_ENV", failingDownloader(blocked, &tried), &NullLog{})
+		got, err := downloadNewestAllowed(versions, "PIN_ENV", false, failingDownloader(blocked, &tried), &NullLog{})
 		require.NoError(t, err)
 		assert.Equal(t, "2.43.9", got)
 		assert.Equal(t, []string{"2.44.2", "2.44.1", "2.44.0", "2.43.9"}, tried)
 	})
 	t.Run("all blocked", func(t *testing.T) {
 		blocked := blockAll(versions...)
-		_, err := downloadNewestAllowed(versions, "MY_PIN_ENV", failingDownloader(blocked, new([]string)), &NullLog{})
+		_, err := downloadNewestAllowed(versions, "MY_PIN_ENV", false, failingDownloader(blocked, new([]string)), &NullLog{})
 		assert.ErrorIs(t, err, ErrBlockedByCuration)
 		assert.Contains(t, err.Error(), "2.44.2, 2.44.1, 2.44.0, 2.43.9, 2.43.6")
 		assert.Contains(t, err.Error(), "MY_PIN_ENV")
 	})
 	t.Run("other errors stop the walk", func(t *testing.T) {
 		var tried []string
-		_, err := downloadNewestAllowed(versions, "PIN_ENV", func(v string) error {
+		_, err := downloadNewestAllowed(versions, "PIN_ENV", false, func(v string) error {
 			tried = append(tried, v)
 			return errors.New("server response: 403 permission denied")
 		}, &NullLog{})
@@ -508,4 +510,26 @@ func TestDownloadNewestExtractorErrorTexts(t *testing.T) {
 		assert.NotContains(t, err.Error(), "environment variable")
 		assert.Contains(t, err.Error(), "Ask your Curation admin to allow one of them.")
 	})
+}
+
+func TestDownloadNewestExtractorLookupFailureLog(t *testing.T) {
+	timeout := errors.New("timeout")
+	cases := []struct {
+		name         string
+		lookupErr    error
+		wantWarnings int
+	}{
+		{"a lookup that failed now is a warning", timeout, 1},
+		{"a lookup that is not repeated yet is not a warning", fmt.Errorf("the last lookup failed at 10:00: %w", ErrLookupNotRepeated), 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := &warnRecorder{}
+			chosen, err := DownloadNewestExtractor(listerOf(t, ExtractorVersions{PinEnv: "PIN_ENV"}, tc.lookupErr), t.TempDir(), "2.43.9", testJarFormat,
+				failingDownloader(nil, new([]string)), logger)
+			require.NoError(t, err)
+			assert.Equal(t, "2.43.9", chosen, "the default version is used in both cases")
+			assert.Len(t, logger.warnings, tc.wantWarnings)
+		})
+	}
 }
