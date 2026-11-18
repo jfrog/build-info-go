@@ -8,15 +8,19 @@ import (
 type PyProjectToml struct {
 	// Represents the [tool.poetry] section in pyproject.toml.
 	Tool map[string]PoetryPackage
-	// Represents the [project] section in pyproject.toml, for pypi package managers other than poetry.
+	// Represents the [project] section in pyproject.toml.
 	Project Project
 }
 
-// Pypi project defined for package managers other than poetry (pip, pipenv, etc...)
+// The PEP 621 [project] table. Used by pip, pipenv, etc., and by Poetry 2.0+, which declares
+// project metadata and dependencies here by default instead of in [tool.poetry].
 type Project struct {
 	Name        string
 	Version     string
 	Description string
+	// PEP 508 requirement strings, e.g. "requests (>=2.31.0,<3.0.0)".
+	Dependencies         []string
+	OptionalDependencies map[string][]string `toml:"optional-dependencies"`
 }
 
 // Get project name and version by parsing the pyproject.toml file.
