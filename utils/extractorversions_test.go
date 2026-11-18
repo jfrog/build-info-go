@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -194,6 +195,80 @@ func TestDownloadNewestExtractor(t *testing.T) {
 			failingDownloader(nil, &tried), &NullLog{})
 		assert.ErrorIs(t, err, ErrInvalidExtractorVersion)
 		assert.Empty(t, tried)
+	})
+}
+
+// A jar on disk is not downloaded again, so Curation can block a version after the first download.
+func TestDownloadNewestExtractorVerifiesCachedJar(t *testing.T) {
+	versions := []string{"2.44.2", "2.44.1", "2.44.0", "2.43.9", "2.43.6", "2.43.5"}
+	verifyBlocking := func(asked *[]string, blocked ...string) func(string) error {
+		return func(v string) error {
+			*asked = append(*asked, v)
+			if slices.Contains(blocked, v) {
+				return blockedError(v)
+			}
+			return nil
+		}
+	}
+	t.Run("the newest cached jar is blocked: the next allowed version is used", func(t *testing.T) {
+		baseDir := t.TempDir()
+		createLocalJar(t, baseDir, "2.44.2")
+		createLocalJar(t, baseDir, "2.44.1")
+		var asked, downloaded []string
+		found := ExtractorVersions{Versions: versions, Verify: verifyBlocking(&asked, "2.44.2")}
+		chosen, err := DownloadNewestExtractor(listerOf(t, found, nil), baseDir, "2.43.9", testJarFormat, failingDownloader(nil, &downloaded), &NullLog{})
+		require.NoError(t, err)
+		assert.Equal(t, "2.44.1", chosen)
+		assert.Equal(t, []string{"2.44.2", "2.44.1"}, asked)
+		assert.Equal(t, []string{"2.44.1"}, downloaded, "the blocked version is not downloaded or used")
+	})
+	t.Run("a version that is not on disk is not verified: the download tells", func(t *testing.T) {
+		var asked, downloaded []string
+		found := ExtractorVersions{Versions: versions, Verify: verifyBlocking(&asked)}
+		chosen, err := DownloadNewestExtractor(listerOf(t, found, nil), t.TempDir(), "2.43.9", testJarFormat, failingDownloader(nil, &downloaded), &NullLog{})
+		require.NoError(t, err)
+		assert.Equal(t, "2.44.2", chosen)
+		assert.Empty(t, asked)
+	})
+	t.Run("the server cannot tell: the cached jar is used", func(t *testing.T) {
+		baseDir := t.TempDir()
+		createLocalJar(t, baseDir, "2.44.2")
+		found := ExtractorVersions{Versions: versions, Verify: func(string) error { return errors.New("connection refused") }}
+		var downloaded []string
+		chosen, err := DownloadNewestExtractor(listerOf(t, found, nil), baseDir, "2.43.9", testJarFormat, failingDownloader(nil, &downloaded), &NullLog{})
+		require.NoError(t, err)
+		assert.Equal(t, "2.44.2", chosen)
+	})
+	t.Run("all the versions tried are blocked: a blocked cached jar is not the fallback", func(t *testing.T) {
+		baseDir := t.TempDir()
+		for _, v := range versions {
+			createLocalJar(t, baseDir, v)
+		}
+		var asked []string
+		// The first five versions are tried. The sixth is older, was not tried, and is the newest jar that was not found blocked.
+		found := ExtractorVersions{Versions: versions, Verify: verifyBlocking(&asked, versions[:maxExtractorVersionTries]...)}
+		chosen, err := DownloadNewestExtractor(listerOf(t, found, nil), baseDir, "2.43.9", testJarFormat, failingDownloader(nil, new([]string)), &NullLog{})
+		require.NoError(t, err)
+		assert.Equal(t, "2.43.5", chosen)
+		assert.Equal(t, versions[:maxExtractorVersionTries], asked)
+	})
+	t.Run("all the cached jars are blocked: an error", func(t *testing.T) {
+		baseDir := t.TempDir()
+		createLocalJar(t, baseDir, "2.44.2")
+		var asked []string
+		found := ExtractorVersions{Versions: versions[:1], Verify: verifyBlocking(&asked, "2.44.2")}
+		_, err := DownloadNewestExtractor(listerOf(t, found, nil), baseDir, "2.44.2", testJarFormat, failingDownloader(nil, new([]string)), &NullLog{})
+		assert.ErrorIs(t, err, ErrBlockedByCuration)
+	})
+	t.Run("a pinned version is used as is: it is not verified", func(t *testing.T) {
+		baseDir := t.TempDir()
+		createLocalJar(t, baseDir, "2.44.2")
+		var asked []string
+		found := ExtractorVersions{Versions: []string{"2.44.2"}, Pinned: true, Verify: verifyBlocking(&asked, "2.44.2")}
+		chosen, err := DownloadNewestExtractor(listerOf(t, found, nil), baseDir, "2.43.9", testJarFormat, failingDownloader(nil, new([]string)), &NullLog{})
+		require.NoError(t, err)
+		assert.Equal(t, "2.44.2", chosen)
+		assert.Empty(t, asked)
 	})
 }
 

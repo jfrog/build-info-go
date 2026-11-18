@@ -40,6 +40,10 @@ type ExtractorVersions struct {
 	Pinned bool
 	// The name of the environment variable that pins the version. It is shown in error messages.
 	PinEnv string
+	// Verify is optional. It asks the server if a version is still allowed, for a version whose jar is already on disk,
+	// because the server is not asked when the jar exists. It returns an error that wraps ErrBlockedByCuration for a blocked version.
+	// Any other error means that the server could not tell. The jar on disk is used then.
+	Verify func(version string) error
 }
 
 // ExtractorVersionsFunc lists the available versions of an extractor that belong to the given major line.
@@ -112,9 +116,18 @@ func DownloadNewestExtractor(versionsFunc ExtractorVersionsFunc, baseDir, defaul
 	}
 	// Remember if the default version was tried: the walk stops at the first error that is not a Curation block.
 	defaultTried := false
+	// A version that Curation blocked in this walk is not used as a cached jar either.
+	blockedNow := map[string]bool{}
 	tracked := func(v string) error {
 		defaultTried = defaultTried || v == defaultVersion
-		return download(v)
+		err := verifyCachedJar(found.Verify, baseDir, v, jarFileFormat, logger)
+		if err == nil {
+			err = download(v)
+		}
+		if errors.Is(err, ErrBlockedByCuration) {
+			blockedNow[v] = true
+		}
+		return err
 	}
 	candidates := found.Versions
 	switch {
@@ -131,7 +144,7 @@ func DownloadNewestExtractor(versionsFunc ExtractorVersionsFunc, baseDir, defaul
 		return chosen, nil
 	}
 	// download of the cached jar does no download: it only completes what an earlier run may have left unfinished.
-	if local := newestLocalVersion(baseDir, defaultVersion, jarFileFormat); local != "" && download(local) == nil {
+	if local := newestLocalVersion(baseDir, defaultVersion, jarFileFormat, blockedNow); local != "" && download(local) == nil {
 		logger.Warn(fmt.Sprintf("Could not download a new extractor version. Using version %s from the local cache.%s\n%s", local, pinHint(found.PinEnv), err.Error()))
 		return local, nil
 	}
@@ -160,22 +173,43 @@ func pinHint(pinEnv string) string {
 	return fmt.Sprintf(" Set %s to a version to skip the lookup.", pinEnv)
 }
 
+// verifyCachedJar asks the server if a version is still allowed, if its jar is already on disk. A jar on disk is not downloaded again,
+// so the server would not tell that Curation blocked the version after the first download.
+// It returns an error only for a Curation block. If the server cannot tell, the jar on disk is used.
+func verifyCachedJar(verify func(version string) error, baseDir, version, jarFileFormat string, logger Log) error {
+	if verify == nil || !localJarExists(baseDir, version, jarFileFormat) {
+		return nil
+	}
+	err := verify(version)
+	if err != nil && !errors.Is(err, ErrBlockedByCuration) {
+		logger.Debug(fmt.Sprintf("Could not check if extractor version %s is still allowed. Using the jar on disk: %s", version, err.Error()))
+		return nil
+	}
+	return err
+}
+
+// localJarExists checks the jar, not the folder: a failed download leaves an empty folder.
+func localJarExists(baseDir, version, jarFileFormat string) bool {
+	exists, err := IsFileExists(filepath.Join(baseDir, version, fmt.Sprintf(jarFileFormat, version)), true)
+	return err == nil && exists
+}
+
 // newestLocalVersion returns the highest version in baseDir whose jar exists and has the major line of defaultVersion.
-func newestLocalVersion(baseDir, defaultVersion, jarFileFormat string) string {
+// A version in 'exclude' is not returned.
+func newestLocalVersion(baseDir, defaultVersion, jarFileFormat string, exclude map[string]bool) string {
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
 		return ""
 	}
 	var versions []string
 	for _, entry := range entries {
-		if entry.IsDir() && IsStableVersion(entry.Name()) && MajorLine(entry.Name()) == MajorLine(defaultVersion) {
+		if entry.IsDir() && IsStableVersion(entry.Name()) && MajorLine(entry.Name()) == MajorLine(defaultVersion) && !exclude[entry.Name()] {
 			versions = append(versions, entry.Name())
 		}
 	}
 	sortNewestFirst(versions)
 	for _, v := range versions {
-		// Check the jar, not the folder: a failed download leaves an empty folder.
-		if exists, err := IsFileExists(filepath.Join(baseDir, v, fmt.Sprintf(jarFileFormat, v)), true); err == nil && exists {
+		if localJarExists(baseDir, v, jarFileFormat) {
 			return v
 		}
 	}
