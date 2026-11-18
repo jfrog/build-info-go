@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         # macos-latest = arm64, macos-14-large = amd64
-        os: [ ubuntu-latest, windows-latest, macos-latest, macos-14-large ]
+        os: [ ubuntu-24.04, windows-latest, macos-latest, macos-14-large ]
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
@@ -71,7 +71,7 @@ jobs:
 
       # Install Mono on Ubuntu to run nuget.exe (due to this issue on Ubuntu 24 that hasn't been fixed yet - https://github.com/NuGet/setup-nuget/issues/168)
       - name: Install Mono on Ubuntu
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y apt-transport-https dirmngr gnupg ca-certificates
