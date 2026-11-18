@@ -19,7 +19,8 @@ jobs:
       fail-fast: false
       matrix:
         # macos-latest = arm64, macos-14-large = amd64
-        os: [ ubuntu-24.04, windows-latest, macos-latest, macos-14-large ]
+        # ubuntu-24.04 is pinned because setup-python has no Python 3.8/3.9 for Ubuntu 26.04 (ubuntu-latest).
+        os: [ ubuntu-24.04, ubuntu-latest, windows-latest, macos-latest, macos-14-large ]
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
@@ -32,6 +33,11 @@ jobs:
           # MacOS with ARM does not support node 14
           - os: macos-latest
             node: 14
+          # Python 3.8 and 3.9 are not available on Ubuntu 26.04. They run on ubuntu-24.04.
+          - os: ubuntu-latest
+            node: 14
+          - os: ubuntu-latest
+            node: 16
 
     steps:
       - uses: actions/checkout@v4
@@ -71,12 +77,12 @@ jobs:
 
       # Install Mono on Ubuntu to run nuget.exe (due to this issue on Ubuntu 24 that hasn't been fixed yet - https://github.com/NuGet/setup-nuget/issues/168)
       - name: Install Mono on Ubuntu
-        if: matrix.os == 'ubuntu-24.04'
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y apt-transport-https dirmngr gnupg ca-certificates
-          sudo apt-key adv --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-          echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+          sudo gpg --homedir /tmp --no-default-keyring --keyring /usr/share/keyrings/mono-official-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+          echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/ubuntu stable-focal main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
           sudo apt-get update
           sudo apt-get install -y mono-complete
 
