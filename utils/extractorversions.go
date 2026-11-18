@@ -114,21 +114,8 @@ func DownloadNewestExtractor(versionsFunc ExtractorVersionsFunc, baseDir, defaul
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Failed to look up the latest extractor version: %s.%s", err.Error(), pinHint(found.PinEnv)))
 	}
-	// Remember if the default version was tried: the walk stops at the first error that is not a Curation block.
-	defaultTried := false
-	// A version that Curation blocked in this walk is not used as a cached jar either.
-	blockedNow := map[string]bool{}
-	tracked := func(v string) error {
-		defaultTried = defaultTried || v == defaultVersion
-		err := verifyCachedJar(found.Verify, baseDir, v, jarFileFormat, logger)
-		if err == nil {
-			err = download(v)
-		}
-		if errors.Is(err, ErrBlockedByCuration) {
-			blockedNow[v] = true
-		}
-		return err
-	}
+	walk := &extractorWalk{defaultVersion: defaultVersion, baseDir: baseDir, jarFileFormat: jarFileFormat,
+		verify: found.Verify, download: download, logger: logger, blocked: map[string]bool{}}
 	candidates := found.Versions
 	switch {
 	case found.Pinned:
@@ -139,21 +126,46 @@ func DownloadNewestExtractor(versionsFunc ExtractorVersionsFunc, baseDir, defaul
 	default:
 		candidates = candidates[:min(len(candidates), maxExtractorVersionTries)]
 	}
-	chosen, err := chooseVersion(candidates, found.PinEnv, defaultVersion, tracked, logger)
+	chosen, err := chooseVersion(candidates, found.PinEnv, defaultVersion, walk.fetch, logger)
 	if err == nil {
 		return chosen, nil
 	}
 	// download of the cached jar does no download: it only completes what an earlier run may have left unfinished.
-	if local := newestLocalVersion(baseDir, defaultVersion, jarFileFormat, blockedNow); local != "" && download(local) == nil {
+	if local := newestLocalVersion(baseDir, defaultVersion, jarFileFormat, walk.blocked); local != "" && download(local) == nil {
 		logger.Warn(fmt.Sprintf("Could not download a new extractor version. Using version %s from the local cache.%s\n%s", local, pinHint(found.PinEnv), err.Error()))
 		return local, nil
 	}
 	// The version that worked before the lookup existed is the last resort on a machine with no jar.
-	if !defaultTried && download(defaultVersion) == nil {
+	if !walk.defaultTried && download(defaultVersion) == nil {
 		logger.Warn(fmt.Sprintf("Could not download a new extractor version. Using the default version %s.\n%s", defaultVersion, err.Error()))
 		return defaultVersion, nil
 	}
 	return "", err
+}
+
+// extractorWalk is what the walk over the versions remembers.
+type extractorWalk struct {
+	defaultVersion, baseDir, jarFileFormat string
+	verify                                 func(version string) error
+	download                               func(version string) error
+	logger                                 Log
+	// True if the default version was tried: the walk stops at the first error that is not a Curation block.
+	defaultTried bool
+	// The versions that Curation blocked in this walk. A blocked version is not used as a cached jar either.
+	blocked map[string]bool
+}
+
+// fetch makes one version available: it checks a jar on disk with the server, or downloads the jar.
+func (w *extractorWalk) fetch(v string) error {
+	w.defaultTried = w.defaultTried || v == w.defaultVersion
+	err := verifyCachedJar(w.verify, w.baseDir, v, w.jarFileFormat, w.logger)
+	if err == nil {
+		err = w.download(v)
+	}
+	if errors.Is(err, ErrBlockedByCuration) {
+		w.blocked[v] = true
+	}
+	return err
 }
 
 // chooseVersion downloads the first allowed version of the list, and tells the user if it is not the default one.
