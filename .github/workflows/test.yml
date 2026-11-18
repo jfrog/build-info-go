@@ -81,7 +81,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y apt-transport-https dirmngr gnupg ca-certificates
-          sudo gpg --homedir /tmp --no-default-keyring --keyring /usr/share/keyrings/mono-official-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+          # Export to a binary keyring: apt on Ubuntu 26.04 ignores the keybox format that gpg writes by default.
+          GNUPGHOME="$(mktemp -d)"
+          export GNUPGHOME
+          gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+          gpg --export 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF | sudo tee /usr/share/keyrings/mono-official-archive-keyring.gpg > /dev/null
           echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/ubuntu stable-focal main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
           sudo apt-get update
           sudo apt-get install -y mono-complete
