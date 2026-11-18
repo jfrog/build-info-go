@@ -76,8 +76,8 @@ jobs:
           maven-version: 3.9.11
 
       # Install Mono on Ubuntu to run nuget.exe (due to this issue on Ubuntu 24 that hasn't been fixed yet - https://github.com/NuGet/setup-nuget/issues/168)
-      - name: Install Mono on Ubuntu
-        if: startsWith(matrix.os, 'ubuntu')
+      - name: Install Mono on Ubuntu 24.04
+        if: matrix.os == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y apt-transport-https dirmngr gnupg ca-certificates
@@ -87,6 +87,13 @@ jobs:
           gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
           gpg --export 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF | sudo tee /usr/share/keyrings/mono-official-archive-keyring.gpg > /dev/null
           echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/ubuntu stable-focal main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+          sudo apt-get update
+          sudo apt-get install -y mono-complete
+
+      # The Mono repository only has packages for Ubuntu 20.04, so Ubuntu 26.04 uses the Mono of the Ubuntu repositories.
+      - name: Install Mono on Ubuntu latest
+        if: matrix.os == 'ubuntu-latest'
+        run: |
           sudo apt-get update
           sudo apt-get install -y mono-complete
 
