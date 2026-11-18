@@ -3,6 +3,7 @@ package pythonutils
 import (
 	"errors"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -14,6 +15,11 @@ type PoetryPackage struct {
 	Version         string
 	Dependencies    map[string]interface{}
 	DevDependencies map[string]interface{} `toml:"dev-dependencies"`
+	Group map[string]PoetryDependencyGroup `toml:"group"`
+}
+
+type PoetryDependencyGroup struct {
+	Dependencies map[string]interface{}
 }
 
 type PoetryLock struct {
@@ -77,12 +83,69 @@ func extractPoetryPackageFromPyProjectToml(pyProjectFilePath string) (project Po
 	if err != nil {
 		return
 	}
-	if poetryProject, ok := pyProjectFile.Tool["poetry"]; ok {
+	poetryTool := pyProjectFile.Tool["poetry"]
+	groupDependencies := collectPoetryGroupDependencies(poetryTool)
+
+	if poetryTool.Name != "" {
 		// Extract project name from file content.
-		poetryProject.Name = poetryProject.Name + ":" + poetryProject.Version
-		return poetryProject, nil
+		poetryTool.Name = poetryTool.Name + ":" + poetryTool.Version
+		mergeIntoDevDependencies(&poetryTool, groupDependencies)
+		return poetryTool, nil
+	}
+	if pyProjectFile.Project.Name != "" {
+		project = poetryPackageFromPep621Project(pyProjectFile.Project)
+		mergeIntoDevDependencies(&project, groupDependencies)
+		return project, nil
 	}
 	return PoetryPackage{}, errors.New("Couldn't find project name and version in " + pyProjectFilePath)
+}
+
+func collectPoetryGroupDependencies(poetryTool PoetryPackage) map[string]interface{} {
+	if len(poetryTool.Group) == 0 {
+		return nil
+	}
+	merged := make(map[string]interface{})
+	for _, group := range poetryTool.Group {
+		for name, spec := range group.Dependencies {
+			merged[name] = spec
+		}
+	}
+	return merged
+}
+
+func mergeIntoDevDependencies(project *PoetryPackage, groupDependencies map[string]interface{}) {
+	if len(groupDependencies) == 0 {
+		return
+	}
+	if project.DevDependencies == nil {
+		project.DevDependencies = make(map[string]interface{}, len(groupDependencies))
+	}
+	for name, spec := range groupDependencies {
+		project.DevDependencies[name] = spec
+	}
+}
+
+func poetryPackageFromPep621Project(project Project) PoetryPackage {
+	dependencies := make(map[string]interface{}, len(project.Dependencies))
+	for _, requirement := range project.Dependencies {
+		if name := pep508PackageName(requirement); name != "" {
+			dependencies[name] = requirement
+		}
+	}
+	return PoetryPackage{
+		Name:         project.Name + ":" + project.Version,
+		Dependencies: dependencies,
+	}
+}
+
+var pep508NameRegex = regexp.MustCompile(`^\s*([A-Za-z0-9][A-Za-z0-9._-]*)`)
+
+func pep508PackageName(requirement string) string {
+	match := pep508NameRegex.FindStringSubmatch(requirement)
+	if match == nil {
+		return ""
+	}
+	return match[1]
 }
 
 // Get the project-name by parsing the poetry.lock file

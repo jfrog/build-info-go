@@ -17,6 +17,8 @@ func TestGetProjectNameFromPyproject(t *testing.T) {
 	}{
 		{"project", "my-poetry-project:1.1.0"},
 		{"nodevdeps", "my-poetry-project:1.1.17"},
+		{"pep621", "my-poetry-project:1.1.0"},
+		{"pep621-with-groups", "my-poetry-project:1.1.0"},
 	}
 
 	for _, testCase := range testCases {
@@ -41,6 +43,8 @@ func TestGetProjectDependencies(t *testing.T) {
 	}{
 		{"project", []string{"numpy:1.23.0", "pytest:5.4.3", "python:"}, [][]string{nil, {"atomicwrites:1.4.0", "attrs:21.4.0", "colorama:0.4.5", "more-itertools:8.13.0", "packaging:21.3", "pluggy:0.13.1", "py:1.11.0", "wcwidth:0.2.5"}, nil}},
 		{"nodevdeps", []string{"numpy:1.23.0", "python:"}, [][]string{nil, nil, nil}},
+		{"pep621", []string{"numpy:1.26.4"}, [][]string{nil}},
+		{"pep621-with-groups", []string{"numpy:1.26.4", "pytest:8.3.4"}, [][]string{nil, nil}},
 	}
 
 	for _, testCase := range testCases {
