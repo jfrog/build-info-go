@@ -19,8 +19,9 @@ jobs:
       fail-fast: false
       matrix:
         # macos-latest = arm64, macos-14-large = amd64
-        # ubuntu-24.04 is pinned because setup-python has no Python 3.8/3.9 for Ubuntu 26.04 (ubuntu-latest).
-        os: [ ubuntu-24.04, ubuntu-latest, windows-latest, macos-latest, macos-14-large ]
+        # ubuntu-24.04 is pinned (as in jfrog-cli): ubuntu-latest is Ubuntu 26.04, which has no Python 3.8/3.9 for setup-python,
+        # no apt-key, and no Mono package source that lets the NuGet tests download from nuget.org.
+        os: [ ubuntu-24.04, windows-latest, macos-latest, macos-14-large ]
         node: [ 14, 16, 16.9 ]
         include:
           - node: "14"
@@ -33,11 +34,6 @@ jobs:
           # MacOS with ARM does not support node 14
           - os: macos-latest
             node: 14
-          # Python 3.8 and 3.9 are not available on Ubuntu 26.04. They run on ubuntu-24.04.
-          - os: ubuntu-latest
-            node: 14
-          - os: ubuntu-latest
-            node: 16
 
     steps:
       - uses: actions/checkout@v4
@@ -76,33 +72,15 @@ jobs:
           maven-version: 3.9.11
 
       # Install Mono on Ubuntu to run nuget.exe (due to this issue on Ubuntu 24 that hasn't been fixed yet - https://github.com/NuGet/setup-nuget/issues/168)
-      - name: Install Mono on Ubuntu 24.04
+      - name: Install Mono on Ubuntu
         if: matrix.os == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y apt-transport-https dirmngr gnupg ca-certificates
-          # Export to a binary keyring: apt on Ubuntu 26.04 ignores the keybox format that gpg writes by default.
-          GNUPGHOME="$(mktemp -d)"
-          export GNUPGHOME
-          gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-          gpg --export 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF | sudo tee /usr/share/keyrings/mono-official-archive-keyring.gpg > /dev/null
-          echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/ubuntu stable-focal main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+          sudo apt-key adv --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+          echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
           sudo apt-get update
           sudo apt-get install -y mono-complete
-
-      # The Mono repository only has packages for Ubuntu 20.04, so Ubuntu 26.04 uses the Mono of the Ubuntu repositories.
-      - name: Install Mono on Ubuntu latest
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mono-complete
-          # Ubuntu 26.04 has no cert-sync, so Mono has no trusted CA certificates and nuget.exe cannot verify nuget.org.
-          # Add every certificate of the system bundle to the Mono trust store of the current user with certmgr.
-          certs="$(mktemp -d)"
-          awk -v dir="$certs" '/BEGIN CERTIFICATE/ {n++} {print > (dir "/c" n ".crt")}' /etc/ssl/certs/ca-certificates.crt
-          command -v certmgr
-          for f in "$certs"/c*.crt; do certmgr -add -c Trust "$f" > /dev/null 2>&1 || true; done
-          certmgr -list -c Trust | tail -3
 
       # Install Mono on macOS to run nuget.exe
       - name: Install Mono on macOS
