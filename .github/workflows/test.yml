@@ -96,14 +96,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y mono-complete
-          # mono-complete does not install the Mono certificate store on Ubuntu 26.04, so nuget.exe cannot verify nuget.org. Fill it with the system CA certificates.
-          # DEBUG: find where cert-sync is
-          find / -iname '*cert-sync*' 2>/dev/null || true
-          dpkg -l | grep -i mono | awk '{print $2}' | tr '\n' ' '; echo
-          apt-cache search 'mono' | grep -iE 'cert|ssl' || true
-          ls ~/.config/.mono 2>&1 || true
-          cert-sync --help 2>&1 | head -3 || true
-          mono --version | head -1
+          # Ubuntu 26.04 has no cert-sync, so Mono has no trusted CA certificates and nuget.exe cannot verify nuget.org.
+          # Add every certificate of the system bundle to the Mono trust store of the current user with certmgr.
+          certs="$(mktemp -d)"
+          awk -v dir="$certs" '/BEGIN CERTIFICATE/ {n++} {print > (dir "/c" n ".crt")}' /etc/ssl/certs/ca-certificates.crt
+          command -v certmgr
+          for f in "$certs"/c*.crt; do certmgr -add -c Trust "$f" > /dev/null 2>&1 || true; done
+          certmgr -list -c Trust | tail -3
 
       # Install Mono on macOS to run nuget.exe
       - name: Install Mono on macOS
