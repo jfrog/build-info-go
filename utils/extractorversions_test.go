@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -181,6 +182,13 @@ func TestDownloadNewestExtractor(t *testing.T) {
 		_, err := DownloadNewestExtractor(listerOf(t, ExtractorVersions{}, timeout), filepath.Join(t.TempDir(), "missing"), "2.44.2", testJarFormat,
 			failingDownloader(map[string]error{"2.44.2": errors.New("not found")}, new([]string)), &NullLog{})
 		assert.EqualError(t, err, "not found")
+	})
+	t.Run("the lookup returns versions and an error: the default version is used", func(t *testing.T) {
+		var tried []string
+		chosen, err := DownloadNewestExtractor(listerOf(t, newest, timeout), t.TempDir(), "2.43.9", testJarFormat, failingDownloader(nil, &tried), &NullLog{})
+		require.NoError(t, err)
+		assert.Equal(t, "2.43.9", chosen)
+		assert.Equal(t, []string{"2.43.9"}, tried)
 	})
 	t.Run("empty list is a failed lookup", func(t *testing.T) {
 		chosen, err := DownloadNewestExtractor(listerOf(t, ExtractorVersions{}, nil), t.TempDir(), "2.44.2", testJarFormat, failingDownloader(nil, new([]string)), &NullLog{})
@@ -412,4 +420,43 @@ func TestDownloadExtractorIfNeededRemovesEmptyFolderOnFailure(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(baseDir, "5.2.5", "gradle.init"), []byte("x"), 0644))
 	assert.Error(t, DownloadDependencies(filepath.Join(baseDir, "5.2.5"), "extractor.jar", "path", failing, &NullLog{}))
 	assert.FileExists(t, filepath.Join(baseDir, "5.2.5", "gradle.init"))
+}
+
+func TestCachedVersions(t *testing.T) {
+	baseDir := t.TempDir()
+	for _, v := range []string{"2.43.9", "2.44.1", "2.43.9-rc1", "3.0.0"} {
+		createLocalJar(t, baseDir, v)
+	}
+	// A folder without a jar is a failed download.
+	require.NoError(t, os.MkdirAll(filepath.Join(baseDir, "2.44.2"), 0755))
+	assert.Equal(t, []string{"2.44.1", "2.43.9"}, cachedVersions(baseDir, "2.43.9", testJarFormat, nil))
+	assert.Equal(t, []string{"2.43.9"}, cachedVersions(baseDir, "2.43.9", testJarFormat, map[string]bool{"2.44.1": true}))
+	assert.Empty(t, cachedVersions(filepath.Join(baseDir, "missing"), "2.43.9", testJarFormat, nil))
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, errors.New("connection reset") }
+
+func TestWriteFileAtomicFailureKeepsOldFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sub", "x.jar")
+	require.NoError(t, WriteFileAtomic(path, strings.NewReader("old"), 0644))
+	assert.ErrorContains(t, WriteFileAtomic(path, failingReader{}, 0644), "connection reset")
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "old", string(content))
+	entries, err := os.ReadDir(filepath.Dir(path))
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "no temporary file stays after a failed write")
+}
+
+func TestWriteFileAtomicMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no Unix file mode")
+	}
+	path := filepath.Join(t.TempDir(), "x.jar")
+	require.NoError(t, WriteFileAtomic(path, strings.NewReader("jar"), 0644))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0644), info.Mode().Perm())
 }

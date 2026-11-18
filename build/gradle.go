@@ -139,6 +139,7 @@ func (gm *GradleModule) downloadGradleExtractor(gradleExecPath string) (err erro
 	if err != nil {
 		return err
 	}
+	gm.containingBuild.logger.Debug("Using Gradle build-info extractor", gradleExtractorVersion)
 	dependencyLocalPath := filepath.Join(gm.gradleExtractorDetails.localPath, gradleExtractorVersion)
 	gradlePluginFilename := fmt.Sprintf(gradleExtractorFileName, gradleExtractorVersion)
 
