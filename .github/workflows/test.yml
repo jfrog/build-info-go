@@ -97,6 +97,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mono-complete
 
+      - name: DEBUG nuget on ubuntu-latest
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        run: |
+          mono --version
+          which nuget mono
+          cat "$(which nuget)" | head -20
+          nuget restore build/utils/dotnet/solution/testdata/nugetproj/solutions/nugetproj.sln -Verbosity detailed 2>&1 | tail -60
+
       # Install Mono on macOS to run nuget.exe
       - name: Install Mono on macOS
         if: startsWith(matrix.os, 'macos')
