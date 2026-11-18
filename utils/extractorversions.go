@@ -238,6 +238,9 @@ func cachedVersions(baseDir, defaultVersion, jarFileFormat string, exclude map[s
 // A version blocked by Curation is skipped. Any other error stops the walk.
 // pinEnv is the name of the environment variable that pins a version. It is shown if all the versions are blocked.
 func downloadNewestAllowed(versions []string, pinEnv string, download func(version string) error, logger Log) (string, error) {
+	if len(versions) == 0 {
+		return "", errors.New("no extractor version to download")
+	}
 	var blocked []string
 	var blockedErr error
 	for _, v := range versions {
@@ -256,9 +259,13 @@ func downloadNewestAllowed(versions []string, pinEnv string, download func(versi
 		blocked = append(blocked, v)
 		blockedErr = err
 	}
+	pinAdvice := ""
+	if pinEnv != "" {
+		pinAdvice = fmt.Sprintf(", or pin an allowed version with the %s environment variable", pinEnv)
+	}
 	return "", fmt.Errorf("all the extractor versions tried (%s) are blocked by Curation. "+
-		"Ask your Curation admin to allow one of them, or pin an allowed version with the %s environment variable.\n%w",
-		strings.Join(blocked, ", "), pinEnv, blockedErr)
+		"Ask your Curation admin to allow one of them%s.\n%w",
+		strings.Join(blocked, ", "), pinAdvice, blockedErr)
 }
 
 // WriteFileAtomic writes the content of r to path. A reader of path sees the old file or the whole new one, never a part of it.

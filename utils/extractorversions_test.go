@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -459,4 +461,51 @@ func TestWriteFileAtomicMode(t *testing.T) {
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0644), info.Mode().Perm())
+}
+
+func TestDownloadFile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ok":
+			_, _ = w.Write([]byte("jar"))
+		case "/cut":
+			// The body is shorter than the length that was announced: the client sees a cut download.
+			w.Header().Set("Content-Length", "100")
+			_, _ = w.Write([]byte("partial"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	dir := t.TempDir()
+
+	path := filepath.Join(dir, "ok.jar")
+	require.NoError(t, DownloadFile(path, server.URL+"/ok"))
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "jar", string(content))
+
+	for _, urlPath := range []string{"/cut", "/missing"} {
+		path = filepath.Join(dir, "failed.jar")
+		assert.Error(t, DownloadFile(path, server.URL+urlPath), urlPath)
+		entries, err := os.ReadDir(dir)
+		require.NoError(t, err)
+		assert.Len(t, entries, 1, "a failed download leaves no file, not even a partial one (%s)", urlPath)
+	}
+}
+
+func TestDownloadNewestExtractorErrorTexts(t *testing.T) {
+	t.Run("a pinned version list that is empty is an error, not a nil error", func(t *testing.T) {
+		_, err := DownloadNewestExtractor(listerOf(t, ExtractorVersions{Pinned: true, PinEnv: "PIN_ENV"}, nil), t.TempDir(), "2.43.9", testJarFormat,
+			failingDownloader(nil, new([]string)), &NullLog{})
+		assert.EqualError(t, err, "no extractor version to download")
+	})
+	t.Run("all blocked and no pin variable: the error does not name a variable", func(t *testing.T) {
+		found := ExtractorVersions{Versions: []string{"2.44.2"}}
+		_, err := DownloadNewestExtractor(listerOf(t, found, nil), t.TempDir(), "2.43.9", testJarFormat,
+			failingDownloader(blockAll("2.44.2", "2.43.9"), new([]string)), &NullLog{})
+		require.ErrorIs(t, err, ErrBlockedByCuration)
+		assert.NotContains(t, err.Error(), "environment variable")
+		assert.Contains(t, err.Error(), "Ask your Curation admin to allow one of them.")
+	})
 }
