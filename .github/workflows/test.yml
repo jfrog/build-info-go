@@ -95,8 +95,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y mono-complete
-          # The Mono certificate store is empty, so nuget.exe cannot verify nuget.org. Copy the system CA certificates into it.
+          sudo apt-get install -y mono-complete ca-certificates-mono
+          # mono-complete does not install the Mono certificate store on Ubuntu 26.04, so nuget.exe cannot verify nuget.org. Fill it with the system CA certificates.
           sudo cert-sync /etc/ssl/certs/ca-certificates.crt
 
       # Install Mono on macOS to run nuget.exe
