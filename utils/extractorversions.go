@@ -130,8 +130,7 @@ func DownloadNewestExtractor(versionsFunc ExtractorVersionsFunc, baseDir, defaul
 	if err == nil {
 		return chosen, nil
 	}
-	// download of the cached jar does no download: it only completes what an earlier run may have left unfinished.
-	if local := newestLocalVersion(baseDir, defaultVersion, jarFileFormat, walk.blocked); local != "" && download(local) == nil {
+	if local := walk.newestCached(); local != "" {
 		logger.Warn(fmt.Sprintf("Could not download a new extractor version. Using version %s from the local cache.%s\n%s", local, pinHint(found.PinEnv), err.Error()))
 		return local, nil
 	}
@@ -166,6 +165,17 @@ func (w *extractorWalk) fetch(v string) error {
 		w.blocked[v] = true
 	}
 	return err
+}
+
+// newestCached returns the newest jar on disk that is still allowed, or "" if there is none.
+// Each jar goes through fetch: the server is asked about it, and a version that Curation blocked is skipped.
+func (w *extractorWalk) newestCached() string {
+	for _, v := range cachedVersions(w.baseDir, w.defaultVersion, w.jarFileFormat, w.blocked) {
+		if w.fetch(v) == nil {
+			return v
+		}
+	}
+	return ""
 }
 
 // chooseVersion downloads the first allowed version of the list, and tells the user if it is not the default one.
@@ -206,26 +216,22 @@ func localJarExists(baseDir, version, jarFileFormat string) bool {
 	return err == nil && exists
 }
 
-// newestLocalVersion returns the highest version in baseDir whose jar exists and has the major line of defaultVersion.
+// cachedVersions returns the versions in baseDir whose jar exists and whose major line is the one of defaultVersion, newest first.
 // A version in 'exclude' is not returned.
-func newestLocalVersion(baseDir, defaultVersion, jarFileFormat string, exclude map[string]bool) string {
+func cachedVersions(baseDir, defaultVersion, jarFileFormat string, exclude map[string]bool) []string {
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
-		return ""
+		return nil
 	}
 	var versions []string
 	for _, entry := range entries {
-		if entry.IsDir() && IsStableVersion(entry.Name()) && MajorLine(entry.Name()) == MajorLine(defaultVersion) && !exclude[entry.Name()] {
-			versions = append(versions, entry.Name())
+		v := entry.Name()
+		if entry.IsDir() && IsStableVersion(v) && MajorLine(v) == MajorLine(defaultVersion) && !exclude[v] && localJarExists(baseDir, v, jarFileFormat) {
+			versions = append(versions, v)
 		}
 	}
 	sortNewestFirst(versions)
-	for _, v := range versions {
-		if localJarExists(baseDir, v, jarFileFormat) {
-			return v
-		}
-	}
-	return ""
+	return versions
 }
 
 // downloadNewestAllowed calls download for each version, in order, and returns the first version that succeeds.

@@ -245,12 +245,12 @@ func TestDownloadNewestExtractorVerifiesCachedJar(t *testing.T) {
 			createLocalJar(t, baseDir, v)
 		}
 		var asked []string
-		// The first five versions are tried. The sixth is older, was not tried, and is the newest jar that was not found blocked.
+		// The first five versions are tried. The sixth is older, was not tried, and is the newest jar that was not found blocked: it is verified too.
 		found := ExtractorVersions{Versions: versions, Verify: verifyBlocking(&asked, versions[:maxExtractorVersionTries]...)}
 		chosen, err := DownloadNewestExtractor(listerOf(t, found, nil), baseDir, "2.43.9", testJarFormat, failingDownloader(nil, new([]string)), &NullLog{})
 		require.NoError(t, err)
 		assert.Equal(t, "2.43.5", chosen)
-		assert.Equal(t, versions[:maxExtractorVersionTries], asked)
+		assert.Equal(t, versions, asked)
 	})
 	t.Run("all the cached jars are blocked: an error", func(t *testing.T) {
 		baseDir := t.TempDir()
@@ -259,6 +259,19 @@ func TestDownloadNewestExtractorVerifiesCachedJar(t *testing.T) {
 		found := ExtractorVersions{Versions: versions[:1], Verify: verifyBlocking(&asked, "2.44.2")}
 		_, err := DownloadNewestExtractor(listerOf(t, found, nil), baseDir, "2.44.2", testJarFormat, failingDownloader(nil, new([]string)), &NullLog{})
 		assert.ErrorIs(t, err, ErrBlockedByCuration)
+	})
+	t.Run("a plain error stops the walk: a cached fallback jar is verified too", func(t *testing.T) {
+		baseDir := t.TempDir()
+		createLocalJar(t, baseDir, "2.43.9")
+		createLocalJar(t, baseDir, "2.43.6")
+		var asked []string
+		// 2.44.2 is not on disk and fails with a plain error. The newest jar on disk, 2.43.9, is blocked: 2.43.6 is the fallback.
+		found := ExtractorVersions{Versions: versions, Verify: verifyBlocking(&asked, "2.43.9")}
+		chosen, err := DownloadNewestExtractor(listerOf(t, found, nil), baseDir, "2.43.9", testJarFormat,
+			failingDownloader(map[string]error{"2.44.2": errors.New("server response: 502 Bad Gateway")}, new([]string)), &NullLog{})
+		require.NoError(t, err)
+		assert.Equal(t, "2.43.6", chosen)
+		assert.Equal(t, []string{"2.43.9", "2.43.6"}, asked)
 	})
 	t.Run("a pinned version is used as is: it is not verified", func(t *testing.T) {
 		baseDir := t.TempDir()
