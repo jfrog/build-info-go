@@ -1,8 +1,11 @@
 package build
 
 import (
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +14,7 @@ import (
 
 	"github.com/jfrog/build-info-go/tests"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateBuildInfoForPython(t *testing.T) {
@@ -35,7 +39,34 @@ func TestGenerateBuildInfoForPython(t *testing.T) {
 	}
 }
 
+// pythonOfPath returns the interpreter that the tests run with: the first Python on the PATH.
+// The Pipfile of the test project accepts any Python, so pipenv uses the newest Python of the machine for the virtualenv.
+// That can be a Python that the installed pipenv does not support, for example a pipenv that was installed for Python 3.9.
+func pythonOfPath(t *testing.T) string {
+	t.Helper()
+	for _, name := range []string{"python", "python3"} {
+		path, err := exec.LookPath(name)
+		if err != nil {
+			continue
+		}
+		output, err := exec.Command(path, "-c", "import sys; print(sys.executable)").Output()
+		require.NoError(t, err)
+		return strings.TrimSpace(string(output))
+	}
+	require.FailNow(t, "python was not found in the PATH")
+	return ""
+}
+
+func TestPythonOfPath(t *testing.T) {
+	python := pythonOfPath(t)
+	assert.True(t, filepath.IsAbs(python), python)
+	assert.FileExists(t, python)
+}
+
 func testGenerateBuildInfoForPython(t *testing.T, pythonTool pythonutils.PythonTool, cmdArgs []string, moduleName, expectedResultsJson string) {
+	if pythonTool == pythonutils.Pipenv {
+		cmdArgs = append(slices.Clone(cmdArgs), "--python", pythonOfPath(t))
+	}
 	service := NewBuildInfoService()
 	pythonBuild, err := service.GetOrCreateBuild("build-info-go-test-"+string(pythonTool), strconv.FormatInt(time.Now().Unix(), 10))
 	assert.NoError(t, err)
