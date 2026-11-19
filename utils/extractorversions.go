@@ -301,8 +301,13 @@ func blockedAdvice(pinEnv string, pinned bool) string {
 	return "Ask your Curation admin to allow one of them"
 }
 
+// renameFile is replaced in the tests.
+var renameFile = os.Rename
+
 // WriteFileAtomic writes the content of r to path. A reader of path sees the old file or the whole new one, never a part of it.
 // The content goes to a temporary file in the same folder first, and then the file is renamed.
+// If the rename fails and path already exists as a regular file, that file is kept and there is no error: on Windows, a rename over
+// a file that another process holds open is refused. The callers write the same content for the same path, so the file that exists is right.
 func WriteFileAtomic(path string, r io.Reader, perm os.FileMode) (err error) {
 	dir := filepath.Dir(path)
 	if err = os.MkdirAll(dir, 0777); err != nil {
@@ -332,5 +337,14 @@ func WriteFileAtomic(path string, r io.Reader, perm os.FileMode) (err error) {
 	if err = os.Chmod(tmp.Name(), perm); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), path)
+	if err = renameFile(tmp.Name(), path); err != nil && isRegularFile(path) {
+		_ = os.Remove(tmp.Name())
+		return nil
+	}
+	return err
+}
+
+func isRegularFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
 }

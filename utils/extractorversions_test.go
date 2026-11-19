@@ -588,3 +588,71 @@ func TestDownloadNewestExtractorTellsWhichVersionIsUsed(t *testing.T) {
 		})
 	}
 }
+
+func TestWriteFileAtomicLostRename(t *testing.T) {
+	lostRename := func(t *testing.T) {
+		t.Helper()
+		original := renameFile
+		renameFile = func(string, string) error { return errors.New("Access is denied.") }
+		t.Cleanup(func() { renameFile = original })
+	}
+	noTempFile := func(t *testing.T, dir string, want int) {
+		t.Helper()
+		entries, err := os.ReadDir(dir)
+		require.NoError(t, err)
+		assert.Len(t, entries, want, "no temporary file stays")
+	}
+	t.Run("the file exists: it is kept and there is no error", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "x.jar")
+		require.NoError(t, os.WriteFile(path, []byte("kept"), 0644))
+		lostRename(t)
+		require.NoError(t, WriteFileAtomic(path, strings.NewReader("new"), 0644))
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, "kept", string(content))
+		noTempFile(t, dir, 1)
+	})
+	t.Run("the file does not exist: the error is returned", func(t *testing.T) {
+		dir := t.TempDir()
+		lostRename(t)
+		assert.ErrorContains(t, WriteFileAtomic(filepath.Join(dir, "x.jar"), strings.NewReader("new"), 0644), "Access is denied.")
+		noTempFile(t, dir, 0)
+	})
+	t.Run("a folder is in the way: the error is returned", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "x.jar")
+		require.NoError(t, os.Mkdir(path, 0755))
+		lostRename(t)
+		assert.ErrorContains(t, WriteFileAtomic(path, strings.NewReader("new"), 0644), "Access is denied.")
+		noTempFile(t, dir, 1)
+	})
+}
+
+// On Windows, a rename over a file that another process holds open is refused. This test holds the file open, as a running Gradle does,
+// while several writers replace it.
+func TestWriteFileAtomicWhileTheFileIsOpen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "init.gradle")
+	require.NoError(t, WriteFileAtomic(path, strings.NewReader("content"), 0644))
+	held, err := os.Open(path)
+	require.NoError(t, err)
+	defer func() { assert.NoError(t, held.Close()) }()
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 8)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- WriteFileAtomic(path, strings.NewReader("content"), 0644)
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		assert.NoError(t, err)
+	}
+	entries, err := os.ReadDir(filepath.Dir(path))
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "no temporary file stays")
+}
