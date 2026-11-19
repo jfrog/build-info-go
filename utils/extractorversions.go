@@ -272,7 +272,7 @@ func downloadNewestAllowed(versions []string, pinEnv string, pinned bool, downlo
 		err := download(v)
 		if err == nil {
 			if len(blocked) > 0 {
-				logger.Warn(fmt.Sprintf("Using extractor version %s, because newer versions are blocked by Curation: %s", v, strings.Join(blocked, ", ")))
+				logger.Info(fmt.Sprintf("Using extractor version %s, because newer versions are blocked by Curation: %s. Use the debug log level to see the reason.", v, strings.Join(blocked, ", ")))
 			}
 			return v, nil
 		}
@@ -280,7 +280,8 @@ func downloadNewestAllowed(versions []string, pinEnv string, pinned bool, downlo
 			return "", err
 		}
 		// The error says why: a block that is remembered from an earlier run names the file to delete to try again.
-		logger.Warn(fmt.Sprintf("Extractor version %s is blocked by Curation. Trying an older version.\n%s", v, err.Error()))
+		// It is not a warning: a version can stay blocked for days, and each command would repeat the full answer of the server.
+		logger.Debug(fmt.Sprintf("Extractor version %s is blocked by Curation. Trying an older version.\n%s", v, err.Error()))
 		blocked = append(blocked, v)
 		blockedErr = err
 	}

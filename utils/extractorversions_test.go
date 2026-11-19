@@ -302,19 +302,41 @@ type warnRecorder struct {
 	NullLog
 	warnings []string
 	infos    []string
+	debugs   []string
 }
 
 func (w *warnRecorder) Warn(a ...interface{}) { w.warnings = append(w.warnings, fmt.Sprint(a...)) }
 
-func (w *warnRecorder) Info(a ...interface{}) { w.infos = append(w.infos, fmt.Sprint(a...)) }
+func (w *warnRecorder) Info(a ...interface{})  { w.infos = append(w.infos, fmt.Sprint(a...)) }
+func (w *warnRecorder) Debug(a ...interface{}) { w.debugs = append(w.debugs, fmt.Sprint(a...)) }
 
 func TestDownloadNewestExtractorWarnings(t *testing.T) {
-	t.Run("a block that is remembered shows its hint", func(t *testing.T) {
+	t.Run("a block that is remembered shows its hint in the debug log, not as a warning", func(t *testing.T) {
 		logger := &warnRecorder{}
 		remembered := fmt.Errorf("%w: url was blocked at 12:00. Delete blocked.json to try it now", ErrBlockedByCuration)
 		_, err := downloadNewestAllowed([]string{"2.44.2", "2.44.1"}, "PIN_ENV", false, failingDownloader(map[string]error{"2.44.2": remembered}, new([]string)), logger)
 		require.NoError(t, err)
-		assert.Contains(t, strings.Join(logger.warnings, "\n"), "Delete blocked.json to try it now")
+		assert.Contains(t, strings.Join(logger.debugs, "\n"), "Delete blocked.json to try it now")
+		assert.Empty(t, logger.warnings)
+	})
+	t.Run("blocked versions: one Info line, one Debug line for each, and no warning", func(t *testing.T) {
+		logger := &warnRecorder{}
+		failing := blockAll("2.44.2", "2.44.1")
+		chosen, err := downloadNewestAllowed([]string{"2.44.2", "2.44.1", "2.44.0"}, "PIN_ENV", false, failingDownloader(failing, new([]string)), logger)
+		require.NoError(t, err)
+		assert.Equal(t, "2.44.0", chosen)
+		assert.Empty(t, logger.warnings, "a version that stays blocked for days must not warn in each command")
+		require.Len(t, logger.infos, 1)
+		assert.Contains(t, logger.infos[0], "2.44.0")
+		assert.Contains(t, logger.infos[0], "2.44.2, 2.44.1")
+		assert.Len(t, logger.debugs, 2)
+	})
+	t.Run("all versions blocked: no warning, the error carries the reason", func(t *testing.T) {
+		logger := &warnRecorder{}
+		_, err := downloadNewestAllowed([]string{"2.44.2", "2.44.1"}, "PIN_ENV", false, failingDownloader(blockAll("2.44.2", "2.44.1"), new([]string)), logger)
+		require.ErrorIs(t, err, ErrBlockedByCuration)
+		assert.Contains(t, err.Error(), "2.44.1: blocked by JFrog Curation")
+		assert.Empty(t, logger.warnings)
 	})
 	t.Run("a failed lookup names the variable that skips it", func(t *testing.T) {
 		logger := &warnRecorder{}
