@@ -321,6 +321,11 @@ func WriteFileAtomic(path string, r io.Reader, perm os.FileMode) (err error) {
 	if _, err = io.Copy(tmp, r); err != nil {
 		return errors.Join(err, tmp.Close())
 	}
+	// The data must be on disk before the rename. After a crash, the final name must not point to an empty or partial file:
+	// the checks for an existing jar would accept it, and it would never download again.
+	if err = tmp.Sync(); err != nil {
+		return errors.Join(err, tmp.Close())
+	}
 	if err = tmp.Close(); err != nil {
 		return err
 	}
