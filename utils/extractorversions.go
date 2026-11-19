@@ -310,7 +310,7 @@ var renameFile = os.Rename
 // a file that another process holds open is refused. The callers write the same content for the same path, so the file that exists is right.
 func WriteFileAtomic(path string, r io.Reader, perm os.FileMode) (err error) {
 	dir := filepath.Dir(path)
-	if err = os.MkdirAll(dir, 0777); err != nil {
+	if err = os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".*.part")

@@ -31,7 +31,7 @@ func downloadExtractorIfNeeded(downloadTo, filename, downloadPath string, downlo
 	if exists || err != nil {
 		return err
 	}
-	if err = os.MkdirAll(downloadTo, 0777); err != nil {
+	if err := os.MkdirAll(downloadTo, 0777); err != nil {
 		return err
 	}
 	defer func() {
