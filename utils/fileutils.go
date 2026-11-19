@@ -242,18 +242,8 @@ func DownloadFile(downloadTo string, fromUrl string) (err error) {
 		err = fmt.Errorf("download failed. status code: %s", resp.Status)
 		return
 	}
-	// Create the file
-	var out *os.File
-	out, err = os.Create(downloadTo)
-	if err != nil {
-		return
-	}
-	defer func() {
-		err = errors.Join(err, out.Close())
-	}()
-	// Write the body to file
-	_, err = io.Copy(out, resp.Body)
-	return
+	// A cut download must not leave a partial file at downloadTo: a file that exists is taken as complete.
+	return WriteFileAtomic(downloadTo, resp.Body, 0644)
 }
 
 func DoubleWinPathSeparator(filePath string) string {
