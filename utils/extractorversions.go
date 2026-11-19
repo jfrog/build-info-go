@@ -103,6 +103,9 @@ func sortNewestFirst(versions []string) {
 // The newest maxExtractorVersionTries are tried in order, and a version blocked by Curation is skipped.
 // A version that the user chose (pinned) is used as is, with no other version tried.
 //
+// The versions that the lookup lists are not bounded below by defaultVersion: the newest version the repository lists is used,
+// even if it is older than defaultVersion, and the user is told. An offline mirror may hold only that version.
+//
 // If the lookup fails or finds nothing, defaultVersion is used. If no version can be downloaded, the newest jar of that major line
 // that is already in baseDir is used, so a cached jar keeps working. If there is none, defaultVersion is the last resort.
 // download must skip the download of a jar that exists. jarFileFormat is the file name of a jar, with the version as its argument.
@@ -185,9 +188,16 @@ func (w *extractorWalk) newestCached() string {
 // chooseVersion downloads the first allowed version of the list, and tells the user if it is not the default one.
 func chooseVersion(versions []string, pinEnv, defaultVersion string, download func(version string) error, logger Log) (string, error) {
 	chosen, err := downloadNewestAllowed(versions, pinEnv, false, download, logger)
-	if err == nil && chosen != defaultVersion {
-		logger.Info("Using build-info extractor version", chosen)
+	if err != nil || chosen == defaultVersion {
+		return chosen, err
 	}
+	message := "Using build-info extractor version " + chosen
+	// Compare returns -1 when its argument is older than the receiver.
+	if version.NewVersion(defaultVersion).Compare(chosen) < 0 {
+		// A repository that lists nothing newer is used as it is: an offline mirror may hold only an older version.
+		message += fmt.Sprintf(". It is older than %s, the default version of this CLI. The repository offers no newer allowed version.", defaultVersion)
+	}
+	logger.Info(message)
 	return chosen, err
 }
 

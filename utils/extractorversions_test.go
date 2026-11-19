@@ -301,9 +301,12 @@ func TestDownloadNewestExtractorVerifiesCachedJar(t *testing.T) {
 type warnRecorder struct {
 	NullLog
 	warnings []string
+	infos    []string
 }
 
 func (w *warnRecorder) Warn(a ...interface{}) { w.warnings = append(w.warnings, fmt.Sprint(a...)) }
+
+func (w *warnRecorder) Info(a ...interface{}) { w.infos = append(w.infos, fmt.Sprint(a...)) }
 
 func TestDownloadNewestExtractorWarnings(t *testing.T) {
 	t.Run("a block that is remembered shows its hint", func(t *testing.T) {
@@ -530,6 +533,36 @@ func TestDownloadNewestExtractorLookupFailureLog(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, "2.43.9", chosen, "the default version is used in both cases")
 			assert.Len(t, logger.warnings, tc.wantWarnings)
+		})
+	}
+}
+
+func TestDownloadNewestExtractorTellsWhichVersionIsUsed(t *testing.T) {
+	cases := []struct {
+		name         string
+		listed       []string
+		wantChosen   string
+		wantInfo     string
+		wantOlderMsg bool
+	}{
+		{"the newest listed version is older than the default: it is used and the user is told", []string{"2.43.9", "2.43.6"}, "2.43.9", "Using build-info extractor version 2.43.9. It is older than 2.44.2", true},
+		{"the newest listed version is newer than the default", []string{"2.44.3", "2.44.2"}, "2.44.3", "Using build-info extractor version 2.44.3", false},
+		{"the newest listed version is the default: nothing to tell", []string{"2.44.2", "2.43.9"}, "2.44.2", "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := &warnRecorder{}
+			found := ExtractorVersions{Versions: tc.listed, PinEnv: "PIN_ENV"}
+			chosen, err := DownloadNewestExtractor(listerOf(t, found, nil), t.TempDir(), "2.44.2", testJarFormat, failingDownloader(nil, new([]string)), logger)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantChosen, chosen)
+			if tc.wantInfo == "" {
+				assert.Empty(t, logger.infos)
+				return
+			}
+			require.Len(t, logger.infos, 1)
+			assert.Contains(t, logger.infos[0], tc.wantInfo)
+			assert.Equal(t, tc.wantOlderMsg, strings.Contains(logger.infos[0], "older than"))
 		})
 	}
 }
