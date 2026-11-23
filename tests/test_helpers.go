@@ -64,6 +64,14 @@ func CreateNpmTest(t *testing.T, testdataPath, projectDirName string, withOsInPa
 	return CreateTestProject(t, path)
 }
 
+// Return the project path for pnpm tests based on 'projectDir'.
+// testdataPath - abs path to testdata dir.
+// projectDirName - name of the project's directory.
+func CreatePnpmTest(t *testing.T, testdataPath, projectDirName string) (tmpProjectPath string, cleanup func()) {
+	path := filepath.Join(testdataPath, "pnpm", projectDirName)
+	return CreateTestProject(t, path)
+}
+
 func PrintBuildInfoMismatch(t *testing.T, expected, actual []entities.Module) {
 	excpectedStr, err := json.MarshalIndent(expected, "", "  ")
 	assert.NoError(t, err)
