@@ -1,0 +1,15 @@
+[project]
+name = "my-poetry-project"
+version = "1.1.0"
+description = ""
+requires-python = ">=3.10"
+dependencies = [
+    "numpy (>=1.23.0,<2.0.0)"
+]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
