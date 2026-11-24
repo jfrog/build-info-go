@@ -50,6 +50,51 @@ func TestCreateProjectPackageIDResolution(t *testing.T) {
 </Project>`,
 			expectedPackageID: "SampleLib",
 		},
+		{
+			name: "trims whitespace around PackageId",
+			csprojContent: `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>
+      Company.SampleLib
+    </PackageId>
+  </PropertyGroup>
+</Project>`,
+			expectedPackageID: "Company.SampleLib",
+		},
+		{
+			name: "whitespace-only PackageId falls through to AssemblyName",
+			csprojContent: `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>   </PackageId>
+    <AssemblyName> SampleLib.Core </AssemblyName>
+  </PropertyGroup>
+</Project>`,
+			expectedPackageID: "SampleLib.Core",
+		},
+		{
+			name: "MSBuild property in AssemblyName falls back to file name",
+			csprojContent: `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>$(MSBuildProjectName).Core</AssemblyName>
+  </PropertyGroup>
+</Project>`,
+			expectedPackageID: "SampleLib",
+		},
+		{
+			name: "MSBuild property in PackageId falls back to file name",
+			csprojContent: `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>$(Company).SampleLib</PackageId>
+    <AssemblyName>SampleLib.Core</AssemblyName>
+  </PropertyGroup>
+</Project>`,
+			expectedPackageID: "SampleLib",
+		},
+		{
+			name:              "unparseable XML falls back to file name",
+			csprojContent:     `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><PackageId>Company.SampleLib</PropertyGroup>`,
+			expectedPackageID: "SampleLib",
+		},
 	}
 
 	for _, test := range tests {

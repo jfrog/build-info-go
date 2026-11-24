@@ -105,9 +105,10 @@ func (solution *solution) buildInfo(moduleName string, useNameVersionModuleId bo
 		// Use PackageID rather than Name: it's what pack/push embed in the produced .nupkg's
 		// file name, so the module recorded here matches the published package instead of the
 		// project file's base name whenever <PackageId>/<AssemblyName> differs from it.
-		moduleID := getModuleId(moduleName, currProject.PackageID())
+		packageID := currProject.PackageID()
+		moduleID := getModuleId(moduleName, packageID)
 		if useNameVersionModuleId {
-			moduleID = getNameVersionModuleId(moduleName, currProject.PackageID(), projectVersion(currProject))
+			moduleID = getNameVersionModuleId(moduleName, packageID, projectVersion(currProject))
 		}
 		module := buildinfo.Module{Id: moduleID, Type: buildinfo.Nuget}
 
@@ -170,11 +171,11 @@ func (solution *solution) buildInfo(moduleName string, useNameVersionModuleId bo
 	return build, nil
 }
 
-func getModuleId(customModuleID, projectName string) string {
+func getModuleId(customModuleID, packageID string) string {
 	if customModuleID != "" {
 		return customModuleID
 	}
-	return projectName
+	return packageID
 }
 
 // getNameVersionModuleId returns the module ID as the fixed "<PackageID>:<Version>" form. It

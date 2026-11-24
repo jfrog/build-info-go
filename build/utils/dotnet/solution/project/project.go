@@ -67,6 +67,10 @@ type msbuildProject struct {
 // MSBuild's own default resolution order (PackageId, then AssemblyName), falling back to
 // fallbackName when the file can't be read/parsed or neither property is set.
 //
+// Values are whitespace-trimmed. MSBuild property references (e.g.
+// "$(MSBuildProjectName).Core") are not evaluated, so a value that contains one falls back to
+// fallbackName rather than producing a literal "$(...)" ID.
+//
 // Limitation: only the project file itself is parsed; Directory.Build.props files in parent
 // directories are not walked. If PackageId is declared exclusively in Directory.Build.props,
 // the fallback name (derived from the filename) is used instead.
@@ -80,16 +84,24 @@ func resolvePackageID(projectFilePath, fallbackName string) string {
 		return fallbackName
 	}
 	for _, group := range parsed.PropertyGroups {
-		if group.PackageId != "" {
-			return group.PackageId
+		if packageID := strings.TrimSpace(group.PackageId); packageID != "" {
+			return literalOrFallback(packageID, fallbackName)
 		}
 	}
 	for _, group := range parsed.PropertyGroups {
-		if group.AssemblyName != "" {
-			return group.AssemblyName
+		if assemblyName := strings.TrimSpace(group.AssemblyName); assemblyName != "" {
+			return literalOrFallback(assemblyName, fallbackName)
 		}
 	}
 	return fallbackName
+}
+
+// literalOrFallback returns value unless it contains an unevaluated MSBuild property reference.
+func literalOrFallback(value, fallbackName string) string {
+	if strings.Contains(value, "$(") {
+		return fallbackName
+	}
+	return value
 }
 
 func (project *project) getCompatibleExtractor(log utils.Log) (dependencies.Extractor, error) {
