@@ -23,6 +23,10 @@ const (
 	gradleInitScriptTemplate          = "gradle.init"
 	gradleExtractorRemotePath         = "org/jfrog/buildinfo/build-info-extractor-gradle/%s"
 	gradleExtractor4DependencyVersion = "4.35.12"
+	// TODO(RTECO-2747): Change this version to the Artifactory Gradle plugin release that contains the fix for
+	// "publishArtifacts = false" being ignored (jfrog/artifactory-gradle-plugin PR #179, for example 6.0.5).
+	// DO NOT MERGE before that plugin version is released and its uber jar can be downloaded from Artifactory.
+	// Then update the version in the tests that use this constant, if needed.
 	gradleExtractor5DependencyVersion = "5.2.5"
 	projectPropertiesFlag             = "-P"
 	systemPropertiesFlag              = "-D"
