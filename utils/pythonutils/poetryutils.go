@@ -84,7 +84,9 @@ func getPoetryPackageFromPyProject(srcPath string) (string, []string, error) {
 	if err != nil {
 		return "", []string{}, err
 	}
-	return project.Name, append(maps.Keys(project.Dependencies), maps.Keys(project.DevDependencies)...), nil
+	// A package may be declared in both the main and the dev/group dependencies, so list it only once.
+	directDependencies := mergeDependencyMaps(mergeDependencyMaps(nil, project.Dependencies), project.DevDependencies)
+	return project.Name, maps.Keys(directDependencies), nil
 }
 
 // Look for 'poetry.lock' file in current work dir.
@@ -122,7 +124,22 @@ func extractPoetryPackageFromPyProjectToml(pyProjectFilePath string) (project Po
 	for _, group := range poetryProject.Group {
 		poetryProject.DevDependencies = mergeDependencyMaps(poetryProject.DevDependencies, group.Dependencies)
 	}
+	for _, groupEntries := range pyProjectFile.DependencyGroups {
+		poetryProject.DevDependencies = mergePoetryDependencies(poetryProject.DevDependencies, getDependencyGroupRequirements(groupEntries))
+	}
 	return poetryProject, nil
+}
+
+// Returns the PEP 508 requirement strings of a PEP 735 dependency group.
+// {include-group = "<name>"} entries are skipped, as the dependencies of every group are collected anyway.
+func getDependencyGroupRequirements(groupEntries []interface{}) []string {
+	requirements := make([]string, 0, len(groupEntries))
+	for _, entry := range groupEntries {
+		if requirement, ok := entry.(string); ok {
+			requirements = append(requirements, requirement)
+		}
+	}
+	return requirements
 }
 
 // Adds the packages of the given PEP 508 requirement strings to the dependencies map, skipping packages that already exist in it.

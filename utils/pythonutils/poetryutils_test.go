@@ -20,6 +20,9 @@ func TestGetProjectNameFromPyproject(t *testing.T) {
 		{"nodevdeps", "my-poetry-project:1.1.17"},
 		{"pep621", "my-poetry-project:0.1.0"},
 		{"pep621-mixed", "my-poetry-project:1.2.0"},
+		{"pep621-dependency-groups", "my-poetry-project:1.3.0"},
+		// A dynamic version is not declared in pyproject.toml, so the version is left empty, as for a missing version in [tool.poetry] or in a pip project.
+		{"pep621-dynamic-version", "my-poetry-project:"},
 	}
 
 	for _, testCase := range testCases {
@@ -49,6 +52,11 @@ func TestGetProjectDependencies(t *testing.T) {
 		// [project.dependencies], [project.optional-dependencies], [tool.poetry.dependencies] and [tool.poetry.group.*.dependencies] combined.
 		// "Typing_Extensions" is resolved to its poetry.lock name, and the duplicate "aiostream" declaration is only listed once.
 		{"pep621-mixed", []string{"aiostream:0.8.1", "click:8.1.8", "pytest:8.3.4", "typing-extensions:4.16.0"}, [][]string{{"typing-extensions:4.16.0"}, {"colorama:0.4.6"}, {"colorama:0.4.6", "iniconfig:2.0.0"}, nil}},
+		// PEP 735 [dependency-groups] (Poetry 2.2+). The {include-group} entry is skipped, as the included group is collected on its own.
+		{"pep621-dependency-groups", []string{"aiostream:0.8.1", "click:8.1.8", "pytest:8.3.4"}, [][]string{{"typing-extensions:4.16.0"}, {"colorama:0.4.6"}, {"colorama:0.4.6", "iniconfig:2.0.0"}}},
+		// Packages declared under equivalent names in both the main and the group dependencies are listed once.
+		{"pep621-duplicates", []string{"aiostream:0.8.1", "pytest:8.3.4", "typing-extensions:4.16.0"}, [][]string{{"typing-extensions:4.16.0"}, {"colorama:0.4.6", "iniconfig:2.0.0"}, nil}},
+		{"pep621-dynamic-version", []string{"aiostream:0.8.1"}, [][]string{{"typing-extensions:4.16.0"}}},
 	}
 
 	for _, testCase := range testCases {

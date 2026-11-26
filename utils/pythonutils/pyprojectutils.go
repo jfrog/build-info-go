@@ -10,6 +10,9 @@ type PyProjectToml struct {
 	Tool map[string]PoetryPackage
 	// Represents the [project] section in pyproject.toml.
 	Project Project
+	// Represents the PEP 735 [dependency-groups] section in pyproject.toml, read by Poetry 2.2+.
+	// Each entry is either a PEP 508 requirement string or an {include-group = "<name>"} table.
+	DependencyGroups map[string][]interface{} `toml:"dependency-groups"`
 }
 
 // The PEP 621 [project] table. Used by pip, pipenv, etc., and by Poetry 2.0+, which declares
