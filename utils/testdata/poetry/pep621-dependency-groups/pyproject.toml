@@ -1,0 +1,19 @@
+# Poetry 2.2+ project declaring its dev dependencies in the PEP 735 [dependency-groups] table.
+[project]
+name = "my-poetry-project"
+version = "1.3.0"
+requires-python = ">=3.10"
+dependencies = [
+    "aiostream (>=0.8.1,<0.9.0)",
+]
+
+[dependency-groups]
+test = ["pytest>=8"]
+dev = [
+    { include-group = "test" },
+    "Click>=8.1",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

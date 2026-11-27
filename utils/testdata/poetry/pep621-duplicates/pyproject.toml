@@ -1,0 +1,20 @@
+# Poetry 2.2+ project declaring the same packages, under equivalent names, in several dependency tables.
+[project]
+name = "my-poetry-project"
+version = "1.4.0"
+requires-python = ">=3.10"
+dependencies = [
+    "aiostream (>=0.8.1,<0.9.0)",
+    "typing-extensions>=4.0",
+]
+
+[tool.poetry.group.test.dependencies]
+AIOStream = "^0.8"
+pytest = "^8.0"
+
+[dependency-groups]
+dev = ["Typing_Extensions>=4.0", "PyTest>=8"]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
