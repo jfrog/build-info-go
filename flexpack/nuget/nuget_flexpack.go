@@ -66,8 +66,8 @@ func (n *NuGetFlexPack) CollectBuildInfo(buildName, buildNumber string) (*entiti
 		return nil, fmt.Errorf("load NuGet solution: %w", err)
 	}
 	// Honor the user-supplied --module override; when empty, default each module ID to the
-	// fixed "<Name>:<Version>" form (falling back to the project name when no version is
-	// available). BuildInfo's legacy project-name default is intentionally not used here.
+	// fixed "<PackageID>:<Version>" form (falling back to the bare PackageID when no version is
+	// available). BuildInfo's legacy versionless default is intentionally not used here.
 	bi, err := sol.BuildInfoWithNameVersionModuleId(n.config.Module, n.log)
 	if err != nil {
 		return nil, fmt.Errorf("collect NuGet build info: %w", err)

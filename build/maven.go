@@ -22,7 +22,7 @@ const (
 	classworldsConfFileName         = "classworlds.conf"
 	PropertiesTempFolderName        = "properties"
 	MavenExtractorRemotePath        = "org/jfrog/buildinfo/build-info-extractor-maven3/%s"
-	MavenExtractorDependencyVersion = "2.44.1"
+	MavenExtractorDependencyVersion = "2.44.2"
 
 	ClassworldsConf = `main is org.apache.maven.cli.MavenCli from plexus.core
 
@@ -67,6 +67,9 @@ type extractorDetails struct {
 	propsDir string
 	// Use the maven wrapper to build the project.
 	useWrapper bool
+	// Optional. Lists the available extractor versions. When set, the newest allowed version is used and stored under versionsBaseDir.
+	versionsFunc    utils.ExtractorVersionsFunc
+	versionsBaseDir string
 }
 
 // Add a new Maven module to a given build.
@@ -102,6 +105,14 @@ func (mm *MavenModule) SetExtractorDetails(localExtractorPath, extractorPropsdir
 	if configProps != nil {
 		mm.extractorDetails.props = configProps
 	}
+	return mm
+}
+
+// SetExtractorVersionsFunc enables the run-time selection of the extractor version.
+// baseDir holds one sub folder per extractor version. Without this call, the version of MavenExtractorDependencyVersion is used.
+func (mm *MavenModule) SetExtractorVersionsFunc(baseDir string, versionsFunc utils.ExtractorVersionsFunc) *MavenModule {
+	mm.extractorDetails.versionsBaseDir = baseDir
+	mm.extractorDetails.versionsFunc = versionsFunc
 	return mm
 }
 
@@ -176,7 +187,7 @@ func (mm *MavenModule) CalcDependencies() (err error) {
 		}
 	}
 
-	if err = downloadMavenExtractor(mm.extractorDetails.localPath, mm.extractorDetails.downloadExtractorFunc, mm.containingBuild.logger); err != nil {
+	if err = mm.prepareExtractor(); err != nil {
 		return
 	}
 	mvnRunConfig, err := mm.createMvnRunConfig()
@@ -296,9 +307,30 @@ func (mm *MavenModule) SetRootProjectDir(rootDir string) {
 	mm.rootProjectDir = rootDir
 }
 
+// Downloads the extractor, if needed, and sets the local path of the version used.
+func (mm *MavenModule) prepareExtractor() error {
+	details := mm.extractorDetails
+	logger := mm.containingBuild.logger
+	if details.versionsFunc == nil {
+		return downloadMavenExtractor(details.localPath, details.downloadExtractorFunc, logger)
+	}
+	chosen, err := utils.DownloadNewestExtractor(details.versionsFunc, details.versionsBaseDir, MavenExtractorDependencyVersion, MavenExtractorFileName, func(v string) error {
+		return downloadMavenExtractorVersion(filepath.Join(details.versionsBaseDir, v), v, details.downloadExtractorFunc, logger)
+	}, logger)
+	if err != nil {
+		return err
+	}
+	details.localPath = filepath.Join(details.versionsBaseDir, chosen)
+	return nil
+}
+
 func downloadMavenExtractor(downloadTo string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
-	filename := fmt.Sprintf(MavenExtractorFileName, MavenExtractorDependencyVersion)
-	filePath := fmt.Sprintf(MavenExtractorRemotePath, MavenExtractorDependencyVersion)
+	return downloadMavenExtractorVersion(downloadTo, MavenExtractorDependencyVersion, downloadExtractorFunc, logger)
+}
+
+func downloadMavenExtractorVersion(downloadTo, extractorVersion string, downloadExtractorFunc func(downloadTo, downloadPath string) error, logger utils.Log) error {
+	filename := fmt.Sprintf(MavenExtractorFileName, extractorVersion)
+	filePath := fmt.Sprintf(MavenExtractorRemotePath, extractorVersion)
 	if err := utils.DownloadDependencies(downloadTo, filename, filePath, downloadExtractorFunc, logger); err != nil {
 		return err
 	}
@@ -310,7 +342,7 @@ func createClassworldsConfig(dependenciesPath string) error {
 	if utils.IsPathExists(classworldsPath) {
 		return nil
 	}
-	return os.WriteFile(classworldsPath, []byte(ClassworldsConf), 0644)
+	return utils.WriteFileAtomic(classworldsPath, strings.NewReader(ClassworldsConf), 0644)
 }
 
 func (config *mvnRunConfig) GetCmd() *exec.Cmd {
