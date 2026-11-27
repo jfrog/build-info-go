@@ -21,9 +21,9 @@ import (
 type Solution interface {
 	BuildInfo(module string, log utils.Log) (*buildinfo.BuildInfo, error)
 	// BuildInfoWithNameVersionModuleId behaves like BuildInfo but, when no module override is
-	// given, defaults each module ID to the fixed "<Name>:<Version>" form using the project's
-	// own version (from project.assets.json). Used by the FlexPack path; BuildInfo retains the
-	// legacy project-name default to avoid changing existing 'jf rt nuget/dotnet' build-info.
+	// given, defaults each module ID to the fixed "<PackageID>:<Version>" form using the project's
+	// own version (from project.assets.json). Used by the FlexPack path; BuildInfo defaults to the
+	// bare PackageID (no version) to keep existing 'jf rt nuget/dotnet' build-info shape.
 	BuildInfoWithNameVersionModuleId(module string, log utils.Log) (*buildinfo.BuildInfo, error)
 	Marshal() ([]byte, error)
 	GetProjects() []project.Project
@@ -102,12 +102,13 @@ func (solution *solution) buildInfo(moduleName string, useNameVersionModuleId bo
 		}
 
 		// Create module
-		moduleID := getModuleId(moduleName, currProject.Name())
+		// Use PackageID rather than Name: it's what pack/push embed in the produced .nupkg's
+		// file name, so the module recorded here matches the published package instead of the
+		// project file's base name whenever <PackageId>/<AssemblyName> differs from it.
+		packageID := currProject.PackageID()
+		moduleID := getModuleId(moduleName, packageID)
 		if useNameVersionModuleId {
-			// Use PackageID rather than Name: it's what pack/push embed in the produced .nupkg's
-			// file name, so restore's module here matches the module pack/push produce later for
-			// the same project instead of splitting into two disconnected modules.
-			moduleID = getNameVersionModuleId(moduleName, currProject.PackageID(), projectVersion(currProject))
+			moduleID = getNameVersionModuleId(moduleName, packageID, projectVersion(currProject))
 		}
 		module := buildinfo.Module{Id: moduleID, Type: buildinfo.Nuget}
 
@@ -149,7 +150,7 @@ func (solution *solution) buildInfo(moduleName string, useNameVersionModuleId bo
 			// under. Strip it before emitting, dropping paths that become empty (a direct
 			// dependency, requested by nothing but the module itself). Scoped to the FlexPack
 			// module-ID convention only ("<PackageID>:<Version>", matching Maven/Gradle FlexPack's
-			// requestedBy shape) - BuildInfo's legacy project-name default keeps its existing
+			// requestedBy shape) - BuildInfo's legacy bare-PackageID default keeps its existing
 			// requestedBy shape so 'jf rt nuget'/'jf rt dotnet' output doesn't change.
 			// Collapse to one path per distinct immediate parent. Consumers of requestedBy
 			// (Xray's SBOM builder) read only path[0] of each path and reassemble the tree from
@@ -170,11 +171,11 @@ func (solution *solution) buildInfo(moduleName string, useNameVersionModuleId bo
 	return build, nil
 }
 
-func getModuleId(customModuleID, projectName string) string {
+func getModuleId(customModuleID, packageID string) string {
 	if customModuleID != "" {
 		return customModuleID
 	}
-	return projectName
+	return packageID
 }
 
 // getNameVersionModuleId returns the module ID as the fixed "<PackageID>:<Version>" form. It

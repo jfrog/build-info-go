@@ -834,3 +834,103 @@ func TestDedupeRequestedByPreservesDistinctParents(t *testing.T) {
 		assert.Equal(t, [][]string{{"TestModule"}}, dedupeRequestedByParent(in))
 	})
 }
+
+// TestBuildInfoModuleIdUsesPackageID verifies that BuildInfo's default module ID is the project's
+// resolved NuGet PackageId (<PackageId>, then <AssemblyName>) rather than the project file's base
+// name, so the build-info module matches the .nupkg that pack/push produce for the same project.
+func TestBuildInfoModuleIdUsesPackageID(t *testing.T) {
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	coreTestdata := filepath.Join(wd, "testdata", "multi", "core")
+
+	tests := []struct {
+		name             string
+		propertyGroup    string
+		moduleOverride   string
+		expectedModuleID string
+		expectedFlexPack string
+	}{
+		{"assemblyName", "<AssemblyName>JohnsonControls.jftest</AssemblyName>", "", "JohnsonControls.jftest", "JohnsonControls.jftest:1.0.0"},
+		{"packageIdWinsOverAssemblyName", "<AssemblyName>Some.Assembly</AssemblyName><PackageId>JohnsonControls.Pkg</PackageId>", "", "JohnsonControls.Pkg", "JohnsonControls.Pkg:1.0.0"},
+		{"noOverrideFallsBackToFileName", "", "", "jftest", "jftest:1.0.0"},
+		{"moduleOverrideWins", "<AssemblyName>JohnsonControls.jftest</AssemblyName>", "custom-module", "custom-module", "custom-module"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			projectDir := filepath.Join(t.TempDir(), "jftest")
+			require.NoError(t, utils.CopyDir(coreTestdata, projectDir, true, nil))
+			require.NoError(t, os.Remove(filepath.Join(projectDir, "core.csproj")))
+			projectFile := filepath.Join(projectDir, "jftest.csproj")
+			content := `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework>` + test.propertyGroup + `</PropertyGroup></Project>`
+			require.NoError(t, os.WriteFile(projectFile, []byte(content), 0644))
+
+			sol, err := LoadProject(projectFile, logger)
+			require.NoError(t, err)
+
+			bi, err := sol.BuildInfo(test.moduleOverride, logger)
+			require.NoError(t, err)
+			require.Len(t, bi.Modules, 1)
+			assert.Equal(t, test.expectedModuleID, bi.Modules[0].Id)
+			require.NotEmpty(t, bi.Modules[0].Dependencies)
+			for _, dep := range bi.Modules[0].Dependencies {
+				for _, path := range dep.RequestedBy {
+					assert.Equal(t, test.expectedModuleID, path[len(path)-1], "requestedBy paths must terminate in the module ID")
+				}
+			}
+
+			bi, err = sol.BuildInfoWithNameVersionModuleId(test.moduleOverride, logger)
+			require.NoError(t, err)
+			require.Len(t, bi.Modules, 1)
+			assert.Equal(t, test.expectedFlexPack, bi.Modules[0].Id)
+		})
+	}
+}
+
+// TestLoadSolutionModuleIdsUsePackageIDPerProject loads a multi-project solution through Load()
+// and verifies that each project's module ID is its own resolved PackageID and that requestedBy
+// paths end in that module. Projects that resolve to the same PackageID (here 'beta' and 'gamma'
+// share one AssemblyName) get the same module ID, mirroring the .nupkg name MSBuild would produce
+// for each; they are still emitted as separate modules.
+func TestLoadSolutionModuleIdsUsePackageIDPerProject(t *testing.T) {
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	coreTestdata := filepath.Join(wd, "testdata", "multi", "core")
+
+	solutionDir := t.TempDir()
+	projectProperties := map[string]string{
+		"alpha": "<PackageId>Company.Alpha</PackageId>",
+		"beta":  "<AssemblyName>Company.Shared</AssemblyName>",
+		"gamma": "<AssemblyName>Company.Shared</AssemblyName>",
+		"delta": "<AssemblyName>$(MSBuildProjectName).Core</AssemblyName>",
+	}
+	slnx := "<Solution>\n"
+	for name, properties := range projectProperties {
+		projectDir := filepath.Join(solutionDir, name)
+		require.NoError(t, utils.CopyDir(coreTestdata, projectDir, true, nil))
+		require.NoError(t, os.Remove(filepath.Join(projectDir, "core.csproj")))
+		content := `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework>` + properties + `</PropertyGroup></Project>`
+		require.NoError(t, os.WriteFile(filepath.Join(projectDir, name+".csproj"), []byte(content), 0644))
+		slnx += `  <Project Path="` + name + "/" + name + `.csproj" />` + "\n"
+	}
+	slnx += "</Solution>\n"
+	require.NoError(t, os.WriteFile(filepath.Join(solutionDir, "multi.slnx"), []byte(slnx), 0644))
+
+	sol, err := Load(solutionDir, "multi.slnx", "", logger)
+	require.NoError(t, err)
+	require.Len(t, sol.GetProjects(), len(projectProperties))
+
+	bi, err := sol.BuildInfo("", logger)
+	require.NoError(t, err)
+	var moduleIDs []string
+	for _, module := range bi.Modules {
+		moduleIDs = append(moduleIDs, module.Id)
+		assert.NotContains(t, module.Id, "$(")
+		require.NotEmpty(t, module.Dependencies, "module %s", module.Id)
+		for _, dep := range module.Dependencies {
+			for _, path := range dep.RequestedBy {
+				assert.Equal(t, module.Id, path[len(path)-1], "requestedBy paths must terminate in the module ID")
+			}
+		}
+	}
+	assert.ElementsMatch(t, []string{"Company.Alpha", "Company.Shared", "Company.Shared", "delta"}, moduleIDs)
+}
